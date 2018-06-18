@@ -330,6 +330,12 @@ local function summarize_histogram(histogram, prev)
    return min * 1e6, avg * 1e6, max * 1e6
 end
 
+local leaf_mt = {}
+local function make_leaf(value, rrd)
+   return setmetatable({value=value, rrd=rrd}, leaf_mt)
+end
+local function is_leaf(x) return getmetatable(x) == leaf_mt end
+
 local function compute_histograms_tree(histograms)
    if histograms == nil then return {} end
    local ret = {}
@@ -340,12 +346,12 @@ local function compute_histograms_tree(histograms)
          if parent[branch] == nil then parent[branch] = {} end
          parent = parent[branch]
       end
-      parent[leaf] = function() return v:snapshot() end
+      parent[leaf] = make_leaf(function() return v:snapshot() end)
    end
    return ret
 end
 
-local function compute_counters_tree(counters)
+local function compute_counters_tree(counters, rrds)
    if counters == nil then return {} end
    local ret = {}
    for k,v in pairs(counters) do
@@ -356,7 +362,8 @@ local function compute_counters_tree(counters)
             if parent[branch] == nil then parent[branch] = {} end
             parent = parent[branch]
          end
-         parent[leaf] = function() return counter.read(v) end
+         parent[leaf] = make_leaf(
+            function() return counter.read(v) end, rrds[k])
       end
    end
    -- The rxpackets and rxbytes link counters are redundant.
@@ -375,8 +382,8 @@ end
 local function adjoin(t, k, v)
    if t[k] == nil then t[k] = v; return end
    if t[k] == v then return end
-   assert(type(t[k]) == 'table')
-   assert(type(v) == 'table')
+   assert(type(t[k]) == 'table' and not is_leaf(t[k]))
+   assert(type(v) == 'table' and not is_leaf(v))
    for vk, vv in pairs(v) do adjoin(t[k], vk, vv) end
 end
 
@@ -406,7 +413,8 @@ local function compute_tree()
       for k,v in pairs(compute_histograms_tree(snabb_state.histograms[pid])) do
          adjoin(node, k, v)
       end
-      for k,v in pairs(compute_counters_tree(snabb_state.counters[pid])) do
+         for k,v in pairs(compute_counters_tree(snabb_state.counters[pid],
+                                                snabb_state.rrds[pid] or {})) do
          adjoin(node, k, v)
       end
    end
@@ -425,8 +433,8 @@ end
 local function sample_tree(tree)
    local ret = {}
    for k,v in pairs(tree) do
-      if type(v) == 'function' then v = v() end
-      if type(v) == 'table' then v = sample_tree(v) end
+      if is_leaf(v) then v = make_leaf(v.value(), v.rrd)
+      elseif type(v) == 'table' then v = sample_tree(v) end
       ret[k] = v
    end
    return nil_if_empty(ret)
@@ -437,12 +445,12 @@ local function prune_sample(tree)
       if name == 'apps' and not ui.show_apps then return nil end
       if name == 'links' and not ui.show_links then return nil end
       if name == 'engine' and not ui.show_engine then return nil end
-      if type(tree) == 'table' then
+      if is_leaf(tree) then
+         if not ui.show_empty and tonumber(tree.value) == 0 then return nil end
+      elseif type(tree) == 'table' then
          local ret = {}
          for k,v in pairs(tree) do ret[k] = prune(k, v) end
          return nil_if_empty(ret)
-      elseif not ui.show_empty and tonumber(tree) == 0 then
-         return nil
       end
       return tree
    end
@@ -476,8 +484,15 @@ function compute_display_tree.tree(tree, prev, dt)
    local function visit(tree, prev)
       local ret = {kind='rows', contents={}}
       for k, v in sortedpairs(tree) do
+         local prev = prev and prev[k]
+         local rrd
+         if is_leaf(v) then
+            v, rrd = v.value, v.rrd
+            if is_leaf(prev) then prev = prev.value else prev = nil end
+         elseif type(v) ~= type(prev) then
+            prev = nil
+         end
          if type(v) ~= 'table' then
-            local prev = prev and type(prev[k]) == type(v) and prev[k]
             if type(v) == 'cdata' and tonumber(v) then
                if ui.show_rates and prev and tonumber(v) ~= tonumber(prev) then
                   if k:match('packets') then units = 'PPS'
@@ -501,7 +516,7 @@ function compute_display_tree.tree(tree, prev, dt)
          end
       end
       for k, v in sortedpairs(tree) do
-         if type(v) == 'table' then
+         if type(v) == 'table' and not is_leaf(v) then
             local has_prev = prev and type(prev[k]) == type(v)
             local rows = visit(v, has_prev and prev[k])
             table.insert(ret.contents, {kind='group', label=k, contents=rows})
@@ -545,8 +560,8 @@ function compute_display_tree.interface(tree, prev, dt, t)
    --                  RX:       PPS, bps, %, [drops/s]
    --                  TX:       PPS, bps, %, [drops/s]
    local function rate(key, counters, prev)
-      if counters and counters[key] and prev and prev[key] then
-         return tonumber(counters[key] - prev[key])/dt
+      if counters and is_leaf(counters[key]) and prev and is_leaf(prev[key]) then
+         return tonumber(counters[key].value - prev[key].value)/dt
       else
          return 0
       end
@@ -566,7 +581,7 @@ function compute_display_tree.interface(tree, prev, dt, t)
       -- 7 bytes preamble, 1 start-of-frame, 4 CRC, 12 interframe gap.
       local overhead = (7 + 1 + 4 + 12) * pps
       local bps = (bytes + overhead) * 8
-      local max = tonumber(pci.speed) or 0
+      local max = tonumber(pci.speed.value) or 0
       gridrow(nil,
               rchars('%s:', tag:upper()),
               lchars('%.3f %sPPS', scale(pps)),
@@ -575,21 +590,21 @@ function compute_display_tree.interface(tree, prev, dt, t)
               drops > 0 and rchars('%.3f %sPPS dropped', drops) or nil)
    end
    local function show_pci(addr, pci, prev)
-      local bps, tag = scale(pci.speed or 0)
+      local bps, tag = scale(pci.speed.value or 0)
       gridrow(rchars('| '), lchars(''))
       gridrow(rchars('\\-'),
               rchars('%s:', addr),
               lchars('%d %sbE, MAC: %s', bps, tag,
-                     macaddr_string(pci.macaddr or 0)))
+                     macaddr_string(pci.macaddr.value or 0)))
       show_traffic('rx', pci, prev)
       show_traffic('tx', pci, prev)
    end
    local function show_instance(label, instance, prev)
       local engine, prev_engine = instance.engine, prev and prev.engine
-      local latency = engine and engine.latency
+      local latency = engine and engine.latency and engine.latency.value
       local latency_str = ''
       if latency then 
-         local prev = prev_engine and prev_engine.latency
+         local prev = prev_engine and prev_engine.latency.value
          latency_str = string.format('latency: %.2f min, %.2f avg, %.2f max',
                                      summarize_histogram(latency, prev))
       end
