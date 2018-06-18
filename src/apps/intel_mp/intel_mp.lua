@@ -275,7 +275,7 @@ DVMOLR      0x0C038 +0x04*0..7      RW  DMA VM Offload register
 VMRCTL      0x05D80 +0x04*0..7      RW  Virtual Mirror rule control
 VMRVLAN     0x05D90 +0x04*0..7      RW  Virtual Mirror rule VLAN
 VMRVM       0x05DA0 +0x04*0..7      RW  Virtual Mirror rule VM
-RQDPC       0x0C030 +0x40*0..7      RCR Receive Queue Drop Packet Count
+RQDPC       0x0C030 +0x40*0..7      RC Receive Queue Drop Packet Count
 TQDPC       0x0E030 +0x40*0..7      RCR Transmit Queue Drop Packet Count
 PQGPRC      0x10010 +0x100*0..7     RCR Per Queue Good Packets Received Count
 PQGPTC      0x10014 +0x100*0..7     RCR Per Queue Good Packets Transmitted Count
