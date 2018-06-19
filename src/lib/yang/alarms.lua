@@ -342,6 +342,7 @@ function add_alarm_notification (key, alarm)
       resource             = key.resource,
       alarm_type_id        = key.alarm_type_id,
       alarm_type_qualifier = key.alarm_type_qualifier,
+      alt_resource         = alarm.alt_resource,
       perceived_severity   = alarm.perceived_severity,
       alarm_text           = alarm.alarm_text
    }
@@ -741,6 +742,7 @@ function selftest ()
    do_declare_alarm({resource='nic-v4', alarm_type_id='arp-resolution'}, {
       perceived_severity = 'critical',
       alarm_text = 'Make sure you can ARP resolve IP addresses on NIC',
+      alt_resource={'nic-v4-2'},
    })
    -- NDP alarm.
    do_add_to_inventory({alarm_type_id='ndp-resolution'}, {
@@ -763,6 +765,8 @@ function selftest ()
    local key = alarm_keys:fetch('nic-v4', 'arp-resolution')
    raise_alarm(key)
    local alarm = assert(state.alarm_list.alarm[key])
+   assert(#alarm.alt_resource == 1)
+   assert(alarm.alt_resource[1] == 'nic-v4-2')
    assert(table_size(alarm.status_change) == 1)
    assert(state.alarm_list.number_of_alarms == 1)
 

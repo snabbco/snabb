@@ -53,7 +53,7 @@ function Trace:record(id, args)
    if not obj then return end
    obj.id = tostring(self.id)
    self.id = self.id + 1
-   json.write_json_object(self.output, obj)
+   json.write_json(self.output, obj)
    self.output:write('\n')
    self.output:flush()
 end
@@ -75,13 +75,13 @@ function selftest ()
                 {path="/", schema="foo", revision="bar", config="baz"})
 
    tmp:seek('set', 0)
-   local parsed = json.read_json_object(tmp)
+   local parsed = json.read_json(tmp)
    assert(lib.equal(parsed, {id="0", verb="get", path="/",
                              schema="foo", revision="bar"}))
-   parsed = json.read_json_object(tmp)
+   parsed = json.read_json(tmp)
    assert(lib.equal(parsed, {id="1", verb="set", path="/",
                              schema="foo", revision="bar", value="baz"}))
-   assert(json.read_json_object(tmp) == nil)
+   assert(json.read_json(tmp) == nil)
    assert(tmp:read_char() == nil)
 
    print('selftest: ok')

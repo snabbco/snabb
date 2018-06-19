@@ -15,7 +15,7 @@ for i, name in ipairs(alarm_names) do alarm_codes[name] = i end
 local alarms = {}
 
 function alarms.raise_alarm (codec, resource, alarm_type_id, alarm_type_qualifier,
-   perceived_severity, alarm_text)
+   perceived_severity, alarm_text, alt_resource)
 
    local resource = codec:string(resource)
    local alarm_type_id = codec:string(alarm_type_id)
@@ -23,9 +23,10 @@ function alarms.raise_alarm (codec, resource, alarm_type_id, alarm_type_qualifie
 
    local perceived_severity = codec:maybe_string(perceived_severity)
    local alarm_text = codec:maybe_string(alarm_text)
+   local alt_resource = codec:maybe_string_list(alt_resource)
 
    return codec:finish(resource, alarm_type_id, alarm_type_qualifier,
-                       perceived_severity, alarm_text)
+                       perceived_severity, alarm_text, alt_resource)
 end
 function alarms.clear_alarm (codec, resource, alarm_type_id, alarm_type_qualifier)
    local resource = codec:string(resource)
@@ -35,7 +36,7 @@ function alarms.clear_alarm (codec, resource, alarm_type_id, alarm_type_qualifie
    return codec:finish(resource, alarm_type_id, alarm_type_qualifier)
 end
 function alarms.add_to_inventory (codec, alarm_type_id, alarm_type_qualifier,
-   resource, has_clear, description)
+   resource, has_clear, description, alt_resource)
 
    local alarm_type_id = codec:string(alarm_type_id)
    local alarm_type_qualifier = codec:maybe_string(alarm_type_qualifier)
@@ -43,12 +44,13 @@ function alarms.add_to_inventory (codec, alarm_type_id, alarm_type_qualifier,
    local resource = codec:string(resource)
    local has_clear = codec:string((has_clear and "true" or "false"))
    local description = codec:maybe_string(description)
+   local alt_resource = codec:maybe_string_list(alt_resource)
 
    return codec:finish(alarm_type_id, alarm_type_qualifier,
-                       resource, has_clear, description)
+                       resource, has_clear, description, alt_resource)
 end
 function alarms.declare_alarm (codec, resource, alarm_type_id, alarm_type_qualifier,
-   perceived_severity, alarm_text)
+   perceived_severity, alarm_text, alt_resource)
 
    local resource = codec:string(resource)
    local alarm_type_id = codec:string(alarm_type_id)
@@ -56,9 +58,11 @@ function alarms.declare_alarm (codec, resource, alarm_type_id, alarm_type_qualif
 
    local perceived_severity = codec:maybe_string(perceived_severity)
    local alarm_text = codec:maybe_string(alarm_text)
+   local alt_resource = codec:maybe_string_list(alt_resource)
+
 
    return codec:finish(resource, alarm_type_id, alarm_type_qualifier,
-                       perceived_severity, alarm_text)
+                       perceived_severity, alarm_text, alt_resource)
 end
 
 local function encoder()
@@ -77,6 +81,16 @@ local function encoder()
          self:uint32(UINT32_MAX)
       else
          self:string(str)
+      end
+   end
+   function encoder:maybe_string_list(list)
+      if list == nil or #list == 0 then
+         self:uint32(UINT32_MAX)
+      else
+         self:uint32(#list)
+         for _, str in ipairs(list) do
+            self:string(str)
+         end
       end
    end
    function encoder:finish()
@@ -138,6 +152,15 @@ local function decoder(buf, len)
       if len == UINT32_MAX then return nil end
       return ffi.string(self:read(len), len)
    end
+   function decoder:maybe_string_list()
+      local count = self:uint32()
+      if count == UINT32_MAX then return nil end
+      local out = {}
+      for item=1, count do
+         table.insert(out, self:string())
+      end
+      return out
+   end
    function decoder:finish(...)
       return { ... }
    end
@@ -175,7 +198,7 @@ end
 
 local alarm = {
    key_attrs = {'resource', 'alarm_type_id', 'alarm_type_qualifier'},
-   args_attrs = {'perceived_severity', 'alarm_text'},
+   args_attrs = {'perceived_severity', 'alarm_text', 'alt_resource'},
 }
 function alarm:normalize_key (t)
    return normalize(t, self.key_attrs)
@@ -194,13 +217,14 @@ function to_alarm (args)
    local args = {
       perceived_severity = args[4],
       alarm_text = args[5],
+      alt_resource = args[6],
    }
    return key, args
 end
 
 local alarm_type = {
    key_attrs = {'alarm_type_id', 'alarm_type_qualifier'},
-   args_attrs = {'resource', 'has_clear', 'description'},
+   args_attrs = {'resource', 'has_clear', 'description', 'alt_resource'},
 }
 function alarm_type:normalize_key (t)
    return normalize(t, self.key_attrs)
@@ -210,7 +234,7 @@ function alarm_type:normalize_args (t)
 end
 
 function to_alarm_type (args)
-   local alarm_type_id, alarm_type_qualifier, resource, has_clear, description = unpack(args)
+   local alarm_type_id, alarm_type_qualifier, resource, has_clear, description, alt_resource = unpack(args)
    local key = {
       alarm_type_id = args[1],
       alarm_type_qualifier = args[2],
@@ -219,6 +243,7 @@ function to_alarm_type (args)
       resource = args[3],
       has_clear = args[4],
       description = args[5],
+      alt_resource = args[6],
    }
    return key, args
 end
@@ -227,10 +252,10 @@ function raise_alarm (key, args)
    local channel = get_channel()
    if channel then
       local resource, alarm_type_id, alarm_type_qualifier = alarm:normalize_key(key)
-      local perceived_severity, alarm_text = alarm:normalize_args(args)
+      local perceived_severity, alarm_text, alt_resource = alarm:normalize_args(args)
       local buf, len = encode_raise_alarm(
          resource, alarm_type_id, alarm_type_qualifier,
-         perceived_severity, alarm_text
+         perceived_severity, alarm_text, alt_resource
       )
       channel:put_message(buf, len)
    end
@@ -249,10 +274,10 @@ function add_to_inventory (key, args)
    local channel = get_channel()
    if channel then
       local alarm_type_id, alarm_type_qualifier = alarm_type:normalize_key(key)
-      local resource, has_clear, description = alarm_type:normalize_args(args)
+      local resource, has_clear, description, alt_resource = alarm_type:normalize_args(args)
       local buf, len = encode_add_to_inventory(
          alarm_type_id, alarm_type_qualifier,
-         resource, has_clear, description
+         resource, has_clear, description, alt_resource
       )
       channel:put_message(buf, len)
    end
@@ -262,10 +287,10 @@ function declare_alarm (key, args)
    local channel = get_channel()
    if channel then
       local resource, alarm_type_id, alarm_type_qualifier = alarm:normalize_key(key)
-      local perceived_severity, alarm_text = alarm:normalize_args(args)
+      local perceived_severity, alarm_text, alt_resource = alarm:normalize_args(args)
       local buf, len = encode_declare_alarm(
          resource, alarm_type_id, alarm_type_qualifier,
-         perceived_severity, alarm_text
+         perceived_severity, alarm_text, alt_resource
       )
       channel:put_message(buf, len)
    end
@@ -288,12 +313,12 @@ function selftest ()
    end
    local function test_raise_alarm ()
       local key = {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''}
-      local args = {perceived_severity='critical'}
+      local args = {perceived_severity='critical', alt_resource={'res2a','res2b'}}
 
       local resource, alarm_type_id, alarm_type_qualifier = alarm:normalize_key(key)
-      local perceived_severity, alarm_text = alarm:normalize_args(args)
+      local perceived_severity, alarm_text, alt_resource = alarm:normalize_args(args)
       local alarm = {resource, alarm_type_id, alarm_type_qualifier,
-                     perceived_severity, alarm_text}
+                     perceived_severity, alarm_text, alt_resource}
 
       test_alarm('raise_alarm', alarm)
    end

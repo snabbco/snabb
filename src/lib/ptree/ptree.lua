@@ -235,7 +235,7 @@ function Manager:handle_notification_peer(peer)
    end
    self:call_with_cleanup(q, function()
       while true do
-         json.write_json_object(peer, q:get())
+         json.write_json(peer, q:get())
          peer:write_chars("\n")
          peer:flush_output()
       end

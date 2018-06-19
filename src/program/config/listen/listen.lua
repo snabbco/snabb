@@ -58,7 +58,7 @@ function request_handlers.remove(schema_name, revision_date, path)
 end
 
 local function read_request(client, schema_name, revision_date)
-   local json = json_lib.read_json_object(client)
+   local json = json_lib.read_json(client)
    if json == nil then
       -- The input pipe is closed.  FIXME: there could still be buffered
       -- responses; we should exit only once we've received them.
@@ -76,7 +76,7 @@ local function read_request(client, schema_name, revision_date)
       if verb == 'get' then value = reply.config
       elseif verb == 'get-state' then value = reply.state
       end
-      json_lib.write_json_object(output, {id=id, status='ok', value=value})
+      json_lib.write_json(output, {id=id, status='ok', value=value})
       output:flush()
    end
    return req, print_reply
