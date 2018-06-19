@@ -503,6 +503,18 @@ end
 
 local compute_display_tree = {}
 
+local macaddr_string
+do
+   local buf = ffi.new('union { uint64_t u64; uint8_t bytes[6]; }')
+   function macaddr_string(n)
+      -- The app read out the address and wrote it to the counter as a
+      -- uint64, just as if it aliased the address.  So, to get the
+      -- right byte sequence, we can do the same, without swapping.
+      buf.u64 = n
+      return ethernet:ntop(buf.bytes)
+   end
+end
+
 -- The state renders to a nested display tree, consisting of "group",
 -- "rows", "grid", and "chars" elements.
 function compute_display_tree.tree(tree, prev, dt, t)
@@ -539,6 +551,8 @@ function compute_display_tree.tree(tree, prev, dt, t)
                   local rate = compute_rate(v, prev, rrd, t, dt)
                   local v, tag = scale(rate)
                   out = lchars("%s: %.3f %s%s", k, v, tag, units or "/sec")
+               elseif k == 'macaddr' then
+                  out = lchars("%s: %s", k, macaddr_string(v))
                else
                   out = lchars("%s: %s", k, lib.comma_value(v))
                end
@@ -566,18 +580,6 @@ function compute_display_tree.tree(tree, prev, dt, t)
                             os.date('%Y-%m-%d %H:%M:%S', ui.pause_time or t)),
                      lchars('----'),
                      visit(tree, prev)}}
-end
-
-local macaddr_string
-do
-   local buf = ffi.new('union { uint64_t u64; uint8_t bytes[6]; }')
-   function macaddr_string(n)
-      -- The app read out the address and wrote it to the counter as a
-      -- uint64, just as if it aliased the address.  So, to get the
-      -- right byte sequence, we can do the same, without swapping.
-      buf.u64 = n
-      return ethernet:ntop(buf.bytes)
-   end
 end
 
 function compute_display_tree.interface(tree, prev, dt, t)
