@@ -175,3 +175,12 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Jianbo Liu <jianbo.liu@linaro.org>
 
+#### raptorjit
+
+    BRANCH: raptorjit git://github.com/snabbco/raptorjit
+    RaptorJIT updates integration and testing branch.
+
+    - Contains new RaptorJIT changes targeted to Snabb.
+
+    Maintainers: Luke Gorrie (@lukego) and Andy Wingo (@wingo)
+
