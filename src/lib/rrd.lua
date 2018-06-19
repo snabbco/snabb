@@ -356,6 +356,11 @@ function ref(rrd, t)
          end
       end
    end
+   for name,source in pairs(ret) do
+      for cf,readings in pairs(source.cf) do
+         table.sort(readings, function(a,b) return a.interval<b.interval end)
+      end
+   end
    return ret
 end
 

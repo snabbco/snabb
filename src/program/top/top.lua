@@ -25,10 +25,11 @@ local rrd = require("lib.rrd")
 local snabb_state = { instances={}, counters={}, histograms={}, rrds={} }
 local ui = {
    view='interface',
+   sample_time=nil, sample=nil, prev_sample_time=nil, prev_sample=nil,
    tree=nil, focus=nil, wake=cond.new(), rows=24, cols=80,
    show_empty=false, show_rates=true,
    show_links=true, show_apps=true, show_engine=true,
-   paused=false }
+   pause_time=nil }
 
 local function needs_redisplay(keep_tree)
    if not keep_tree then ui.tree = nil end
@@ -330,6 +331,12 @@ local function summarize_histogram(histogram, prev)
    return min * 1e6, avg * 1e6, max * 1e6
 end
 
+local leaf_mt = {}
+local function make_leaf(value, rrd)
+   return setmetatable({value=value, rrd=rrd}, leaf_mt)
+end
+local function is_leaf(x) return getmetatable(x) == leaf_mt end
+
 local function compute_histograms_tree(histograms)
    if histograms == nil then return {} end
    local ret = {}
@@ -340,12 +347,12 @@ local function compute_histograms_tree(histograms)
          if parent[branch] == nil then parent[branch] = {} end
          parent = parent[branch]
       end
-      parent[leaf] = function() return v:snapshot() end
+      parent[leaf] = make_leaf(function() return v:snapshot() end)
    end
    return ret
 end
 
-local function compute_counters_tree(counters)
+local function compute_counters_tree(counters, rrds)
    if counters == nil then return {} end
    local ret = {}
    for k,v in pairs(counters) do
@@ -356,7 +363,8 @@ local function compute_counters_tree(counters)
             if parent[branch] == nil then parent[branch] = {} end
             parent = parent[branch]
          end
-         parent[leaf] = function() return counter.read(v) end
+         parent[leaf] = make_leaf(
+            function() return counter.read(v) end, rrds[k])
       end
    end
    -- The rxpackets and rxbytes link counters are redundant.
@@ -375,8 +383,8 @@ end
 local function adjoin(t, k, v)
    if t[k] == nil then t[k] = v; return end
    if t[k] == v then return end
-   assert(type(t[k]) == 'table')
-   assert(type(v) == 'table')
+   assert(type(t[k]) == 'table' and not is_leaf(t[k]))
+   assert(type(v) == 'table' and not is_leaf(v))
    for vk, vv in pairs(v) do adjoin(t[k], vk, vv) end
 end
 
@@ -403,27 +411,20 @@ local function compute_tree()
          parent_node.workers[pid] = node
       end
       node.pid = pid
-      if ui.focus == nil or ui.focus == pid then
-         for k,v in pairs(compute_histograms_tree(snabb_state.histograms[pid])) do
-            adjoin(node, k, v)
-         end
-         for k,v in pairs(compute_counters_tree(snabb_state.counters[pid])) do
-            adjoin(node, k, v)
-         end
+      for k,v in pairs(compute_histograms_tree(snabb_state.histograms[pid])) do
+         adjoin(node, k, v)
+      end
+         for k,v in pairs(compute_counters_tree(snabb_state.counters[pid],
+                                                snabb_state.rrds[pid] or {})) do
+         adjoin(node, k, v)
       end
    end
    return root
 end
 
-local function isempty(x)
-   for k,v in pairs(x) do return false end
-   return true
-end
-
-local function maybe_hide(tab, ...)
-   for _,k in ipairs{...} do
-      if tab[k] and not ui['show_'..k] then tab[k] = nil end
-   end
+local function nil_if_empty(x)
+   for k,v in pairs(x) do return x end
+   return nil
 end
 
 -- The ui.tree just represents the structure of the state.  Before we go
@@ -433,57 +434,138 @@ end
 local function sample_tree(tree)
    local ret = {}
    for k,v in pairs(tree) do
-      if type(v) == 'function' then v = v() end
-      if type(v) == 'table' then ret[k] = sample_tree(v)
-      elseif not ui.show_empty and tonumber(v) == 0 then
-         -- Pass.
-      else
-         ret[k] = v
-      end
+      if is_leaf(v) then v = make_leaf(v.value(), v.rrd)
+      elseif type(v) == 'table' then v = sample_tree(v) end
+      ret[k] = v
    end
-   maybe_hide(ret, 'apps', 'links', 'engine')
-   if isempty(ret) then return end
+   return nil_if_empty(ret)
+end
+
+local function prune_sample(tree)
+   local function prune(name, tree)
+      if name == 'apps' and not ui.show_apps then return nil end
+      if name == 'links' and not ui.show_links then return nil end
+      if name == 'engine' and not ui.show_engine then return nil end
+      if is_leaf(tree) then
+         if not ui.show_empty and tonumber(tree.value) == 0 then return nil end
+      elseif type(tree) == 'table' then
+         local ret = {}
+         for k,v in pairs(tree) do ret[k] = prune(k, v) end
+         return nil_if_empty(ret)
+      end
+      return tree
+   end
+   local function prune_instance(instance)
+      local ret = {}
+      if instance.workers then
+         ret.workers = {}
+         for k,v in pairs(instance.workers) do
+            ret.workers[k] = prune_instance(v)
+         end
+         ret.workers = nil_if_empty(ret.workers)
+      end
+      if ui.focus == nil or ui.focus == instance.pid then
+         for k,v in pairs(instance) do
+            if k ~= 'workers' then ret[k] = prune(k, v) end
+         end
+      end
+      return nil_if_empty(ret)
+   end
+   local ret = {}
+   for k,v in pairs(tree) do ret[k] = prune_instance(v) end
    return ret
+end
+
+local function compute_rate(v, prev, rrd, t, dt)
+   if ui.pause_time and t ~= ui.pause_time then
+      if not rrd then return 0 end
+      for name,source in pairs(rrd:ref(ui.pause_time)) do
+         for _,reading in ipairs(source.cf.average) do
+            return reading.value
+         end
+      end
+      return 0/0
+   elseif prev then
+      return tonumber(v - prev)/dt
+   else
+      return 0/0
+   end
+end
+
+local function scale(x)
+   x=tonumber(x)
+   for _,scale in ipairs {{'T', 1e12}, {'G', 1e9}, {'M', 1e6}, {'k', 1e3}} do
+      local tag, base = unpack(scale)
+      if x > base then return x/base, tag end
+   end
+   return x, ''
 end
 
 local compute_display_tree = {}
 
 -- The state renders to a nested display tree, consisting of "group",
 -- "rows", "grid", and "chars" elements.
-function compute_display_tree.tree(tree, prev, dt)
-   local ret = {kind='rows', contents={}}
-   for k, v in sortedpairs(tree) do
-      if type(v) ~= 'table' then
-         local prev = prev and type(prev[k]) == type(v) and prev[k]
-         if type(v) == 'cdata' and tonumber(v) then
-            if ui.show_rates and prev and tonumber(v) ~= tonumber(prev) then
+function compute_display_tree.tree(tree, prev, dt, t)
+   local function chars(align, fmt, ...)
+      return {kind='chars', align=align, contents=fmt:format(...)}
+   end
+   local function lchars(fmt, ...) return chars('left', fmt, ...) end
+   tree = prune_sample(tree)
+   local function visit(tree, prev)
+      local ret = {kind='rows', contents={}}
+      for k, v in sortedpairs(tree) do
+         local prev = prev and prev[k]
+         local rrd
+         if is_leaf(v) then
+            v, rrd = v.value, v.rrd
+            if is_leaf(prev) then prev = prev.value else prev = nil end
+         elseif type(v) ~= type(prev) then
+            prev = nil
+         end
+         if type(v) ~= 'table' then
+            local out
+            if type(v) == 'cdata' and tonumber(v) then
+               local units
                if k:match('packets') then units = 'PPS'
                elseif k:match('bytes') then units = 'bytes/s'
-               elseif k:match('bits') then units = 'bits/s'
-               else units = 'per second' end
-               local rate = math.floor(tonumber(v-prev)/dt)
-               str = string.format("%s: %s %s", k, lib.comma_value(rate), units)
+               elseif k:match('bits') then units = 'bps'
+               elseif k:match('breath') then units = 'breaths/s'
+               elseif k:match('drop') then units = 'PPS'
+               end
+               local show_rates = units or tonumber(v) ~= tonumber(prev)
+               show_rates = show_rates and ui.show_rates
+               show_rates = show_rates or (ui.pause_time and ui.pause_time ~= t)
+               if show_rates then
+                  local rate = compute_rate(v, prev, rrd, t, dt)
+                  local v, tag = scale(rate)
+                  out = lchars("%s: %.3f %s%s", k, v, tag, units or "/sec")
+               else
+                  out = lchars("%s: %s", k, lib.comma_value(v))
+               end
+            elseif type(v) == 'cdata' then
+               -- Hackily, assume that the value is a histogram.
+               out = lchars('%s: %.2f min, %.2f avg, %.2f max',
+                            k, summarize_histogram(v, prev))
             else
-               str = string.format("%s: %s", k, lib.comma_value(v))
+               out = lchars("%s: %s", k, tostring(v))
             end
-         elseif type(v) == 'cdata' then
-            -- Hackily, assume that the value is a histogram.
-            str = string.format('%s: %.2f min, %.2f avg, %.2f max',
-                                k, summarize_histogram(v, prev))
-         else
-            str = string.format("%s: %s", k, tostring(v))
+            table.insert(ret.contents, out)
          end
-         table.insert(ret.contents, {kind='chars', contents=str})
       end
-   end
-   for k, v in sortedpairs(tree) do
-      if type(v) == 'table' then
-         local has_prev = prev and type(prev[k]) == type(v)
-         local rows = compute_display_tree.tree(v, has_prev and prev[k], dt)
-         table.insert(ret.contents, {kind='group', label=k, contents=rows})
+      for k, v in sortedpairs(tree) do
+         if type(v) == 'table' and not is_leaf(v) then
+            local has_prev = prev and type(prev[k]) == type(v)
+            local rows = visit(v, has_prev and prev[k])
+            table.insert(ret.contents, {kind='group', label=k, contents=rows})
+         end
       end
+      return ret
    end
-   return ret
+   return {kind='rows',
+           contents={lchars('snabb top: %s',
+                            os.date('%Y-%m-%d %H:%M:%S', ui.pause_time or t)),
+                     lchars('----'),
+                     visit(tree, prev)}}
 end
 
 local macaddr_string
@@ -509,7 +591,8 @@ function compute_display_tree.interface(tree, prev, dt, t)
    local rows = {
       kind='rows',
       contents = {
-         lchars('snabb top: %s', os.date('%Y-%m-%d %H:%M:%S', t)),
+         lchars('snabb top: %s',
+                os.date('%Y-%m-%d %H:%M:%S', ui.pause_time or t)),
          lchars('----'),
          {kind='grid', width=6, shrink={true,true}, contents=grid}
    }}
@@ -519,19 +602,14 @@ function compute_display_tree.interface(tree, prev, dt, t)
    --                  RX:       PPS, bps, %, [drops/s]
    --                  TX:       PPS, bps, %, [drops/s]
    local function rate(key, counters, prev)
-      if counters and counters[key] and prev and prev[key] then
-         return tonumber(counters[key] - prev[key])/dt
-      else
-         return 0
+      if not counters then return 0/0 end
+      if not counters[key] then return 0/0 end
+      local v, rrd = counters[key], nil
+      prev = prev and prev[key]
+      if is_leaf(v) then
+         v, rrd, prev = v.value, v.rrd, is_leaf(prev) and prev.value or nil
       end
-   end
-   local function scale(x)
-      x=tonumber(x)
-      for _,scale in ipairs {{'T', 1e12}, {'G', 1e9}, {'M', 1e6}, {'k', 1e3}} do
-         local tag, base = unpack(scale)
-         if x > base then return x/base, tag end
-      end
-      return x, ''
+      return compute_rate(v, prev, rrd, t, dt)
    end
    local function show_traffic(tag, pci, prev)
       local pps = rate(tag..'packets', pci, prev)
@@ -540,7 +618,7 @@ function compute_display_tree.interface(tree, prev, dt, t)
       -- 7 bytes preamble, 1 start-of-frame, 4 CRC, 12 interframe gap.
       local overhead = (7 + 1 + 4 + 12) * pps
       local bps = (bytes + overhead) * 8
-      local max = tonumber(pci.speed) or 0
+      local max = tonumber(pci.speed.value) or 0
       gridrow(nil,
               rchars('%s:', tag:upper()),
               lchars('%.3f %sPPS', scale(pps)),
@@ -549,21 +627,21 @@ function compute_display_tree.interface(tree, prev, dt, t)
               drops > 0 and rchars('%.3f %sPPS dropped', drops) or nil)
    end
    local function show_pci(addr, pci, prev)
-      local bps, tag = scale(pci.speed or 0)
+      local bps, tag = scale(pci.speed.value or 0)
       gridrow(rchars('| '), lchars(''))
       gridrow(rchars('\\-'),
               rchars('%s:', addr),
               lchars('%d %sbE, MAC: %s', bps, tag,
-                     macaddr_string(pci.macaddr or 0)))
+                     macaddr_string(pci.macaddr.value or 0)))
       show_traffic('rx', pci, prev)
       show_traffic('tx', pci, prev)
    end
    local function show_instance(label, instance, prev)
       local engine, prev_engine = instance.engine, prev and prev.engine
-      local latency = engine and engine.latency
+      local latency = engine and engine.latency and engine.latency.value
       local latency_str = ''
       if latency then 
-         local prev = prev_engine and prev_engine.latency
+         local prev = prev_engine and prev_engine.latency.value
          latency_str = string.format('latency: %.2f min, %.2f avg, %.2f max',
                                      summarize_histogram(latency, prev))
       end
@@ -832,8 +910,17 @@ local function render_status_line()
       if ui['show_'..what] then return key..'=hide '..what end
       return key..'=show '..what
    end
-   local entries = { ui.paused and 'SPACE=unpause' or 'SPACE=pause',
-                     'q=quit' }
+   local entries = {}
+   table.insert(entries, 'q=quit')
+   if ui.pause_time then
+      table.insert(entries, 'SPACE=unpause')
+      table.insert(entries, '[=rewind 1s')
+      table.insert(entries, ']=advance 1s')
+      table.insert(entries, '{=rewind 60s')
+      table.insert(entries, '}=advance 60s')
+   else
+      table.insert(entries, 'SPACE=pause')
+   end
    if ui.view == 'interface' then
       table.insert(entries, 't=tree view')
    else
@@ -890,7 +977,7 @@ local function show_ui()
          ui.tree = compute_tree() or {}
          ui.prev_sample, ui.prev_sample_time = nil, nil
       end
-      if not ui.paused then
+      if not ui.pause_time then
          ui.prev_sample_time, ui.prev_sample = ui.sample_time, ui.sample
          ui.sample_time, ui.sample = rrd.now(), sample_tree(ui.tree) or {}
       end
@@ -919,11 +1006,6 @@ local function toggle(tab, k)
    return function() tab[k] = not tab[k]; needs_redisplay(true) end
 end
 
-local function unfocus()
-   ui.focus = nil
-   needs_redisplay(true)
-end
-
 local function sortedkeys(t)
    local ret = {}
    for k,v in sortedpairs(t) do table.insert(ret, k) end
@@ -942,7 +1024,7 @@ local function focus_prev()
          end
       end
    end
-   needs_redisplay()
+   needs_redisplay(true)
 end
 
 local function focus_next()
@@ -958,23 +1040,40 @@ local function focus_next()
          end
       end
    end
-   needs_redisplay()
+   needs_redisplay(true)
 end
 
 local function unfocus()
    ui.focus = nil
-   needs_redisplay()
+   needs_redisplay(true)
 end
 
 local function tree_view()
    ui.view = 'tree'
-   needs_redisplay()
+   needs_redisplay(true)
 end
 
 local function interface_view()
    ui.view = 'interface'
-   ui.focus = nil
-   needs_redisplay()
+   needs_redisplay(true)
+end
+
+local function toggle_paused()
+   if ui.pause_time then
+      ui.pause_time = nil
+   else
+      ui.pause_time = ui.sample_time or rrd.now()
+   end
+   needs_redisplay(true)
+end
+
+local function rewind(secs)
+   return function()
+      if not ui.sample_time then return end -- Ensure we have a sample.
+      if not ui.pause_time then return end -- Only work when paused.
+      ui.pause_time = ui.pause_time - secs
+      needs_redisplay(true)
+   end
 end
 
 bind_keys("0", in_view('tree', toggle(ui, 'show_empty')))
@@ -982,10 +1081,14 @@ bind_keys("r", in_view('tree', toggle(ui, 'show_rates')))
 bind_keys("l", in_view('tree', toggle(ui, 'show_links')))
 bind_keys("a", in_view('tree', toggle(ui, 'show_apps')))
 bind_keys("e", in_view('tree', toggle(ui, 'show_engine')))
-bind_keys(" ", toggle(ui, 'paused'))
+bind_keys(" ", toggle_paused)
 bind_keys("u", in_view('tree', unfocus))
 bind_keys("t", in_view('interface', tree_view))
 bind_keys("i", in_view('tree', interface_view))
+bind_keys("[", rewind(1))
+bind_keys("]", rewind(-1))
+bind_keys("{", rewind(60))
+bind_keys("}", rewind(-60))
 bind_keys("<", in_view('tree', focus_prev))
 bind_keys(">", in_view('tree', focus_next))
 bind_keys("AD", global_key_bindings['<'], csi_key_bindings) -- Left and up arrow.
