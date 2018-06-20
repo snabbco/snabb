@@ -283,7 +283,7 @@ function create_file(filename, arg)
    f:flush_output()
    local ptr = assert(S.mmap(nil, rrd.size, "read, write", "shared", fd, 0))
    f:close()
-   ffi.gc(ptr, function (ptr) S.munmap(ptr, len) end)
+   ffi.gc(ptr, function (ptr) S.munmap(ptr, rrd.size) end)
    return open_mem(ptr, rrd.size)
 end
 
