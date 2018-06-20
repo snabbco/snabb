@@ -130,13 +130,10 @@ end
 -- Requires a V4V6 splitter if running in on-a-stick mode and VLAN tag values
 -- are the same for the internal and external interfaces.
 local function requires_splitter (opts, conf)
-   local device, id, queue = lwutil.parse_instance(conf)
-   if opts["on-a-stick"] then
-      local internal_interface = queue.internal_interface
-      local external_interface = queue.external_interface
-      return internal_interface.vlan_tag == external_interface.vlan_tag
-   end
-   return false
+   local queue = select(3, lwutil.parse_instance(conf))
+   local internal_interface = queue.internal_interface
+   local external_interface = queue.external_interface
+   return internal_interface.vlan_tag == external_interface.vlan_tag
 end
 
 function run(args)
