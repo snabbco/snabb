@@ -9,6 +9,7 @@ local value = require("lib.yang.value")
 local schema = require("lib.yang.schema")
 local parse_path = require("lib.yang.path").parse_path
 local util = require("lib.yang.util")
+local cltable = require("lib.cltable")
 local normalize_id = data.normalize_id
 
 local function table_keys(t)
