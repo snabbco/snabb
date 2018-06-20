@@ -38,7 +38,7 @@ local function compute_multi_hash_fn(key_ctype, width, stride, seed)
 end
 
 local entry_types = {}
-local function make_entry_type(key_type, value_type)
+local function make_entry_type(key_type, value_type, pad)
    local cache = entry_types[key_type]
    if cache then
       cache = cache[value_type]
@@ -47,7 +47,8 @@ local function make_entry_type(key_type, value_type)
       entry_types[key_type] = {}
    end
    local raw_size = ffi.sizeof(key_type) + ffi.sizeof(value_type) + 4
-   local padding = 2^ceil(math.log(raw_size)/math.log(2)) - raw_size
+   local padding = (pad and 2^ceil(math.log(raw_size)/math.log(2)) - raw_size)
+      or raw_size
    local ret = ffi.typeof([[struct {
          uint32_t hash;
          $ key;
@@ -126,13 +127,15 @@ local optional_params = {
    hash_seed = false,
    initial_size = 8,
    max_occupancy_rate = 0.9,
-   min_occupancy_rate = 0.0
+   min_occupancy_rate = 0.0,
+   pad_entry = false,
 }
 
 function new(params)
    local ctab = {}   
    local params = parse_params(params, required_params, optional_params)
-   ctab.entry_type = make_entry_type(params.key_type, params.value_type)
+   ctab.entry_type = make_entry_type(params.key_type, params.value_type,
+                                     params.pad_entry)
    ctab.type = make_entries_type(ctab.entry_type)
    function ctab.make_hash_fn()
       return compute_hash_fn(params.key_type, ctab.hash_seed)
