@@ -620,7 +620,7 @@ function compute_display_tree.interface(tree, prev, dt, t)
       -- 7 bytes preamble, 1 start-of-frame, 4 CRC, 12 interframe gap.
       local overhead = (7 + 1 + 4 + 12) * pps
       local bps = (bytes + overhead) * 8
-      local max = tonumber(pci.speed.value) or 0
+      local max = tonumber(pci.speed and pci.speed.value) or 0
       gridrow(nil,
               rchars('%s:', tag:upper()),
               lchars('%.3f %sPPS', scale(pps)),
@@ -629,12 +629,12 @@ function compute_display_tree.interface(tree, prev, dt, t)
               drops > 0 and rchars('%.3f %sPPS dropped', drops) or nil)
    end
    local function show_pci(addr, pci, prev)
-      local bps, tag = scale(pci.speed.value or 0)
+      local bps, tag = scale(tonumber(pci.speed and pci.speed.value) or 0)
       gridrow(rchars('| '), lchars(''))
       gridrow(rchars('\\-'),
               rchars('%s:', addr),
               lchars('%d %sbE, MAC: %s', bps, tag,
-                     macaddr_string(pci.macaddr.value or 0)))
+                     macaddr_string(tonumber(pci.macaddr and pci.macaddr.value) or 0)))
       show_traffic('rx', pci, prev)
       show_traffic('tx', pci, prev)
    end
