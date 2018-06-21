@@ -48,7 +48,7 @@ local function make_entry_type(key_type, value_type, pad)
    end
    local raw_size = ffi.sizeof(key_type) + ffi.sizeof(value_type) + 4
    local padding = (pad and 2^ceil(math.log(raw_size)/math.log(2)) - raw_size)
-      or raw_size
+      or 0
    local ret = ffi.typeof([[struct {
          uint32_t hash;
          $ key;
