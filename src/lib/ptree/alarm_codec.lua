@@ -67,61 +67,76 @@ function alarms.declare_alarm (codec, resource, alarm_type_id, alarm_type_qualif
                        perceived_severity, alarm_text, alt_resource)
 end
 
-local function encoder()
-   local encoder = { out = mem.tmpfile() }
-   function encoder:uint32(len)
-      self.out:write_scalar(uint32_t, len)
+local Encoder = {}
+function Encoder.new()
+   return setmetatable({ out = mem.tmpfile() }, {__index=Encoder})
+end
+function Encoder:reset()
+   self.out:seek('set', 0)
+end
+function Encoder:uint32(len)
+   self.out:write_scalar(uint32_t, len)
+end
+function Encoder:string(str)
+   self:uint32(#str)
+   self.out:write_chars(str)
+end
+function Encoder:maybe_string(str)
+   if str == nil then
+      self:uint32(UINT32_MAX)
+   else
+      self:string(str)
    end
-   function encoder:string(str)
-      self:uint32(#str)
-      self.out:write_chars(str)
-   end
-   function encoder:maybe_string(str)
-      if str == nil then
-         self:uint32(UINT32_MAX)
-      else
+end
+function Encoder:maybe_string_list(list)
+   if list == nil or #list == 0 then
+      self:uint32(UINT32_MAX)
+   else
+      self:uint32(#list)
+      for _, str in ipairs(list) do
          self:string(str)
       end
    end
-   function encoder:maybe_string_list(list)
-      if list == nil or #list == 0 then
-         self:uint32(UINT32_MAX)
-      else
-         self:uint32(#list)
-         for _, str in ipairs(list) do
-            self:string(str)
-         end
-      end
-   end
-   function encoder:finish()
-      self.out:seek('set', 0)
-      return self.out:read_all_bytes()
-   end
-   return encoder
+end
+function Encoder:finish()
+   local len = self.out:seek()
+   local buf = ffi.new('uint8_t[?]', len)
+   self.out:seek('set', 0)
+   self.out:read_bytes_or_error(buf, len)
+   return buf, len
 end
 
-function encode_raise_alarm (...)
-   local codec = encoder()
-   codec:uint32(assert(alarm_codes['raise_alarm']))
-   return assert(alarms['raise_alarm'])(codec, ...)
+local encoder = Encoder.new()
+function encode_raise_alarm (alarm_type_id, alarm_type_qualifier,
+                             perceived_severity, alarm_text, alt_resource)
+   encoder:reset()
+   encoder:uint32(alarm_codes.raise_alarm)
+   return alarms.raise_alarm(encoder, alarm_type_id, alarm_type_qualifier,
+                             perceived_severity, alarm_text, alt_resource)
 end
 
-function encode_clear_alarm (...)
-   local codec = encoder()
-   codec:uint32(assert(alarm_codes['clear_alarm']))
-   return assert(alarms['clear_alarm'])(codec, ...)
+function encode_clear_alarm (resource, alarm_type_id, alarm_type_qualifier)
+   encoder:reset()
+   encoder:uint32(alarm_codes.clear_alarm)
+   return alarms.clear_alarm(encoder, resource, alarm_type_id,
+                             alarm_type_qualifier)
 end
 
-function encode_add_to_inventory (...)
-   local codec = encoder()
-   codec:uint32(assert(alarm_codes['add_to_inventory']))
-   return assert(alarms['add_to_inventory'])(codec, ...)
+function encode_add_to_inventory (alarm_type_id, alarm_type_qualifier,
+                                  resource, has_clear, description, alt_resource)
+   encoder:reset()
+   encoder:uint32(alarm_codes.add_to_inventory)
+   return alarms.add_to_inventory(encoder, alarm_type_id, alarm_type_qualifier,
+                                  resource, has_clear, description, alt_resource)
 end
 
-function encode_declare_alarm (...)
-   local codec = encoder()
-   codec:uint32(assert(alarm_codes['declare_alarm']))
-   return assert(alarms['declare_alarm'])(codec, ...)
+function encode_declare_alarm (resource, alarm_type_id, alarm_type_qualifier,
+                               perceived_severity, alarm_text, alt_resource)
+   encoder:reset()
+   encoder:uint32(alarm_codes.declare_alarm)
+   return alarms.declare_alarm(encoder, resource, alarm_type_id,
+                               alarm_type_qualifier, perceived_severity,
+                               alarm_text, alt_resource)
 end
 
 local function decoder(buf, len)
