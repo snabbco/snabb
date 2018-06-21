@@ -52,6 +52,11 @@ Optional entries that may be present in the *parameters* table include:
    2.  Defaults to 0.9, for a 90% maximum occupancy ratio.
  * `min_occupancy_rate`: Minimum ratio of `occupancy/size`.  Removing an
    entry from an "empty" table will shrink the table.
+ * `pad_entry`: If `true`, the data structure stored in the table is
+   padded with bytes of zero to make its size to be equal to a power
+   of two.  This can be used to work around a limitation of LuaJIT
+   which causes traces to abort when calculating differences of
+   pointers which are not a power of two.  The default is `false`.
 
 — Function **ctable.load** *stream* *parameters*
 
