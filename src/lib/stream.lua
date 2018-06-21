@@ -144,8 +144,18 @@ function Stream:read_struct(buf, type)
    return buf
 end
 
+local array_types = {}
+local function get_array_type(t)
+   local at = array_types[t]
+   if not at then
+      at = ffi.typeof('$[?]', t)
+      array_types[t] = at
+   end
+   return at
+end
+
 function Stream:read_array(buf, type, count)
-   if buf == nil then buf = ffi.typeof('$[?]', type)(count) end
+   if buf == nil then buf = get_array_type(type)(count) end
    self:read_bytes_or_error(buf, ffi.sizeof(type) * count)
    return buf
 end
@@ -246,7 +256,8 @@ function Stream:write_array(type, ptr, count)
 end
 
 function Stream:write_scalar(type, value)
-   local ptr = ffi.typeof('$[1]', type)(value)
+   local ptr = get_array_type(type)(1)
+   ptr[0] = value
    assert(ptr[0] == value, "value out of range")
    self:write_array(type, ptr, 1)
 end
