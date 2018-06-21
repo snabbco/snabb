@@ -324,6 +324,9 @@ function load_on_a_stick(c, conf, args)
       link_source(c, v4v6..'.v4', v4v6..'.v6')
       link_sink(c, v4v6..'.v4', v4v6..'.v6')
    else
+      assert(queue.external_interface.mac ~= queue.internal_interface.mac,
+             "When using different VLAN tags, external and internal MAC "..
+                "addresses must be different too")
       config.app(c, v4_nic_name, driver, {
          pciaddr = pciaddr,
          vmdq=true, -- Needed to enable MAC filtering/stamping.
