@@ -3,9 +3,11 @@
 module(...,package.seeall)
 
 local S = require("syscall")
+local mem = require("lib.stream.mem")
 local channel = require("lib.ptree.channel")
 local ffi = require("ffi")
 
+local uint32_t = ffi.typeof('uint32_t')
 local UINT32_MAX = 0xffffffff
 
 local alarm_names = { 'raise_alarm', 'clear_alarm', 'add_to_inventory', 'declare_alarm' }
@@ -66,15 +68,13 @@ function alarms.declare_alarm (codec, resource, alarm_type_id, alarm_type_qualif
 end
 
 local function encoder()
-   local encoder = { out = {} }
+   local encoder = { out = mem.tmpfile() }
    function encoder:uint32(len)
-      table.insert(self.out, ffi.new('uint32_t[1]', len))
+      self.out:write_scalar(uint32_t, len)
    end
    function encoder:string(str)
       self:uint32(#str)
-      local buf = ffi.new('uint8_t[?]', #str)
-      ffi.copy(buf, str, #str)
-      table.insert(self.out, buf)
+      self.out:write_chars(str)
    end
    function encoder:maybe_string(str)
       if str == nil then
@@ -94,15 +94,8 @@ local function encoder()
       end
    end
    function encoder:finish()
-      local size = 0
-      for _,src in ipairs(self.out) do size = size + ffi.sizeof(src) end
-      local dst = ffi.new('uint8_t[?]', size)
-      local pos = 0
-      for _,src in ipairs(self.out) do
-         ffi.copy(dst + pos, src, ffi.sizeof(src))
-         pos = pos + ffi.sizeof(src)
-      end
-      return dst, size
+      self.out:seek('set', 0)
+      return self.out:read_all_bytes()
    end
    return encoder
 end
@@ -131,26 +124,19 @@ function encode_declare_alarm (...)
    return assert(alarms['declare_alarm'])(codec, ...)
 end
 
-local uint32_ptr_t = ffi.typeof('uint32_t*')
 local function decoder(buf, len)
-   local decoder = { buf=buf, len=len, pos=0 }
-   function decoder:read(count)
-      local ret = self.buf + self.pos
-      self.pos = self.pos + count
-      assert(self.pos <= self.len)
-      return ret
-   end
+   local decoder = { stream=mem.open(buf, len) }
    function decoder:uint32()
-      return ffi.cast(uint32_ptr_t, self:read(4))[0]
+      return self.stream:read_scalar(nil, uint32_t)
    end
    function decoder:string()
       local len = self:uint32()
-      return ffi.string(self:read(len), len)
+      return self.stream:read_chars(len)
    end
    function decoder:maybe_string()
       local len = self:uint32()
       if len == UINT32_MAX then return nil end
-      return ffi.string(self:read(len), len)
+      return self.stream:read_chars(len)
    end
    function decoder:maybe_string_list()
       local count = self:uint32()
