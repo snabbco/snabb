@@ -65,3 +65,17 @@ tree view, there are also keys to show and hide these subtrees.
 
 Again, all of these commands are shown in the status bar, when
 available.
+
+Finally, it's possible to use `snabb top` to read a snapshot of counters
+taken from some other machine.  To take a sample of a machine's counters
+and RRD files, do:
+
+  ( cd /var/run; sudo tar cf /tmp/snabb-state-snapshot.tar.gz snabb )
+
+Then copy /tmp/snabb-state-snapshot.tar.gz to a technician, who can unpack it:
+
+  mkdir /tmp/forensics; cd /tmp/forensics; tar xvf snabb-state-snapshot.tar.gz
+
+Then to investigate this snapshot:
+
+  SNABB_SHM_ROOT=/tmp/forensics/snabb snabb top
