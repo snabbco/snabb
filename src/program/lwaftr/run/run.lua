@@ -18,7 +18,7 @@ local function show_usage(exit_code)
    print(require("program.lwaftr.run.README_inc"))
    if exit_code then main.exit(exit_code) end
 end
-local function migrate_device_on_config(config, v4, v6, on_a_stick)
+local function migrate_device_on_config(config, v4, v6)
    -- Validate there is only one instance, otherwise the option is ambiguous.
    local device, instance
    for k, v in pairs(config.softwire_config.instance) do
@@ -40,12 +40,6 @@ local function migrate_device_on_config(config, v4, v6, on_a_stick)
    if v6 then
       for id, queue in cltable.pairs(instance.queue) do
          queue.external_interface.device = v6
-      end
-   end
-
-   if on_a_stick then
-      for id, queue in cltable.pairs(instance.queue) do
-         queue.external_interface.device = v4
       end
    end
 end
@@ -148,7 +142,8 @@ function run(args)
 
    -- If the user passed --v4, --v6, or --on-a-stick, migrate the
    -- configuration's device.
-   if v4 or v6 then migrate_device_on_config(conf, v4, v6, opts['on-a-stick']) end
+   if opts['on-a-stick'] then assert(v4); v6 = v4 end
+   if v4 or v6 then migrate_device_on_config(conf, v4, v6) end
 
    -- If there is a name defined on the command line, it should override
    -- anything defined in the config.
