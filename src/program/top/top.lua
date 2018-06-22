@@ -643,7 +643,7 @@ function compute_display_tree.interface(tree, prev, dt, t)
       local latency = engine and engine.latency and engine.latency.value
       local latency_str = ''
       if latency then 
-         local prev = prev_engine and prev_engine.latency.value
+         local prev = prev_engine and prev_engine.latency and prev_engine.latency.value
          latency_str = string.format('latency: %.2f min, %.2f avg, %.2f max',
                                      summarize_histogram(latency, prev))
       end
