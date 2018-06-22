@@ -67,8 +67,8 @@ Again, all of these commands are shown in the status bar, when
 available.
 
 Finally, it's possible to use `snabb top` to read a snapshot of counters
-taken from some otherkremote machine.  To take a sample of a machine's
-counters and RRD files, do:
+taken from some other machine.  To take a sample of a machine's counters
+and RRD files, do:
 
   ( cd /var/run; sudo tar cf /tmp/snabb-state-snapshot.tar.gz snabb )
 
