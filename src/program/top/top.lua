@@ -626,7 +626,7 @@ function compute_display_tree.interface(tree, prev, dt, t)
               lchars('%.3f %sPPS', scale(pps)),
               lchars('%.3f %sbps', scale(bps)),
               lchars('%.2f%%', bps/max*100),
-              drops > 0 and rchars('%.3f %sPPS dropped', drops) or nil)
+              drops > 0 and rchars('%.3f %sPPS dropped', scale(drops)) or nil)
    end
    local function show_pci(addr, pci, prev)
       local bps, tag = scale(tonumber(pci.speed and pci.speed.value) or 0)
