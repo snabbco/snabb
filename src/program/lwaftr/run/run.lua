@@ -129,14 +129,11 @@ end
 
 -- Requires a V4V6 splitter if running in on-a-stick mode and VLAN tag values
 -- are the same for the internal and external interfaces.
-local function requires_splitter (opts, conf)
-   local device, id, queue = lwutil.parse_instance(conf)
-   if opts["on-a-stick"] then
-      local internal_interface = queue.internal_interface
-      local external_interface = queue.external_interface
-      return internal_interface.vlan_tag == external_interface.vlan_tag
-   end
-   return false
+local function requires_splitter (conf)
+   local queue = select(3, lwutil.parse_instance(conf))
+   local internal_interface = queue.internal_interface
+   local external_interface = queue.external_interface
+   return internal_interface.vlan_tag == external_interface.vlan_tag
 end
 
 function run(args)
@@ -145,6 +142,7 @@ function run(args)
 
    -- If the user passed --v4, --v6, or --on-a-stick, migrate the
    -- configuration's device.
+   if opts['on-a-stick'] then assert(v4); v6 = v4 end
    if v4 or v6 then migrate_device_on_config(conf, v4, v6) end
 
    -- If there is a name defined on the command line, it should override
@@ -160,7 +158,7 @@ function run(args)
       -- If instance has external-interface.device configure as bump-in-the-wire
       -- otherwise configure it in on-a-stick mode.
       local device, id, queue = lwutil.parse_instance(lwconfig)
-      if queue.external_interface.device then
+      if not lwutil.is_on_a_stick(device, queue) then
          if lib.is_iface(queue.external_interface.device) then
             return setup.load_kernel_iface(graph, lwconfig, 'inetNic', 'b4sideNic')
          else
@@ -168,7 +166,7 @@ function run(args)
                                   opts.ring_buffer_size)
          end
       else
-         local use_splitter = requires_splitter(opts, lwconfig)
+         local use_splitter = requires_splitter(lwconfig)
          local options = {
             v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
             v4v6 = use_splitter and 'v4v6', mirror = opts.mirror,
