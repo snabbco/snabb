@@ -142,13 +142,15 @@ function merge_pr_with_target {
     fi
 }
 
-function dock_make { (cd src/; timeout 1h scripts/dock.sh make $1); }
+function dock_make {
+    (cd src/; timeout --foreground 1h scripts/dock.sh make $1);
+}
 
 function check_for_performance_regressions {
     echo "Checking for performance regressions:"
     dock_make benchmarks > $(benchmark_results pr)
     for bench in $(cut -d " " -f 1 $(benchmark_results pr)); do
-        if grep $bench $(benchmark_results current) >/dev/null 2>&1; then
+        if grep "$bench " $(benchmark_results $1) >/dev/null 2>&1; then
             echo $(grep "$bench " $(benchmark_results $1)) \
                  $(grep "$bench " $(benchmark_results pr)) \
                 | awk '
