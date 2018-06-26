@@ -109,7 +109,6 @@ function unbind_numa_node ()
 end
 
 function bind_to_numa_node (node)
-   if not has_numa() then return end
    if node == bound_numa_node then return end
    if not node then return unbind_numa_node() end
    assert(not bound_numa_node, "already bound")
@@ -136,11 +135,11 @@ function selftest ()
       assert(bound_cpu == cpu)
       assert(bound_numa_node == node)
       assert(S.getcpu().cpu == cpu)
-      assert(not has_numa() or S.getcpu().node == node)
+      assert(S.getcpu().node == node)
       bind_to_cpu(nil)
       assert(bound_cpu == nil)
       assert(bound_numa_node == node)
-      assert(not has_numa() or S.getcpu().node == node)
+      assert(S.getcpu().node == node)
       bind_to_numa_node(nil)
       assert(bound_cpu == nil)
       assert(bound_numa_node == nil)
