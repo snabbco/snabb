@@ -199,7 +199,7 @@ if vendor == "GenuineIntel" then
       -- All available counters are globally enabled
       -- (IA32_PERF_GLOBAL_CTRL).
       writemsr(cpu, 0x38f, bit.bor(bit.lshift(0x3ULL, 32),
-                                   bit.lshift(1ULL, pmu_x86.ngeneral) - 1))
+                                   bit.lshift(1ULL, ngeneral) - 1))
       -- Enable all fixed-function counters (IA32_FIXED_CTR_CTRL)
       writemsr(cpu, 0x38d, 0x333)
       return {"instructions", "cycles", "ref_cycles"}, 0
