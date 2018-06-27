@@ -782,7 +782,7 @@ function run (parameters)
 
    local file = table.remove(parameters, 1)
 
-   local engine_opts = { no_report = true }
+   local engine_opts = { no_report = true, measure_latency = false }
    if duration ~= 0 then engine_opts.duration = duration end
    if jit_conf.p then
       require("jit.p").start(jit_conf.p.opts, jit_conf.p.file)
