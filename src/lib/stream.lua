@@ -65,22 +65,22 @@ end
 
 function Stream:flush_some_output()
    assert(not self.tx:is_empty())
-   while true do
-      local buf, count = self.tx:peek()
-      local did_write = self.io:write(buf, count)
-      if did_write then
-         self.tx:advance_read(did_write)
-         if self.tx:is_empty() then self.tx:reset() end
-         return
-      else
-         self.io:wait_for_writable()
-      end
+   local buf, count = self.tx:peek()
+   local did_write = self.io:write(buf, count)
+   if did_write then
+      self.tx:advance_read(did_write)
+      if self.tx:is_empty() then self.tx:reset() end
+   else
+      self.io:wait_for_writable()
+      return self:flush_some_output()
    end
 end
 
 function Stream:flush_output()
    if not self.tx then return end
-   while not self.tx:is_empty() do self:flush_some_output() end
+   if self.tx:is_empty() then return end
+   self:flush_some_output()
+   if not self.tx:is_empty() then return self:flush_output() end
 end
 
 Stream.flush = Stream.flush_output
