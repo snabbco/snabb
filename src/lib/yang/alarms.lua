@@ -184,17 +184,13 @@ end
 function add_to_inventory (key, args)
    local key = alarm_type_keys:normalize(key)
    alarm_codec.add_to_inventory(key, args)
-end
-
-function do_add_to_inventory (k, v)
-   local key = alarm_type_keys:normalize(k)
-   local resource = {v.resource}
+   local resource = {args.resource}
    -- Preserve previously defined resources.
    if state.alarm_inventory.alarm_type[key] then
       resource = state.alarm_inventory.alarm_type[key].resource
-      table.insert(resource, v.resource)
+      table.insert(resource, args.resource)
    end
-   state.alarm_inventory.alarm_type[key] = v
+   state.alarm_inventory.alarm_type[key] = args
    state.alarm_inventory.alarm_type[key].resource = resource
    alarm_inventory_changed()
 end
@@ -288,9 +284,17 @@ function default_alarms (alarms)
    end
 end
 
-function declare_alarm (k, v)
-   alarm_codec.declare_alarm(k, v)
-   local key = alarm_keys:normalize(k)
+function declare_alarm (key, args)
+   key = alarm_keys:normalize(key)
+   alarm_codec.declare_alarm(key, args)
+   local dst = alarm_list:lookup(key)
+   if dst then
+      -- Extend or overwrite existing alarm values.
+      for k, v in pairs(args) do dst[k] = v end
+      alarm_list:new(key, dst)
+   else
+      alarm_list:new(key, args)
+   end
    local alarm = {}
    function alarm:raise (args)
       alarm_codec.raise_alarm(key, args)
@@ -299,23 +303,6 @@ function declare_alarm (k, v)
       alarm_codec.clear_alarm(key)
    end
    return alarm
-end
-
-function do_declare_alarm (key, args)
-   local function create_or_update (key, src)
-      local dst = alarm_list:lookup(key)
-      if dst then
-         -- Extend or overwrite existing alarm values.
-         for k, v in pairs(src) do
-            dst[k] = v
-         end
-         alarm_list:new(key, dst)
-      else
-         alarm_list:new(key, src)
-      end
-   end
-   key = alarm_keys:normalize(key)
-   create_or_update(key, args)
 end
 
 -- Raise alarm.
@@ -731,23 +718,23 @@ function selftest ()
    end
 
    -- ARP alarm.
-   do_add_to_inventory({alarm_type_id='arp-resolution'}, {
+   add_to_inventory({alarm_type_id='arp-resolution'}, {
       resource='nic-v4',
       has_clear=true,
       description='Raise up if ARP app cannot resolve IP address',
    })
-   do_declare_alarm({resource='nic-v4', alarm_type_id='arp-resolution'}, {
+   declare_alarm({resource='nic-v4', alarm_type_id='arp-resolution'}, {
       perceived_severity = 'critical',
       alarm_text = 'Make sure you can ARP resolve IP addresses on NIC',
       alt_resource={'nic-v4-2'},
    })
    -- NDP alarm.
-   do_add_to_inventory({alarm_type_id='ndp-resolution'}, {
+   add_to_inventory({alarm_type_id='ndp-resolution'}, {
       resource='nic-v6',
       has_clear=true,
       description='Raise up if NDP app cannot resolve IP address',
    })
-   do_declare_alarm({resource='nic-v6', alarm_type_id='ndp-resolution'}, {
+   declare_alarm({resource='nic-v6', alarm_type_id='ndp-resolution'}, {
       perceived_severity = 'critical',
       alarm_text = 'Make sure you can NDP resolve IP addresses on NIC',
    })
