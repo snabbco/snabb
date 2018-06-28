@@ -246,7 +246,8 @@ function Reassembler:lookup_reassembly(h, fragment_id)
    return entry
 end
 
-function Reassembler:handle_fragment(h)
+function Reassembler:handle_fragment(pkt)
+   local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
    local fragment = ffi.cast(fragment_header_ptr_t, h.ipv6.payload)
    -- Note: keep the number of local variables to a minimum when
    -- calling lookup_reassembly to avoid "register coalescing too
@@ -369,13 +370,18 @@ function Reassembler:push ()
       elseif h.ipv6.next_header == fragment_proto then
          -- A fragment; try to reassemble.
          counter.add(self.shm["in-ipv6-frag-needs-reassembly"])
-         self:handle_fragment(h)
-         packet.free(pkt)
+         link.transmit(input, pkt)
       else
          -- Not fragmented; forward it on.
          counter.add(self.shm["in-ipv6-frag-reassembly-unneeded"])
          link.transmit(output, pkt)
       end
+   end
+
+   for _ = 1, link.nreadable(input) do
+      local pkt = link.receive(input)
+      self:handle_fragment(pkt)
+      packet.free(pkt)
    end
 
    if self.next_counter_update < engine.now() then
