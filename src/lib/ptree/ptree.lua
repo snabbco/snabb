@@ -26,7 +26,7 @@ local state = require("lib.yang.state")
 local path_mod = require("lib.yang.path")
 local path_data = require("lib.yang.path_data")
 local action_codec = require("lib.ptree.action_codec")
-local alarm_codec = require("lib.ptree.alarm_codec")
+local ptree_alarms = require("lib.ptree.alarms")
 local support = require("lib.ptree.support")
 local channel = require("lib.ptree.channel")
 local trace = require("lib.ptree.trace")
@@ -759,7 +759,7 @@ function Manager:receive_alarms_from_worker (worker)
    while true do
       local buf, len = channel:peek_message()
       if not buf then break end
-      local name, key, args = alarm_codec.decode(buf, len)
+      local name, key, args = ptree_alarms.decode(buf, len)
       local ok, err = pcall(self.handle_alarm, self, worker, name, key, args)
       if not ok then self:warn('failed to handle alarm op %s', name) end
       channel:discard_message(len)

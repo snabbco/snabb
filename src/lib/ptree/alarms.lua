@@ -217,54 +217,32 @@ end
 
 ---
 
-local alarms_channel
-
-function get_channel()
-   if alarms_channel then return alarms_channel end
-   local name = '/'..S.getpid()..'/alarms-worker-channel'
-   local success, value = pcall(channel.open, name)
-   if success then
-      alarms_channel = value
-   else
-      alarms_channel = channel.create('alarms-worker-channel', 1e6)
-   end
-   return alarms_channel
-end
-
-function raise_alarm (key, args)
-   local channel = get_channel()
-   if channel then
+function alarm_handler()
+   local success, value = pcall(channel.open, 'alarms-worker-channel')
+   local ch = success and value
+   if not ch then ch = channel.create('alarms-worker-channel', 1e6) end
+   local ret = {}
+   function ret.raise_alarm (key, args)
       local buf, len = encoders.raise_alarm(key, args)
-      channel:put_message(buf, len)
+      ch:put_message(buf, len)
    end
-end
-
-function clear_alarm (key)
-   local channel = get_channel()
-   if channel then
+   function ret.clear_alarm (key)
       local buf, len = encoders.clear_alarm(key)
-      channel:put_message(buf, len)
+      ch:put_message(buf, len)
    end
-end
-
-function add_to_inventory (key, args)
-   local channel = get_channel()
-   if channel then
+   function ret.add_to_inventory (key, args)
       local buf, len = encoders.add_to_inventory(key, args)
-      channel:put_message(buf, len)
+      ch:put_message(buf, len)
    end
-end
-
-function declare_alarm (key, args)
-   local channel = get_channel()
-   if channel then
+   function ret.declare_alarm (key, args)
       local buf, len = encoders.declare_alarm(key, args)
-      channel:put_message(buf, len)
+      ch:put_message(buf, len)
    end
+   return ret
 end
 
 function selftest ()
-   print('selftest: lib.ptree.alarm_codec')
+   print('selftest: lib.ptree.alarms')
    local lib = require("core.lib")
    local function test_alarm (name, key, args)
       local encoded, len = encode(name, key, args)
