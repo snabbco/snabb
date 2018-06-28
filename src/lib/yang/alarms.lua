@@ -181,11 +181,9 @@ function alarm_type_keys:normalize (key)
    return self:fetch(alarm_type_id, alarm_type_qualifier)
 end
 
-function add_to_inventory (alarm_types)
-   assert(type(alarm_types) == 'table')
-   for key,args in pairs(alarm_types) do
-      alarm_codec.add_to_inventory(key, args)
-   end
+function add_to_inventory (key, args)
+   local key = alarm_type_keys:normalize(key)
+   alarm_codec.add_to_inventory(key, args)
 end
 
 function do_add_to_inventory (k, v)
@@ -290,8 +288,7 @@ function default_alarms (alarms)
    end
 end
 
-function declare_alarm (alarms)
-   local k, v = next(alarms)
+function declare_alarm (k, v)
    alarm_codec.declare_alarm(k, v)
    local key = alarm_keys:normalize(k)
    local alarm = {}
