@@ -824,10 +824,11 @@ end
 
 function Intel:sync_stats ()
    local set, stats = counter.set, self.stats
+   set(stats.speed, self:link_speed())
+   set(stats.status, self:link_status() and 1 or 2)
+   set(stats.promisc, self:promisc() and 1 or 2)
+   -- Values only updated by master.
    if self.master then
-      set(stats.speed, self:link_speed())
-      set(stats.status, self:link_status() and 1 or 2)
-      set(stats.promisc, self:promisc() and 1 or 2)
       set(stats.rxbytes, self:rxbytes())
       set(stats.rxpackets, self:rxpackets())
       set(stats.rxmcast, self:rxmcast())
