@@ -3,11 +3,27 @@ module(..., package.seeall)
 local data = require('lib.yang.data')
 local lib = require('core.lib')
 local util = require('lib.yang.util')
-local alarm_codec = require('lib.ptree.alarm_codec')
 local counter = require("core.counter")
 
 local format_date_as_iso_8601 = util.format_date_as_iso_8601
 local parse_date_as_iso_8601 = util.parse_date_as_iso_8601
+
+local alarm_handler
+function install_alarm_handler(handler)
+   alarm_handler = handler
+end
+
+local default_alarm_handler = {}
+function default_alarm_handler.raise_alarm(key, args)
+end
+function default_alarm_handler.clear_alarm(key)
+end
+function default_alarm_handler.add_to_inventory(key, args)
+end
+function default_alarm_handler.declare_alarm(key, args)
+end
+
+install_alarm_handler(default_alarm_handler)
 
 local control = {
    alarm_shelving = {
@@ -183,7 +199,7 @@ end
 
 function add_to_inventory (key, args)
    local key = alarm_type_keys:normalize(key)
-   alarm_codec.add_to_inventory(key, args)
+   alarm_handler.add_to_inventory(key, args)
    local resource = {args.resource}
    -- Preserve previously defined resources.
    if state.alarm_inventory.alarm_type[key] then
@@ -286,7 +302,7 @@ end
 
 function declare_alarm (key, args)
    key = alarm_keys:normalize(key)
-   alarm_codec.declare_alarm(key, args)
+   alarm_handler.declare_alarm(key, args)
    local dst = alarm_list:lookup(key)
    if dst then
       -- Extend or overwrite existing alarm values.
@@ -297,10 +313,10 @@ function declare_alarm (key, args)
    end
    local alarm = {}
    function alarm:raise (args)
-      alarm_codec.raise_alarm(key, args)
+      alarm_handler.raise_alarm(key, args)
    end
    function alarm:clear ()
-      alarm_codec.clear_alarm(key)
+      alarm_handler.clear_alarm(key)
    end
    return alarm
 end
