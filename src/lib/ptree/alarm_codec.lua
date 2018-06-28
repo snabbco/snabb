@@ -242,7 +242,7 @@ end
 function clear_alarm (key)
    local channel = get_channel()
    if channel then
-      local buf, len = encoders.raise_alarm(key)
+      local buf, len = encoders.clear_alarm(key)
       channel:put_message(buf, len)
    end
 end
