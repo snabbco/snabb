@@ -107,11 +107,11 @@ function Encoder:finish()
 end
 
 local encoder = Encoder.new()
-function encode_raise_alarm (alarm_type_id, alarm_type_qualifier,
+function encode_raise_alarm (resource, alarm_type_id, alarm_type_qualifier,
                              perceived_severity, alarm_text, alt_resource)
    encoder:reset()
    encoder:uint32(alarm_codes.raise_alarm)
-   return alarms.raise_alarm(encoder, alarm_type_id, alarm_type_qualifier,
+   return alarms.raise_alarm(encoder, resource, alarm_type_id, alarm_type_qualifier,
                              perceived_severity, alarm_text, alt_resource)
 end
 
@@ -299,7 +299,8 @@ function selftest ()
    end
    local function test_raise_alarm ()
       local key = {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''}
-      local args = {perceived_severity='critical', alt_resource={'res2a','res2b'}}
+      local args = {perceived_severity='critical',
+                    alarm_text='whoa', alt_resource={'res2a','res2b'}}
 
       local resource, alarm_type_id, alarm_type_qualifier = alarm_key(key)
       local perceived_severity, alarm_text, alt_resource = alarm_args(args)
