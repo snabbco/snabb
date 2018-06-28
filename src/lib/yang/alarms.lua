@@ -312,7 +312,13 @@ function declare_alarm (key, args)
       alarm_list:new(key, args)
    end
    local alarm = {}
-   function alarm:raise (args)
+   function alarm:raise (raise_args)
+      if raise_args then
+         local union = {}
+         for k,v in pairs(args) do union[k] = v end
+         for k,v in pairs(raise_args) do union[k] = v end
+         args = union
+      end
       alarm_handler.raise_alarm(key, args)
    end
    function alarm:clear ()
