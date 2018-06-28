@@ -417,35 +417,25 @@ function Intel:new (conf)
       self.sync_timer = lib.throttle(0.01)
    end
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='ingress-bandwith'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Ingress bandwith exceeds N Gbps',
-      }
-   }
-   local ingress_bandwith = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='ingress-bandwith'}] = {
-         perceived_severity='major',
-         alarm_text='Ingress bandwith exceeds 1e9 bytes/s which can cause packet drops.'
-      }
-   }
+   alarms.add_to_inventory(
+      {alarm_type_id='ingress-bandwith'},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description='Ingress bandwith exceeds N Gbps'})
+   local ingress_bandwith = alarms.declare_alarm(
+      {resource=tostring(S.getpid()),alarm_type_id='ingress-bandwith'},
+      {perceived_severity='major',
+       alarm_text='Ingress bandwith exceeds 1e9 bytes/s which can cause packet drops.'})
    self.ingress_bandwith_alarm = CallbackAlarm.new(ingress_bandwith,
       1, 1e9, function() return self:rxbytes() end)
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='ingress-packet-rate'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Ingress packet-rate exceeds N Gbps',
-      }
-   }
-   local ingress_packet_rate = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='ingress-packet-rate'}] = {
-         perceived_severity='major',
-         alarm_text='Ingress packet-rate exceeds 2MPPS which can cause packet drops.'
-      }
-   }
+   alarms.add_to_inventory(
+      {alarm_type_id='ingress-packet-rate'},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description='Ingress packet-rate exceeds N Gbps'})
+   local ingress_packet_rate = alarms.declare_alarm(
+      {resource=tostring(S.getpid()),alarm_type_id='ingress-packet-rate'},
+      {perceived_severity='major',
+       alarm_text='Ingress packet-rate exceeds 2MPPS which can cause packet drops.'})
    self.ingress_packet_rate_alarm = CallbackAlarm.new(ingress_packet_rate,
       1, 2e6, function() return self:rxpackets() end)
 

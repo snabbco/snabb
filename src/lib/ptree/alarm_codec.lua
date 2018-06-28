@@ -107,36 +107,43 @@ function Encoder:finish()
 end
 
 local encoder = Encoder.new()
-function encode_raise_alarm (resource, alarm_type_id, alarm_type_qualifier,
-                             perceived_severity, alarm_text, alt_resource)
+local encoders = {}
+function encoders.raise_alarm (key, args)
    encoder:reset()
    encoder:uint32(alarm_codes.raise_alarm)
-   return alarms.raise_alarm(encoder, resource, alarm_type_id, alarm_type_qualifier,
-                             perceived_severity, alarm_text, alt_resource)
+   return alarms.raise_alarm(
+      encoder,
+      key.resource, key.alarm_type_id, key.alarm_type_qualifier,
+      args.perceived_severity, args.alarm_text, args.alt_resource)
 end
 
-function encode_clear_alarm (resource, alarm_type_id, alarm_type_qualifier)
+function encoders.clear_alarm (key)
    encoder:reset()
    encoder:uint32(alarm_codes.clear_alarm)
-   return alarms.clear_alarm(encoder, resource, alarm_type_id,
-                             alarm_type_qualifier)
+   return alarms.clear_alarm(encoder, key.resource, key.alarm_type_id,
+                             key.alarm_type_qualifier)
 end
 
-function encode_add_to_inventory (alarm_type_id, alarm_type_qualifier,
-                                  resource, has_clear, description, alt_resource)
+function encoders.add_to_inventory (key, args)
    encoder:reset()
    encoder:uint32(alarm_codes.add_to_inventory)
-   return alarms.add_to_inventory(encoder, alarm_type_id, alarm_type_qualifier,
-                                  resource, has_clear, description, alt_resource)
+   return alarms.add_to_inventory(
+      encoder,
+      key.alarm_type_id, key.alarm_type_qualifier,
+      args.resource, args.has_clear, args.description, args.alt_resource)
 end
 
-function encode_declare_alarm (resource, alarm_type_id, alarm_type_qualifier,
-                               perceived_severity, alarm_text, alt_resource)
+function encoders.declare_alarm (key, args)
    encoder:reset()
    encoder:uint32(alarm_codes.declare_alarm)
-   return alarms.declare_alarm(encoder, resource, alarm_type_id,
-                               alarm_type_qualifier, perceived_severity,
-                               alarm_text, alt_resource)
+   return alarms.declare_alarm(
+      encoder,
+      key.resource, key.alarm_type_id, key.alarm_type_qualifier,
+      args.perceived_severity, args.alarm_text, args.alt_resource)
+end
+
+function encode(name, key, args)
+   return assert(encoders[name])(key, args)
 end
 
 local function decoder(buf, len)
@@ -168,10 +175,44 @@ local function decoder(buf, len)
    return decoder
 end
 
+local function to_alarm (args)
+   local key = {
+      resource = args[1],
+      alarm_type_id = args[2],
+      alarm_type_qualifier = args[3],
+   }
+   local args = {
+      perceived_severity = args[4],
+      alarm_text = args[5],
+      alt_resource = args[6],
+   }
+   return key, args
+end
+local function to_alarm_type (args)
+   local key = {
+      alarm_type_id = args[1],
+      alarm_type_qualifier = args[2],
+   }
+   local args = {
+      resource = args[3],
+      has_clear = args[4],
+      description = args[5],
+      alt_resource = args[6],
+   }
+   return key, args
+end
+
+local decoders = {
+   raise_alarm = to_alarm,
+   clear_alarm = to_alarm,
+   add_to_inventory = to_alarm_type,
+   declare_alarm = to_alarm
+}
+
 function decode(buf, len)
    local codec = decoder(buf, len)
    local name = assert(alarm_names[codec:uint32()])
-   return { name, assert(alarms[name], name)(codec) }
+   return name, decoders[name](alarms[name](codec))
 end
 
 ---
@@ -190,59 +231,10 @@ function get_channel()
    return alarms_channel
 end
 
-local function alarm_key (t)
-   return t.resource, t.alarm_type_id, t.alarm_type_qualifier
-end
-local function alarm_args (t)
-   return t.perceived_severity, t.alarm_text, t.alt_resource
-end
-
--- To be used by the manager to group args into key and args.
-function to_alarm (args)
-   local key = {
-      resource = args[1],
-      alarm_type_id = args[2],
-      alarm_type_qualifier = args[3],
-   }
-   local args = {
-      perceived_severity = args[4],
-      alarm_text = args[5],
-      alt_resource = args[6],
-   }
-   return key, args
-end
-
-local function alarm_type_key (t)
-   return t.alarm_type_id, t.alarm_type_qualifier
-end
-local function alarm_type_args (t)
-   return t.resource, t.has_clear, t.description, t.alt_resource
-end
-
-function to_alarm_type (args)
-   local alarm_type_id, alarm_type_qualifier, resource, has_clear, description, alt_resource = unpack(args)
-   local key = {
-      alarm_type_id = args[1],
-      alarm_type_qualifier = args[2],
-   }
-   local args = {
-      resource = args[3],
-      has_clear = args[4],
-      description = args[5],
-      alt_resource = args[6],
-   }
-   return key, args
-end
-
 function raise_alarm (key, args)
    local channel = get_channel()
    if channel then
-      local resource, alarm_type_id, alarm_type_qualifier = alarm_key(key)
-      local perceived_severity, alarm_text, alt_resource = alarm_args(args)
-      local buf, len = encode_raise_alarm(
-         resource, alarm_type_id, alarm_type_qualifier,
-         perceived_severity, alarm_text, alt_resource
-      )
+      local buf, len = encoders.raise_alarm(key, args)
       channel:put_message(buf, len)
    end
 end
@@ -250,8 +242,7 @@ end
 function clear_alarm (key)
    local channel = get_channel()
    if channel then
-      local resource, alarm_type_id, alarm_type_qualifier = alarm_key(key)
-      local buf, len = encode_clear_alarm(resource, alarm_type_id, alarm_type_qualifier)
+      local buf, len = encoders.clear_alarm(key)
       channel:put_message(buf, len)
    end
 end
@@ -259,12 +250,7 @@ end
 function add_to_inventory (key, args)
    local channel = get_channel()
    if channel then
-      local alarm_type_id, alarm_type_qualifier = alarm_type_key(key)
-      local resource, has_clear, description, alt_resource = alarm_type_args(args)
-      local buf, len = encode_add_to_inventory(
-         alarm_type_id, alarm_type_qualifier,
-         resource, has_clear, description, alt_resource
-      )
+      local buf, len = encoders.add_to_inventory(key, args)
       channel:put_message(buf, len)
    end
 end
@@ -272,12 +258,7 @@ end
 function declare_alarm (key, args)
    local channel = get_channel()
    if channel then
-      local resource, alarm_type_id, alarm_type_qualifier = alarm_key(key)
-      local perceived_severity, alarm_text, alt_resource = alarm_args(args)
-      local buf, len = encode_declare_alarm(
-         resource, alarm_type_id, alarm_type_qualifier,
-         perceived_severity, alarm_text, alt_resource
-      )
+      local buf, len = encoders.declare_alarm(key, args)
       channel:put_message(buf, len)
    end
 end
@@ -285,39 +266,21 @@ end
 function selftest ()
    print('selftest: lib.ptree.alarm_codec')
    local lib = require("core.lib")
-   local function test_alarm (name, args)
-      local encoded, len
-      if name == 'raise_alarm' then
-         encoded, len = encode_raise_alarm(unpack(args))
-      elseif name == 'clear_alarm' then
-         encoded, len = encode_clear_alarm(unpack(args))
-      else
-         error('not valid alarm name: '..alarm)
-      end
-      local decoded = decode(encoded, len)
-      assert(lib.equal({name, args}, decoded))
-   end
-   local function test_raise_alarm ()
-      local key = {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''}
-      local args = {perceived_severity='critical',
-                    alarm_text='whoa', alt_resource={'res2a','res2b'}}
-
-      local resource, alarm_type_id, alarm_type_qualifier = alarm_key(key)
-      local perceived_severity, alarm_text, alt_resource = alarm_args(args)
-      local alarm = {resource, alarm_type_id, alarm_type_qualifier,
-                     perceived_severity, alarm_text, alt_resource}
-
-      test_alarm('raise_alarm', alarm)
-   end
-   local function test_clear_alarm ()
-      local key = {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''}
-      local resource, alarm_type_id, alarm_type_qualifier = alarm_key(key)
-      local alarm = {resource, alarm_type_id, alarm_type_qualifier}
-      test_alarm('clear_alarm', alarm)
+   local function test_alarm (name, key, args)
+      local encoded, len = encode(name, key, args)
+      local dname, dkey, dargs = decode(encoded, len)
+      assert(name == dname)
+      assert(lib.equal(key, dkey))
+      assert(lib.equal(args or {}, dargs))
    end
 
-   test_raise_alarm()
-   test_clear_alarm()
+   test_alarm('raise_alarm',
+              {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''},
+              {perceived_severity='critical',
+               alarm_text='whoa', alt_resource={'res2a','res2b'}})
+
+   test_alarm('clear_alarm',
+              {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''})
 
    print('selftest: ok')
 end
