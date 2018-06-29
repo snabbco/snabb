@@ -1,5 +1,50 @@
 # Change Log
 
+## [2018.06.01]
+
+### Features
+
+* Support influxdb format for snabb config by passing `--format influxdb`.
+
+* Support for large binding tables of above 4GB
+
+* Support TAP interface for the lwAFTR.
+
+* New snabb top with interactive interface (this replaces snabbvmx top too).
+    * Supports new interface view for condensed information per NIC.
+    * Support going back in time to see historical data.
+
+    See more information here:
+    https://github.com/Igalia/snabb/tree/lwaftr/src/program/top
+
+* Support running on RaptorJIT
+
+* Add RRD support enabling storage of historical counter change rates.
+
+* Support YANG leafref type in ietf-alarms schema.
+
+### Bug fixes
+
+* Fix display of invalid IP address when configured to use ARP to resolve the external
+  interface's next hop.
+
+* Fix ip-prefix in YANG
+
+* Fix binary serialization of by-reference types in YANG data.
+
+* Relax NUMA policy to preferred to allow allocation of larger amounts of memory which
+  before would have silently killed the process.
+
+* Fixed the TTL on ICMP packets.
+
+* Fix timezone offset in YANG alarms.
+
+* Fix reading of YANG configurations over stdin
+
+* Fix `snabb alarms listen` runtime error when running with wrong number of args.
+
+* Fix incorrect argument parsing in `snabb loadtest find-limit` short form.
+
 ## [2018.04.01]
 
 ### Features
