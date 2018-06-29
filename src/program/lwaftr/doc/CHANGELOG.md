@@ -4,42 +4,56 @@
 
 ### Features
 
-* Support influxdb format for snabb config by passing `--format influxdb`.
+* Support influxdb format for `snabb config`.   Pass `--format influxdb` to
+  `snabb config get-state` for output suitable for feeding to influxdb.
 
-* Support for large binding tables of above 4GB
+* Support larger binding tables.  The lwAFTR has now been tested with binding
+  tables containing 40M entries.
 
-* Support TAP interface for the lwAFTR.
+* Support TAP interface for the lwAFTR.  This is useful when testing.
 
-* New snabb top with interactive interface (this replaces snabbvmx top too).
-    * Supports new interface view for condensed information per NIC.
-    * Support going back in time to see historical data.
+* Completely rewritten `snabb top`.  Notable changes include:
+    * Shows all Snabb instances on the current machine, and worker-manager
+      relationships.
+    * Interactive interface for focussing in on specific Snabb processes.
+    * New `top`-like summary view focussed on NIC throughput.
+    * New tree view that can show all counters.
+    * Support for historical flight-recorder data view.
 
-    See more information here:
+  The new `snabb top` replaces `snabb snabbvmx top` as well.
+
+  For more information, see `snabb top --help`:
     https://github.com/Igalia/snabb/tree/lwaftr/src/program/top
 
-* Port the lwAFTR to the new raptorJIT engine. 
+* Make the necessary lwAFTR changes to allow it to work with the new raptorJIT
+  engine.  Note that this release does not include RaptorJIT yet; we are waiting
+  on an upstream Snabb release that officially ships it.
 
-* Add RRD support enabling storage of historical counter change rates.
+* Add RRD support enabling storage of historical counter change rates.  Counter
+  change rates are measured over 2-second windows for the last 2 hours, 30-second
+  windows for the last 24 hours, and 5-minute intervals over the last 7 days.  This
+  data can be useful in an incident response context to find interesting events
+  from the recent past.
 
-* Improved support of several YANG data-types (leafref, ipv4-prefix and ipv6-prefix)
+* Improved support of several YANG data-types (leafref, ipv4-prefix and ipv6-prefix).
 
-* Added support for YANG notifications
+* Added support for YANG notifications.
 
 ### Bug fixes
 
 * Fix display of invalid IP address when configured to use ARP to resolve the external
   interface's next hop.
 
-* Fix binary serialization of by-reference types in YANG data.
+* Relax NUMA policy to be less strict.  It used to be that if no NUMA-local memory was
+  available for a Snabb worker, the worker would be silently killed.  The new behavior
+  is to continue with some non-local memory.  This is a tradeoff that may result in lower
+  performance when less NUMA-local memory is available, without warnings, but which
+  prevents the operating system from silently killing Snabb workers.
 
-* Relax NUMA policy to preferred to allow allocation of larger amounts of memory which
-  before would have silently killed the process.
-
-* Fixed the TTL on ICMP packets.
+* Fixed the TTL on ICMP ECHO reply packets, which no longer take their initial TTL from
+  the corresponding ECHO request packets.
 
 * Fix timezone offset in YANG alarms.
-
-* Fix reading of YANG configurations over stdin
 
 * Fix `snabb alarms listen` runtime error when running with wrong number of args.
 
