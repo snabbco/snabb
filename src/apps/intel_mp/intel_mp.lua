@@ -1290,16 +1290,23 @@ function Intel82599:rxdmapackets ()
 end
 
 function Intel82599:init_queue_stats (frame)
+   local function keys(t)
+      local ret = {}
+      for k,_ in pairs(t) do table.insert(ret, k) end
+      table.sort(ret)
+      return ret
+   end
    local perqregs = {
       rxdrops = "QPRDC",
       rxpackets = "QPRC",
-      txpackets = "QPTC",
       rxbytes = "QBRC64",
       txbytes = "QBTC64",
+      txpackets = "QPTC",
    }
    self.queue_stats = {}
    for i=0,15 do
-      for k,v in pairs(perqregs) do
+      for _,k in ipairs(keys(perqregs)) do
+         local v = perqregs[k]
          local name = "q" .. i .. "_" .. k
          table.insert(self.queue_stats, name)
          table.insert(self.queue_stats, self.r[v][i])
