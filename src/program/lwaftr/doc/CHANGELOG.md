@@ -17,18 +17,18 @@
     See more information here:
     https://github.com/Igalia/snabb/tree/lwaftr/src/program/top
 
-* Support running on RaptorJIT
+* Port the lwAFTR to the new raptorJIT engine. 
 
 * Add RRD support enabling storage of historical counter change rates.
 
-* Support YANG leafref type in ietf-alarms schema.
+* Improved support of several YANG data-types (leafref, ipv4-prefix and ipv6-prefix)
+
+* Added support for YANG notifications
 
 ### Bug fixes
 
 * Fix display of invalid IP address when configured to use ARP to resolve the external
   interface's next hop.
-
-* Fix ip-prefix in YANG
 
 * Fix binary serialization of by-reference types in YANG data.
 
