@@ -334,11 +334,9 @@ function Manager:make_rrd(counter_name)
       base_interval='2s' })
 end
 
+local blacklisted_counters = lib.set('macaddr', 'mtu', 'promisc', 'speed', 'status', 'type')
 local function blacklisted (name)
-   local t = lib.set('macaddr', 'mtu', 'promisc', 'speed', 'status', 'type')
-   name = lib.basename(name)
-   name = name:gsub("%.counter", "")
-   return t[name]
+   return blacklisted_counters[strip_suffix(lib.basename(name), '.counter')]
 end
 
 function Manager:monitor_worker_counters(id)
@@ -350,10 +348,11 @@ function Manager:monitor_worker_counters(id)
    for ev in events.get, events do
       if has_suffix(ev.name, '.counter') then
          local name = strip_prefix(ev.name, dir..'/')
-         if blacklisted(name) then goto continue end
          local qualified_name = '/'..pid..'/'..name
          local counters = self.counters[name]
-         if ev.kind == 'creat' then
+         if blacklisted(name) then
+            -- Pass.
+         elseif ev.kind == 'creat' then
             if not counters then
                counters = { aggregated=counter.create(name), active={},
                             rrd={}, aggregated_rrd=self:make_rrd(name),
@@ -371,7 +370,6 @@ function Manager:monitor_worker_counters(id)
             S.unlink(strip_suffix(qualified_name, ".counter")..".rrd")
          end
       end
-      ::continue::
    end
 end
 
