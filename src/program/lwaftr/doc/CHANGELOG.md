@@ -29,11 +29,11 @@
   engine.  Note that this release does not include RaptorJIT yet; we are waiting
   on an upstream Snabb release that officially ships it.
 
-* Add RRD support enabling storage of historical counter change rates.  Counter
-  change rates are measured over 2-second windows for the last 2 hours, 30-second
-  windows for the last 24 hours, and 5-minute intervals over the last 7 days.  This
-  data can be useful in an incident response context to find interesting events
-  from the recent past.
+* Add RRD support enabling storage of historical counter change rates.  The lwAFTR
+  is configured to record counter change rates over 2-second windows for the last
+  2 hours, 30-second windows for the last 24 hours, and 5-minute intervals over
+  the last 7 days.  This data can be useful in an incident response context to
+  find interesting operational events from the recent past.
 
 * Improved support of several YANG data-types (leafref, ipv4-prefix and ipv6-prefix).
 
