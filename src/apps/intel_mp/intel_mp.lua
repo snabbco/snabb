@@ -654,7 +654,7 @@ function Intel:push ()
    if self.rxq and self.output.output then return end
 
    -- Sync device statistics.
-   if self.sync_timer() then self:sync_stats() end
+   if self.sync_timer and self.sync_timer() then self:sync_stats() end
 end
 
 function Intel:pull ()
@@ -680,7 +680,7 @@ function Intel:pull ()
    self.r.RDT(band(self.rdt - 1, self.ndesc-1))
 
    -- Sync device statistics.
-   if self.sync_timer() then self:sync_stats() end
+   if self.sync_timer and self.sync_timer() then self:sync_stats() end
 end
 
 function Intel:unlock_sw_sem()
