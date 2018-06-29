@@ -334,6 +334,11 @@ function Manager:make_rrd(counter_name)
       base_interval='2s' })
 end
 
+local blacklisted_counters = lib.set('macaddr', 'mtu', 'promisc', 'speed', 'status', 'type')
+local function blacklisted (name)
+   return blacklisted_counters[strip_suffix(lib.basename(name), '.counter')]
+end
+
 function Manager:monitor_worker_counters(id)
    local worker = self.workers[id]
    if not worker then return end -- Worker was removed before monitor started.
@@ -345,7 +350,9 @@ function Manager:monitor_worker_counters(id)
          local name = strip_prefix(ev.name, dir..'/')
          local qualified_name = '/'..pid..'/'..name
          local counters = self.counters[name]
-         if ev.kind == 'creat' then
+         if blacklisted(name) then
+            -- Pass.
+         elseif ev.kind == 'creat' then
             if not counters then
                counters = { aggregated=counter.create(name), active={},
                             rrd={}, aggregated_rrd=self:make_rrd(name),
