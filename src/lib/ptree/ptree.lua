@@ -334,6 +334,13 @@ function Manager:make_rrd(counter_name)
       base_interval='2s' })
 end
 
+local function blacklisted (name)
+   local t = lib.set('macaddr', 'mtu', 'promisc', 'speed', 'status', 'type')
+   name = lib.basename(name)
+   name = name:gsub("%.counter", "")
+   return t[name]
+end
+
 function Manager:monitor_worker_counters(id)
    local worker = self.workers[id]
    if not worker then return end -- Worker was removed before monitor started.
@@ -343,6 +350,7 @@ function Manager:monitor_worker_counters(id)
    for ev in events.get, events do
       if has_suffix(ev.name, '.counter') then
          local name = strip_prefix(ev.name, dir..'/')
+         if blacklisted(name) then goto continue end
          local qualified_name = '/'..pid..'/'..name
          local counters = self.counters[name]
          if ev.kind == 'creat' then
@@ -363,14 +371,8 @@ function Manager:monitor_worker_counters(id)
             S.unlink(strip_suffix(qualified_name, ".counter")..".rrd")
          end
       end
+      ::continue::
    end
-end
-
-local function blacklisted (name)
-   local t = lib.set('macaddr', 'mtu', 'promisc', 'speed', 'status', 'type')
-   name = lib.basename(name)
-   name = name:gsub("%.counter", "")
-   return t[name]
 end
 
 function Manager:sample_active_counters()
@@ -378,12 +380,10 @@ function Manager:sample_active_counters()
       local now = rrd.now()
       for name, counters in pairs(self.counters) do
          local sum = counters.archived[0]
-         if not blacklisted(name) then
-            for pid, active in pairs(counters.active) do
-               local v = counter.read(active)
-               counters.rrd[pid]:add({value=v}, now)
-               sum = sum + v
-            end
+         for pid, active in pairs(counters.active) do
+            local v = counter.read(active)
+            counters.rrd[pid]:add({value=v}, now)
+            sum = sum + v
          end
          counters.aggregated_rrd:add({value=sum}, now)
          counter.set(counters.aggregated, sum)
