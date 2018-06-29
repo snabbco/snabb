@@ -1,5 +1,64 @@
 # Change Log
 
+## [2018.04.02]
+
+### Features
+
+* Support influxdb format for `snabb config`.   Pass `--format influxdb` to
+  `snabb config get-state` for output suitable for feeding to influxdb.
+
+* Support larger binding tables.  The lwAFTR has now been tested with binding
+  tables containing 40M entries.
+
+* Support TAP interface for the lwAFTR.  This is useful when testing.
+
+* Completely rewritten `snabb top`.  Notable changes include:
+    * Shows all Snabb instances on the current machine, and worker-manager
+      relationships.
+    * Interactive interface for focussing in on specific Snabb processes.
+    * New `top`-like summary view focussed on NIC throughput.
+    * New tree view that can show all counters.
+    * Support for historical flight-recorder data view.
+
+  The new `snabb top` replaces `snabb snabbvmx top` as well.
+
+  For more information, see `snabb top --help`:
+    https://github.com/Igalia/snabb/tree/lwaftr/src/program/top
+
+* Make the necessary lwAFTR changes to allow it to work with the new raptorJIT
+  engine.  Note that this release does not include RaptorJIT yet; we are waiting
+  on an upstream Snabb release that officially ships it.
+
+* Add RRD support enabling storage of historical counter change rates.  The lwAFTR
+  is configured to record counter change rates over 2-second windows for the last
+  2 hours, 30-second windows for the last 24 hours, and 5-minute intervals over
+  the last 7 days.  This data can be useful in an incident response context to
+  find interesting operational events from the recent past.
+
+* Improved support of several YANG data-types (leafref, ipv4-prefix and ipv6-prefix).
+
+* Added support for YANG notifications.
+
+### Bug fixes
+
+* Fix display of invalid IP address when configured to use ARP to resolve the external
+  interface's next hop.
+
+* Relax NUMA policy to be less strict.  It used to be that if no NUMA-local memory was
+  available for a Snabb worker, the worker would be silently killed.  The new behavior
+  is to continue with some non-local memory.  This is a tradeoff that may result in lower
+  performance when less NUMA-local memory is available, without warnings, but which
+  prevents the operating system from silently killing Snabb workers.
+
+* Fixed the TTL on ICMP ECHO reply packets, which no longer take their initial TTL from
+  the corresponding ECHO request packets.
+
+* Fix timezone offset in YANG alarms.
+
+* Fix `snabb alarms listen` runtime error when running with wrong number of args.
+
+* Fix incorrect argument parsing in `snabb loadtest find-limit` short form.
+
 ## [2018.04.01]
 
 ### Features
