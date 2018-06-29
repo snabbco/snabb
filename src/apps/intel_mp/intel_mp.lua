@@ -822,6 +822,18 @@ end
 
 function Intel:sync_stats ()
    local set, stats = counter.set, self.stats
+   local function update_queue_stats (start, last)
+      for idx = start, last, 2 do
+         local name, register = self.queue_stats[idx], self.queue_stats[idx+1]
+         set(stats[name], register())
+      end
+   end
+   local function update_rx_queue_stats (idx)
+      update_queue_stats(idx*10+1, idx*10+6)
+   end
+   local function update_tx_queue_stats (idx)
+      update_queue_stats(idx*10+7, idx*10+10)
+   end
    set(stats.speed, self:link_speed())
    set(stats.status, self:link_status() and 1 or 2)
    set(stats.promisc, self:promisc() and 1 or 2)
@@ -841,15 +853,9 @@ function Intel:sync_stats ()
       set(stats.txerrors, self:txerrors())
       set(stats.rxdmapackets, self:rxdmapackets())
    end
-   -- FIXME: rxcounter and txcounter are tightly coupled.
    if self.rxcounter or self.txcounter then
-      local rxcounter = self.rxcounter or self.txcounter
-      -- Each queue index consists of 10 elements (5 names, 5 values).
-      local start, last = rxcounter*10+1, rxcounter*10+10
-      for idx = start, last, 2 do
-         local name, register = self.queue_stats[idx], self.queue_stats[idx+1]
-         set(stats[name], register())
-      end
+      update_rx_queue_stats(self.rxcounter or self.txcounter)
+      update_tx_queue_stats(self.txcounter or self.rxcounter)
    else
       for idx = 1, #self.queue_stats, 2 do
          local name, register = self.queue_stats[idx], self.queue_stats[idx+1]
