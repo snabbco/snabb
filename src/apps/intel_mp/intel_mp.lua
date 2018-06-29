@@ -652,9 +652,9 @@ function Intel:push ()
    -- same code as in pull, but we only call it in case the rxq
    -- is disabled for this app
    if self.rxq and self.output.output then return end
-   if self.run_stats and self.sync_timer() then
-      self:sync_stats()
-   end
+
+   -- Sync device statistics.
+   if self.sync_timer() then self:sync_stats() end
 end
 
 function Intel:pull ()
@@ -679,10 +679,8 @@ function Intel:pull ()
    -- This avoids RDT == RDH when every descriptor is available.
    self.r.RDT(band(self.rdt - 1, self.ndesc-1))
 
-   -- Sync device statistics if we are master.
-   if self.run_stats and self.sync_timer() then
-      self:sync_stats()
-   end
+   -- Sync device statistics.
+   if self.sync_timer() then self:sync_stats() end
 end
 
 function Intel:unlock_sw_sem()
