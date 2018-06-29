@@ -366,15 +366,24 @@ function Manager:monitor_worker_counters(id)
    end
 end
 
+local function blacklisted (name)
+   local t = lib.set('macaddr', 'mtu', 'promisc', 'speed', 'status', 'type')
+   name = lib.basename(name)
+   name = name:gsub("%.counter", "")
+   return t[name]
+end
+
 function Manager:sample_active_counters()
    while true do
       local now = rrd.now()
       for name, counters in pairs(self.counters) do
          local sum = counters.archived[0]
-         for pid, active in pairs(counters.active) do
-            local v = counter.read(active)
-            counters.rrd[pid]:add({value=v}, now)
-            sum = sum + v
+         if not blacklisted(name) then
+            for pid, active in pairs(counters.active) do
+               local v = counter.read(active)
+               counters.rrd[pid]:add({value=v}, now)
+               sum = sum + v
+            end
          end
          counters.aggregated_rrd:add({value=sum}, now)
          counter.set(counters.aggregated, sum)
