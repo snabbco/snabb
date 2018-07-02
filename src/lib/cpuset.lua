@@ -19,6 +19,26 @@ do
    end
 end
 
+local function parse_cpulist (cpus)
+   local ret = {}
+   for range in cpus:split(',') do
+      local lo, hi = range:match("^%s*([^%-]*)%s*-%s*([^%-%s]*)%s*$")
+      if lo == nil then lo = range:match("^%s*([^%-]*)%s*$") end
+      assert(lo ~= nil, 'invalid range: '..range)
+      lo = assert(tonumber(lo), 'invalid range begin: '..lo)
+      assert(lo == math.floor(lo), 'invalid range begin: '..lo)
+      if hi ~= nil then
+         hi = assert(tonumber(hi), 'invalid range end: '..hi)
+         assert(hi == math.floor(hi), 'invalid range end: '..hi)
+         assert(lo < hi, 'invalid range: '..range)
+      else
+         hi = lo
+      end
+      for cpu=lo,hi do table.insert(ret, cpu) end
+   end
+   return ret
+end
+
 function CPUSet:bind_to_numa_node()
    local nodes = {}
    for node, _ in pairs(self.by_node) do table.insert(nodes, node) end
@@ -34,20 +54,8 @@ function CPUSet:bind_to_numa_node()
 end
 
 function CPUSet:add_from_string(cpus)
-   for range in cpus:split(',') do
-      local lo, hi = range:match("^%s*([^%-]*)%s*-%s*([^%-%s]*)%s*$")
-      if lo == nil then lo = range:match("^%s*([^%-]*)%s*$") end
-      assert(lo ~= nil, 'invalid range: '..range)
-      lo = assert(tonumber(lo), 'invalid range begin: '..lo)
-      assert(lo == math.floor(lo), 'invalid range begin: '..lo)
-      if hi ~= nil then
-         hi = assert(tonumber(hi), 'invalid range end: '..hi)
-         assert(hi == math.floor(hi), 'invalid range end: '..hi)
-         assert(lo < hi, 'invalid range: '..range)
-      else
-         hi = lo
-      end
-      for cpu=lo,hi do self:add(cpu) end
+   for _, cpu in ipairs(parse_cpulist(cpus)) do
+      self:add(cpu)
    end
 end
 
@@ -106,4 +114,11 @@ function CPUSet:release(cpu)
       end
    end
    error('CPU not found on NUMA node: '..cpu..', '..node)
+end
+
+function selftest ()
+   print('selftest: cpuset')
+   local cpus = set(parse_cpulist("0-5,7"))
+   assert(cpus["3"] and cpus["7"])
+   print('selftest: ok')
 end
