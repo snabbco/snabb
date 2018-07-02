@@ -196,12 +196,15 @@ function Fragmenter:unfragmentable_packet(p)
    -- TODO: Send an error packet.
 end
 
-function Fragmenter:fragment_and_transmit(in_next_header, in_pkt, mtu)
+function Fragmenter:fragment_and_transmit(in_next_header, in_pkt_box, mtu)
    local mtu_with_l2 = mtu + ether_header_len
-   local total_payload_size = in_pkt.length - ether_ipv6_header_len
+   local total_payload_size = in_pkt_box[0].length - ether_ipv6_header_len
    local offset, id = 0, self:fresh_fragment_id()
 
+   -- Use explicit boxing to avoid garbage when passing the header and
+   -- packet pointers in case this loop gets compiled first.
    while offset < total_payload_size do
+      local in_pkt = in_pkt_box[0]
       local out_pkt = packet.allocate()
       packet.append(out_pkt, in_pkt.data, ether_ipv6_header_len)
       local out_h = ffi.cast(ether_ipv6_header_ptr_t, out_pkt.data)
@@ -283,6 +286,7 @@ function Fragmenter:expire_pmtu ()
    until cursor == 0
 end
 
+local pkt_box = ffi.new("struct packet *[1]")
 function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
    local south, north = self.input.south, self.output.north
@@ -302,23 +306,41 @@ function Fragmenter:push ()
          -- counter here.
          packet.free(pkt)
       else
-         local mtu = self.mtu
-         if self.pmtud then
-            local entry = self.dcache:lookup_ptr(h.ipv6.dst_ip)
-            if entry then
-               mtu = entry.value.mtu
-            end
-         end
-         if pkt.length <= mtu + ether_header_len then
-            -- No need to fragment; forward it on.
-            counter.add(self.shm["out-ipv6-frag-not"])
-            link.transmit(output, pkt)
-         else
-            -- Packet doesn't fit into MTU; need to fragment.
-            self:fragment_and_transmit(h.ipv6.next_header, pkt, mtu)
-            packet.free(pkt)
+         link.transmit(input, pkt)
+      end
+   end
+
+   for _ = 1, link.nreadable(input) do
+      local pkt = link.receive(input)
+      local mtu = self.mtu
+      if self.pmtud then
+         local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
+         local entry = self.dcache:lookup_ptr(h.ipv6.dst_ip)
+         if entry then
+            mtu = entry.value.mtu
          end
       end
+      -- FIXME: assumes that there is always room to store the MTU at
+      -- the end of the payload.
+      ffi.cast("uint16_t *", pkt.data + pkt.length)[0] = mtu
+      if pkt.length <= mtu + ether_header_len then
+         -- No need to fragment; forward it on.
+         counter.add(self.shm["out-ipv6-frag-not"])
+         link.transmit(output, pkt)
+      else
+         -- Packet doesn't fit into MTU; need to fragment.
+         link.transmit(input, pkt)
+      end
+   end
+
+   for _ = 1,  link.nreadable(input) do
+      local pkt  = link.receive(input)
+      local mtu = ffi.cast("uint16_t *", pkt.data + pkt.length)[0]
+      local next_header =
+         ffi.cast(ether_ipv6_header_ptr_t, pkt.data).ipv6.next_header
+      pkt_box[0] = pkt
+      self:fragment_and_transmit(next_header, pkt_box, mtu)
+      packet.free(pkt_box[0])
    end
 
    if self.pmtud then
