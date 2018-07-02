@@ -39,6 +39,51 @@ local function parse_cpulist (cpus)
    return ret
 end
 
+local function parse_cpulist_from_file (path)
+   local fd = assert(io.open(path))
+   if not fd then return {} end
+   local ret = parse_cpulist(fd:read("*all"))
+   fd:close()
+   return ret
+end
+
+local function set (t)
+   local ret = {}
+   for _,v in pairs(t) do ret[tostring(v)] = true end
+   return ret
+end
+
+local function available_cpus (node)
+   local function cpus_in_node (node)
+      local node_path = '/sys/devices/system/node/node'..node
+      return parse_cpulist_from_file(node_path..'/cpulist')
+   end
+   local function isolated_cpus ()
+      return parse_cpulist_from_file('/sys/devices/system/cpu/isolated')
+   end
+   local ret = {}
+   local isolated_cpus = set(isolated_cpus())
+   for _, cpu in ipairs(cpus_in_node(node)) do
+      if not isolated_cpus[tostring(cpu)] then
+         table.insert(ret, cpu)
+      end
+   end
+   table.sort(ret)
+   return ret
+end
+
+function CPUSet:bind_to_first_available_cpu()
+   local nodes = {}
+   for node, _ in pairs(self.by_node) do table.insert(nodes, node) end
+   if #nodes > 0 then
+      local numa_node = nodes[1]
+      local cpus = available_cpus(numa_node)
+      local cpu = cpus[1]
+      if cpu then numa.bind_to_cpu(cpu) end
+      return cpu
+   end
+end
+
 function CPUSet:bind_to_numa_node()
    local nodes = {}
    for node, _ in pairs(self.by_node) do table.insert(nodes, node) end
