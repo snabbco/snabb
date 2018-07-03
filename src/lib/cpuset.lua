@@ -3,6 +3,7 @@
 module(...,package.seeall)
 
 local numa = require('lib.numa')
+local S = require('syscall')
 
 local CPUSet = {}
 
@@ -86,12 +87,12 @@ function CPUSet:acquire(on_node)
       end
    end
    for node, cpus in pairs(self.by_node) do
-      print("Warning: All assignable CPUs in use; "
-               .."leaving data-plane process without assigned CPU.")
+      print(("Warning: All assignable CPUs in use; "..
+             "leaving data-plane PID %d without assigned CPU."):format(S.getpid()))
       return
    end
-   print("Warning: No assignable CPUs declared; "
-            .."leaving data-plane process without assigned CPU.")
+   print(("Warning: No assignable CPUs declared; "..
+         "leaving data-plane PID %d without assigned CPU."):format(S.getpid()))
 end
 
 function CPUSet:release(cpu)
