@@ -7,7 +7,7 @@ local lib = require("core.lib")
 local binary_search = require("lib.binary_search")
 local multi_copy = require("lib.multi_copy")
 local siphash = require("lib.hash.siphash")
-local max, floor, ceil = math.max, math.floor, math.ceil
+local min, max, floor, ceil = math.min, math.max, math.floor, math.ceil
 
 CTable = {}
 LookupStreamer = {}
@@ -97,12 +97,6 @@ local function make_equal_fn(key_type)
    end
 end
 
-local function set(...)
-   local ret = {}
-   for k, v in pairs({...}) do ret[v] = true end
-   return ret
-end
-
 local function parse_params(params, required, optional)
    local ret = {}
    for k, _ in pairs(required) do
@@ -123,7 +117,7 @@ end
 -- FIXME: For now the value_type option is required, but in the future
 -- we should allow for a nil value type to create a set instead of a
 -- map.
-local required_params = set('key_type', 'value_type')
+local required_params = lib.set('key_type', 'value_type')
 local optional_params = {
    hash_seed = false,
    initial_size = 8,
@@ -160,6 +154,7 @@ end
 local try_huge_pages = true
 local huge_page_threshold = 1e6
 local function calloc(t, count)
+   if count == 0 then return 0, 0 end
    local byte_size = ffi.sizeof(t) * count
    local mem, err
    if try_huge_pages and byte_size > huge_page_threshold then
@@ -210,6 +205,7 @@ end
 
 function CTable:resize(size)
    assert(size >= (self.occupancy / self.max_occupancy_rate))
+   assert(size == floor(size))
    local old_entries = self.entries
    local old_size = self.size
    local old_max_displacement = self.max_displacement
@@ -286,7 +282,7 @@ function CTable:add(key, value, updates_allowed)
    if self.occupancy + 1 > self.occupancy_hi then
       -- Note that resizing will invalidate all hash keys, so we need
       -- to hash the key after resizing.
-      self:resize(self.size * 2)
+      self:resize(max(self.size * 2, 1)) -- Could be current size is 0.
    end
 
    local hash = self.hash_fn(key)
@@ -302,10 +298,11 @@ function CTable:add(key, value, updates_allowed)
    -- Fast path.
    if entries[index].hash == HASH_MAX and updates_allowed ~= 'required' then
       self.occupancy = self.occupancy + 1
-      entries[index].hash = hash
-      entries[index].key = key
-      entries[index].value = value
-      return index
+      local entry = entries + index
+      entry.hash = hash
+      entry.key = key
+      entry.value = value
+      return entry
    end
 
    while entries[index].hash < hash do
@@ -313,11 +310,12 @@ function CTable:add(key, value, updates_allowed)
    end
 
    while entries[index].hash == hash do
-      if self.equal_fn(key, entries[index].key) then
+      local entry = entries + index
+      if self.equal_fn(key, entry.key) then
          assert(updates_allowed, "key is already present in ctable")
-         entries[index].key = key
-         entries[index].value = value
-         return index
+         entry.key = key
+         entry.value = value
+         return entry
       end
       index = index + 1
    end
@@ -346,10 +344,11 @@ function CTable:add(key, value, updates_allowed)
    end
            
    self.occupancy = self.occupancy + 1
-   entries[index].hash = hash
-   entries[index].key = key
-   entries[index].value = value
-   return index
+   local entry = entries + index
+   entry.hash = hash
+   entry.key = key
+   entry.value = value
+   return entry
 end
 
 function CTable:update(key, value)
@@ -405,7 +404,7 @@ function CTable:remove_ptr(entry)
    end
 
    if self.occupancy < self.occupancy_lo then
-      self:resize(self.size / 2)
+      self:resize(max(ceil(self.size / 2), 1))
    end
 end
 
@@ -592,7 +591,7 @@ function CTable:next_entry(offset, limit)
    elseif limit == nil then
       limit = self.size + self.max_displacement
    else
-      limit = math.min(limit, self.size + self.max_displacement)
+      limit = min(limit, self.size + self.max_displacement)
    end
    for offset=offset, limit-1 do
       if self.entries[offset].hash ~= HASH_MAX then
@@ -615,7 +614,6 @@ function selftest()
       initial_size = ceil(occupancy / 0.4)
    }
    local ctab = new(params)
-   ctab:resize(occupancy / 0.4 + 1)
 
    -- Fill with {i} -> { bnot(i), ... }.
    local k = ffi.new('uint32_t[1]');
@@ -685,7 +683,8 @@ function selftest()
          -- keep references to avoid GCing too early
          local handle = {}
          local function read(size)
-            local buf = ffi.new('uint8_t[?]', size, file:read(size))
+            local buf = ffi.new('uint8_t[?]', size)
+            ffi.copy(buf, file:read(size), size)
             table.insert(handle, buf)
             return buf
          end
@@ -709,7 +708,7 @@ function selftest()
    repeat
       local streamer = ctab:make_lookup_streamer(width)
       for i = 1, occupancy, width do
-         local n = math.min(width, occupancy-i+1)
+         local n = min(width, occupancy-i+1)
          for j = 0, n-1 do
             streamer.entries[j].key[0] = i + j
          end

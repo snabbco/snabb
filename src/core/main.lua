@@ -81,6 +81,7 @@ function select_program (args)
             usage(0)
          elseif opt == '-v' or opt == '--version' then
             version()
+            os.exit(0)
          else
             print("unrecognized option: "..opt)
             usage(1)
@@ -119,7 +120,6 @@ License: <https://www.apache.org/licenses/LICENSE-2.0>
 
 Snabb is open source software.  For more information on Snabb, see
 https://github.com/snabbco/snabb.]])
-   os.exit(0)
 end
 
 function programname (name)
@@ -172,17 +172,19 @@ end
 
 -- Cleanup after Snabb process.
 function shutdown (pid)
+   -- simple pcall helper to print error and continue
+   local function safely (f)
+      local ok, err = pcall(f)
+      if not ok then print(err) end
+   end
+   -- Run cleanup hooks
+   safely(function () require("apps.interlink.receiver").shutdown(pid) end)
+   safely(function () require("apps.interlink.transmitter").shutdown(pid) end)
    -- Parent process performs additional cleanup steps.
    -- (Parent is the process whose 'group' folder is not a symlink.)
    local st, err = S.lstat(shm.root.."/"..pid.."/group")
    local is_parent = st and st.isdir
    if is_parent then
-      -- simple pcall helper to print error and continue
-      local function safely (f)
-         local ok, err = pcall(f)
-         if not ok then print(err) end
-      end
-      -- Run cleanup hooks
       safely(function () require("lib.hardware.pci").shutdown(pid) end)
       safely(function () require("core.memory").shutdown(pid) end)
    end
@@ -225,23 +227,23 @@ end
 -- Fork a child process that monitors us and performs cleanup actions
 -- when we terminate.
 local snabbpid = S.getpid()
+local lockfile = os.tmpname()
+local lock = S.open(lockfile, "wronly")
+S.unlink(lockfile)
+S.sigprocmask("block", "hup, int, quit, term")
+lock:lockf("lock", 0)
 if assert(S.fork()) ~= 0 then
-   -- parent process: run snabb
+   -- Parent process; run Snabb.
+   S.sigprocmask("unblock", "hup, int, quit, term")
    xpcall(main, handler)
+   -- Lock will be released however the process exits.
 else
-   -- child process: supervise parent & perform cleanup
-   -- Subscribe to SIGHUP on parent death
+   -- Child process: Supervise parent & perform cleanup.  Lock not
+   -- inherited from parent.
    S.prctl("set_name", "[snabb sup]")
-   S.prctl("set_pdeathsig", "hup")
-   -- Trap relevant signals to a file descriptor
-   local exit_signals = "hup, int, quit, term"
-   local signalfd = S.signalfd(exit_signals)
-   S.sigprocmask("block", exit_signals)
-   -- wait until we receive a signal
-   local signals
-   repeat signals = assert(S.util.signalfd_read(signalfd)) until #signals > 0
-   -- cleanup after parent process
+   -- Wait for parent to release lock.
+   lock:lockf("lock", 0)
+   -- Finally, clean up after parent process.
    shutdown(snabbpid)
-   -- exit with signal-appropriate status
-   os.exit(128 + signals[1].signo)
+   os.exit(128)
 end

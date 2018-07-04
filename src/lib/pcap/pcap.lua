@@ -28,7 +28,7 @@ struct {
 }
 ]]
 
-function write_file_header(file)
+function write_file_header (file)
    local pcap_file = ffi.new(pcap_file_t)
    pcap_file.magic_number = 0xa1b2c3d4
    pcap_file.version_major = 2
@@ -52,16 +52,21 @@ function write_record_header (file, length)
    file:write(ffi.string(pcap_record, ffi.sizeof(pcap_record)))
 end
 
--- Return an iterator for pcap records in FILENAME.
-function records (filename)
-   local file = io.open(filename, "r")
-   if file == nil then error("Unable to open file: " .. filename) end
+function read_file_header (file)
    local pcap_file = readc(file, pcap_file_t)
    if pcap_file.magic_number == 0xD4C3B2A1 then
       error("Endian mismatch in " .. filename)
    elseif pcap_file.magic_number ~= 0xA1B2C3D4 then
       error("Bad PCAP magic number in " .. filename)
    end
+   return pcap_file
+end
+
+-- Return an iterator for pcap records in FILENAME.
+function records (filename)
+   local file = io.open(filename, "r")
+   if file == nil then error("Unable to open file: " .. filename) end
+   read_file_header(file)
    local function pcap_records_it (t, i)
       local record = readc(file, pcap_record_t)
       if record == nil then return nil end

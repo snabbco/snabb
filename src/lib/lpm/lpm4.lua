@@ -237,6 +237,15 @@ function selftest ()
 end
 function LPM4:selftest (cfg, millions)
    assert(self, "selftest must be called with : ")
+
+   if not os.getenv("SNABB_LPM4_TEST_INTENSIVE") then
+      print("Skipping LPM4:selfest (very specific / excessive runtime)")
+      print("In case you are hacking on lib.lpm you might want to enable")
+      print("these tests by setting SNABB_LPM4_TEST_INTENSIVE in your")
+      print("environment.")
+      return
+   end
+
    local trusted = require("lib.lpm.lpm4_trie").LPM4_trie:new()
    trusted:add_random_entries()
 

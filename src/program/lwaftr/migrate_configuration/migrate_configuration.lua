@@ -11,6 +11,7 @@ local yang = require('lib.yang.yang')
 local stream = require('lib.yang.stream')
 local binding_table = require("apps.lwaftr.binding_table")
 local Parser = require("program.lwaftr.migrate_configuration.conf_parser").Parser
+local data = require('lib.yang.data')
 
 local br_address_t = ffi.typeof('uint8_t[16]')
 local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
@@ -214,7 +215,13 @@ local function parse_softwires(parser, psid_map, br_address_count)
       end
    }
 
-   local softwire_key_t = binding_table.softwire_key_t
+   local softwire_key_t = ffi.typeof[[
+     struct {
+         uint32_t ipv4;       // Public IPv4 address of this softwire (host-endian).
+         uint16_t padding;    // Zeroes.
+         uint16_t psid;       // Port set ID.
+     } __attribute__((packed))
+   ]]
    -- FIXME: Pull this type from the yang model, not out of thin air.
    local softwire_value_t = ffi.typeof[[
       struct {
@@ -233,7 +240,7 @@ local function parse_softwires(parser, psid_map, br_address_count)
    while not parser:check('}') do
       local entry = parser:parse_property_list(softwire_spec, '{', '}')
       key.ipv4, key.psid = entry.ipv4, entry.psid
-      value.br, value.b4_ipv6 = entry.aftr + 1, entry.b4
+      value.br, value.b4_ipv6 = entry.aftr, entry.b4
       local success = pcall(map.add, map, key, value)
       if not success then
          parser:error('duplicate softwire for ipv4=%s, psid=%d',
@@ -261,6 +268,23 @@ function load_binding_table(file)
    local source = stream.open_input_byte_stream(file)
    return parse_binding_table(Parser.new(source:as_text_stream()))
 end
+
+
+local function config_to_string(schema, conf)
+   if type(schema) == "string" then
+      schema = yang.load_schema_by_name(schema)
+   end
+   -- To keep memory usage as low as possible write it out to a temp file.
+   local memfile = util.string_io_file()
+   yang.print_config_for_schema(schema, conf, memfile)
+   conf = memfile:flush()
+
+   -- Do best to remove things manually which take a lot of memory
+   memfile:clear()
+   memfile = nil
+   return conf
+end
+
 
 local function migrate_conf(old)
    function convert_ipv4(addr)
@@ -329,7 +353,12 @@ local function migrate_conf(old)
       end
    end
 
-   return {
+   -- Build a version of snabb-softwire-v1 with a 0-based index so increment_br
+   -- does the correct thing.
+   local schema = yang.load_schema_by_name("snabb-softwire-v1")
+   local bt = schema.body["softwire-config"].body["binding-table"].body
+   bt.softwire.body.br.default = "0"
+   return config_to_string(schema, {
       softwire_config = {
          external_interface = external,
          internal_interface = internal,
@@ -339,12 +368,7 @@ local function migrate_conf(old)
             softwire = old_bt.softwires
          }
       }
-   }
-end
-
-local function migrate_legacy(stream)
-   local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
-   return migrate_conf(conf)
+   })
 end
 
 local function increment_br(conf)
@@ -363,31 +387,247 @@ local function increment_br(conf)
                          'verification needed.\n')
       io.stderr:flush()
    end
+   return config_to_string('snabb-softwire-v1', conf)
+end
+
+local function remove_address_list(conf)
+   local bt = conf.softwire_config.binding_table
+   for key, entry in cltable.pairs(bt.softwire) do
+      local br = entry.br or 1
+      entry.br_address = assert(bt.br_address[br])
+      entry.br = nil
+   end
    return conf
 end
 
-local function migrate_3_0_1(conf_file)
-   local data = require('lib.yang.data')
-   local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
-   return increment_br(data.load_data_for_schema_by_name(
-                          'snabb-softwire-v1', str, conf_file))
+local function remove_psid_map(conf)
+   -- We're actually going to load the psidmap in the schema so ranges can easily be
+   -- looked up. With support of end-addr simply trying to lookup by addr will fail.
+   -- Luckily this is the last time this should bother us hopefully.
+   local function load_range_map(conf)
+      local rangemap = require("apps.lwaftr.rangemap")
+      local psid_map_value_t = binding_table.psid_map_value_t
+
+      -- This has largely been taken from the binding_table.lua at 3db2896
+      -- however it only builds the psidmap and not the entire binding table.
+      local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
+      local psid_value = psid_map_value_t()
+      for k, v in cltable.pairs(conf.psid_map) do
+         local psid_length, shift = v.psid_length, v.shift
+         shift = shift or 16 - psid_length - (v.reserved_ports_bit_count or 0)
+         assert(psid_length + shift <= 16,
+               'psid_length '..psid_length..' + shift '..shift..
+               ' should not exceed 16')
+         psid_value.psid_length, psid_value.shift = psid_length, shift
+         psid_builder:add_range(k.addr, v.end_addr or k.addr, psid_value)
+      end
+      return psid_builder:build(psid_map_value_t())
+   end
+
+   local psid_map = load_range_map(conf.softwire_config.binding_table)
+
+   -- Remove the psid-map and add it to the softwire.
+   local bt = conf.softwire_config.binding_table
+   for key, entry in cltable.pairs(bt.softwire) do
+      -- Find the port set for the ipv4 address
+      local port_set = psid_map:lookup(key.ipv4)
+      assert(port_set, "Unable to migrate conf: softwire without psidmapping")
+
+      -- Add the psidmapping to the softwire
+      local shift, length = port_set.value.shift, port_set.value.psid_length
+      entry.port_set = {
+         psid_length=length,
+         reserved_ports_bit_count=(16 - shift - length)
+      }
+   end
+
+   return conf
 end
 
-local function migrate_3_0_1bis(conf_file)
-   return increment_br(yang.load_configuration(
-                          conf_file, {schema_name='snabb-softwire-v1'}))
+local function multiprocess_migration(src, conf_file)
+   local device = "IPv6 PCI Address"
+   local ex_device = "IPv4 PCI address"
+
+   -- We should build up a hybrid schema from parts of v1 and v2.
+   local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
+   local v1_external = v1_schema.body["softwire-config"].body["external-interface"]
+   local v1_internal = v1_schema.body["softwire-config"].body["internal-interface"]
+   local external = hybridscm.body["softwire-config"].body["external-interface"]
+   local internal = hybridscm.body["softwire-config"].body["internal-interface"]
+   local queue = hybridscm.body["softwire-config"].body.instance.body.queue
+
+   -- Remove the mandatory requirements
+   queue.body["external-interface"].body.ip.mandatory = false
+   queue.body["external-interface"].body.mac.mandatory = false
+   queue.body["external-interface"].body["next-hop"].mandatory = false
+   queue.body["internal-interface"].body.ip.mandatory = false
+   queue.body["internal-interface"].body.mac.mandatory = false
+   queue.body["internal-interface"].body["next-hop"].mandatory = false
+
+   hybridscm.body["softwire-config"].body["external-interface"] = v1_external
+   hybridscm.body["softwire-config"].body["internal-interface"] = v1_internal
+
+   -- Extract the grammar, load the config and find the key
+   local hybridgmr = data.config_grammar_from_schema(hybridscm)
+   local instgmr = hybridgmr.members["softwire-config"].members.instance
+   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
+   local queue_key = ffi.typeof(instgmr.values.queue.key_ctype)
+   local global_external_if = conf.softwire_config.external_interface
+   local global_internal_if = conf.softwire_config.internal_interface
+   -- If there is a external device listed we should include that too.
+
+
+   -- Build up the instance list
+   local instance = {
+      [device] = {queue = cltable.new({ key_type = queue_key }),},
+   }
+   local key = ffi.new(queue_key, 0)
+   local value = {
+      external_interface = {
+         device = ex_device,
+         ip = conf.softwire_config.external_interface.ip,
+         mac = conf.softwire_config.external_interface.mac,
+         next_hop = {},
+         vlan_tag = conf.softwire_config.external_interface.vlan_tag
+      },
+      internal_interface = {
+         ip = conf.softwire_config.internal_interface.ip,
+         mac = conf.softwire_config.internal_interface.mac,
+         next_hop = {},
+         vlan_tag = conf.softwire_config.internal_interface.vlan_tag
+      }
+   }
+
+   -- Add the list to the config
+   if global_external_if.next_hop.mac then
+      value.external_interface.next_hop.mac = global_external_if.next_hop.mac
+   elseif global_external_if.next_hop.ip then
+      value.external_interface.next_hop.ip = global_external_if.next_hop.ip
+   else
+      error("One or both of next-hop values must be provided.")
+   end
+
+   if global_internal_if.next_hop.mac then
+      value.internal_interface.next_hop.mac = global_internal_if.next_hop.mac
+   elseif global_internal_if.next_hop.ip then
+      value.internal_interface.next_hop.ip = global_internal_if.next_hop.ip
+   else
+      error("One or both of next-hop values must be provided.")
+   end
+   cltable.set(instance[device].queue, key, value)
+   conf.softwire_config.instance = instance
+
+   -- Remove the fields which no longer should exist
+   conf.softwire_config.internal_interface.ip = nil
+   conf.softwire_config.internal_interface.mac = nil
+   conf.softwire_config.internal_interface.next_hop = nil
+   conf.softwire_config.internal_interface.vlan_tag = nil
+   conf.softwire_config.external_interface.ip = nil
+   conf.softwire_config.external_interface.mac = nil
+   conf.softwire_config.external_interface.next_hop = nil
+   conf.softwire_config.external_interface.vlan_tag = nil
+
+   return config_to_string('snabb-softwire-v2', conf)
 end
 
-local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
-                    ['3.0.1.1'] = migrate_3_0_1bis }
+local function v2_migration(src, conf_file)
+   -- Lets create a custom schema programmatically as an intermediary so we can
+   -- switch over to v2 of snabb-softwire config.
+   local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
+   local v1_binding_table = v1_schema.body["softwire-config"].body["binding-table"]
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
+   local binding_table = hybridscm.body["softwire-config"].body["binding-table"]
+
+   -- Add the schema from v1 that we need to convert them.
+   binding_table.body["br-address"] = v1_binding_table.body["br-address"]
+   binding_table.body["psid-map"] = v1_binding_table.body["psid-map"]
+   binding_table.body.softwire.body.br = v1_binding_table.body.softwire.body.br
+   binding_table.body.softwire.body.padding = v1_binding_table.body.softwire.body.padding
+
+   -- Add the external and internal interfaces
+   local hybridconfig = hybridscm.body["softwire-config"]
+   local v1config = v1_schema.body["softwire-config"]
+   hybridconfig.body["external-interface"] = v1config.body["external-interface"]
+   hybridconfig.body["internal-interface"] = v1config.body["internal-interface"]
+
+   -- Remove the mandatory requirement on softwire.br-address for the migration
+   binding_table.body["softwire"].body["br-address"].mandatory = false
+
+   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
+
+   -- Remove the br-address leaf-list and add it onto the softwire.
+   conf = remove_address_list(conf)
+   conf.softwire_config.binding_table.br_address = nil
+
+   -- Remove the psid-map and add it to the softwire.
+   conf = remove_psid_map(conf)
+   conf.softwire_config.binding_table.psid_map = nil
+
+   return config_to_string(hybridscm, conf)
+end
+
+local function migrate_legacy(stream)
+   local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
+   conf = migrate_conf(conf)
+   return conf
+end
+
+
+local function migrate_3_0_1(conf_file, src)
+   if src:sub(0, 15) == "softwire-config" then
+      return src
+   else
+      return "softwire-config { "..src.." }"
+   end
+end
+
+local function migrate_3_0_1bis(conf_file, src)
+   return increment_br(
+      yang.load_config_for_schema_by_name('snabb-softwire-v1', src, conf_file)
+   )
+end
+
+local function migrate_3_2_0(conf_file, src)
+   return v2_migration(src, conf_file)
+end
+
+local function migrate_2017_07_01(conf_file, src)
+   return multiprocess_migration(src, conf_file)
+end
+
+
+local migrations = {
+   {version='legacy',    migrator=migrate_legacy},
+   {version='3.0.1',     migrator=migrate_3_0_1},
+   {version='3.0.1.1',   migrator=migrate_3_0_1bis},
+   {version='3.2.0',     migrator=migrate_3_2_0},
+   {version='2017.07.01',migrator=migrate_2017_07_01}
+}
+
+
 function run(args)
    local conf_file, version = parse_args(args)
-   local migrate = migrators[version]
-   if not migrate then
+
+   -- Iterate over migrations until we've found the
+   local start
+   for id, migration in pairs(migrations) do
+      if migration.version == version then
+         start = id - 1
+      end
+   end
+   if start == nil then
       io.stderr:write("error: unknown version: "..version.."\n")
       show_usage(1)
    end
-   local conf = migrate(conf_file)
-   yang.print_data_for_schema_by_name('snabb-softwire-v1', conf, io.stdout)
+
+   local conf = io.open(conf_file, "r"):read("*a")
+   for _, migration in next,migrations,start do
+      conf = migration.migrator(conf_file, conf)
+      -- Prompt the garbage collection to do a full collect after each migration
+      collectgarbage()
+   end
+
+   print(conf)
    main.exit(0)
 end

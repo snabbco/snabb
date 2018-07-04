@@ -43,7 +43,9 @@ function start (name, luacode)
       S.setenv("SNABB_PROGRAM_LUACODE", luacode, true)
       -- Restart the process with execve().
       -- /proc/$$/exe is a link to the same Snabb executable that we are running
-      lib.execv(("/proc/%d/exe"):format(S.getpid()), {})
+      local filename = ("/proc/%d/exe"):format(S.getpid())
+      local argv = { ("[snabb worker '%s' for %d]"):format(name, S.getppid()) }
+      lib.execv(filename, argv)
    else
       -- Parent process
       children[name] = { pid = pid }
@@ -63,7 +65,8 @@ function status ()
       local infop = S.waitid("pid", info.pid, "nohang, exited")
       status[name] = {
          pid = info.pid,
-         alive = infop and infop.code == 0 or false
+         alive = infop and infop.code == 0 or false,
+         status = infop and infop.status
       }
    end
    return status

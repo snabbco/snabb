@@ -32,14 +32,14 @@ The current state of each branch with respect to master is visible here:
 
 #### fixes
 
-    BRANCH: fixes git://github.com/lukego/snabbswitch
+    BRANCH: fixes git://github.com/snabbco/snabb
     Test and integration branch for bug fixes.
 
     - Contains the changes for the next weekly maintenance release.
     - Merges Pull Requests that fix bugs in the latest release.
     - Generally stable.
 
-    Maintainer: Luke Gorrie <luke@snabb.co>
+    Maintainer: Max Rottenkolber <max@mr.gy>
 
 #### kbara-next
 
@@ -174,4 +174,13 @@ The current state of each branch with respect to master is visible here:
     Development branch for ARM aarch64 platform.
 
     Maintainer: Jianbo Liu <jianbo.liu@linaro.org>
+
+#### raptorjit
+
+    BRANCH: raptorjit git://github.com/snabbco/raptorjit
+    RaptorJIT updates integration and testing branch.
+
+    - Contains new RaptorJIT changes targeted to Snabb.
+
+    Maintainers: Luke Gorrie (@lukego) and Andy Wingo (@wingo)
 

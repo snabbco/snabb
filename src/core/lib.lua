@@ -107,14 +107,6 @@ end
 
 function firstline (filename) return readfile(filename, "*l") end
 
-function files_in_directory (dir)
-   local files = {}
-   for line in assert(io.popen('ls -1 "'..dir..'" 2>/dev/null')):lines() do
-      table.insert(files, line)
-   end
-   return files
-end
-
 -- Load Lua value from string.
 function load_string (string)
    return loadstring("return "..string)()
@@ -126,7 +118,8 @@ function load_conf (file)
 end
 
 -- Store Lua representation of value in file.
-function store_conf (file, value)
+function print_object (value, stream)
+   stream = stream or io.stdout
    local indent = 0
    local function print_indent (stream)
       for i = 1, indent do stream:write(" ") end
@@ -159,10 +152,13 @@ function store_conf (file, value)
          stream:write(("%s"):format(value))
       end
    end
-   local stream = assert(io.open(file, "w"))
-   stream:write("return ")
    print_value(value, stream)
    stream:write("\n")
+end
+function store_conf (file, value)
+   local stream = assert(io.open(file, "w"))
+   stream:write("return ")
+   print_object(value, stream)
    stream:close()
 end
 
@@ -374,8 +370,13 @@ if ffi.abi("be") then
    function htons(b) return b end
 else
   -- htonl is unsigned, matching the C version and expectations.
-   function htonl(b) return tonumber(cast('uint32_t', bswap(b))) end
-   function htons(b) return rshift(bswap(b), 16) end
+  -- Wrapping the return call in parenthesis avoids the compiler to do
+  -- a tail call optimization.  In LuaJIT when the number of successive
+  -- tail calls is higher than the loop unroll threshold, the
+  -- compilation of a trace is aborted.  If the trace was long that
+  -- can result in poor performance.
+   function htonl(b) return (tonumber(cast('uint32_t', bswap(b)))) end
+   function htons(b) return (rshift(bswap(b), 16)) end
 end
 ntohl = htonl
 ntohs = htons
@@ -721,6 +722,7 @@ function random_bytes_from_dev_urandom (count)
    while written < count do
       written = written + assert(f:read(bytes, count-written))
    end
+   f:close()
    return bytes
 end
 
@@ -750,6 +752,23 @@ function random_data (length)
    return ffi.string(random_bytes(length), length)
 end
 
+local lower_case = "abcdefghijklmnopqrstuvwxyz"
+local upper_case = lower_case:upper()
+local extra = "0123456789_-"
+local alphabet = table.concat({lower_case, upper_case, extra})
+assert(#alphabet == 64)
+function random_printable_string (entropy)
+   -- 64 choices in our alphabet, so 6 bits of entropy per byte.
+   entropy = entropy or 160
+   local length = math.floor((entropy - 1) / 6) + 1
+   local bytes = random_data(length)
+   local out = {}
+   for i=1,length do
+      out[i] = alphabet:byte(bytes:byte(i) % 64 + 1)
+   end
+   return string.char(unpack(out))
+end
+
 -- Compiler barrier.
 -- Prevents LuaJIT from moving load/store operations over this call.
 -- Any FFI call is sufficient to achieve this, see:
@@ -777,6 +796,12 @@ function parse (arg, config)
    for k, o in pairs(config) do
       if ret[k] == nil then ret[k] = o.default end
    end
+   return ret
+end
+
+function set(...)
+   local ret = {}
+   for k, v in pairs({...}) do ret[v] = true end
    return ret
 end
 

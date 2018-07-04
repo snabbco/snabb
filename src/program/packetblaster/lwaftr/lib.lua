@@ -33,6 +33,11 @@ local ether_header_ptr_type = ffi.typeof("$*", ether_header_t)
 local ethernet_header_size = ffi.sizeof(ether_header_t)
 local OFFSET_ETHERTYPE = 12
 
+-- The ethernet CRC field is not included in the packet as seen by
+-- Snabb, but it is part of the frame and therefore a contributor to the
+-- frame size.
+local ethernet_crc_size = 4
+
 local ether_vlan_header_type = ffi.typeof([[
 struct {
    uint16_t tag;
@@ -56,6 +61,7 @@ struct {
    uint8_t  dst_ip[4];
 } __attribute__((packed))
 ]]
+local ipv4_header_size = ffi.sizeof(ipv4hdr_t)
 local ipv4_header_ptr_type = ffi.typeof("$*", ipv4hdr_t)
 
 local ipv6_ptr_type = ffi.typeof([[
@@ -148,6 +154,7 @@ function Lwaftrgen:new(conf)
    local aftr_ipv6 = conf.aftr_ipv6 and ipv6:pton(conf.aftr_ipv6)
 
    local ipv4_pkt = packet.allocate()
+   ffi.fill(ipv4_pkt.data, packet.max_payload)
    local eth_hdr = cast(ether_header_ptr_type, ipv4_pkt.data)
    eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
 
@@ -185,6 +192,7 @@ function Lwaftrgen:new(conf)
    -- IPv4 in IPv6 packet
    copy(n_cache_src_ipv6, b4_ipv6, 16)
    local ipv6_pkt = packet.allocate()
+   ffi.fill(ipv6_pkt.data, packet.max_payload)
    local eth_hdr = cast(ether_header_ptr_type, ipv6_pkt.data)
    eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
 
@@ -365,37 +373,44 @@ function Lwaftrgen:pull ()
       ipv4_udp_hdr.dst_port = C.htons(self.current_port)
       ipv6_ipv4_udp_hdr.src_port = C.htons(self.current_port)
 
-      for _,size in ipairs(self.sizes) do
+      -- The sizes are frame sizes, including the 4-byte ethernet CRC
+      -- that we don't see in Snabb.
 
+      local vlan_size = self.vlan and ether_vlan_header_size or 0
+      local ethernet_total_size = ethernet_header_size + vlan_size
+      local minimum_size = ethernet_total_size + ipv4_header_size +
+         udp_header_size + ethernet_crc_size
+
+      for _,size in ipairs(self.sizes) do
+         assert(size >= minimum_size)
+         local packet_len = size - ethernet_crc_size
+         local ipv4_len =  packet_len - ethernet_total_size
+         local udp_len = ipv4_len - ipv4_header_size
          if not self.ipv6_only then
-            ipv4_hdr.total_length = C.htons(size)
-            if self.vlan then
-               ipv4_udp_hdr.len = C.htons(size - 28 + 4)
-               self.ipv4_pkt.length = size + ethernet_header_size + 4
-            else
-               ipv4_udp_hdr.len = C.htons(size - 28)
-               self.ipv4_pkt.length = size + ethernet_header_size
-            end
+            ipv4_hdr.total_length = C.htons(ipv4_len)
+            ipv4_udp_hdr.len = C.htons(udp_len)
+            self.ipv4_pkt.length = packet_len
             ipv4_hdr.checksum =  0
-            ipv4_hdr.checksum = C.htons(ipsum(self.ipv4_pkt.data + ethernet_header_size, 20, 0))
-            self.ipv4_payload.number = self.ipv4_packet_number;
-            self.ipv4_packet_number = self.ipv4_packet_number + 1
+            ipv4_hdr.checksum = C.htons(ipsum(self.ipv4_pkt.data + ethernet_total_size, 20, 0))
+            if size >= minimum_size + payload_size then
+               self.ipv4_payload.number = self.ipv4_packet_number;
+               self.ipv4_packet_number = self.ipv4_packet_number + 1
+            end
             local ipv4_pkt = packet.clone(self.ipv4_pkt)
             transmit(output, ipv4_pkt)
          end
 
          if not self.ipv4_only then
-            ipv6_hdr.payload_length = C.htons(size)
-            ipv6_ipv4_hdr.total_length = C.htons(size)
-            if self.vlan then
-               ipv6_ipv4_udp_hdr.len = C.htons(size - 28 + 4)
-               self.ipv6_pkt.length = size + 54 + 4
-            else
-               ipv6_ipv4_udp_hdr.len = C.htons(size - 28)
-               self.ipv6_pkt.length = size + 54
+            -- Expectation from callers is to make packets that are SIZE
+            -- bytes big, *plus* the IPv6 header.
+            ipv6_hdr.payload_length = C.htons(ipv4_len)
+            ipv6_ipv4_hdr.total_length = C.htons(ipv4_len)
+            ipv6_ipv4_udp_hdr.len = C.htons(udp_len)
+            self.ipv6_pkt.length = packet_len + ipv6_header_size
+            if size >= minimum_size + payload_size then
+               self.ipv6_payload.number = self.ipv6_packet_number;
+               self.ipv6_packet_number = self.ipv6_packet_number + 1
             end
-            self.ipv6_payload.number = self.ipv6_packet_number;
-            self.ipv6_packet_number = self.ipv6_packet_number + 1
             local ipv6_pkt = packet.clone(self.ipv6_pkt)
             transmit(output, ipv6_pkt)
          end
