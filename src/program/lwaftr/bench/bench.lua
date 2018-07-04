@@ -27,12 +27,14 @@ function parse_args(args)
       cpuset.global_cpuset():add_from_string(arg)
    end
    function handlers.n(arg) opts.name = assert(arg) end
+   function handlers.t (arg) opts.trace = assert(arg) end
    function handlers.b(arg) opts.bench_file = arg end
    function handlers.y() opts.hydra = true end
    function handlers.j(arg) scheduling.j = arg end
    function handlers.h() show_usage(0) end
-   args = lib.dogetopt(args, handlers, "j:n:hyb:D:", {
-      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1})
+   args = lib.dogetopt(args, handlers, "j:n:hyb:D:t:", {
+      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1,
+      trace="t" })
    if #args ~= 3 then show_usage(1) end
    return opts, scheduling, unpack(args)
 end
@@ -52,7 +54,9 @@ function run(args)
 			      'sinkv6')
    end
 
-   local manager = setup.ptree_manager(scheduling, setup_fn, conf)
+   local manager_opts = { worker_default_scheduling=scheduling,
+                          rpc_trace_file=opts.trace }
+   local manager = setup.ptree_manager(setup_fn, conf, manager_opts)
 
    local stats = {csv={}}
    function stats:worker_starting(id) end

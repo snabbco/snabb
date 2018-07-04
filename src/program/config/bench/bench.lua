@@ -4,7 +4,7 @@ module(..., package.seeall)
 local S = require("syscall")
 local lib = require("core.lib")
 local ffi = require("ffi")
-local json_lib = require("program.config.json")
+local json_lib = require("lib.ptree.json")
 
 function show_usage(command, status, err_msg)
    if err_msg then print('error: '..err_msg) end

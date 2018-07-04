@@ -9,6 +9,7 @@ local value = require("lib.yang.value")
 local ffi = require("ffi")
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
+local regexp = require("lib.xsd_regexp")
 
 function normalize_id(id)
    return id:gsub('[^%w_]', '_')
@@ -181,7 +182,8 @@ function data_grammar_from_schema(schema, is_config)
    function handlers.choice(node)
       local choices = {}
       for choice, n in pairs(node.body) do
-         choices[choice] = visit_body(n)
+         local members = visit_body(n)
+         if not is_empty(members) then choices[choice] = members end
       end
       if is_empty(choices) then return end
       return {type="choice", default=node.default, mandatory=node.mandatory,
@@ -291,22 +293,35 @@ end
 local function range_validator(range, f)
    if not range then return f end
    local is_in_range = range_predicate(range.value)
-   return function(val)
-      if is_in_range(val) then return f(val) end
-      error('value '..val..' is out of the valid range')
+   return function(val, P)
+      if is_in_range(val) then return f(val, P) end
+      P:error('value '..val..' is out of the valid range')
    end
 end
 local function length_validator(length, f)
    if not length then return f end
    local is_in_range = range_predicate(length.value)
-   return function(val)
-      if is_in_range(string.length(val)) then return f(val) end
-      error('length of string '..val..' is out of the valid range')
+   return function(val, P)
+      if is_in_range(string.length(val)) then return f(val, P) end
+      P:error('length of string '..val..' is out of the valid range')
    end
 end
-local function pattern_validator(pattern, f)
-   -- FIXME: Implement me!
-   return f
+function pattern_validator(patterns, f)
+   if not patterns or #patterns == 0 then return f end
+   local compiled = {}
+   for _, pattern in ipairs(patterns) do
+      compiled[pattern.value] = regexp.compile(pattern.value)
+   end
+   return function (val, P)
+      if type(val) == 'string' then
+         for pattern, match in pairs(compiled) do
+            if not match(val) then
+               P:error("pattern mismatch\n"..pattern.."\n"..val)
+            end
+         end
+      end
+      return f(val, P)
+   end
 end
 local function bit_validator(range, f)
    -- FIXME: Implement me!
@@ -314,24 +329,24 @@ local function bit_validator(range, f)
 end
 local function enum_validator(enums, f)
    if not enums then return f end
-   return function (val)
+   return function (val, P)
       if not enums[val] then
-         error('enumeration '..val..' is not a valid value')
+         P:error('enumeration '..val..' is not a valid value')
       end
-      return f(val)
+      return f(val, P)
    end
 end
 local function identityref_validator(bases, default_prefix, f)
    if not default_prefix then return f end
-   return function(val)
+   return function(val, P)
       if not val:match(':') then val = default_prefix..":"..val end
       local identity = schema.lookup_identity(val)
       for _, base in ipairs(bases) do
          if not schema.identity_is_instance_of(identity, base) then
-            error('identity '..val..' not an instance of '..base)
+            P:error('identity '..val..' not an instance of '..base)
          end
       end
-      return val
+      return f(val, P)
    end
 end
 
@@ -349,8 +364,8 @@ function value_parser(typ)
    validate = enum_validator(enums(typ), validate)
    validate = identityref_validator(typ.bases, typ.default_prefix, validate)
    -- TODO: union, require-instance.
-   return function(str, k)
-      return validate(parse(str, k))
+   return function(str, k, P)
+      return validate(parse(str, k), P)
    end
 end
 
@@ -423,7 +438,7 @@ local function array_parser(keyword, element_type, ctype)
       local str = P:parse_string()
       P:skip_whitespace()
       P:consume(";")
-      return parsev(str, keyword)
+      return parsev(str, keyword, P)
    end
    local function parse(P, out)
       table.insert(out, parse1(P))
@@ -441,6 +456,9 @@ local function array_parser(keyword, element_type, ctype)
    return {init=init, parse=parse, finish=finish}
 end
 
+local default_parser = {}
+function default_parser:error (...) error(...) end
+
 local function scalar_parser(keyword, argument_type, default, mandatory)
    local function init() return nil end
    local parsev = value_parser(argument_type)
@@ -452,7 +470,7 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
       end
       P:skip_whitespace()
       P:consume(";")
-      return parsev(maybe_str, keyword)
+      return parsev(maybe_str, keyword, P)
    end
    local function parse(P, out)
       if out ~= nil then P:error('duplicate parameter: '..keyword) end
@@ -460,7 +478,7 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
    end
    local function finish(out)
       if out ~= nil then return out end
-      if default then return parsev(default, keyword) end
+      if default then return parsev(default, keyword, default_parser) end
       if mandatory then error('missing scalar value: '..keyword) end
    end
    return {init=init, parse=parse, finish=finish}
@@ -704,7 +722,9 @@ function data_parser_from_grammar(production)
    function top_parsers.scalar(production)
       local parse = value_parser(production.argument_type)
       return function(str, filename)
-         return parse(parser_mod.parse_string(str, filename), '[bare scalar]')
+         return parse(parser_mod.parse_string(str, filename),
+                      '[bare scalar]',
+                      default_parser)
       end
    end
    return assert(top_parsers[production.type])(production)
@@ -757,56 +777,52 @@ function rpc_output_parser_from_schema(schema)
    return data_parser_from_grammar(rpc_output_grammar_from_schema(schema))
 end
 
-local function encode_yang_string(str)
-   if #str == 0 then return "''" end
-   if str:match("^[^%s;{}\"'/]*$") then return str end
-   local out = {}
-   table.insert(out, '"')
-   for i=1,#str do
-      local chr = str:sub(i,i)
-      if chr == '\n' then
-         table.insert(out, '\\n')
-      elseif chr == '\t' then
-         table.insert(out, '\\t')
-      elseif chr == '"' or chr == '\\' then
-         table.insert(out, '\\')
-         table.insert(out, chr)
-      else
-         table.insert(out, chr)
-      end
-   end
-   table.insert(out, '"')
-   return table.concat(out)
-end
-
 local value_serializers = {}
 local function value_serializer(typ)
    local prim = typ.primitive_type
    if value_serializers[prim] then return value_serializers[prim] end
    local tostring = assert(value.types[prim], prim).tostring
-   local function serializer(val)
-      return encode_yang_string(tostring(val))
+   value_serializers[prim] = tostring
+   return tostring
+end
+
+local function print_yang_string(str, file)
+   if #str == 0 then
+      file:write("''")
+   elseif str:match("^[^%s;{}\"'/]*$") then
+      file:write(str)
+   else
+      file:write('"')
+      for i=1,#str do
+         local chr = str:sub(i,i)
+         if chr == '\n' then
+            file:write('\\n')
+         elseif chr == '\t' then
+            file:write('\\t')
+         elseif chr == '"' or chr == '\\' then
+            file:write('\\')
+            file:write(chr)
+         else
+            file:write(chr)
+         end
+      end
+      file:write('"')
    end
-   value_serializers[prim] = serializer
-   return serializer
 end
 
 function xpath_printer_from_grammar(production, print_default, root)
-   if #root > 1 and root:sub(#root, #root) == '/' then
-      root = root:sub(1, #root-1)
+   if #root == 1 and root:sub(1, 1) == '/' then
+      root = ''
    end
    local handlers = {}
    local translators = {}
    local function printer(keyword, production, printers)
       return assert(handlers[production.type])(keyword, production, printers)
    end
-   local function print_string(str, file)
-      file:write(encode_yang_string(str))
-   end
    local function print_keyword(k, file, path)
       path = path:sub(1, 1) ~= '[' and root..'/'..path or root..path
       file:write(path)
-      print_string(k, file)
+      print_yang_string(k, file)
       file:write(' ')
    end
    local function body_printer(productions, order)
@@ -888,7 +904,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          local count = 1
          for _,v in ipairs(data) do
             print_keyword(keyword.."[position()="..count.."]", file, '')
-            file:write(serialize(v))
+            print_yang_string(serialize(v), file)
             file:write('\n')
             count = count + 1
          end
@@ -906,34 +922,38 @@ function xpath_printer_from_grammar(production, print_default, root)
       local print_value = body_printer(production.values, value_order)
       if production.key_ctype and production.value_ctype then
          return function(data, file, path)
+            path = path or ''
             for entry in data:iterate() do
                local key = compose_key(entry.key)
-               local path = keyword and keyword..key..'/' or key..'/'
+               local path = path..(keyword or '')..key..'/'
                print_value(entry.value, file, path)
             end
          end
       elseif production.string_key then
          local id = normalize_id(production.string_key)
          return function(data, file, path)
+            path = path or ''
             for key, value in pairs(data) do
                local key = compose_key({[id]=key})
-               local path = keyword and keyword..key..'/' or key..'/'
+               local path = path..(keyword or '')..key..'/'
                print_value(value, file, path)
             end
          end
       elseif production.key_ctype then
          return function(data, file, path)
+            path = path or ''
             for key, value in cltable.pairs(data) do
                local key = compose_key(key)
-               local path = keyword and keyword..key..'/' or key..'/'
+               local path = path..(keyword or '')..key..'/'
                print_value(value, file, path)
             end
          end
       else
          return function(data, file, path)
+            path = path or ''
             for key, value in pairs(data) do
                local key = compose_key(key)
-               local path = keyword and keyword..key..'/' or key..'/'
+               local path = path..(keyword or '')..key..'/'
                print_value(value, file, path)
             end
          end
@@ -945,7 +965,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          local str = serialize(data)
          if print_default or str ~= production.default then
             print_keyword(keyword, file, path)
-            file:write(str)
+            print_yang_string(str, file)
             file:write('\n')
          end
       end
@@ -986,7 +1006,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          for _,v in ipairs(data) do
             file:write(root.."[position()="..count.."]")
             file:write(' ')
-            file:write(serialize(v))
+            print_yang_string(serialize(v), file)
             file:write('\n')
             count = count + 1
          end
@@ -1000,7 +1020,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          if print_default or str ~= production.default then
             file:write(root)
             file:write(' ')
-            file:write(str)
+            print_yang_string(str, file)
             file:write('\n')
             return file:flush()
          end
@@ -1017,12 +1037,9 @@ function data_printer_from_grammar(production, print_default)
    local function printer(keyword, production, printers)
       return assert(handlers[production.type])(keyword, production, printers)
    end
-   local function print_string(str, file)
-      file:write(encode_yang_string(str))
-   end
    local function print_keyword(k, file, indent)
       file:write(indent)
-      print_string(k, file)
+      print_yang_string(k, file)
       file:write(' ')
    end
    local function body_printer(productions, order)
@@ -1082,7 +1099,7 @@ function data_printer_from_grammar(production, print_default)
       return function(data, file, indent)
          for _,v in ipairs(data) do
             print_keyword(keyword, file, indent)
-            file:write(serialize(v))
+            print_yang_string(serialize(v), file)
             file:write(';\n')
          end
       end
@@ -1146,7 +1163,7 @@ function data_printer_from_grammar(production, print_default)
          local str = serialize(data)
          if print_default or str ~= production.default then
             print_keyword(keyword, file, indent)
-            file:write(str)
+            print_yang_string(str, file)
             file:write(';\n')
          end
       end
@@ -1184,7 +1201,7 @@ function data_printer_from_grammar(production, print_default)
       local serialize = value_serializer(production.element_type)
       return function(data, file, indent)
          for _,v in ipairs(data) do
-            file:write(serialize(v))
+            print_yang_string(serialize(v), file)
             file:write('\n')
          end
          return file:flush()
@@ -1193,21 +1210,13 @@ function data_printer_from_grammar(production, print_default)
    function top_printers.scalar(production)
       local serialize = value_serializer(production.argument_type)
       return function(data, file)
-         file:write(serialize(data))
+         print_yang_string(serialize(data), file)
          return file:flush()
       end
    end
    return assert(top_printers[production.type])(production)
 end
 data_printer_from_grammar = util.memoize(data_printer_from_grammar)
-
-local function string_output_file()
-   local file = {}
-   local out = {}
-   function file:write(str) table.insert(out, str) end
-   function file:flush(str) return table.concat(out) end
-   return file
-end
 
 function data_printer_from_schema(schema, is_config)
    local grammar = data_grammar_from_schema(schema, is_config)
@@ -1319,7 +1328,7 @@ function selftest()
    assert(parse_uint32('1') == 1)
    assert(parse_uint32('"1"') == 1)
    assert(parse_uint32('    "1"   \n  ') == 1)
-   assert(print_uint32(1, string_output_file()) == '1')
+   assert(print_uint32(1, util.string_io_file()) == '1')
 
    -- Verify that lists can lack keys when "config false;" is set.
    local list_wo_key_config_false = [[module config-false-schema {

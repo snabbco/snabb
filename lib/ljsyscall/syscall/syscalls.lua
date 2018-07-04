@@ -740,6 +740,7 @@ if C.getdents then
     buf = buf or t.buffer(size)
     local ret, err = C.getdents(getfd(fd), buf, size)
     if ret == -1 then return nil, t.error(err or errno()) end
+    if ret == 0 then return nil, nil end
     return t.dirents(buf, ret)
   end
 end

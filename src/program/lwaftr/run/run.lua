@@ -53,6 +53,7 @@ function parse_args(args)
    local handlers = {}
    function handlers.n (arg) opts.name = assert(arg) end
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
+   function handlers.t (arg) opts.trace = assert(arg) end
    function handlers.i () opts.virtio_net = true end
    function handlers.D (arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")
@@ -103,12 +104,12 @@ function parse_args(args)
    end
    function handlers.j(arg) scheduling.j = arg end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:j:",
+   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:j:t:",
      { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
      verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
      ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
      ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,
-     hydra = "y", reconfigurable = 0, name="n" })
+     hydra = "y", reconfigurable = 0, name = "n", trace = "t" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -172,7 +173,9 @@ function run(args)
       end
    end
 
-   local manager = setup.ptree_manager(scheduling, setup_fn, conf)
+   local manager_opts = { worker_default_scheduling=scheduling,
+                          rpc_trace_file=opts.trace }
+   local manager = setup.ptree_manager(setup_fn, conf, manager_opts)
 
    -- FIXME: Doesn't work in multi-process environment.
    if false and opts.verbosity >= 2 then
@@ -193,7 +196,7 @@ function run(args)
          local ipv4_rx = opts.hydra and 'ipv4tx' or 'IPv4 TX'
          local ipv6_tx = opts.hydra and 'ipv6rx' or 'IPv6 RX'
          local ipv6_rx = opts.hydra and 'ipv6tx' or 'IPv6 TX'
-         if use_splitter then
+         if requires_splitter(opts, conf) then
             csv:add_app('v4v6', { 'v4', 'v4' }, { tx=ipv4_tx, rx=ipv4_rx })
             csv:add_app('v4v6', { 'v6', 'v6' }, { tx=ipv6_tx, rx=ipv6_rx })
          else

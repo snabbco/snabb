@@ -56,22 +56,19 @@ function util.ls(name, buf, size)
   if err then return nil, err end
   local di
   return function()
-    local d, first
-    repeat
-      if not di then
-        local err
-        di, err = fd:getdents(buf, size)
-        if not di then
-          fd:close()
-          error(err)
-        end
-        first = true
+    while true do
+      if di then
+        local d = di()
+        if d then return d.name, d end
       end
-      d = di()
-      if not d then di = nil end
-      if not d and first then return nil end
-    until d
-    return d.name, d
+      -- Fetch more entries.
+      local err
+      di, err = fd:getdents(buf, size)
+      if not di then
+        fd:close()
+        if err then error(err) else return nil end
+      end
+    end
   end
 end
 
