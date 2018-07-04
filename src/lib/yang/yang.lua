@@ -38,6 +38,7 @@ local params = {
    verbose = {},
    schema_name = {required=true},
    revision_date = {},
+   compiled_filename = {},
 }
 
 -- Load the configuration from FILENAME.  If it's compiled, load it
@@ -111,7 +112,10 @@ function load_configuration(filename, opts)
    -- in a well-known place.
    local stat = source.io.fd:stat()
    local source_mtime = { sec=stat.st_mtime, nsec=stat.st_mtime_nsec }
-   local compiled_filename = filename:gsub("%.conf$", "")..'.o'
+   local compiled_filename = opts.compiled_filename
+   if not compiled_filename then
+      compiled_filename = filename:gsub("%.conf$", "")..'.o'
+   end
    local use_compiled_cache = not lib.getenv("SNABB_RANDOM_SEED")
    local compiled_stream = maybe(file.open, compiled_filename)
    if compiled_stream then
