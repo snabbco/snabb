@@ -93,18 +93,14 @@ function w:unindent()
 end
 
 function show_usage(code)
-   print(require("program.lwaftr.generate_binding_table.README_inc"))
+   print(require("program.lwaftr.generate_configuration.README_inc"))
    main.exit(code)
 end
-
-local is_configuration = false
 
 local function parse_args(args)
    local handlers = {}
    function handlers.o(arg)
-      local filename = arg
-      if filename:match("%.conf$") then is_configuration = true end
-      local fd = assert(io.open(filename, "w"),
+      local fd = assert(io.open(arg, "w"),
          ("Couldn't find %s"):format(arg))
       function w:ln(...)
          fd:write(string.rep("   ", self.tabs))
@@ -214,39 +210,24 @@ function run(args)
    end
    assert(psid_len + shift <= 16)
 
-   if is_configuration then
-      w:ln("softwire-config {") w:indent()
-      w:ln("binding-table {") w:indent()
-      softwires(w, {
-         from_ipv4 = from_ipv4,
-         num_ips = num_ips,
-         from_b4 = from_b4,
+   w:ln("softwire-config {") w:indent()
+   w:ln("binding-table {") w:indent()
+   softwires(w, {
+      from_ipv4 = from_ipv4,
+      num_ips = num_ips,
+      from_b4 = from_b4,
+      psid_len = psid_len,
+      br_address = br_address,
+      port_set = {
          psid_len = psid_len,
-         br_address = br_address,
-         port_set = {
-            psid_len = psid_len,
-            shift = shift
-         }
-      })
-      w:unindent() w:ln("}")
-      external_interface(w)
-      internal_interface(w)
-      instance(w)
-      w:unindent() w:ln("}")
-   else
-      w:ln("binding-table {") w:indent()
-      softwires(w, {
-         from_ipv4 = from_ipv4,
-         num_ips = num_ips,
-         from_b4 = from_b4,
-         psid_len = psid_len,
-         br_address = br_address,
-         port_set = {
-            psid_len = psid_len,
-            shift = shift
-         }
-      })
-      w:unindent() w:ln("}")
-   end
+         shift = shift
+      }
+   })
+   w:unindent() w:ln("}")
+   external_interface(w)
+   internal_interface(w)
+   instance(w)
+   w:unindent() w:ln("}")
+
    main.exit(0)
 end
