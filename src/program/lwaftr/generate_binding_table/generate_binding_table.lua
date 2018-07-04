@@ -34,7 +34,7 @@ end
 
 local function inc_ipv6(ipv6)
    for i = 15, 0, -1 do
-      if ipv6[i] == 255 then 
+      if ipv6[i] == 255 then
          ipv6[i] = 0
       else
          ipv6[i] = ipv6[i] + 1
@@ -52,9 +52,9 @@ local function softwire_entries(from_ipv4, num_ips, psid_len, from_b4, port_set)
    for _ = 1, params.num_ips do
       for psid = 1, n-1 do
          table.insert(
-	    entries,
-	    softwire_entry(v4addr, psid, ipv6:ntop(b4), port_set)
-	 )
+       entries,
+       softwire_entry(v4addr, psid, ipv6:ntop(b4), port_set)
+    )
          b4 = inc_ipv6(b4)
       end
       v4addr = inc_ipv4(v4addr)
@@ -77,12 +77,19 @@ local function softwires(w, params)
    end
 end
 
-local w = {}
+local w = {tabs=0}
 function w:ln(...)
    io.write(...) io.write("\n")
 end
 function w:close()
 
+end
+function w:indent()
+   self.tabs = self.tabs + 1
+end
+function w:unindent()
+   assert(self.tabs > 0)
+   self.tabs = self.tabs - 1
 end
 
 function show_usage(code)
@@ -90,12 +97,17 @@ function show_usage(code)
    main.exit(code)
 end
 
-function parse_args(args)
+local is_configuration = false
+
+local function parse_args(args)
    local handlers = {}
    function handlers.o(arg)
-      local fd = assert(io.open(arg, "w"), 
+      local filename = arg
+      if filename:match("%.conf$") then is_configuration = true end
+      local fd = assert(io.open(filename, "w"),
          ("Couldn't find %s"):format(arg))
       function w:ln(...)
+         fd:write(string.rep("   ", self.tabs))
          fd:write(...) fd:write("\n")
       end
       function w:close()
@@ -108,6 +120,90 @@ function parse_args(args)
    return unpack(args)
 end
 
+local function lint (text)
+   local t = {}
+   local tabs = 0
+   function put (line)
+      table.insert(t, string.rep("   ", tabs)..line)
+   end
+   function flush ()
+      return table.concat(t, "\n")
+   end
+   for line in text:gmatch("([^\n]+)") do
+      line = line:gsub("^%s+", "")
+      if line:sub(#line, #line) == '{' then
+         put(line)
+         tabs = tabs + 1
+      elseif line:sub(#line, #line) == '}' then
+         tabs = tabs - 1
+         put(line)
+      else
+         put(line)
+      end
+   end
+   return flush()
+end
+
+local function external_interface (w)
+   local text = lint[[
+      external-interface {
+         allow-incoming-icmp false;
+         error-rate-limiting {
+            packets 600000;
+         }
+         reassembly {
+            max-fragments-per-packet 40;
+         }
+      }
+   ]]
+   for line in text:gmatch("([^\n]+)") do
+      w:ln(line)
+   end
+end
+local function internal_interface (w)
+   local text = lint[[
+      internal-interface {
+         allow-incoming-icmp false;
+         error-rate-limiting {
+            packets 600000;
+         }
+         reassembly {
+            max-fragments-per-packet 40;
+         }
+      }
+   ]]
+   for line in text:gmatch("([^\n]+)") do
+      w:ln(line)
+   end
+end
+local function instance (w)
+   local text = lint[[
+      instance {
+          device test;
+          queue {
+              id 1;
+              external-interface {
+                  ip 10.0.1.1;
+                  mac 02:aa:aa:aa:aa:aa;
+                  next-hop {
+                      mac 02:99:99:99:99:99;
+                  }
+              }
+              internal-interface {
+                  ip fc00::100;
+                  mac 02:aa:aa:aa:aa:aa;
+                  next-hop {
+                      mac 02:99:99:99:99:99;
+                  }
+              }
+          }
+      }
+   ]]
+   for line in text:gmatch("([^\n]+)") do
+      w:ln(line)
+   end
+end
+
 function run(args)
    local from_ipv4, num_ips, br_address, from_b4, psid_len, shift = parse_args(args)
    psid_len = assert(tonumber(psid_len))
@@ -118,20 +214,39 @@ function run(args)
    end
    assert(psid_len + shift <= 16)
 
-   w:ln("binding-table {")
-   softwires(w, {
-      from_ipv4 = from_ipv4,
-      num_ips = num_ips,
-      from_b4 = from_b4,
-      psid_len = psid_len,
-      br_address = br_address,
-      port_set = {
-	 psid_len = psid_len,
-	 shift = shift
-      }
-   })
-   w:ln("}")
-   w:close()
-
+   if is_configuration then
+      w:ln("softwire-config {") w:indent()
+      w:ln("binding-table {") w:indent()
+      softwires(w, {
+         from_ipv4 = from_ipv4,
+         num_ips = num_ips,
+         from_b4 = from_b4,
+         psid_len = psid_len,
+         br_address = br_address,
+         port_set = {
+            psid_len = psid_len,
+            shift = shift
+         }
+      })
+      w:unindent() w:ln("}")
+      external_interface(w)
+      internal_interface(w)
+      instance(w)
+      w:unindent() w:ln("}")
+   else
+      w:ln("binding-table {") w:indent()
+      softwires(w, {
+         from_ipv4 = from_ipv4,
+         num_ips = num_ips,
+         from_b4 = from_b4,
+         psid_len = psid_len,
+         br_address = br_address,
+         port_set = {
+            psid_len = psid_len,
+            shift = shift
+         }
+      })
+      w:unindent() w:ln("}")
+   end
    main.exit(0)
 end

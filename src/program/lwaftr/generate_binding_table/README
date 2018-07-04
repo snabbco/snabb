@@ -3,6 +3,11 @@ Usage:
 snabb lwaftr generate-binding-table <ipv4> <num_ipv4s> <br_address> <b4> <psid_len> <shift>
     --output <filename>: Write down binding table to file.
 
+Arguments:
+
+   --output <filename>     Output filename. If filename extension is '.conf',
+                           a 'snabb-softwire-v2' configuration is written instead.
+
 Examples:
 
 - 10 public IPv4 address starting from 193.5.1.00.
@@ -11,22 +16,33 @@ Examples:
   snabb lwaftr generate-binding-table --output binding-table.txt \
      193.5.1.100 10 fc00::100 fc00:1:2:3:4:5:0:7e 6
 
-- 1 million subscribers:
+- 1 million subscribers. Write as configuration file:
 
-  snabb lwaftr generate-binding-table --output binding_table.txt \
+  snabb lwaftr generate-binding-table --output lwaftr.conf \
     193.5.1.100 15874 fc00::100 fc00:1:2:3:4:5:0:7e 6
 
-The resulting binding table can be concatenated with
-"external-interface" and "internal-interface" configuration blocks to
-make a lwAFTR configuration.  Here are some minimal configurations:
 
-   external-interface {
-     ip 10.10.10.10;
-     mac 12:12:12:12:12:12;
-     next-hop { mac 68:68:68:68:68:68; }
-   }
-   internal-interface {
-     ip 8:9:a:b:c:d:e:f;
-     mac 22:22:22:22:22:22;
-     next-hop { mac 44:44:44:44:44:44; }
+When the output file is a configuration file, it contains predefined values
+for "external-interface", "internal-interface" and "instance" containers which
+will be needed to change:
+
+   instance {
+       device test;
+       queue {
+           id 1;
+           external-interface {
+               ip 10.0.1.1;
+               mac 02:aa:aa:aa:aa:aa;
+               next-hop {
+                   mac 02:99:99:99:99:99;
+               }
+           }
+           internal-interface {
+               ip fc00::100;
+               mac 02:aa:aa:aa:aa:aa;
+               next-hop {
+                   mac 02:99:99:99:99:99;
+               }
+           }
+       }
    }
