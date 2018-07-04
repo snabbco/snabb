@@ -4,7 +4,7 @@ local lib = require('core.lib')
 local yang = require('lib.yang.yang')
 
 function show_usage(code)
-   print(require('program.lwaftr.compile_binding_table.README_inc'))
+   print(require('program.lwaftr.compile_configuration.README_inc'))
    main.exit(code)
 end
 

@@ -1,9 +1,14 @@
-Usage: compile-binding-table LWAFTR.CONF [LWAFTR.O]
+Usage: compile-configuration LWAFTR.CONF [LWAFTR.O]
 
   -h, --help
                              Print usage information.
 
-Validate and compile a binding table.
+Validate and compile a configuration file.
+
+A lwAFTR configuration file follows the schema described in
+`lib/yang/snabb-softwire-v2.yang`.  It consists of several containers
+such as `binding-table`, `external-interface` and `internal-interface` and
+`instance`.
 
 A binding table is a collection of softwires (tunnels).  One endpoint
 of the softwire is in the AFTR and the other is in the B4.  A
@@ -15,11 +20,11 @@ an incoming packet.
 
 This command will atomically overwrite the output file.  If the output
 file name LWAFTR.O is not given as an argument, the output file
-will be the name of the input file, minus a ".txt" suffix if present,
+will be the name of the input file, minus a ".conf" suffix if present,
 plus a ".o" suffix.
 
 Note that when a lwAFTR is started, it will automatically compile its
-binding table if needed.  However for large tables (millions of entries)
-this can take a second or two, so it can still be useful to compile the
-binding table ahead of time.  If you do this, you can send a SIGHUP to
-the AFTR to cause it to reload the table.
+configuration file if needed.  However for large tables (millions of entries)
+this can take a second or two, so it can still be useful to compile a
+configuration file ahead of time.  If you do this, you can send a SIGHUP to
+the AFTR to cause it to reload the file.
