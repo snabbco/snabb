@@ -239,40 +239,54 @@ inbound direction.  The ND module is the feature that identifies the
 uplink as a "L3-port", while the ACs are L2-ports without the need for
 neighbor discovery.
 
+The box labelled `Frag` is a collections of apps that performs IPv6
+fragmentation and reassembly for packets destined to any of the
+pseudowires connected to the dispatcher. Initially, the path MTU
+(PMTU) for all outgoing packets is equal to the MTU of the uplink
+port, but the fragmenter implements standard PMTU discovery (PMTUD):
+ff any of the packets experiences an MTU bottleneck (i.e. a link along
+the path to the destination whose MTU is smaller than that of the
+uplink port), the corresponding device will generate an appropriate
+ICMP _Packet-Too-Big_ (PTB) message, which will be processed by the
+fragmenter to populate a per-destination PMTU cache.  From that point
+on, packets sent to that destination will be fragmented for that PMTU
+instead of the uplink's MTU.  The cached PMTUD is discarded after 10
+minutes to allow the system to discover an increase of the PMTU,
+e.g. after a routing change.
 
     DIAGRAM: VPN-TP
     
-    -------------------------------------- Decapsulation ----------------------------------->
-    <------------------------------------- Encapsulation ------------------------------------ 
-                                                   +=-------------------------------+                         
-                                                   |  VPLS                          |                         
-                                                   |                                |                         
-                                                   |     +-------+    +---------+   |                         
-                                             +---------->+ PW    +<-->+         |   |                         
-                                             |     :     +-------+    |         +<-------> AC                 
-                                             |     |         .        | Bridge  |   :  .                      
-                                             |     |         .        |         |   |  .                      
-                                             |     |     +-------+    |         +<-------> AC                 
-                                             |+--------->+ PW    +<-->+         |   |                         
-                                             ||    |     +-------+    +---------+   |                         
-                           +------------+    ||    +=-------------------------------+                         
-                           |            +<---+|              .                                                
-                +----+     |            +<----+              .   
-    Uplink <--->+ ND +<--->+ dispatcher |                    .                                                
-                +----+     |            +<----+              .                                                
-                           |            +<---+|              .                                                
-                           +------------+    ||    +=-------------------------------+                         
-                                             ||    |     +-------+    +---------+   |                         
-                                             |+--------->+ PW    +<-->+         |   |                         
-                                             |     :     +-------+    |         +<-------> AC                 
-                                             |     |         .        | Bridge  |   :  .                      
-                                             |     |         .        |         |   |  .                      
-                                             |     |     +-------+    |         +<-------> AC                 
-                                             +---------->+ PW    +<-->|         |   |                         
-                                                   |     +-------+    +---------+   |                         
-                                                   |                                |                         
-                                                   |  VPLS                          |                         
-                                                   +=-------------------------------+                         
+    ------------------------------------------ Decapsulation ---------------------------------------->
+    <----------------------------------------- Encapsulation -----------------------------------------
+                                                            +=-------------------------------+
+                                                            |  VPLS                          |
+                                                            |                                |
+                                                            |     +-------+    +---------+   |
+                                                      +---------->+ PW    +<-->+         |   |
+                                                      |     :     +-------+    |         +<-------> AC
+                                                      |     |         .        | Bridge  |   :  .
+                                                      |     |         .        |         |   |  .
+                                                      |     |     +-------+    |         +<-------> AC
+                                                      |+--------->+ PW    +<-->+         |   |
+                                                      ||    |     +-------+    +---------+   |
+                                    +------------+    ||    +=-------------------------------+
+                                    |            +<---+|              .
+                +----+   +------+   |            +<----+              .
+    Uplink <--->+ ND +<->+ Frag +<->+ dispatcher |                    .
+                +----+   +------+   |            +<----+              .
+                                    |            +<---+|              .
+                                    +------------+    ||    +=-------------------------------+
+                                                      ||    |     +-------+    +---------+   |
+                                                      |+--------->+ PW    +<-->+         |   |
+                                                      |     :     +-------+    |         +<-------> AC
+                                                      |     |         .        | Bridge  |   :  .
+                                                      |     |         .        |         |   |  .
+                                                      |     |     +-------+    |         +<-------> AC
+                                                      +---------->+ PW    +<-->|         |   |
+                                                            |     +-------+    +---------+   |
+                                                            |                                |
+                                                            |  VPLS                          |
+                                                            +=-------------------------------+
 
 Any of the ACs or uplinks can be implemented either as physical
 interfaces or as VLAN-mode sub-interfaces of a physical interface
