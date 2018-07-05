@@ -236,7 +236,6 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
       vlan=queue.external_interface.vlan_tag,
       rxcounter=id,
       txcounter=id,
-      run_stats=true,
       ring_buffer_size=ring_buffer_size,
       macaddr=ethernet:ntop(queue.external_interface.mac)})
    config.app(c, v6_nic_name, require(v6_info.driver).driver, {
@@ -248,7 +247,6 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
       vlan=queue.internal_interface.vlan_tag,
       rxcounter=id,
       txcounter=id,
-      run_stats=true,
       ring_buffer_size=ring_buffer_size,
       macaddr = ethernet:ntop(queue.internal_interface.mac)})
 
@@ -312,7 +310,6 @@ function load_on_a_stick(c, conf, args)
          ring_buffer_size=args.ring_buffer_size,
          rxcounter = id,
          txcounter = id,
-         run_stats=true,
          macaddr = ethernet:ntop(queue.external_interface.mac)})
       if mirror then
          local Tap = require("apps.tap.tap").Tap
@@ -344,7 +341,6 @@ function load_on_a_stick(c, conf, args)
          ring_buffer_size=args.ring_buffer_size,
          rxcounter = id,
          txcounter = id,
-         run_stats=true,
          macaddr = ethernet:ntop(queue.external_interface.mac)})
       config.app(c, v6_nic_name, driver, {
          pciaddr = pciaddr,
@@ -356,7 +352,6 @@ function load_on_a_stick(c, conf, args)
          ring_buffer_size=args.ring_buffer_size,
          rxcounter = id,
          txcounter = id,
-         run_stats=true,
          macaddr = ethernet:ntop(queue.internal_interface.mac)})
 
       link_source(c, v4_nic_name..'.'..device.tx, v6_nic_name..'.'..device.tx)

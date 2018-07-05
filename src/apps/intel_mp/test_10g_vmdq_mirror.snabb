@@ -38,7 +38,6 @@ config.app(c, "nic1p1", intel.Intel,
              macaddr = "12:34:56:78:9a:bc",
              rxq = 0,
              rxcounter = 2,
-             run_stats = true,
              wait_for_link = true })
 
 config.app(c, "nic1p2", intel.Intel,
@@ -49,7 +48,6 @@ config.app(c, "nic1p2", intel.Intel,
              macaddr = "aa:aa:aa:aa:aa:aa",
              rxq = 0,
              rxcounter = 3,
-             run_stats = true,
              wait_for_link = true })
 
 config.app(c, "pcap", pcap.PcapReader, "source2.pcap")
