@@ -383,6 +383,17 @@ function CTable:lookup_and_copy(key, entry)
    return true
 end
 
+local function remove_ptr_aux(entry, index, scale)
+   entry = entry + 1
+   index = index + 1
+   if entry.hash == HASH_MAX then return nil end
+   if hash_to_index(entry.hash, scale) == index then return nil end
+   -- Give to the poor.
+   entry[-1] = entry[0]
+   entry.hash = HASH_MAX
+   return entry, index
+end
+
 function CTable:remove_ptr(entry)
    local scale = self.scale
    local index = entry - self.entries
@@ -393,14 +404,13 @@ function CTable:remove_ptr(entry)
    self.occupancy = self.occupancy - 1
    entry.hash = HASH_MAX
 
-   while true do
-      entry = entry + 1
-      index = index + 1
-      if entry.hash == HASH_MAX then break end
-      if hash_to_index(entry.hash, scale) == index then break end
-      -- Give to the poor.
-      entry[-1] = entry[0]
-      entry.hash = HASH_MAX
+   -- Unroll the first two iterations
+   entry, index = remove_ptr_aux(entry, index, scale)
+   if entry then
+      entry, index = remove_ptr_aux(entry, index, scale)
+   end
+   while entry do
+      entry, index = remove_ptr_aux(entry, index, scale)
    end
 
    if self.occupancy < self.occupancy_lo then
