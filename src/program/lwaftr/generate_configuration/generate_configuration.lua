@@ -177,7 +177,7 @@ local function instance (w)
       instance {
           device test;
           queue {
-              id 1;
+              id 0;
               external-interface {
                   ip 10.0.1.1;
                   mac 02:aa:aa:aa:aa:aa;
