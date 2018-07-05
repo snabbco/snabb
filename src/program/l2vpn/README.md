@@ -460,9 +460,14 @@ The keys define the properties of the VPLS instance.
      property of the VPLS.  To avoid misconfigurations, it is also
      communicated to the remote endpoints of all pseudowires through
      the control channel to make the MTU coherent across the entire
-     virtual switch.  Since the MTU of the ACs is configured
-     independently in the `interfaces` section, an error is raised
-     when the MTU setting between the VPLS and any of its ACs differs.
+     virtual switch.
+
+     Since the MTU of the ACs is configured independently in the
+     `interfaces` section, an error is raised when the MTU setting
+     between the VPLS and any of its ACs differs.  If an AC is in
+     [VLAN-mode](#ac-modes), the size of the service-delimiting tag (4
+     bytes) is subtracted from the MTU of the sub-interface before it
+     is compared to the VPLS MTU.
 
    *  `vc_id`
 
@@ -906,6 +911,7 @@ configured by a Lua table of the following form
         {
           [ description = <description>, ]
           vid = <vid>,
+          [ mtu = <mtu>, ]
           [ afs = {
               ipv6 = {
                 address = <address>,
@@ -1454,6 +1460,7 @@ trunk = {
     {
       [ description = <description>, ]
       vid = <vid>,
+      [ mtu = <mtu>, ]
       [ afs = {
           ipv6 = {
             address = <address>,
@@ -1502,6 +1509,19 @@ address as an interface's name is not practical (because the PCI
 address uses a dot to separate the "function" element in the standard
 syntax).  A sub-interface is configured as a L3-port exactly like a
 physical port as explained in the previous section.
+
+The optional `mtu` parameter can be used to assign an MTU to the
+sub-interface which is smaller than the MTU of the physical interface.
+If it is omitted, the sub-interface inherits the MTU from the physical
+interface.
+
+Note that the MTU is not enforced at L2, i.e. it only is effective for
+services at higher layers.  For example, if the sub-interface carries
+a L3 configuration, IP packets destined for that inerface must not
+exceed the MTU of the sub-interface (subtracted by the L2 header).
+Another example is the case when a sub-interface is used as an AC in a
+VPLS, where the MTU of the VPLS must match the MTU of the
+sub-interface.
 
 #### <a name="native-vlan">Native VLAN</a>
 

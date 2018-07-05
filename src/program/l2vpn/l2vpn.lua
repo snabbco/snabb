@@ -100,6 +100,7 @@
 --           vlans = {
 --             {
 --               [ description = <description>, ]
+--               [ mtu = mtu, ]
 --               vid = <vid>,
 --               [ afs = {
 --                   ipv6 = {
@@ -425,6 +426,12 @@ function parse_intf(config)
                 "Invalid VLAN ID "..vid.." for sub-interface #"..n)
          local name = config.name..'.'..vid
          assert(not intf.subintfs[name], "Duplicate VID: "..vid)
+
+         local mtu = vlan.mtu or intf.mtu
+         assert(mtu <= intf.mtu,
+                string.format("MTU %d on sub-interface %s "
+                                 .."exceeds MTU %d of physical interface",
+                              mtu, name, intf.mtu))
          local subintf = {
             name = name,
             -- The normalized name is used in app and link names
@@ -432,14 +439,14 @@ function parse_intf(config)
             description = vlan.description,
             vlan = true,
             phys_intf = intf,
-            -- The effective MTU of the VLAN port
-            mtu = intf.mtu-4,
+            mtu = mtu,
          }
          intf.subintfs[name] = subintf
          print("    "..config.name.."."..vid)
          print("      Description: "..(vlan.description or '<none>'))
          print("      L2 configuration")
          print("        VLAN ID: "..(vid > 0 and vid or "<untagged>"))
+         print("        MTU: "..subintf.mtu)
          local connector = vmux:connector((vid == 0 and 'native') or 'vlan'..vid)
          if vlan.afs then
             subintf.connector = process_afs(vlan.afs, vid, connector
@@ -573,9 +580,14 @@ function parse_config (main_config)
          intf.used = true
          -- Note: if the AC is the native VLAN on a trunk, the actual packets
          -- can carry frames which exceed the nominal MTU by 4 bytes.
-         assert(vpls.mtu == intf.mtu, "MTU mismatch between "
+         local eff_mtu = intf.mtu
+         if intf.vlan then
+            -- Subtract size of service-delimiting tag
+            eff_mtu = eff_mtu - 4
+         end
+         assert(vpls.mtu == eff_mtu, "MTU mismatch between "
                    .."VPLS ("..vpls.mtu..") and interface "
-                   ..ac.." ("..intf.mtu..")")
+                   ..ac.." ("..eff_mtu..")")
       end
    end
 
