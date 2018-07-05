@@ -52,9 +52,9 @@ local function softwire_entries(from_ipv4, num_ips, psid_len, from_b4, port_set)
    for _ = 1, params.num_ips do
       for psid = 1, n-1 do
          table.insert(
-       entries,
-       softwire_entry(v4addr, psid, ipv6:ntop(b4), port_set)
-    )
+            entries,
+            softwire_entry(v4addr, psid, ipv6:ntop(b4), port_set)
+         )
          b4 = inc_ipv6(b4)
       end
       v4addr = inc_ipv4(v4addr)
