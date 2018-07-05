@@ -4,6 +4,7 @@ local S          = require("syscall")
 local config     = require("core.config")
 local cpuset     = require("lib.cpuset")
 local csv_stats  = require("program.lwaftr.csv_stats")
+local ethernet   = require("lib.protocol.ethernet")
 local lib        = require("core.lib")
 local setup      = require("program.lwaftr.setup")
 local cltable    = require("lib.cltable")
@@ -131,9 +132,10 @@ end
 -- are the same for the internal and external interfaces.
 local function requires_splitter (conf)
    local queue = select(3, lwutil.parse_instance(conf))
-   local internal_interface = queue.internal_interface
-   local external_interface = queue.external_interface
-   return internal_interface.vlan_tag == external_interface.vlan_tag
+   local int = queue.internal_interface
+   local ext = queue.external_interface
+   return ethernet:ntop(int.mac) == ethernet:ntop(ext.mac) and
+          int.vlan_tag == ext.vlan_tag
 end
 
 function run(args)
