@@ -1,8 +1,8 @@
 Usage:
   snabb lwaftr bench
   snabb lwaftr check
-  snabb lwaftr compile-binding-table
-  snabb lwaftr generate-binding-table
+  snabb lwaftr compile-configuration
+  snabb lwaftr generate-configuration
   snabb lwaftr migrate-configuration
   snabb lwaftr monitor
   snabb lwaftr query
