@@ -300,8 +300,16 @@ function load_on_a_stick(c, conf, args)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
       args.v6_nic_name, args.v4v6, args.mirror
 
+   if queue.external_interface.vlan_tag ~= queue.internal_interface.vlan_tag then
+      assert(queue.external_interface.mac ~= queue.internal_interface.mac,
+             "When using different VLAN tags, external and internal MAC "..
+                "addresses must be different too")
+   end
+
    if v4v6 then
       assert(queue.external_interface.vlan_tag == queue.internal_interface.vlan_tag)
+      assert(ethernet:ntop(queue.external_interface.mac) ==
+                ethernet:ntop(queue.internal_interface.mac))
       config.app(c, 'nic', driver, {
          pciaddr = pciaddr,
          vmdq=true, -- Needed to enable MAC filtering/stamping.
@@ -331,9 +339,6 @@ function load_on_a_stick(c, conf, args)
       link_source(c, v4v6..'.v4', v4v6..'.v6')
       link_sink(c, v4v6..'.v4', v4v6..'.v6')
    else
-      assert(queue.external_interface.mac ~= queue.internal_interface.mac,
-             "When using different VLAN tags, external and internal MAC "..
-                "addresses must be different too")
       config.app(c, v4_nic_name, driver, {
          pciaddr = pciaddr,
          vmdq=true, -- Needed to enable MAC filtering/stamping.
