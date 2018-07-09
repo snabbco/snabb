@@ -352,6 +352,18 @@ local function compute_histograms_tree(histograms)
    return ret
 end
 
+-- given a prefix (tx or rx), bitmap of enabled queue counters, & a table
+-- of counters, remove the counters not matching the bitmap
+local function filter_queue_counters(prefix, bitmap, counters)
+   for i=0, 15 do
+      if not lib.bitset(bitmap, i) then
+         counters["q"..i.."_"..prefix.."packets"] = nil
+         counters["q"..i.."_"..prefix.."drops"] = nil
+         counters["q"..i.."_"..prefix.."bytes"] = nil
+      end
+   end
+end
+
 local function compute_counters_tree(counters, rrds)
    if counters == nil then return {} end
    local ret = {}
@@ -365,6 +377,16 @@ local function compute_counters_tree(counters, rrds)
          end
          parent[leaf] = make_leaf(
             function() return counter.read(v) end, rrds[k])
+      end
+   end
+   if ret.pci then
+      for pci, counters in pairs(ret.pci) do
+         if counters.rxcounters then
+            filter_queue_counters("rx", counters.rxcounters.value(), counters)
+         end
+         if counters.txcounters then
+            filter_queue_counters("tx", counters.txcounters.value(), counters)
+         end
       end
    end
    -- The rxpackets and rxbytes link counters are redundant.

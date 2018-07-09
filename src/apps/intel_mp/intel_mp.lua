@@ -313,6 +313,15 @@ byPciID = {
   [0x10fb] = { registers = "82599ES", driver = Intel82599, max_q = 16 }
 }
 
+-- constant used in constructor below, keep synced with the actual
+-- keys used for the driver stats shm frame that should be shared between
+-- NIC processes
+local shm_frame_keys = { "dtime", "mtu", "speed", "status", "type",
+                         "promisc", "macaddr", "rxbytes", "rxpackets",
+                         "rxmcast", "rxbcast", "rxdrop", "rxerrors",
+                         "txbytes", "txpackets", "txmcast", "txbcast",
+                         "txdrop", "txerrors", "rxdmapackets" }
+
 -- The `driver' variable is used as a reference to the driver class in
 -- order to interchangeably use NIC drivers.
 driver = Intel
@@ -415,24 +424,32 @@ function Intel:new (conf)
       self:init_queue_stats(frame)
       self.stats = shm.create_frame(self.shm_root.."stats", frame)
       self.sync_timer = lib.throttle(0.01)
+   else
+      -- use a dummy frame, this is just used to populate shm_frame_keys
+      self:init_queue_stats({})
    end
 
-   -- Alias to the shared stats frame in each process's pci dir
-   -- The conditional checks if the symlink exists with lstat since
-   -- shm.exists requires the target exist, and the run_stats process
-   -- could go down and make the target cease to exist
-   if not S.lstat(shm.root.."/"..S.getpid().."/pci/"..self.pciaddress) then
-      shm.alias("pci/"..self.pciaddress, self.shm_root.."stats")
+   -- Alias each counter in the shared stats frame in each process's pci dir
+   -- Not all counters in pci/ are shared, some are process specific
+   for _, name in ipairs(shm_frame_keys) do
+      -- The conditional checks if the symlink exists with lstat since
+      -- shm.exists requires the target exist, and the run_stats process
+      -- could go down and make the target cease to exist
+      if not S.lstat(shm.root.."/"..S.getpid().."/pci/"..
+                     self.pciaddress.."/"..name..".counter") then
+         shm.alias("pci/"..self.pciaddress.."/"..name..".counter",
+                   self.shm_root.."stats".."/"..name..".counter")
+      end
    end
 
    -- Expose per-instance queue counter assignment, which allows a program like
    -- `snabb top` to associate PIDs to queue counters
    if self.rxcounter then
-      local rxcs = counter.create("pci/" .. self.pciaddress .. "/rxcounters")
+      local rxcs = counter.create("pci/"..self.pciaddress.."/rxcounters.counter")
       counter.set(rxcs, lib.bits({rxc=self.rxcounter}, counter.read(rxcs)))
    end
    if self.txcounter then
-      local txcs = counter.create("pci/" .. self.pciaddress .. "/txcounters")
+      local txcs = counter.create("pci/"..self.pciaddress.."/txcounters.counter")
       counter.set(txcs, lib.bits({rxc=self.txcounter}, counter.read(txcs)))
    end
 
@@ -1202,6 +1219,7 @@ function Intel1g:init_queue_stats (frame)
          local name = "q" .. i .. "_" .. k
          table.insert(self.queue_stats, name)
          table.insert(self.queue_stats, self.r[v][i])
+         table.insert(shm_frame_keys, name)
          frame[name] = {counter}
       end
    end
@@ -1309,6 +1327,7 @@ function Intel82599:init_queue_stats (frame)
          local name = "q" .. i .. "_" .. k
          table.insert(self.queue_stats, name)
          table.insert(self.queue_stats, self.r[v][i])
+         table.insert(shm_frame_keys, name)
          frame[name] = {counter}
       end
    end
