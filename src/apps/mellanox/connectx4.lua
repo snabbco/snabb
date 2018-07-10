@@ -49,7 +49,7 @@ local band, bor, shl, shr, bswap, bnot =
    bit.band, bit.bor, bit.lshift, bit.rshift, bit.bswap, bit.bnot
 local cast, typeof = ffi.cast, ffi.typeof
 
-local debug_trace   = false     -- Print trace messages
+local debug_trace   = true     -- Print trace messages
 local debug_hexdump = false     -- Print hexdumps (in Linux mlx5 format)
 
 -- Maximum size of a receive queue table.
@@ -208,6 +208,8 @@ function ConnectX4:new (conf)
    local init_seg = InitializationSegment:new(mmio)
    local hca = HCA:new(init_seg)
 
+   -- Makes enable_hca() hang with ConnectX5
+   -- init_seg:reset()
    init_seg:cmdq_phy_addr(memory.virtual_to_physical(hca.entry))
    if debug_trace then init_seg:dump() end
    while not init_seg:ready() do
@@ -1009,54 +1011,51 @@ function RQ:new (cxq)
    end
 
    function rq:receive (l)
-      if have_input() then
-         local limit = engine.pull_npackets
-         while limit > 0 and not link.full(l) do
-            -- Find the next completion entry.
-            local c = cxq.rcq[cxq.next_rx_cqeid]
-            local owner = bit.band(1, c.u8[0x3F])
-            limit = limit - 1
-            -- Advance to next completion.
-            -- Note: assumes sqsize == cqsize
-            cxq.next_rx_cqeid = slot(cxq.next_rx_cqeid + 1)
-            -- Toggle the ownership value if the CQ wraps around.
-            if cxq.next_rx_cqeid == 0 then
-               cxq.rx_mine = (cxq.rx_mine + 1) % 2
-            end
-            -- Decode the completion entry.
-            local opcode = shr(c.u8[0x3F], 4)
-            local len = bswap(c.u32[0x2C/4])
-            local wqeid = shr(bswap(c.u32[0x3C/4]), 16)
-            local idx = slot(wqeid)
-            if opcode == 0 or opcode == 2 then
-               -- Successful receive
-               local p = cxq.rx[idx]
-               assert(p ~= nil)
-               p.length = len
-               link.transmit(l, p)
-               cxq.rx[idx] = nil
-            elseif opcode == 13 or opcode == 14 then
-               local syndromes = {
-                  [0x1] = "Local_Length_Error",
-                  [0x4] = "Local_Protection_Error",
-                  [0x5] = "Work_Request_Flushed_Error",
-                  [0x6] = "Memory_Window_Bind_Error",
-                  [0x10] = "Bad_Response_Error",
-                  [0x11] = "Local_Access_Error",
-                  [0x12] = "Remote_Invalid_Request_Error",
-                  [0x13] = "Remote_Access_Error",
-                  [0x14] = "Remote_Operation_Error"
-               }
-               local syndrome = c.u8[0x37]
-               print(("Got error. opcode=%d syndrome=0x%x message=%s"):format(
-                     opcode, syndrome, syndromes[syndromes])) -- XXX
-               -- Error on receive
-               assert(packets[idx] ~= nil)
-               packet.free(packets[idx])
-               packets[idx] = nil
-            else
-               error(("Unexpected CQE opcode: %d (0x%x)"):format(opcode, opcode))
-            end
+      local limit = engine.pull_npackets
+      while have_input() and limit > 0 and not link.full(l) do
+         -- Find the next completion entry.
+         local c = cxq.rcq[cxq.next_rx_cqeid]
+         limit = limit - 1
+         -- Advance to next completion.
+         -- Note: assumes sqsize == cqsize
+         cxq.next_rx_cqeid = slot(cxq.next_rx_cqeid + 1)
+         -- Toggle the ownership value if the CQ wraps around.
+         if cxq.next_rx_cqeid == 0 then
+            cxq.rx_mine = (cxq.rx_mine + 1) % 2
+         end
+         -- Decode the completion entry.
+         local opcode = shr(c.u8[0x3F], 4)
+         local len = bswap(c.u32[0x2C/4])
+         local wqeid = shr(bswap(c.u32[0x3C/4]), 16)
+         local idx = slot(wqeid)
+         if opcode == 0 or opcode == 2 then
+            -- Successful receive
+            local p = cxq.rx[idx]
+            assert(p ~= nil)
+            p.length = len
+            link.transmit(l, p)
+            cxq.rx[idx] = nil
+         elseif opcode == 13 or opcode == 14 then
+            local syndromes = {
+               [0x1] = "Local_Length_Error",
+               [0x4] = "Local_Protection_Error",
+               [0x5] = "Work_Request_Flushed_Error",
+               [0x6] = "Memory_Window_Bind_Error",
+               [0x10] = "Bad_Response_Error",
+               [0x11] = "Local_Access_Error",
+               [0x12] = "Remote_Invalid_Request_Error",
+               [0x13] = "Remote_Access_Error",
+               [0x14] = "Remote_Operation_Error"
+            }
+            local syndrome = c.u8[0x37]
+            print(("Got error. opcode=%d syndrome=0x%x message=%s"):format(
+                  opcode, syndrome, syndromes[syndromes])) -- XXX
+            -- Error on receive
+            assert(packets[idx] ~= nil)
+            packet.free(packets[idx])
+            packets[idx] = nil
+         else
+            error(("Unexpected CQE opcode: %d (0x%x)"):format(opcode, opcode))
          end
       end
    end
@@ -1659,6 +1658,11 @@ function InitializationSegment:health_syndrome ()
    return self:getbits(0x1010, 31, 24)
 end
 
+function InitializationSegment:reset ()
+   -- Not covered in PRM
+   self:setbits(0x14, 10,  8, 0x7)
+end
+
 function InitializationSegment:dump ()
    print('fw_rev                  ', self:fw_rev())
    print('cmd_interface_rev       ', self:cmd_interface_rev())
@@ -1776,24 +1780,28 @@ function selftest ()
       C.usleep(1e6)
    end
 
-   local bursts = 1000
+   local bursts = 10000
    local each   = 100
    local octets = 100
    print(("Links up. Sending %s packets."):format(lib.comma_value(each*bursts)))
 
-   for i = 1, bursts do
+   for i = 1, bursts + 100 do
       for id, app in ipairs({io0, io1}) do
-         for i = 1, each do
-            local p = packet.allocate()
-            ffi.fill(p.data, octets, 0)  -- zero packet
-            local header = lib.hexundump("000000000001 000000000002 0800", 16)
-            ffi.copy(p.data, header, #header)
-            p.data[12] = 0x08 -- ethertype = 0x0800
-            p.length = octets
-            link.transmit(app.input.input, p)
+         if i <= bursts then
+            for i = 1, each do
+               local p = packet.allocate()
+               ffi.fill(p.data, octets, 0)  -- zero packet
+               local header = lib.hexundump("000000000001 000000000002 0800", 16)
+               ffi.copy(p.data, header, #header)
+               p.data[12] = 0x08 -- ethertype = 0x0800
+               p.length = octets
+               link.transmit(app.input.input, p)
+            end
          end
          app:pull()
          app:push()
+         while not link.empty(io0.output.output) do packet.free(link.receive(io0.output.output)) end
+         while not link.empty(io1.output.output) do packet.free(link.receive(io1.output.output)) end
       end
    end
    print("link", "txpkt", "txbyte", "txdrop")
