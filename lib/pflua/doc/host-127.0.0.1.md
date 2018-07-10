@@ -77,6 +77,38 @@ return function(P,length)
       return cast("uint32_t*", P+38)[0] == 16777343
    end
 end
+```
 
+## Native pflang compilation
+
+```
+7fb06b836000  4883FE22          cmp rsi, +0x22
+7fb06b836004  7C54              jl 0x7fb06b83605a
+7fb06b836006  0FB7470C          movzx eax, word [rdi+0xc]
+7fb06b83600a  4883F808          cmp rax, +0x08
+7fb06b83600e  751A              jnz 0x7fb06b83602a
+7fb06b836010  8B4F1A            mov ecx, [rdi+0x1a]
+7fb06b836013  4881F97F000001    cmp rcx, 0x0100007f
+7fb06b83601a  7441              jz 0x7fb06b83605d
+7fb06b83601c  8B4F1E            mov ecx, [rdi+0x1e]
+7fb06b83601f  4881F97F000001    cmp rcx, 0x0100007f
+7fb06b836026  7435              jz 0x7fb06b83605d
+7fb06b836028  EB30              jmp 0x7fb06b83605a
+7fb06b83602a  4883FE2A          cmp rsi, +0x2a
+7fb06b83602e  7C2A              jl 0x7fb06b83605a
+7fb06b836030  4881F808060000    cmp rax, 0x608
+7fb06b836037  7409              jz 0x7fb06b836042
+7fb06b836039  4881F880350000    cmp rax, 0x3580
+7fb06b836040  7518              jnz 0x7fb06b83605a
+7fb06b836042  8B471C            mov eax, [rdi+0x1c]
+7fb06b836045  4881F87F000001    cmp rax, 0x0100007f
+7fb06b83604c  740F              jz 0x7fb06b83605d
+7fb06b83604e  8B4726            mov eax, [rdi+0x26]
+7fb06b836051  4881F87F000001    cmp rax, 0x0100007f
+7fb06b836058  7403              jz 0x7fb06b83605d
+7fb06b83605a  B000              mov al, 0x0
+7fb06b83605c  C3                ret
+7fb06b83605d  B001              mov al, 0x1
+7fb06b83605f  C3                ret
 ```
 

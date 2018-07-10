@@ -16,6 +16,9 @@ thisdir=$(cd $(dirname $0) && pwd)
 
 prepend LUA_PATH ';' "${thisdir}/tests/?.lua"
 prepend LUA_PATH ';' "${thisdir}/src/?.lua"
+prepend LUA_PATH ';' "${thisdir}/deps/dynasm/?.lua"
+prepend LUA_PATH ';' "${thisdir}/deps/luajit/src/?.lua"
 prepend PATH ':' "${thisdir}/tools"
+prepend LD_LIBRARY_PATH ':' "${thisdir}/deps/dynasm"
 
 exec "$@"

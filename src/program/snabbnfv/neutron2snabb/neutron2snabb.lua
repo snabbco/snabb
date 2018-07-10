@@ -107,8 +107,8 @@ function create_config (input_dir, output_dir, hostname)
                               ingress_filter = filter(port, secbindings, secrules, 'ingress'),
                               egress_filter = filter(port, secbindings, secrules, 'egress'),
                               stateful_filter = (profile.packetfilter ~= 'stateless'),
-                              rx_police_gbps = profile.rx_police_gbps,
-                              tx_police_gbps = profile.tx_police_gbps,
+                              rx_police = profile.rx_police_gbps,
+                              tx_police = profile.tx_police_gbps,
                               tunnel = tunnel(port, vif_details, profile) })
             end
          end

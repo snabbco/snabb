@@ -7,6 +7,7 @@ if [ -n "$1" ]
 then
     sleep 0.5s
     if [ "$1" = ${IFACE} ]; then
+        ip li set up dev ${IFACE}
         ip addr add ${IP} dev ${IFACE}
         sleep 0.5s
     fi;

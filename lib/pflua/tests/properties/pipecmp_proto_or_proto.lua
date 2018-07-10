@@ -6,6 +6,8 @@ local pf = require("pf")
 local savefile = require("pf.savefile")
 local utils = require('pf.utils')
 
+local use_native = os.getenv("PF_QUICKCHECK_NATIVE");
+
 local function choose_proto()
     local protos = {"icmp", "igmp", "igrp", "pim", "ah", "esp", "vrrp",
                      "udp", "tcp", "sctp", "ip", "arp", "rarp", "ip6"}
@@ -20,7 +22,7 @@ function property(packets)
    local P, pkt_len = pkt.packet, pkt.len
 
    local libpcap_pred = pf.compile_filter(or_expr, { bpf = true })
-   local pflua_pred = pf.compile_filter(or_expr)
+   local pflua_pred = pf.compile_filter(or_expr, { native = use_native })
    local bpf_result = libpcap_pred(P, pkt_len)
    local pflua_result = pflua_pred(P, pkt_len) 
 

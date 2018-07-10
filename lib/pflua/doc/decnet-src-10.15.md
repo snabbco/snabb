@@ -103,6 +103,49 @@ return function(P,length)
    if v2 ~= 1665 then return false end
    return cast("uint16_t*", P+32)[0] == 3850
 end
+```
 
+## Native pflang compilation
+
+```
+7f3cc4529000  4883FE15          cmp rsi, +0x15
+7f3cc4529004  0F8C88000000      jl 0x7f3cc4529092
+7f3cc452900a  0FB64710          movzx eax, byte [rdi+0x10]
+7f3cc452900e  4883E007          and rax, +0x07
+7f3cc4529012  4883F802          cmp rax, +0x02
+7f3cc4529016  7516              jnz 0x7f3cc452902e
+7f3cc4529018  0FB74F13          movzx ecx, word [rdi+0x13]
+7f3cc452901c  4881F90A0F0000    cmp rcx, 0xf0a
+7f3cc4529023  0F846C000000      jz 0x7f3cc4529095
+7f3cc4529029  E964000000        jmp 0x7f3cc4529092
+7f3cc452902e  4883FE16          cmp rsi, +0x16
+7f3cc4529032  0F8C5A000000      jl 0x7f3cc4529092
+7f3cc4529038  0FB74F10          movzx ecx, word [rdi+0x10]
+7f3cc452903c  4881E1FF070000    and rcx, 0x7ff
+7f3cc4529043  4881F981020000    cmp rcx, 0x281
+7f3cc452904a  750F              jnz 0x7f3cc452905b
+7f3cc452904c  0FB75714          movzx edx, word [rdi+0x14]
+7f3cc4529050  4881FA0A0F0000    cmp rdx, 0xf0a
+7f3cc4529057  743C              jz 0x7f3cc4529095
+7f3cc4529059  EB37              jmp 0x7f3cc4529092
+7f3cc452905b  4883FE21          cmp rsi, +0x21
+7f3cc452905f  7C31              jl 0x7f3cc4529092
+7f3cc4529061  4883F806          cmp rax, +0x06
+7f3cc4529065  750F              jnz 0x7f3cc4529076
+7f3cc4529067  0FB7471F          movzx eax, word [rdi+0x1f]
+7f3cc452906b  4881F80A0F0000    cmp rax, 0xf0a
+7f3cc4529072  7421              jz 0x7f3cc4529095
+7f3cc4529074  EB1C              jmp 0x7f3cc4529092
+7f3cc4529076  4883FE22          cmp rsi, +0x22
+7f3cc452907a  7C16              jl 0x7f3cc4529092
+7f3cc452907c  4881F981060000    cmp rcx, 0x681
+7f3cc4529083  750D              jnz 0x7f3cc4529092
+7f3cc4529085  0FB74F20          movzx ecx, word [rdi+0x20]
+7f3cc4529089  4881F90A0F0000    cmp rcx, 0xf0a
+7f3cc4529090  7403              jz 0x7f3cc4529095
+7f3cc4529092  B000              mov al, 0x0
+7f3cc4529094  C3                ret
+7f3cc4529095  B001              mov al, 0x1
+7f3cc4529097  C3                ret
 ```
 

@@ -1,0 +1,27 @@
+Usage: snabb alarms set-operator-state [OPTION]... ID ALARM-ID OPERATOR-STATE ALARM-TEXT
+Adds a new operator-state in an alarm.
+
+Available options:
+  -s, --schema SCHEMA        YANG data interface to request.
+  -r, --revision REVISION    Require a specific revision of the YANG module.
+  -f, --format               Selects output format (yang or xpath). Default: yang.
+      --print-default        Forces print out of default values.
+  -h, --help                 Displays this message.
+
+Given an instance identifier, an alarm id and an operator-state, add a new
+operator-state to the given alarm.
+
+An ALARM-ID is composed by three elements: resource, alarm-type-id and
+alarm-type-qualifier.  The first two fields are mandatory while alarm-type-qualifier
+can be left empty. Fields alarm-type-id and alarm-type-qualifier are separated
+by a slash (i.e, link-alarm/link-down).
+
+An OPERATOR-STATE can take the following values: 'none', 'ack', 'closed',
+'shelved' and 'un-shelved'.
+
+Typical usage:
+
+$ snabb alarms set-operator-state lwaftr nic-v4 arp-resolution ack
+
+See https://github.com/Igalia/snabb/blob/lwaftr/src/program/alarms/README.md
+for full documentation.

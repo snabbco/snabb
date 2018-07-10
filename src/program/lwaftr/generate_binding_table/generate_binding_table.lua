@@ -21,48 +21,19 @@ local function to_ipv4_u32(ip)
    return ip[0] * 2^24 + ip[1] * 2^16 + ip[2] * 2^8 + ip[3]
 end
 
-local function psid_map_entry(ipv4, psid_len, shift)
-   if tonumber(ipv4) then ipv4 = to_ipv4_string(ipv4) end
-   return ("%s { psid_length=%d, shift=%d }"):format(ipv4, psid_len, shift) 
-end
-
 local function inc_ipv4(uint32)
    return uint32 + 1
 end
 
-local function psid_map_entries(params)
-   local entries = {}
-   local ipv4 = params.from_ipv4
-   if type(ipv4) == "string" then ipv4 = to_ipv4_u32(ipv4) end
-   assert(type(ipv4) == "number")
-   for i=1,params.num_ips do
-      table.insert(entries, psid_map_entry(ipv4, params.psid_len, params.shift))
-      ipv4 = inc_ipv4(ipv4)
-   end
-   return entries
-end
-
-local function psid_map(w, params)
-   w:ln("psid_map {")
-   for _, entry in ipairs(psid_map_entries(params)) do
-      w:ln("  "..entry)
-   end
-   w:ln("}")
-end
-
-local function br_addresses(w, br_address)
-   w:ln("br_addresses {")
-   w:ln("  "..br_address)
-   w:ln("}")
-end
-
-local function softwire_entry(ipv4, psid_len, b4)
-   if tonumber(ipv4) then ipv4 = to_ipv4_string(ipv4) end
-   return ("{ ipv4=%s, psid=%d, b4=%s }"):format(ipv4, psid_len, b4)
+local function softwire_entry(v4addr, psid_len, b4, br_address, port_set)
+   if tonumber(v4addr) then v4addr = to_ipv4_string(v4addr) end
+   local softwire = "  softwire { ipv4 %s; psid %d; b4-ipv6 %s; br-address %s;"
+   softwire = softwire .. " port-set { psid-length %d; }}"
+   return softwire:format(v4addr, psid_len, b4, br_address, port_set.psid_len)
 end
 
 local function inc_ipv6(ipv6)
-   for i=15,0,-1 do
+   for i = 15, 0, -1 do
       if ipv6[i] == 255 then 
          ipv6[i] = 0
       else
@@ -73,29 +44,37 @@ local function inc_ipv6(ipv6)
    return ipv6
 end
 
-local function softwire_entries(from_ipv4, num_ips, psid_len, from_b4)
+local function softwire_entries(from_ipv4, num_ips, psid_len, from_b4, port_set)
    local entries = {}
-   local ipv4 = to_ipv4_u32(from_ipv4)
-   local b4 = ipv6:pton(from_b4)
-   local n = 2^psid_len
-   for i=1,num_ips do
-      for psid=1,n-1 do
-         table.insert(entries, softwire_entry(ipv4, psid, ipv6:ntop(b4)))
+   local v4addr = to_ipv4_u32(params.from_ipv4)
+   local b4 = ipv6:pton(params.from_b4)
+   local n = 2^params.psid_len
+   for _ = 1, params.num_ips do
+      for psid = 1, n-1 do
+         table.insert(
+	    entries,
+	    softwire_entry(v4addr, psid, ipv6:ntop(b4), port_set)
+	 )
          b4 = inc_ipv6(b4)
       end
-      ipv4 = inc_ipv4(ipv4)
+      v4addr = inc_ipv4(v4addr)
    end
    return entries
 end
 
 local function softwires(w, params)
-   w:ln("softwires {")
-   local entries = softwire_entries(params.from_ipv4, params.num_ips,
-      params.psid_len, params.from_b4)
-   for _, entry in ipairs(entries) do
-      w:ln("  "..entry)
+   local v4addr = to_ipv4_u32(params.from_ipv4)
+   local b4 = ipv6:pton(params.from_b4)
+   local br_address = ipv6:pton(params.br_address)
+   local n = 2^params.psid_len
+   for _ = 1, params.num_ips do
+      for psid = 1, n-1 do
+         w:ln(softwire_entry(v4addr, psid, ipv6:ntop(b4),
+              ipv6:ntop(br_address), params.port_set))
+         b4 = inc_ipv6(b4)
+      end
+      v4addr = inc_ipv4(v4addr)
    end
-   w:ln("}")
 end
 
 local w = {}
@@ -132,23 +111,27 @@ end
 function run(args)
    local from_ipv4, num_ips, br_address, from_b4, psid_len, shift = parse_args(args)
    psid_len = assert(tonumber(psid_len))
-   if not shift then shift = 16 - psid_len end
-   assert(psid_len + shift == 16)
+   if not shift then
+      shift = 16 - psid_len
+   else
+      shift = assert(tonumber(shift))
+   end
+   assert(psid_len + shift <= 16)
 
-   psid_map(w, {
-      from_ipv4 = from_ipv4,
-      num_ips = num_ips,
-      psid_len = psid_len,
-      shift = shift,
-   })
-   br_addresses(w, br_address)
+   w:ln("binding-table {")
    softwires(w, {
       from_ipv4 = from_ipv4,
       num_ips = num_ips,
       from_b4 = from_b4,
       psid_len = psid_len,
+      br_address = br_address,
+      port_set = {
+	 psid_len = psid_len,
+	 shift = shift
+      }
    })
+   w:ln("}")
    w:close()
-   
+
    main.exit(0)
 end

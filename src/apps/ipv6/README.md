@@ -37,6 +37,14 @@ following keys are defined:
 
 *Required*. Local MAC address as a string or in binary representation.
 
+— Key **remote_mac**
+
+*Optional*. MAC address of **next_hop** address as a string or in
+binary representation.  If this option is present, the `nd_light` app
+does not perform neighbor solicitation for the **next_hop** address
+and uses **remote_mac** as the MAC address associated with
+**next_hop**.
+
 — Key **local_ip**
 
 *Required*. Local IPv6 address as a string or in binary representation.
@@ -55,6 +63,11 @@ milliseconds. Default is 1,000ms.
 
 *Optional*. Number of neighbor solicitation retransmissions. Default is
 unlimited retransmissions.
+
+— Key **quiet**
+
+*Optional*. If set to **true**, suppress log messages about ND
+activity. Default is **false**.
 
 ### Special Counters
 
@@ -162,3 +175,57 @@ Ingress packets dropped due to wrong remote IPv6 endpoint address.
 — Key **local_address_errors**
 
 Ingress packets dropped due to wrong local IPv6 endpoint address.
+
+## Fragmenter (apps.ipv6.fragment)
+
+The `Fragmenter` app that will fragment any IPv6 packets larger than a
+configured maximum transmission unit (MTU).
+
+    DIAGRAM: IPv6Fragmenter
+                   +-----------+
+                   |           |
+    input     ---->*Fragmenter *---->   output
+                   |           |
+                   +-----------+
+
+### Configuration
+
+The `Fragmenter` app accepts a table as its configuration argument. The
+following key is defined:
+
+— Key **mtu**
+
+*Required*.  The maximum transmission unit, in bytes, not including the
+Ethernet header.
+
+## ICMP Echo responder (apps.ipv6.echo)
+
+The `ICMPEcho` app responds to ICMP echo requests ("pings") to a given
+set of IPv6 addresses.
+
+Like the `ARP` app, `ICMPEcho` sits between your network function and
+outside traffic.  Its `north` link relays traffic to and from the
+network function; the `south` link talks to the world.
+
+    DIAGRAM: IPv6ICMPEcho
+                   +-----------+
+                   |           |
+    north     ---->* ICMPEcho  *<----   south
+              <----*           *---->
+                   |           |
+                   +-----------+
+
+### Configuration
+
+The `ICMPEcho` app accepts a table as its configuration argument. The
+following keys is defined:
+
+— Key **address**
+
+*Optional*.  An IPv6 address for which to respond to pings, as a
+ `uint8_t[16]`.
+
+— Key **addresses**
+
+*Optional*.  An array of IPv6 addresses for which to respond to pings,
+as a Lua array of `uint8_t[16]` values.

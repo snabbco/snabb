@@ -24,9 +24,11 @@ doc/snabb-lwaftr.epub: doc/snabb-lwaftr.md
 
 CLEAN = doc/snabb-lwaftr.*
 
-clean:
+clean_object_files:
+	@(find . -name "*.o" -exec echo "RM        {}" \; -exec rm -f {} \;)
+
+clean: clean_object_files
 	$(E) "RM        $(CLEAN)"
 	$(Q)-rm -rf $(CLEAN)
-	$(Q) (cd ../../; make clean)
 
-.PHONY: clean
+.PHONY: clean_object_files clean

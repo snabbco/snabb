@@ -33,7 +33,7 @@ tcp:init(
 -- Class methods
 
 function tcp:new (config)
-   local o tcp:superClass().new(self)
+   local o = tcp:superClass().new(self)
    o:src_port(config.src_port)
    o:dst_port(config.dst_port)
    o:seq_num(config.seq)
@@ -191,6 +191,7 @@ local function test_tcp_checksum ()
 
    local ip_hdr = ipv4:new_from_mem(p.data + IP_BASE, IP_HDR_SIZE)
    local tcp_hdr = tcp:new_from_mem(p.data + TCP_BASE, TCP_HDR_SIZE)
+   assert(ip_hdr and tcp_hdr)
    local payload_length = p.length - PAYLOAD_BASE
    local csum = tcp_hdr:checksum(p.data + PAYLOAD_BASE, payload_length, ip_hdr)
    assert(csum == 0x382a, "Wrong TCP checksum")
@@ -198,6 +199,7 @@ end
 
 function selftest ()
    test_tcp_checksum()
+   tcp:new({})
 end
 
 tcp.selftest = selftest

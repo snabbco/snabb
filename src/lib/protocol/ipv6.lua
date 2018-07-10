@@ -75,6 +75,9 @@ end
 
 function ipv6:new_from_mem(mem, size)
    local o = ipv6:superClass().new_from_mem(self, mem, size)
+   if o == nil then
+      return nil
+   end
    if not o._recycled then
       o._ph = ipv6hdr_pseudo_t()
    end
@@ -94,6 +97,14 @@ function ipv6:ntop (n)
    local p = ffi.new("char[?]", INET6_ADDRSTRLEN)
    local c_str = C.inet_ntop(AF_INET6, n, p, INET6_ADDRSTRLEN)
    return ffi.string(c_str)
+end
+
+function ipv6:get()
+   return self:ntop(self)
+end
+
+function ipv6:set(addr)
+   self:pton(addr)
 end
 
 -- Construct the solicited-node multicast address from the given
