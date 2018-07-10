@@ -352,14 +352,32 @@ local function compute_histograms_tree(histograms)
    return ret
 end
 
--- given a prefix (tx or rx), bitmap of enabled queue counters, & a table
--- of counters, remove the counters not matching the bitmap
-local function filter_queue_counters(prefix, bitmap, counters)
-   for i=0, 15 do
-      if not lib.bitset(bitmap, i) then
-         counters["q"..i.."_"..prefix.."packets"] = nil
-         counters["q"..i.."_"..prefix.."drops"] = nil
-         counters["q"..i.."_"..prefix.."bytes"] = nil
+-- given a table of apps in the process & table of sets of pci counters,
+-- remove the counters not used by the apps in the process
+local function filter_queue_counters(apps, pcis)
+   local enabled_rx = 0
+   local enabled_tx = 0
+   for _, app in pairs(apps) do
+      for name, leaf in pairs(app) do
+         if name == "rxcounter" then
+            enabled_rx = lib.bits({bit=leaf.value()}, enabled_rx)
+         elseif name == "txcounter" then
+            enabled_tx = lib.bits({bit=leaf.value()}, enabled_tx)
+         end
+      end
+   end
+   for _, pci in pairs(pcis) do
+      for i=0, 15 do
+         if not lib.bitset(enabled_rx, i) then
+            pci["q"..i.."_".."rxpackets"] = nil
+            pci["q"..i.."_".."rxdrops"] = nil
+            pci["q"..i.."_".."rxbytes"] = nil
+         end
+         if not lib.bitset(enabled_tx, i) then
+            pci["q"..i.."_".."txpackets"] = nil
+            pci["q"..i.."_".."txdrops"] = nil
+            pci["q"..i.."_".."txbytes"] = nil
+         end
       end
    end
 end
@@ -379,15 +397,8 @@ local function compute_counters_tree(counters, rrds)
             function() return counter.read(v) end, rrds[k])
       end
    end
-   if ret.pci then
-      for pci, counters in pairs(ret.pci) do
-         if counters.rxcounters then
-            filter_queue_counters("rx", counters.rxcounters.value(), counters)
-         end
-         if counters.txcounters then
-            filter_queue_counters("tx", counters.txcounters.value(), counters)
-         end
-      end
+   if ret.pci and ret.apps then
+      filter_queue_counters(ret.apps, ret.pci)
    end
    -- The rxpackets and rxbytes link counters are redundant.
    if ret.links then
