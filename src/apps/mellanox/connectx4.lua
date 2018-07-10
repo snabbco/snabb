@@ -435,6 +435,7 @@ end
 
 -- Provide the NIC with freshly allocated memory.
 function HCA:alloc_pages (num_pages)
+   assert(num_pages > 0)
    self:command("MANAGE_PAGES", 0x14 + num_pages*8, 0x0C)
       :input("opcode",            0x00, 31, 16, 0x108)
       :input("opmod",             0x04, 15, 0, 1) -- allocate mode
@@ -532,8 +533,7 @@ end
 
 function HCA:disable_hca ()
    self:command("DISABLE_HCA", 0x0c, 0x0c)
-      :input("opcode", 0x00, 31, 16, 0x103)
-      :input("opmod",  0x04, 15, 0, mode)
+      :input("opcode", 0x00, 31, 16, 0x105)
       :execute()
 end
 
