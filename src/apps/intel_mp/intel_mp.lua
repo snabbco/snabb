@@ -401,12 +401,14 @@ function Intel:new (conf)
          promisc   = {counter},
          macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
          rxbytes   = {counter},
+         rxbits    = {counter},
          rxpackets = {counter},
          rxmcast   = {counter},
          rxbcast   = {counter},
          rxdrop    = {counter},
          rxerrors  = {counter},
          txbytes   = {counter},
+         txbits    = {counter},
          txpackets = {counter},
          txmcast   = {counter},
          txbcast   = {counter},
@@ -835,13 +837,13 @@ function Intel:sync_stats ()
    set(stats.speed, self:link_speed())
    set(stats.status, self:link_status() and 1 or 2)
    set(stats.promisc, self:promisc() and 1 or 2)
-   set(stats.rxbytes, self:rxbytes())
+   set(stats.rxbits, self:rxbytes()*8)
    set(stats.rxpackets, self:rxpackets())
    set(stats.rxmcast, self:rxmcast())
    set(stats.rxbcast, self:rxbcast())
    set(stats.rxdrop, self:rxdrop())
    set(stats.rxerrors, self:rxerrors())
-   set(stats.txbytes, self:txbytes())
+   set(stats.txbits, self:txbytes()*8)
    set(stats.txpackets, self:txpackets())
    set(stats.txmcast, self:txmcast())
    set(stats.txbcast, self:txbcast())
