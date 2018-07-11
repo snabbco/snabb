@@ -277,7 +277,11 @@ end
 
 function create_file(filename, arg)
    local rrd = new(arg)
-   local fd = assert(S.open(filename, "creat, rdwr, excl", '0664'))
+   -- File might already exists if directory is a link.
+   local _, fd = pcall(S.open, filename, "rdwr, excl", '0664')
+   if not fd then
+      fd = assert(S.open(filename, "creat, rdwr, excl", '0664'))
+   end
    local f = file.fdopen(fd, 'wronly', filename)
    f:write_bytes(rrd.ptr, rrd.size)
    f:flush_output()
