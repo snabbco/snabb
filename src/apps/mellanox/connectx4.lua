@@ -1318,7 +1318,7 @@ local data_per_mailbox = 0x200 -- Bytes of input/output data in a mailbox
 
 -- Create a command queue with dedicated/reusable DMA memory.
 function HCA:new (init_seg)
-   local entry = ffi.cast("uint32_t*", memory.dma_alloc(0x40))
+   local entry = ffi.cast("uint32_t*", memory.dma_alloc(0x40, 4096))
    local inboxes, outboxes = {}, {}
    for i = 0, max_mailboxes-1 do
       -- XXX overpadding.. 0x240 alignment is not accepted?
