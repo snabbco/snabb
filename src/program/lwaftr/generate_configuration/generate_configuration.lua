@@ -50,10 +50,16 @@ local function softwires(w, params)
    local br_address = ipv6:pton(params.br_address)
    local n = 2^params.psid_len
    for _ = 1, params.num_ips do
-      for psid = 1, n-1 do
-         w:ln(softwire_entry(v4addr, psid, ipv6:ntop(b4),
+      if params.psid_len == 0 then
+         w:ln(softwire_entry(v4addr, 0, ipv6:ntop(b4),
               ipv6:ntop(br_address), params.port_set))
          b4 = inc_ipv6(b4)
+      else
+         for psid = 1, n-1 do
+            w:ln(softwire_entry(v4addr, psid, ipv6:ntop(b4),
+                 ipv6:ntop(br_address), params.port_set))
+            b4 = inc_ipv6(b4)
+         end
       end
       v4addr = inc_ipv4(v4addr)
    end
