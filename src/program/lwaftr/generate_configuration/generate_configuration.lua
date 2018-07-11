@@ -44,24 +44,6 @@ local function inc_ipv6(ipv6)
    return ipv6
 end
 
-local function softwire_entries(from_ipv4, num_ips, psid_len, from_b4, port_set)
-   local entries = {}
-   local v4addr = to_ipv4_u32(params.from_ipv4)
-   local b4 = ipv6:pton(params.from_b4)
-   local n = 2^params.psid_len
-   for _ = 1, params.num_ips do
-      for psid = 1, n-1 do
-         table.insert(
-            entries,
-            softwire_entry(v4addr, psid, ipv6:ntop(b4), port_set)
-         )
-         b4 = inc_ipv6(b4)
-      end
-      v4addr = inc_ipv4(v4addr)
-   end
-   return entries
-end
-
 local function softwires(w, params)
    local v4addr = to_ipv4_u32(params.from_ipv4)
    local b4 = ipv6:pton(params.from_b4)
