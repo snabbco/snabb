@@ -157,9 +157,6 @@ end
 
 local function is_dir(name)
    local stat = S.lstat(name)
-   if stat and stat.islnk then
-      stat = S.lstat(S.readlink(name))
-   end
    return stat and stat.isdir
 end
 

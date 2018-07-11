@@ -104,8 +104,11 @@ end
 local function monitor_snabb_instance(pid, instance, counters, histograms, rrds)
    local dir = shm.root..'/'..pid
    local rx = inotify.recursive_directory_inventory_events(dir)
+   local rx_op = rx:get_operation()
    fiber.spawn(function ()
-      for event in rx.get, rx do
+      while true do
+         local event = rx_op:perform()
+         if event == nil then break end
          local name = event.name:sub(#dir + 2):match('^(.*)%.counter$')
          if name then
             if event.kind == 'creat' then
@@ -125,6 +128,23 @@ local function monitor_snabb_instance(pid, instance, counters, histograms, rrds)
                instance.group = tonumber(pid)
             else
                instance.group = nil
+            end
+            needs_redisplay()
+         -- if a link to a pci folder is created, then monitor it too
+         elseif event.name:match('^'..dir..'/pci/[%d:%.]+$') then
+            local pciaddr = event.name:match('/pci/([%d:%.]+)$')
+            local target = S.readlink(event.name)
+            if target and event.kind == 'creat' then
+               local pci_rx = inotify.recursive_directory_inventory_events(target)
+               local pci_op = pci_rx:get_operation()
+               -- make snabb top think the path is relative to the link, not the target
+               local function relocate(v)
+                  return { name = v.name:gsub("intel%-mp/[%d:%.]+/stats",
+                                              pid.."/pci/"..pciaddr),
+                           kind = v.kind }
+               end
+               pci_op = pci_op:wrap(relocate)
+               rx_op = op.choice(pci_op, rx_op)
             end
             needs_redisplay()
          elseif event.name:match('%.histogram$') then
