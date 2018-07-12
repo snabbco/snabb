@@ -49,8 +49,8 @@ local band, bor, shl, shr, bswap, bnot =
    bit.band, bit.bor, bit.lshift, bit.rshift, bit.bswap, bit.bnot
 local cast, typeof = ffi.cast, ffi.typeof
 
-local debug_trace   = true     -- Print trace messages
-local debug_hexdump = false     -- Print hexdumps (in Linux mlx5 format)
+local debug_trace   = false     -- Print trace messages
+local debug_hexdump = false    -- Print hexdumps (in Linux mlx5 format)
 
 -- Maximum size of a receive queue table.
 -- XXX This is hard-coded in the Linux mlx5 driver too. Could
@@ -293,10 +293,34 @@ function ConnectX4:new (conf)
          rule = rule + 1
       end
    else
+      -- Set up RSS accross all queues. Hashing is only performed for
+      -- IPv4/IPv6 and TCP/UDP, i.e. non-IP packets as well as non
+      -- TCP/UDP packets are mapped to Queue #1.  Hashing is done by
+      -- the TIR for a specific combination of protocols, hence
+      -- separate flows are needed to provide each TIR with the
+      -- appropriate types of packets.
+      local l3_protos = { 'v4', 'v6' }
+      local l4_protos = { 'udp', 'tcp' }
       local rqt = hca:create_rqt(rqlist)
-      local flow_group_id = hca:create_flow_group_wildcard(rxtable, NIC_RX, 0, 0)
-      local tir = hca:create_tir_indirect(rqt, tdomain)
-      hca:set_flow_table_entry_wildcard(rxtable, NIC_RX, flow_group_id, 0, tir)
+      local flow_group_ip =
+         hca:create_flow_group_ip(rxtable, NIC_RX, 0,
+                                  #l3_protos * #l4_protos - 1)
+      local index = 0
+      for _, l3_proto in ipairs(l3_protos) do
+         for _, l4_proto in ipairs(l4_protos) do
+            local tir = hca:create_tir_indirect(rqt, tdomain,
+                                                l3_proto, l4_proto)
+            hca:set_flow_table_entry_ip(rxtable, NIC_RX, flow_group_ip,
+                                        index, tir, l3_proto, l4_proto)
+            index = index + 1
+         end
+      end
+
+      local flow_group_wildcard =
+         hca:create_flow_group_wildcard(rxtable, NIC_RX, index, index)
+      local tir_q1 = hca:create_tir_direct(rqlist[1], tdomain)
+      hca:set_flow_table_entry_wildcard(rxtable, NIC_RX,
+                                        flow_group_wildcard, index, tir_q1)
    end
    hca:set_flow_table_root(rxtable, NIC_RX)
 
@@ -705,8 +729,19 @@ function HCA:create_tir_direct (rqn, transport_domain)
    return self:output(0x08, 23, 0)
 end
 
--- Create a TIR with indirect dispatching (hashing)
-function HCA:create_tir_indirect (rqt, transport_domain)
+-- Create a TIR with indirect dispatching (hashing) for a particular
+-- combination of IP protocol and TCP/UDP ports.
+function HCA:create_tir_indirect (rqt, transport_domain, l3_proto, l4_proto)
+   local l3_protos = {
+      v4 = 0,
+      v6 = 1
+   }
+   local l4_protos = {
+      tcp = 0,
+      udp = 1
+   }
+   local l3_proto = assert(l3_protos[l3_proto or 'v4'], "invalid l3 proto")
+   local l4_proto = assert(l4_protos[l4_proto or 'tcp'], "invalid l4 proto")
    self:command("CREATE_TIR", 0x10C, 0x0C)
       :input("opcode",           0x00,        31, 16, 0x900)
       :input("disp_type",        0x20 + 0x04, 31, 28, 1) -- indirect
@@ -714,6 +749,9 @@ function HCA:create_tir_indirect (rqt, transport_domain)
       :input("indirect_table",   0x20 + 0x20, 23,  0, rqt)
       :input("rx_hash_fn",       0x20 + 0x24, 31, 28, 2) -- toeplitz
       :input("transport_domain", 0x20 + 0x24, 23,  0, transport_domain)
+      :input("l3_prot_type",     0x20 + 0x50, 31, 31, l3_proto)
+      :input("l4_prot_type",     0x20 + 0x50, 30, 30, l4_proto)
+      :input("selected_fields",  0x20 + 0x50, 29,  0, 15) -- SRC/DST/SPORT/DPORT
    -- XXX Is random hash key a good solution?
    for i = 0x28, 0x4C, 4 do
       self:input("toeplitz_key["..((i-0x28)/4).."]", 0x20 + i, 31,  0, math.random(2^32))
@@ -1172,19 +1210,20 @@ end
 -- Create a "wildcard" flow group that does not inspect any fields.
 function HCA:create_flow_group_wildcard (table_id, table_type, start_ix, end_ix)
    self:command("CREATE_FLOW_GROUP", 0x3FC, 0x0C)
-      :input("opcode",         0x00, 31, 16, 0x933)
-      :input("table_type",     0x10, 31, 24, table_type)
-      :input("table_id",       0x14, 23,  0, table_id)
-      :input("start_ix",       0x1C, 31,  0, start_ix)
-      :input("end_ix",         0x24, 31,  0, end_ix) -- (inclusive)
-      :input("match_criteria", 0x3C,  7,  0, 0)
+      :input("opcode",                0x00, 31, 16, 0x933)
+      :input("table_type",            0x10, 31, 24, table_type)
+      :input("table_id",              0x14, 23,  0, table_id)
+      :input("start_ix",              0x1C, 31,  0, start_ix)
+      :input("end_ix",                0x24, 31,  0, end_ix) -- (inclusive)
+      :input("match_criteria_enable", 0x3C,  7,  0, 0) -- match outer headers
       :execute()
    local group_id = self:output(0x08, 23, 0)
    return group_id
 end
 
 -- Set a "wildcard" flow table entry that does not match on any fields.
-function HCA:set_flow_table_entry_wildcard (table_id, table_type, group_id, flow_index, tir)
+function HCA:set_flow_table_entry_wildcard (table_id, table_type, group_id,
+                                            flow_index, tir)
    self:command("SET_FLOW_TABLE_ENTRY", 0x40 + 0x300, 0x0C)
       :input("opcode",       0x00,         31, 16, 0x936)
       :input("opmod",        0x04,         15,  0, 0) -- new entry
@@ -1195,6 +1234,52 @@ function HCA:set_flow_table_entry_wildcard (table_id, table_type, group_id, flow
       :input("action",       0x40 + 0x0C,  15,  0, 4) -- action = FWD_DST
       :input("dest_list_sz", 0x40 + 0x10,  23,  0, 1) -- destination list size
       :input("dest_type",    0x40 + 0x300, 31, 24, 2)
+      :input("dest_id",      0x40 + 0x300, 23,  0, tir)
+      :execute()
+end
+
+-- Create a flow group that inspects the ethertype and protocol fields.
+function HCA:create_flow_group_ip (table_id, table_type, start_ix, end_ix)
+   self:command("CREATE_FLOW_GROUP", 0x3FC, 0x0C)
+      :input("opcode",                0x00, 31, 16, 0x933)
+      :input("table_type",            0x10, 31, 24, table_type)
+      :input("table_id",              0x14, 23,  0, table_id)
+      :input("start_ix",              0x1C, 31,  0, start_ix)
+      :input("end_ix",                0x24, 31,  0, end_ix) -- (inclusive)
+      :input("match_criteria_enable", 0x3C,  7,  0, 1) -- match outer headers
+      :input("match_ether",           0x40 + 0x04, 15, 0, 0xFFFF)
+      :input("match_proto",           0x40 + 0x10, 31, 24, 0xFF)
+      :execute()
+   local group_id = self:output(0x08, 23, 0)
+   return group_id
+end
+
+-- Set a flow table entry that matches on the ethertype for IPv4/IPv6
+-- as well as TCP/UDP protocol/next-header.
+function HCA:set_flow_table_entry_ip (table_id, table_type, group_id,
+                                      flow_index, tir, l3_proto, l4_proto)
+   local ethertypes = {
+      v4 = 0x0800,
+      v6 = 0x86dd
+   }
+   local l4_protos = {
+      udp = 17,
+      tcp = 6
+   }
+   local type = assert(ethertypes[l3_proto], "invalid l3 proto")
+   local proto = assert(l4_protos[l4_proto], "invalid l4 proto")
+   self:command("SET_FLOW_TABLE_ENTRY", 0x40 + 0x300, 0x0C)
+      :input("opcode",       0x00,         31, 16, 0x936)
+      :input("opmod",        0x04,         15,  0, 0) -- new entry
+      :input("table_type",   0x10,         31, 24, table_type)
+      :input("table_id",     0x14,         23,  0, table_id)
+      :input("flow_index",   0x20,         31,  0, flow_index)
+      :input("group_id",     0x40 + 0x04,  31,  0, group_id)
+      :input("action",       0x40 + 0x0C,  15,  0, 4) -- action = FWD_DST
+      :input("dest_list_sz", 0x40 + 0x10,  23,  0, 1) -- destination list size
+      :input("match_ether",  0x40 + 0x40 + 0x04, 15, 0, type)
+      :input("match_proto",  0x40 + 0x40 + 0x10, 31, 24, proto)
+      :input("dest_type",    0x40 + 0x300, 31, 24, 2) -- TIR
       :input("dest_id",      0x40 + 0x300, 23,  0, tir)
       :execute()
 end
