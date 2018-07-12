@@ -22,7 +22,9 @@ config.app(c, "nic0", intel.Intel,
              rxq = false,
              txq = 0,
              wait_for_link = true })
-config.link(c, "source.output -> nic0.input")
+config.app(c, "repeat", basic_apps.Repeater)
+config.link(c, "source.output -> repeat.input")
+config.link(c, "repeat.output -> nic0.input")
 
 -- nic1 with 4-way RSS
 for i=0, 3 do
@@ -32,6 +34,7 @@ for i=0, 3 do
                 vmdq_queuing_mode = "rss-32-4",
                 macaddr = "90:72:82:78:c9:7a",
                 poolnum = 0,
+                rxcounter = i+1,
                 rxq = i,
                 txq = i,
                 wait_for_link = true })
