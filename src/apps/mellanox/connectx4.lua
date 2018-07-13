@@ -903,6 +903,9 @@ end
 
 IO = {}
 IO.__index = IO
+-- The IO module is the device driver in the sense of
+-- lib.hardware.pci.device_info
+driver = IO
 
 function IO:new (conf)
    local self = setmetatable({}, self)
