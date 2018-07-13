@@ -148,26 +148,7 @@ function run (args)
       ["cpu"] = function (arg)
          cpu = tonumber(arg)
       end,
-      j = function (arg)
-         if arg:match("^v") then
-            local file = arg:match("^v=(.*)")
-            if file == '' then file = nil end
-            jit.v = file
-         elseif arg:match("^p") then
-            local opts, file = arg:match("^p=([^,]*),?(.*)")
-            if file == '' then file = nil end
-            jit.p = { opts, file }
-         elseif arg:match("^dump") then
-            local opts, file = arg:match("^dump=([^,]*),?(.*)")
-            if file == '' then file = nil end
-            jit.dump = { opts, file }
-         elseif arg:match("^opt") then
-            local opt = arg:match("^opt=(.*)")
-            table.insert(jit.opts, opt)
-         elseif arg:match("^tprof") then
-            jit.traceprof = true
-         end
-      end
+      j = require("program.ipfix.lib").parse_jit_option_fn(jit)
    }
 
    args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:j:b", long_opts)
