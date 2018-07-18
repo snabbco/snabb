@@ -101,6 +101,30 @@ function create_ifmib(stats, ifname, ifalias)
       shm.root..ifmib_dir, 5)
 end
 
+function value_to_string (value, string)
+   string = string or ''
+   local type = type(value)
+   if type == 'table'  then
+      string = string.."{ "
+      if #value == 0 then
+         for key, value in pairs(value) do
+            string = string..key.." = "
+            string = value_to_string(value, string)..", "
+         end
+      else
+         for _, value in ipairs(value) do
+            string = value_to_string(value, string)..", "
+         end
+      end
+      string = string.." }"
+   elseif type == 'string' then
+      string = string..("%q"):format(value)
+   else
+      string = string..("%s"):format(value)
+   end
+   return string
+end
+
 probe_config = {
    -- Probe-specific
    output_type = {required = true},

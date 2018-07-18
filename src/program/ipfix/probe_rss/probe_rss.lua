@@ -68,30 +68,6 @@ for _, key in ipairs({
    ipfix_default_config[key] = nil
 end
 
-local function value_to_string (value, string)
-   string = string or ''
-   local type = type(value)
-   if type == 'table'  then
-      string = string.."{ "
-      if #value == 0 then
-         for key, value in pairs(value) do
-            string = string..key.." = "
-            string = value_to_string(value, string)..", "
-         end
-      else
-         for _, value in ipairs(value) do
-            string = value_to_string(value, string)..", "
-         end
-      end
-      string = string.." }"
-   elseif type == 'string' then
-      string = string..("%q"):format(value)
-   else
-      string = string..("%s"):format(value)
-   end
-   return string
-end
-
 local function create_workers (probe_config, duration, busywait, jit, logger)
    local main = lib.parse(probe_config, main_config)
    local maps = lib.parse(main.ipfix.maps, maps_config)
@@ -187,8 +163,8 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
 
                local worker_expr = string.format(
                   'require("program.ipfix.lib").run(%s, %s, %s, nil, %s)',
-                  value_to_string(iconfig), tostring(duration),
-                  tostring(instance.busywait), value_to_string(jit)
+                  probe.value_to_string(iconfig), tostring(duration),
+                  tostring(instance.busywait), probe.value_to_string(jit)
                )
                local child_pid = worker.start(rss_link, worker_expr)
                logger:log("Launched IPFIX worker process #"..child_pid)
@@ -206,9 +182,9 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
       end
       local worker_expr = string.format(
          'require("program.ipfix.lib").run_rss(%s, %s, %s, %s, %s, nil, %s)',
-         value_to_string(main.rss), value_to_string(inputs),
-         value_to_string(outputs), tostring(duration),
-         tostring(busywait), value_to_string(jit_c)
+         probe.value_to_string(main.rss), probe.value_to_string(inputs),
+         probe.value_to_string(outputs), tostring(duration),
+         tostring(busywait), probe.value_to_string(jit_c)
       )
       local child_pid = worker.start("rss"..rssq, worker_expr)
       logger:log("Launched RSS worker process #"..child_pid)

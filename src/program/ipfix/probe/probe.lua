@@ -2,7 +2,10 @@
 
 module(..., package.seeall)
 
-local lib   = require("core.lib")
+local lib    = require("core.lib")
+local worker = require("core.worker")
+local probe  = require("program.ipfix.lib")
+local S      = require("syscall")
 
 local long_opts = {
    help = "h",
@@ -14,6 +17,7 @@ local long_opts = {
    ["input-type"] = "i",
    ["output-type"] = "o",
    ["mtu"] = 1,
+   ["rss-queues"] = 1,
    ["netflow-v9"] = 0,
    ["ipfix"] = 0,
    ["active-timeout"] = 1,
@@ -43,6 +47,7 @@ function run (args)
    local collector_ip = '10.0.0.2' -- Likewise.
    local port = 4739
    local mtu = 1514
+   local nqueues = 1
 
    local active_timeout, idle_timeout, flush_timeout, scan_time
    local observation_domain, template_refresh_interval
@@ -143,6 +148,9 @@ function run (args)
       ["mtu"] = function (arg)
          mtu = tonumber(arg)
       end,
+      ["rss-queues"] = function (arg)
+         nqueues = tonumber(arg)
+      end,
       -- TODO: not implemented
       ["transport"] = function (arg) end,
       ["cpu"] = function (arg)
@@ -189,5 +197,45 @@ function run (args)
       input = input
    }
 
-   require("program.ipfix.lib").run(probe_config, duration, busywait, cpu, jit)
+   if input_type == "pci" and nqueues > 1 then
+      for rssq = 0, nqueues - 1 do
+
+         -- Create unique identifiers for config options that need to
+         -- be unique per instance
+         probe_config.input = input.."/"..rssq
+         probe_config.observation_domain = observation_domain + rssq
+         if output_type == "tap_routed" then
+            probe_config.output = output..probe_config.observation_domain
+         end
+         local jit_c = lib.deepcopy(jit)
+         if jit_c.dump and #jit_c.dump == 2 then
+            jit_c.dump[2] = jit_c.dump[2]..rssq
+         end
+
+         local worker_expr = string.format(
+            'require("program.ipfix.lib").run(%s, %s, %s, nil, %s)',
+            probe.value_to_string(probe_config), tostring(duration),
+            tostring(busywait), probe.value_to_string(jit_c)
+         )
+         local child_pid = worker.start("ipfix"..rssq, worker_expr)
+         print("Launched IPFIX worker process #"..child_pid)
+      end
+
+      if duration then
+         S.sleep(duration)
+         print("Waiting for workers to finish")
+         local alive
+         repeat
+            alive = false
+            for _, s in pairs(worker.status()) do
+               if s.alive then alive = true end
+            end
+         until not alive
+         print("Done")
+      else
+         S.pause()
+      end
+   else
+      require("program.ipfix.lib").run(probe_config, duration, busywait, cpu, jit)
+   end
 end
