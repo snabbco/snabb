@@ -324,11 +324,71 @@ function ConnectX4:new (conf)
    end
    hca:set_flow_table_root(rxtable, NIC_RX)
 
+   self.shm = {
+      mtu    = {counter, mtu},
+      txdrop = {counter}
+   }
+
+   local vport_context = hca:query_nic_vport_context()
+   local frame = {
+      dtime     = {counter, C.get_unix_time()},
+      -- Keep a copy of the mtu here to have all
+      -- data available in a single shm frame
+      mtu       = {counter, mtu},
+      speed     = {counter},
+      status    = {counter, 2}, -- Link down
+      type      = {counter, 0x1000}, -- ethernetCsmacd
+      promisc   = {counter, vport_context.promisc_all},
+      macaddr   = {counter,
+                   macaddress:new(vport_context.permanent_address).bits},
+      rxbytes   = {counter},
+      rxpackets = {counter},
+      rxmcast   = {counter},
+      rxbcast   = {counter},
+      rxdrop    = {counter},
+      rxerrors  = {counter},
+      txbytes   = {counter},
+      txpackets = {counter},
+      txmcast   = {counter},
+      txbcast   = {counter},
+      txdrop    = {counter},
+      txerrors  = {counter},
+   }
+   self.stats = shm.create_frame("pci/"..pciaddress, frame)
+   self.sync_timer = lib.throttle(1)
+
    function self:stop ()
       pci.set_bus_master(pciaddress, false)
       pci.reset_device(pciaddress)
       pci.close_pci_resource(fd, mmio)
       mmio, fd = nil
+   end
+
+   function self:pull ()
+      if self.sync_timer() then
+         self:sync_stats()
+      end
+   end
+
+   function self:sync_stats ()
+      local set, stats = counter.set, self.stats
+      local port_stats = self.hca:get_port_stats()
+      set(stats.rxbytes, port_stats.rxbytes)
+      set(stats.rxpackets, port_stats.rxpackets)
+      set(stats.rxmcast, port_stats.rxmcast)
+      set(stats.rxbcast, port_stats.rxbcast)
+      set(stats.rxdrop, port_stats.rxdrop)
+      set(stats.rxerrors, port_stats.rxerrors)
+      set(stats.txbytes, port_stats.txbytes)
+      set(stats.txpackets, port_stats.txpackets)
+      set(stats.txmcast, port_stats.txmcast)
+      set(stats.txbcast, port_stats.txbcast)
+      set(stats.txdrop, port_stats.txdrop)
+      set(stats.txerrors, port_stats.txerrors)
+
+      set(stats.speed, self.hca:get_port_speed())
+      set(stats.status,
+          (self.hca:get_port_status().oper_status == 1 and 1) or 2)
    end
 
    -- Save "instance variable" values.
@@ -1332,9 +1392,51 @@ end
 -- Note: portnumber is always 1 because the ConnectX-4 HCA is managing
 -- a single physical port.
 
-PAOS = 0x5006 -- Port Administrative & Operational Status
-PPLR = 0x5018 -- Port Physical Loopback Register)
-PMTU = 0x5003
+PMTU  = 0x5003
+PTYS  = 0x5004 -- Port Type and Speed
+PAOS  = 0x5006 -- Port Administrative & Operational Status
+PPCNT = 0x5008 -- Ports Performance Counters
+PPLR  = 0x5018 -- Port Physical Loopback Register
+
+-- Mapping of speed/protocols per 11.1.2 to speed in units of gbps
+local port_speed = {
+   [0x00000002] =   1, -- 1000Base-KX
+   [0x00000004] =  10, --  10GBase-CX4
+   [0x00000008] =  10, --  10GBase-KX4
+   [0x00000010] =  10, --  10GBase-KR
+   [0x00000040] =  40, --  40GBase-CR4
+   [0x00000080] =  40, --  40GBase-KR4
+   [0x00001000] =  10, --  10GBase-CR
+   [0x00002000] =  10, --  10GBase-SR
+   [0x00004000] =  10, --  10GBase-ER/LR
+   [0x00008000] =  40, --  40GBase-SR4
+   [0x00010000] =  40, --  40GBase-LR4/ER4
+   [0x00040000] =  50, --  50GBase-SR2
+   [0x00100000] = 100, -- 100GBase-CR4
+   [0x00200000] = 100, -- 100GBase-SR4
+   [0x00400000] = 100, -- 100GBase-KR4
+   -- Undocumented (from a ConnectX5 NIC with CWDM plugin)
+   [0x00800000] = 100, -- 100GBase-CWDM
+   [0x08000000] =  25, --  25GBase-CR
+   [0x10000000] =  25, --  25GBase-KR
+   [0x20000000] =  25, --  25GBase-SR
+   [0x40000000] =  50, --  50GBase-CR2
+   [0x80000000] =  50, --  50GBase-KR2
+}
+
+-- Get the speed of the port in bps
+function HCA:get_port_speed ()
+   self:command("ACCESS_REGISTER", 0x4C, 0x4C)
+      :input("opcode",       0x00, 31, 16, 0x805)
+      :input("opmod",        0x04, 15,  0, 1) -- read
+      :input("register_id",  0x08, 15,  0, PTYS)
+      :input("local_port",   0x10, 23, 16, 1)
+      :input("proto_mask",   0x10, 2,   0, 0x4) -- Ethernet
+      :execute()
+   -- This doesn'
+   local eth_proto_oper = self:output(0x10 + 0x24, 31, 0)
+   return (port_speed[eth_proto_oper] or 0) * 1e9
+end
 
 -- Set the administrative status of the port (boolean up/down).
 function HCA:set_admin_status (admin_up)
@@ -1388,6 +1490,49 @@ function HCA:set_port_loopback (loopback_mode)
       :input("local_port",    0x10, 23, 16, 1)
       :input("loopback_mode", 0x14,  7,  0, loopback_mode and 2 or 0)
       :execute()
+end
+
+local port_stats = {
+   rxbytes = 0ULL,
+   rxmcast = 0ULL,
+   rxbcast = 0ULL,
+   rxpackets = 0ULL,
+   rxdrop = 0ULL,
+   rxerrors = 0ULL,
+   txbytes = 0ULL,
+   txmcast = 0ULL,
+   txbcast = 0ULL,
+   txpackets = 0ULL,
+   txdrop = 0ULL,
+   txerrors = 0ULL,
+}
+function HCA:get_port_stats ()
+   self:command("ACCESS_REGISTER", 0x14, 0x10C)
+      :input("opcode",        0x00, 31, 16, 0x805)
+      :input("opmod",         0x04, 15,  0, 1) -- read
+      :input("register_id",   0x08, 15,  0, PPCNT)
+      :input("local_port",    0x10, 23, 16, 1)
+      :input("grp",           0x10, 5, 0, 0x1) -- RFC 2863
+      :execute()
+   
+   port_stats.rxbytes = self:output64(0x18 + 0x00) -- includes 4-byte CRC
+   local in_ucast_packets = self:output64(0x18 + 0x08)
+   port_stats.rxmcast = self:output64(0x18 + 0x48)
+   port_stats.rxbcast = self:output64(0x18 + 0x50)
+   port_stats.rxpackets = in_ucast_packets + port_stats.rxmcast
+      + port_stats.rxbcast
+   port_stats.rxdrop = self:output64(0x18 + 0x10)
+   port_stats.rxerrors = self:output64(0x18 + 0x18)
+
+   port_stats.txbytes = self:output64(0x18 + 0x28)
+   local out_ucast_packets = self:output64(0x18 + 0x30)
+   port_stats.txmcast = self:output64(0x18 + 0x58)
+   port_stats.txbcast = self:output64(0x18 + 0x60)
+   port_stats.txpackets = out_ucast_packets + port_stats.txmcast
+      + port_stats.txbcast
+   port_stats.txdrop = self:output64(0x18 + 0x38)
+   port_stats.txerrors = self:output64(0x18 + 0x40)
+   return port_stats
 end
 
 ---------------------------------------------------------------
@@ -1526,6 +1671,11 @@ function HCA:output (offset, hi, lo)
    end
 end
 
+function HCA:output64 (offset)
+   local high = self:output(offset, 31, 0) + 0ULL
+   local low = band(self:output(offset+4, 31, 0) + 0ULL, 0xFFFFFFFF)
+   return shl(high, 32) + low
+end
 
 
 
