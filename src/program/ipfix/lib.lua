@@ -81,6 +81,11 @@ function in_apps.pci (spec)
       conf.rxq = rxq
       conf.rxcounter = rxq
       conf.ring_buffer_size = 32768
+   elseif device_info.driver == 'apps.mellanox.connectx4' then
+      conf = {
+         pciaddress = device,
+         queue = rxq
+      }
    end
    return { input = device_info.rx, output = device_info.tx },
           { require(device_info.driver).driver, conf }

@@ -2,10 +2,12 @@
 
 module(..., package.seeall)
 
-local lib    = require("core.lib")
-local worker = require("core.worker")
-local probe  = require("program.ipfix.lib")
-local S      = require("syscall")
+local lib       = require("core.lib")
+local worker    = require("core.worker")
+local app_graph = require("core.config")
+local pci       = require("lib.hardware.pci")
+local probe     = require("program.ipfix.lib")
+local S         = require("syscall")
 
 local long_opts = {
    help = "h",
@@ -197,45 +199,73 @@ function run (args)
       input = input
    }
 
-   if input_type == "pci" and nqueues > 1 then
-      for rssq = 0, nqueues - 1 do
+   local mellanox_qs
+   if input_type == "pci" then
+      local device_info = pci.device_info(input)
+      if device_info.driver == 'apps.mellanox.connectx4' then
+         mellanox_qs = {}
+      end
+   end
 
+   for rssq = 0, nqueues - 1 do
+
+      local jit_c = lib.deepcopy(jit)
+
+      probe_config.input = input.."/"..rssq
+      if mellanox_qs then
+         table.insert(mellanox_qs, { id = rssq })
+      end
+
+      if nqueues > 1 then
          -- Create unique identifiers for config options that need to
          -- be unique per instance
-         probe_config.input = input.."/"..rssq
          probe_config.observation_domain = observation_domain + rssq
          if output_type == "tap_routed" then
             probe_config.output = output..probe_config.observation_domain
          end
-         local jit_c = lib.deepcopy(jit)
          if jit_c.dump and #jit_c.dump == 2 then
             jit_c.dump[2] = jit_c.dump[2]..rssq
          end
-
-         local worker_expr = string.format(
-            'require("program.ipfix.lib").run(%s, %s, %s, nil, %s)',
-            probe.value_to_string(probe_config), tostring(duration),
-            tostring(busywait), probe.value_to_string(jit_c)
-         )
-         local child_pid = worker.start("ipfix"..rssq, worker_expr)
-         print("Launched IPFIX worker process #"..child_pid)
       end
 
-      if duration then
-         S.sleep(duration)
-         print("Waiting for workers to finish")
-         local alive
-         repeat
-            alive = false
-            for _, s in pairs(worker.status()) do
-               if s.alive then alive = true end
-            end
-         until not alive
-         print("Done")
-      else
-         S.pause()
-      end
-   else
-      require("program.ipfix.lib").run(probe_config, duration, busywait, cpu, jit)
+      local worker_expr = string.format(
+         'require("program.ipfix.lib").run(%s, %s, %s, nil, %s)',
+         probe.value_to_string(probe_config), tostring(duration),
+         tostring(busywait), probe.value_to_string(jit_c)
+      )
+      local child_pid = worker.start("ipfix"..rssq, worker_expr)
+      print("Launched IPFIX worker process #"..child_pid)
    end
+
+   local ctrl_graph = app_graph.new()
+   if mellanox_qs then
+      local conf = {
+         pciaddress = input,
+         queues = mellanox_qs
+      }
+      local driver = pci.device_info(input).driver
+      app_graph.app(ctrl_graph, "ctrl_"..input,
+                    require(driver).ConnectX4, conf)
+   end
+
+   engine.busywait = false
+   engine.Hz = 10
+   engine.configure(ctrl_graph)
+
+   if mellanox_qs then
+      probe.create_ifmib(engine.app_table["ctrl_"..input].stats,
+                         (input:gsub("[:%.]", "_")))
+   end
+
+   engine.main({ duration = duration })
+
+   print("Waiting for workers to finish")
+   local alive
+   repeat
+      alive = false
+      for _, s in pairs(worker.status()) do
+         if s.alive then alive = true end
+      end
+   until not alive
+
 end

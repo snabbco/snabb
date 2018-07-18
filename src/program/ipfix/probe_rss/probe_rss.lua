@@ -96,6 +96,8 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
 
    assert(type(main.interfaces) == "table")
 
+   local mellanox = {}
+   local rss_workers = {}
    local observation_domain = ipfix.observation_domain_base
    for rssq = 0, main.hw_rss_scaling - 1 do
       local inputs, outputs = {}, {}
@@ -103,6 +105,21 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
          local input = lib.parse(interface, interface_config)
          input.rxq = rssq
          table.insert(inputs, input)
+
+         -- The mellanox driver requires a master process that sets up
+         -- all queues for the interface. We collect all queues per
+         -- device of this type here.
+         local device_info = pci.device_info(input.device)
+         if device_info.driver == 'apps.mellanox.connectx4' then
+            local spec = mellanox[input.device]
+            if not spec then
+               spec = { ifName = input.name,
+                        ifAlias = input.description,
+                        queues = {} }
+               mellanox[input.device] = spec
+            end
+            table.insert(spec.queues, { id = rssq })
+         end
       end
 
       local embedded_instance = 1
@@ -186,11 +203,31 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
          probe.value_to_string(outputs), tostring(duration),
          tostring(busywait), probe.value_to_string(jit_c)
       )
-      local child_pid = worker.start("rss"..rssq, worker_expr)
-      logger:log("Launched RSS worker process #"..child_pid)
-      shm.create("rss_workers/"..child_pid, "uint64_t")
+      rss_workers["rss"..rssq] = worker_expr
 
    end
+
+   -- Create a trivial app graph that only contains the control apps
+   -- for the Mellanox driver, which sets up the queues and
+   -- maintains interface counters.
+   local ctrl_graph = app_graph.new()
+   for device, spec in pairs(mellanox) do
+      local conf = {
+         pciaddress = device,
+         queues = spec.queues
+      }
+      local driver = pci.device_info(device).driver
+      app_graph.app(ctrl_graph, "ctrl_"..device,
+                    require(driver).ConnectX4, conf)
+   end
+
+   for name, expr in pairs(rss_workers) do
+      local child_pid = worker.start(name, expr)
+      logger:log("Launched RSS worker process #"..child_pid)
+      shm.create("rss_workers/"..child_pid, "uint64_t")
+   end
+
+   return ctrl_graph, mellanox
 end
 
 local long_opts = {
@@ -235,20 +272,27 @@ function run (parameters)
 
    local file = table.remove(parameters, 1)
    local probe_config = assert(loadfile(file))()
-   create_workers(probe_config, duration, busywait, jit, logger)
+   local ctrl_graph, mellanox =
+      create_workers(probe_config, duration, busywait, jit, logger)
 
-   if duration then
-      S.sleep(duration)
-      logger:log("waiting for workers to finish")
-      local alive
-      repeat
-         alive = false
-         for _, s in pairs(worker.status()) do
-            if s.alive then alive = true end
-         end
-      until not alive
-      logger:log("done")
-   else
-      S.pause()
+   engine.busywait = false
+   engine.Hz = 10
+   engine.configure(ctrl_graph)
+
+   for device, spec in pairs(mellanox) do
+      probe.create_ifmib(engine.app_table["ctrl_"..device].stats,
+                         spec.ifName, spec.ifAlias)
    end
+
+   engine.main({ duration = duration })
+
+   logger:log("waiting for workers to finish")
+   local alive
+   repeat
+      alive = false
+      for _, s in pairs(worker.status()) do
+         if s.alive then alive = true end
+      end
+   until not alive
+   logger:log("done")
 end
