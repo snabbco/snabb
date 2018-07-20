@@ -64,14 +64,13 @@ local function ipfix_info(pid)
    if err then
       return { pid = pid }
    end
-   local ppid = tonumber(link:match("/(%d+)/group$"))
    local link
    for _, name in ipairs(shm.children(path
                                       .."/interlink/receiver")) do
       link = name:match("(.*).interlink")
       break
    end
-   return { pid = pid, ppid = ppid, link = link }
+   return { pid = pid, link = link }
 end
 
 local function rss_info(pid)
@@ -170,7 +169,7 @@ function run (args)
    -- Get PIDs of interlink receivers
    local function pid_from_link(link, ppid)
       for _, ipfix in ipairs(ipfix) do
-         if ipfix.ppid == ppid and ipfix.link == link then
+         if ipfix.link == link then
             return ipfix.pid
          end
       end
