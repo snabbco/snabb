@@ -206,8 +206,8 @@ function ConnectX4:new (conf)
    --
    local mmio, fd = pci.map_pci_memory(pciaddress, 0, true)
    local init_seg = InitializationSegment:new(mmio)
-   HCA:init(init_seg)
-   local hca = HCA:new()
+   local hca_factory = HCA_factory(init_seg)
+   local hca = hca_factory:new()
 
    -- Makes enable_hca() hang with ConnectX5
    -- init_seg:reset()
@@ -394,7 +394,7 @@ function ConnectX4:new (conf)
       },
    }
    for _, req in ipairs(self.stats_reqs) do
-      req.hca = HCA:new()
+      req.hca = hca_factory:new()
       -- Post command
       req.start_fn(req.hca)
    end
@@ -505,9 +505,12 @@ end
 -- hca object is the main interface towards the NIC firmware.
 HCA = {}
 
--- Allocate array of Command Queue Entries.  Must be called prior to
--- HCA:new()
-function HCA:init (init_seg, cmdq_size)
+-- Create a factory for HCAs for the given Initialization Segment
+-- (i.e. device).  Application of the new() method to the returned
+-- object allocates a new HCA for the next available Command Queue
+-- Entry.
+function HCA_factory (init_seg, cmdq_size)
+   local self = {}
    self.size = 2^init_seg:log_cmdq_size()
    self.stride = 2^init_seg:log_cmdq_stride()
    self.init_seg = init_seg
@@ -519,6 +522,7 @@ function HCA:init (init_seg, cmdq_size)
    local entries, entries_phy = memory.dma_alloc(cmdq_size * self.stride, 4096)
    self.entries = ffi.cast(cmdq_t, entries)
    init_seg:cmdq_phy_addr(entries_phy)
+   return setmetatable(self, { __index = HCA })
 end
 
 ---------------------------------------------------------------
@@ -1620,6 +1624,8 @@ local data_per_mailbox = 0x200 -- Bytes of input/output data in a mailbox
 
 -- Create a command queue with dedicated/reusable DMA memory.
 function HCA:new ()
+   -- Must only be called from a factory created by HCA_factory()
+   assert(self ~= HCA)
    local q = self.nextq
    assert(q < self.size)
    self.nextq = self.nextq + 1
@@ -1634,7 +1640,7 @@ function HCA:new ()
                         inboxes = inboxes,
                         outboxes = outboxes,
                         q = q},
-      {__index = HCA})
+      {__index = self})
 end
 
 -- Reset all data structures to zero values.
