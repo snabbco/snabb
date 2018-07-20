@@ -206,11 +206,11 @@ function ConnectX4:new (conf)
    --
    local mmio, fd = pci.map_pci_memory(pciaddress, 0, true)
    local init_seg = InitializationSegment:new(mmio)
-   local hca = HCA:new(init_seg)
+   HCA:init(init_seg)
+   local hca = HCA:new()
 
    -- Makes enable_hca() hang with ConnectX5
    -- init_seg:reset()
-   init_seg:cmdq_phy_addr(memory.virtual_to_physical(hca.entry))
    if debug_trace then init_seg:dump() end
    while not init_seg:ready() do
       C.usleep(1000)
@@ -355,6 +355,49 @@ function ConnectX4:new (conf)
       txerrors  = {counter},
    }
    self.stats = shm.create_frame("pci/"..pciaddress, frame)
+
+   -- Create separate HCAs to retreive port statistics.  Those
+   -- commands must be called asynchronously to reduce latency.
+   self.stats_reqs = {
+      {
+        start_fn = HCA.get_port_stats_start,
+        finish_fn = HCA.get_port_stats_finish,
+        process_fn = function (r, stats)
+           local set = counter.set
+           set(stats.rxbytes, r.rxbytes)
+           set(stats.rxpackets, r.rxpackets)
+           set(stats.rxmcast, r.rxmcast)
+           set(stats.rxbcast, r.rxbcast)
+           set(stats.rxdrop, r.rxdrop)
+           set(stats.rxerrors, r.rxerrors)
+           set(stats.txbytes, r.txbytes)
+           set(stats.txpackets, r.txpackets)
+           set(stats.txmcast, r.txmcast)
+           set(stats.txbcast, r.txbcast)
+           set(stats.txdrop, r.txdrop)
+           set(stats.txerrors, r.txerrors)
+        end
+      },
+      {
+        start_fn = HCA.get_port_speed_start,
+        finish_fn = HCA.get_port_speed_finish,
+        process_fn = function (r, stats)
+           counter.set(stats.speed, r)
+        end
+      },
+      {
+        start_fn = HCA.get_port_status_start,
+        finish_fn = HCA.get_port_status_finish,
+        process_fn = function (r, stats)
+           counter.set(stats.status, (r.oper_status == 1 and 1) or 2)
+        end
+      },
+   }
+   for _, req in ipairs(self.stats_reqs) do
+      req.hca = HCA:new()
+      -- Post command
+      req.start_fn(req.hca)
+   end
    self.sync_timer = lib.throttle(1)
 
    function self:stop ()
@@ -371,24 +414,13 @@ function ConnectX4:new (conf)
    end
 
    function self:sync_stats ()
-      local set, stats = counter.set, self.stats
-      local port_stats = self.hca:get_port_stats()
-      set(stats.rxbytes, port_stats.rxbytes)
-      set(stats.rxpackets, port_stats.rxpackets)
-      set(stats.rxmcast, port_stats.rxmcast)
-      set(stats.rxbcast, port_stats.rxbcast)
-      set(stats.rxdrop, port_stats.rxdrop)
-      set(stats.rxerrors, port_stats.rxerrors)
-      set(stats.txbytes, port_stats.txbytes)
-      set(stats.txpackets, port_stats.txpackets)
-      set(stats.txmcast, port_stats.txmcast)
-      set(stats.txbcast, port_stats.txbcast)
-      set(stats.txdrop, port_stats.txdrop)
-      set(stats.txerrors, port_stats.txerrors)
-
-      set(stats.speed, self.hca:get_port_speed())
-      set(stats.status,
-          (self.hca:get_port_status().oper_status == 1 and 1) or 2)
+      for _, req in ipairs(self.stats_reqs) do
+         local hca = req.hca
+         if hca:completed() then
+            req.process_fn(req.finish_fn(hca), self.stats)
+            hca:post()
+         end
+      end
    end
 
    -- Save "instance variable" values.
@@ -472,6 +504,22 @@ end
 
 -- hca object is the main interface towards the NIC firmware.
 HCA = {}
+
+-- Allocate array of Command Queue Entries.  Must be called prior to
+-- HCA:new()
+function HCA:init (init_seg, cmdq_size)
+   self.size = 2^init_seg:log_cmdq_size()
+   self.stride = 2^init_seg:log_cmdq_stride()
+   self.init_seg = init_seg
+   -- Next queue to be allocated by :new()
+   self.nextq = 0
+   local cmdq_size = cmdq_size or self.size
+   assert(cmdq_size <= self.size, "command queue size limit exceeded")
+   local cmdq_t = ffi.typeof("uint8_t (*)[$]", self.stride)
+   local entries, entries_phy = memory.dma_alloc(cmdq_size * self.stride, 4096)
+   self.entries = ffi.cast(cmdq_t, entries)
+   init_seg:cmdq_phy_addr(entries_phy)
+end
 
 ---------------------------------------------------------------
 -- Startup & General commands
@@ -1425,15 +1473,17 @@ local port_speed = {
 }
 
 -- Get the speed of the port in bps
-function HCA:get_port_speed ()
+function HCA:get_port_speed_start ()
    self:command("ACCESS_REGISTER", 0x4C, 0x4C)
       :input("opcode",       0x00, 31, 16, 0x805)
       :input("opmod",        0x04, 15,  0, 1) -- read
       :input("register_id",  0x08, 15,  0, PTYS)
       :input("local_port",   0x10, 23, 16, 1)
       :input("proto_mask",   0x10, 2,   0, 0x4) -- Ethernet
-      :execute()
-   -- This doesn'
+      :execute_async()
+end
+
+function HCA:get_port_speed_finish ()
    local eth_proto_oper = self:output(0x10 + 0x24, 31, 0)
    return (port_speed[eth_proto_oper] or 0) * 1e9
 end
@@ -1460,6 +1510,7 @@ function HCA:set_port_mtu (mtu)
       :execute()
 end
 
+local port_status = { admin_status = 0, oper_status = 0 }
 function HCA:get_port_status ()
    self:command("ACCESS_REGISTER", 0x10, 0x1C)
       :input("opcode", 0x00, 31, 16, 0x805)
@@ -1467,8 +1518,24 @@ function HCA:get_port_status ()
       :input("register_id", 0x08, 15,  0, PAOS)
       :input("local_port", 0x10, 23, 16, 1)
       :execute()
-   return {admin_status = self:output(0x10, 11, 8),
-           oper_status = self:output(0x10, 3, 0)}
+   port_status.admin_status = self:output(0x10, 11, 8)
+   port_status.oper_status = self:output(0x10, 3, 0)
+   return port_status
+end
+
+function HCA:get_port_status_start ()
+   self:command("ACCESS_REGISTER", 0x10, 0x1C)
+      :input("opcode", 0x00, 31, 16, 0x805)
+      :input("opmod",  0x04, 15,  0, 1) -- read
+      :input("register_id", 0x08, 15,  0, PAOS)
+      :input("local_port", 0x10, 23, 16, 1)
+      :execute()
+end
+
+function HCA:get_port_status_finish ()
+   port_status.admin_status = self:output(0x10, 11, 8)
+   port_status.oper_status = self:output(0x10, 3, 0)
+   return port_status
 end
 
 function HCA:get_port_loopback_capability ()
@@ -1506,15 +1573,17 @@ local port_stats = {
    txdrop = 0ULL,
    txerrors = 0ULL,
 }
-function HCA:get_port_stats ()
+function HCA:get_port_stats_start ()
    self:command("ACCESS_REGISTER", 0x14, 0x10C)
       :input("opcode",        0x00, 31, 16, 0x805)
       :input("opmod",         0x04, 15,  0, 1) -- read
       :input("register_id",   0x08, 15,  0, PPCNT)
       :input("local_port",    0x10, 23, 16, 1)
       :input("grp",           0x10, 5, 0, 0x1) -- RFC 2863
-      :execute()
-   
+      :execute_async()
+end
+
+function HCA:get_port_stats_finish ()
    port_stats.rxbytes = self:output64(0x18 + 0x00) -- includes 4-byte CRC
    local in_ucast_packets = self:output64(0x18 + 0x08)
    port_stats.rxmcast = self:output64(0x18 + 0x48)
@@ -1550,20 +1619,21 @@ local max_mailboxes = 1000
 local data_per_mailbox = 0x200 -- Bytes of input/output data in a mailbox
 
 -- Create a command queue with dedicated/reusable DMA memory.
-function HCA:new (init_seg)
-   local entry = ffi.cast("uint32_t*", memory.dma_alloc(0x40, 4096))
+function HCA:new ()
+   local q = self.nextq
+   assert(q < self.size)
+   self.nextq = self.nextq + 1
+
    local inboxes, outboxes = {}, {}
    for i = 0, max_mailboxes-1 do
       -- XXX overpadding.. 0x240 alignment is not accepted?
       inboxes[i]  = ffi.cast("uint32_t*", memory.dma_alloc(0x240, 4096))
       outboxes[i] = ffi.cast("uint32_t*", memory.dma_alloc(0x240, 4096))
    end
-   return setmetatable({entry = entry,
+   return setmetatable({entry = ffi.cast("uint32_t *", self.entries[q]),
                         inboxes = inboxes,
                         outboxes = outboxes,
-                        init_seg = init_seg,
-                        size = init_seg:log_cmdq_size(),
-                        stride = init_seg:log_cmdq_stride()},
+                        q = q},
       {__index = HCA})
 end
 
@@ -1746,7 +1816,12 @@ local command_errors = {
    [0x40] = 'BAD_SIZE: More outstanding CQEs in CQ than new CQ size',
 }
 
-function HCA:execute ()
+function HCA:post ()
+   self:setbits(0x3C, 0, 0, 1)
+   self.init_seg:ring_doorbell(self.q)
+end
+
+function HCA:execute_async ()
    local last_in_ofs = self.input_size
    local last_out_ofs = self.output_size
    if debug_hexdump then
@@ -1761,38 +1836,49 @@ function HCA:execute ()
          dumpoffset = hexdump(self.inboxes[i], 0, ffi.sizeof(cmdq_mailbox_t), dumpoffset)
       end
    end
-
    assert(self:getbits(0x3C, 0, 0) == 1)
-   self.init_seg:ring_doorbell(0) --post command
-   
-   --poll for command completion
-   while self:getbits(0x3C, 0, 0) == 1 do
+   self:post()
+end
+
+function HCA:completed ()
+   if self:getbits(0x3C, 0, 0) == 0 then
+      if debug_hexdump then
+         local dumpoffset = 0
+         print("command OUTPUT:")
+         dumpoffset = hexdump(self.entry, 0, 0x40, dumpoffset)
+         local noutboxes = math.ceil((last_out_ofs + 4 - 16) / data_per_mailbox)
+         for i = 0, noutboxes-1 do
+            local blocknumber = getint(self.outboxes[i], 0x238, 31, 0)
+            local address = memory.virtual_to_physical(self.outboxes[i])
+            print("Block "..blocknumber.." @ "..bit.tohex(address, 12)..":")
+            dumpoffset = hexdump(self.outboxes[i], 0, ffi.sizeof(cmdq_mailbox_t), dumpoffset)
+         end
+      end
+
+      local token     = self:getbits(0x3C, 31, 24)
+      local signature = self:getbits(0x3C, 23, 16)
+      local status    = self:getbits(0x3C,  7,  1)
+
+      checkz(status)
+      self:checkstatus()
+
+      return signature, token
+   else
       if self.init_seg:getbits(0x1010, 31, 24) ~= 0 then
          error("HCA health syndrome: " .. bit.tohex(self.init_seg:getbits(0x1010, 31, 24)))
       end
+      return nil, nil
+   end
+end
+
+function HCA:execute ()
+   self:execute_async()
+   local signature, token = self:completed()
+   --poll for command completion
+   while not signature do
       C.usleep(10000)
+      signature, token = self:completed()
    end
-
-   if debug_hexdump then
-      local dumpoffset = 0
-      print("command OUTPUT:")
-      dumpoffset = hexdump(self.entry, 0, 0x40, dumpoffset)
-      local noutboxes = math.ceil((last_out_ofs + 4 - 16) / data_per_mailbox)
-      for i = 0, noutboxes-1 do
-         local blocknumber = getint(self.outboxes[i], 0x238, 31, 0)
-         local address = memory.virtual_to_physical(self.outboxes[i])
-         print("Block "..blocknumber.." @ "..bit.tohex(address, 12)..":")
-         dumpoffset = hexdump(self.outboxes[i], 0, ffi.sizeof(cmdq_mailbox_t), dumpoffset)
-      end
-   end
-
-   local token     = self:getbits(0x3C, 31, 24)
-   local signature = self:getbits(0x3C, 23, 16)
-   local status    = self:getbits(0x3C,  7,  1)
-
-   checkz(status)
-   self:checkstatus()
-
    return signature, token
 end
 
