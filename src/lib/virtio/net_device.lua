@@ -54,7 +54,8 @@ local invalid_header_id = 0xffff
 local supported_features = C.VIRTIO_F_ANY_LAYOUT +
                            C.VIRTIO_NET_F_CTRL_VQ +
                            C.VIRTIO_NET_F_MQ +
-                           C.VIRTIO_NET_F_CSUM
+                           C.VIRTIO_NET_F_CSUM +
+                           C.VHOST_USER_F_PROTOCOL_FEATURES
 --[[
    The following offloading flags are also available:
    VIRTIO_NET_F_CSUM
@@ -494,7 +495,9 @@ feature_names = {
    [C.VIRTIO_NET_F_CTRL_MAC_ADDR]               = "VIRTIO_NET_F_CTRL_MAC_ADDR",
    [C.VIRTIO_NET_F_CTRL_GUEST_OFFLOADS]         = "VIRTIO_NET_F_CTRL_GUEST_OFFLOADS",
 
-   [C.VIRTIO_NET_F_MQ]                          = "VIRTIO_NET_F_MQ"
+   [C.VIRTIO_NET_F_MQ]                          = "VIRTIO_NET_F_MQ",
+
+   [C.VHOST_USER_F_PROTOCOL_FEATURES]           = "VHOST_USER_F_PROTOCOL_FEATURES"
 }
 
 -- Request fresh Just-In-Time compilation of the vring processing code.

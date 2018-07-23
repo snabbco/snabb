@@ -56,7 +56,8 @@ enum {
   VIRTIO_NET_F_CTRL_RX_EXTRA = 1 << 20,  // Extra RX mode control support
   VIRTIO_NET_F_GUEST_ANNOUNCE = 1 << 21, // Guest can announce device on network
   VIRTIO_NET_F_MQ         = 1 << 22,     // Device supports Receive Flow Steering
-  VIRTIO_NET_F_CTRL_MAC_ADDR = 1 << 23   // Set MAC address
+  VIRTIO_NET_F_CTRL_MAC_ADDR = 1 << 23,  // Set MAC address
+  VHOST_USER_F_PROTOCOL_FEATURES = 1 << 30 // Protocol feature extensions
 };
 
 enum {
