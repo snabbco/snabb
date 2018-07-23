@@ -50,7 +50,7 @@ local band, bor, shl, shr, bswap, bnot =
 local cast, typeof = ffi.cast, ffi.typeof
 
 local debug_trace   = false     -- Print trace messages
-local debug_hexdump = false    -- Print hexdumps (in Linux mlx5 format)
+local debug_hexdump = false     -- Print hexdumps (in Linux mlx5 format)
 
 -- Maximum size of a receive queue table.
 -- XXX This is hard-coded in the Linux mlx5 driver too. Could
@@ -1828,13 +1828,11 @@ function HCA:post ()
 end
 
 function HCA:execute_async ()
-   local last_in_ofs = self.input_size
-   local last_out_ofs = self.output_size
    if debug_hexdump then
       local dumpoffset = 0
       print("command INPUT:")
       dumpoffset = hexdump(self.entry, 0, 0x40, dumpoffset)
-      local ninboxes  = math.ceil((last_in_ofs + 4 - 16) / data_per_mailbox)
+      local ninboxes  = math.ceil((self.input_size + 4 - 16) / data_per_mailbox)
       for i = 0, ninboxes-1 do
          local blocknumber = getint(self.inboxes[i], 0x238, 31, 0)
          local address = memory.virtual_to_physical(self.inboxes[i])
@@ -1852,7 +1850,7 @@ function HCA:completed ()
          local dumpoffset = 0
          print("command OUTPUT:")
          dumpoffset = hexdump(self.entry, 0, 0x40, dumpoffset)
-         local noutboxes = math.ceil((last_out_ofs + 4 - 16) / data_per_mailbox)
+         local noutboxes = math.ceil((self.output_size + 4 - 16) / data_per_mailbox)
          for i = 0, noutboxes-1 do
             local blocknumber = getint(self.outboxes[i], 0x238, 31, 0)
             local address = memory.virtual_to_physical(self.outboxes[i])
