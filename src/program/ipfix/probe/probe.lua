@@ -241,7 +241,8 @@ function run (args)
    if mellanox_qs then
       local conf = {
          pciaddress = input,
-         queues = mellanox_qs
+         queues = mellanox_qs,
+         recvq_size = 8192
       }
       local driver = pci.device_info(input).driver
       app_graph.app(ctrl_graph, "ctrl_"..input,

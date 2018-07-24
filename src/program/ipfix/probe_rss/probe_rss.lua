@@ -214,7 +214,8 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
    for device, spec in pairs(mellanox) do
       local conf = {
          pciaddress = device,
-         queues = spec.queues
+         queues = spec.queues,
+         recvq_size = 8192
       }
       local driver = pci.device_info(device).driver
       app_graph.app(ctrl_graph, "ctrl_"..device,
