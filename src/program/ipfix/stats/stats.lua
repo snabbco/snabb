@@ -1,3 +1,6 @@
+-- Display statistics for IPFIX processes
+
+-- XXX Re-write needed
 module(..., package.seeall)
 
 local shm = require("core.shm")
@@ -20,6 +23,16 @@ local function format(indent, format, ...)
       io.stdout:write(" ")
    end
    print(string.format(format, ...))
+end
+
+local function ppid_from_group (pid)
+   local ppid
+   local group = shm.root.."/"..shm.resolve("/"..pid.."/group")
+   local stat = assert(S.lstat(group))
+   if stat.islnk then
+      ppid = S.readlink(group):match("/(%d+)/group")
+   end
+   return ppid
 end
 
 local function pci_stats(indent, path)
@@ -140,17 +153,26 @@ function run (args)
 
    local ipfix = {}
    local rss = {}
+   local ctrls = {}
 
    for _, pid in ipairs(pids) do
       for _, dir in ipairs(shm.children('/'..pid)) do
          if dir == 'ipfix_templates' then
             table.insert(ipfix, ipfix_info(tonumber(pid)))
+            local ppid = ppid_from_group(pid)
+            if ppid then
+               ctrls[ppid] = true
+            end
             break
          end
       end
       for _, dir in ipairs(shm.children('/'..pid..'/apps')) do
          if dir == 'rss' then
             table.insert(rss, rss_info(tonumber(pid)))
+            local ppid = ppid_from_group(pid)
+            if ppid then
+               ctrls[ppid] = true
+            end
          end
       end
    end
@@ -180,6 +202,13 @@ function run (args)
             r.id = pid_from_link(r.id, rss.pid)
          end
       end
+   end
+
+   for ppid, _ in pairs(ctrls) do
+      print()
+      format(0, "Control process #%d", ppid)
+      pci_stats(2, '/'..ppid)
+      print()
    end
 
    for _, rss in ipairs(rss) do
