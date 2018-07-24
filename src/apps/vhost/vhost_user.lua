@@ -128,6 +128,8 @@ handler_names = {
    [C.VHOST_USER_SET_VRING_ERR]         = 'set_vring_err',
    [C.VHOST_USER_GET_PROTOCOL_FEATURES] = 'get_protocol_features',
    [C.VHOST_USER_SET_PROTOCOL_FEATURES] = 'set_protocol_features',
+   [C.VHOST_USER_GET_QUEUE_NUM]         = 'get_queue_num',
+   [C.VHOST_USER_SET_VRING_ENABLE]      = 'set_vring_enable'
 }
 
 -- Process all vhost_user requests from QEMU.
@@ -188,6 +190,16 @@ end
 
 function VhostUser:set_protocol_features (msg)
    -- ignore protocol features for now (FIXME)
+end
+
+function VhostUser:get_queue_num (msg)
+   -- ignore for now (FIXME)
+end
+
+-- Handle VHOST_USER_SET_VRING_ENABLE, which explicitly enables/disables the
+-- ring (this msg is only used if VHOST_USER_F_PROTOCOL_FEATURES is used)
+function VhostUser:set_vring_enable (msg)
+   self.vhost_ready = msg.u64 ~= 0
 end
 
 -- Feature cache: A kludge to be compatible with a "QEMU reconnect" patch.
