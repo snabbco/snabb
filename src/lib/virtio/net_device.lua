@@ -230,6 +230,7 @@ end
 
 function VirtioNetDevice:tx_packet_start(addr, len)
    local l = self.owner.input.rx
+   assert(l, "input port not found")
    if link.empty(l) then return nil, nil end
    local tx_p = link.receive(l)
 
@@ -266,6 +267,7 @@ end
 function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
    local tx_mrg_hdr = ffi.cast(virtio_net_hdr_mrg_rxbuf_type, self:map_from_guest(addr))
    local l = self.owner.input.rx
+   assert(l, "input port not found")
    local tx_p = self.tx.p
    ffi.fill(tx_mrg_hdr, virtio_net_hdr_mrg_rxbuf_size)
 
