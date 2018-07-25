@@ -25,7 +25,7 @@ local long_opts = {
    duration     = "D",    -- terminate after n seconds
    verbose      = "V",    -- verbose, display stats
    help         = "h",    -- display help text
-   size         = "S",    -- packet size list (defaults to IMIX)
+   size         = "S",    -- frame size list (defaults to IMIX)
    src_mac      = "s",    -- source ethernet address
    dst_mac      = "d",    -- destination ethernet address
    vlan         = "v",    -- VLAN id
@@ -64,18 +64,10 @@ function run (args)
    end
 
    local sizes = { 64, 64, 64, 64, 64, 64, 64, 594, 594, 594, 1500 }
-   local sizes_ipv6 = { 104, 104, 104, 104, 104, 104, 104, 634, 634, 634, 1540 }
    function opt.S (arg)
       sizes = {}
-      sizes_ipv6 = {}
       for size in string.gmatch(arg, "%d+") do
-         local s = tonumber(size)
-         if s < 28 then
-            s = 28
-            print("Warning: Increasing IPv4 packet size to 28")
-         end
-         sizes[#sizes+1] = s
-         sizes_ipv6[#sizes_ipv6+1] = s + 40
+         sizes[#sizes + 1] = assert(tonumber(size), "size not a number: "..size)
       end
    end
 
@@ -161,6 +153,12 @@ function run (args)
 
    args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:t:i:k:", long_opts)
 
+   for _,s in ipairs(sizes) do
+      if s < 18 + (vlan and 4 or 0) + 20 + 8 then
+         error("Minimum frame size is 46 bytes (18 ethernet+CRC, 20 IPv4, and 8 UDP)")
+      end
+   end
+
    if not target then
       print("either --pci, --tap, --sock, --int or --pcap are required parameters")
       main.exit(1)
@@ -172,14 +170,16 @@ function run (args)
    if not ipv4_only then
       print(string.format("IPv6: %s > %s: %s:%d > %s:12345", b4_ipv6, aftr_ipv6, b4_ipv4, b4_port, public_ipv4))
       print("      source IPv6 and source IPv4/Port adjusted per client")
-      print("IPv6 packet sizes: " .. table.concat(sizes_ipv6,","))
+      local sizes_ipv6 = {}
+      for i,size in ipairs(sizes) do sizes_ipv6[i] = size + 40 end
+      print("IPv6 frame sizes: " .. table.concat(sizes_ipv6,","))
    end
 
    if not ipv6_only then
       print()
       print(string.format("IPv4: %s:12345 > %s:%d", public_ipv4, b4_ipv4, b4_port))
       print("      destination IPv4 and Port adjusted per client")
-      print("IPv4 packet sizes: " .. table.concat(sizes,","))
+      print("IPv4 frame sizes: " .. table.concat(sizes,","))
    end
 
    if ipv4_only and ipv6_only then

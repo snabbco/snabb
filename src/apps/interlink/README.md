@@ -36,10 +36,19 @@ config.link(c, "interlink.output -> otherapp.input")
 Subsequently, packets transmitted to the transmitter’s `input` port will appear
 on the receiver’s `output` port.
 
+Alternatively, a name can be supplied as a configuration argument to be used
+instead of the app’s name:
+
+```lua
+config.app(c, "mylink", Receiver, "interlink")
+config.link(c, "mylink.output -> otherapp.input")
+```
+
 ## Configuration
 
-None, but the configured app names are globally unique within the process
-group.
+The configured app names denote globally unique queues within the process
+group. Alternativelyy, the receiver and transmitter apps can instead be passed
+a string that names the shared queue to which to attach to.
 
 Starting either the transmitter or receiver app attaches them to a shared
 packet queue visible to the process group under the name that was given to the

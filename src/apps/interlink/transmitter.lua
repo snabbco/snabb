@@ -7,15 +7,16 @@ local interlink = require("lib.interlink")
 
 local Transmitter = {name="apps.interlink.Transmitter"}
 
-function Transmitter:new ()
+function Transmitter:new (queue)
    packet.enable_group_freelist()
-   return setmetatable({attached=false}, {__index=Transmitter})
+   return setmetatable({attached=false, queue=queue}, {__index=Transmitter})
 end
 
 function Transmitter:link ()
+   local queue = self.queue or self.appname
    if not self.attached then
-      self.shm_name = "group/interlink/"..self.appname..".interlink"
-      self.backlink = "interlink/transmitter/"..self.appname..".interlink"
+      self.shm_name = "group/interlink/"..queue..".interlink"
+      self.backlink = "interlink/transmitter/"..queue..".interlink"
       self.interlink = interlink.attach_transmitter(self.shm_name)
       shm.alias(self.backlink, self.shm_name)
       self.attached = true
@@ -44,9 +45,9 @@ end
 -- This is an internal API function provided for cleanup during
 -- process termination.
 function Transmitter.shutdown (pid)
-   for _, name in ipairs(shm.children("/"..pid.."/interlink/transmitter")) do
-      local backlink = "/"..pid.."/interlink/transmitter/"..name..".interlink"
-      local shm_name = "/"..pid.."/group/interlink/"..name..".interlink"
+   for _, queue in ipairs(shm.children("/"..pid.."/interlink/transmitter")) do
+      local backlink = "/"..pid.."/interlink/transmitter/"..queue..".interlink"
+      local shm_name = "/"..pid.."/group/interlink/"..queue..".interlink"
       -- Call protected in case /<pid>/group is already unlinked.
       local ok, r = pcall(interlink.open, shm_name)
       if ok then interlink.detach_transmitter(r, shm_name) end

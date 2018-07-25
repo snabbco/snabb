@@ -227,23 +227,23 @@ end
 -- Fork a child process that monitors us and performs cleanup actions
 -- when we terminate.
 local snabbpid = S.getpid()
+local lockfile = os.tmpname()
+local lock = S.open(lockfile, "wronly")
+S.unlink(lockfile)
+S.sigprocmask("block", "hup, int, quit, term")
+lock:lockf("lock", 0)
 if assert(S.fork()) ~= 0 then
-   -- parent process: run snabb
+   -- Parent process; run Snabb.
+   S.sigprocmask("unblock", "hup, int, quit, term")
    xpcall(main, handler)
+   -- Lock will be released however the process exits.
 else
-   -- child process: supervise parent & perform cleanup
-   -- Subscribe to SIGHUP on parent death
+   -- Child process: Supervise parent & perform cleanup.  Lock not
+   -- inherited from parent.
    S.prctl("set_name", "[snabb sup]")
-   S.prctl("set_pdeathsig", "hup")
-   -- Trap relevant signals to a file descriptor
-   local exit_signals = "hup, int, quit, term"
-   local signalfd = S.signalfd(exit_signals)
-   S.sigprocmask("block", exit_signals)
-   -- wait until we receive a signal
-   local signals
-   repeat signals = assert(S.util.signalfd_read(signalfd)) until #signals > 0
-   -- cleanup after parent process
+   -- Wait for parent to release lock.
+   lock:lockf("lock", 0)
+   -- Finally, clean up after parent process.
    shutdown(snabbpid)
-   -- exit with signal-appropriate status
-   os.exit(128 + signals[1].signo)
+   os.exit(128)
 end

@@ -1,4 +1,4 @@
-Usage: loadtest [OPTIONS] <PCAP-FILE> <TX-NAME> <RX-NAME> <PCI> [<PCAP-FILE> <TX-NAME> <RX-NAME> <PCI>]...
+Usage: transient [OPTIONS] <PCAP-FILE> <TX-NAME> <RX-NAME> <PCI> [<PCAP-FILE> <TX-NAME> <RX-NAME> <PCI>]...
 
   -b BITRATE, --bitrate BITRATE
                              Peak at BITRATE bits/second.
@@ -48,6 +48,10 @@ The available workload programs are:
 
     A ramp_up followed by a ramp_down.
 
+  --program constant
+
+    A constant BITRATE bits per second load.
+
 The default workload program is ramp_up_down.
 
 Packets received on the network interfaces are counted and recorded,
@@ -60,5 +64,5 @@ be looking for a response.  Packets sent but not received will be
 counted as loss.
 
 Examples:
-  loadtest cap1.pcap tx tx 01:00.0
-  loadtest -D 1 -b 5e9 -s 0.2e9 cap1.pcap "NIC 0" "NIC 1" 01:00.0 cap2.pcap "NIC 1" "NIC 0" 01:00.1
+  transient cap1.pcap tx tx 01:00.0
+  transient -D 1 -b 5e9 -s 0.2e9 cap1.pcap "NIC 0" "NIC 1" 01:00.0 cap2.pcap "NIC 1" "NIC 0" 01:00.1

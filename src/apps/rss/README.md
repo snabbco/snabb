@@ -68,20 +68,17 @@ processing of the list stops.
 The default class can be disabled by configuration. In that case,
 packets not assigned to any class are dropped.
 
-## Packet duplication
+## Packet replication
 
-As described above, the regular flow-director assigns a packet to at
-most one class.  Any class can also be marked with the attribute
-`continue` to allow matches to multiple classes.  When a packet is
-matched to such a class, it is distributed to the set of ouput links
-as usual but processing of the remaining filter expressions continues.
-For all subsequent matches, a copy of the packet is created and
-distributed to the set of output links of those classes. A packet can
-be copied multiple times if it matches more than one class marked with
-`continue`.
-
-Note that the original rule that processing stops if a packet matches
-a class without `continue` still holds.
+The standard flow-director assigns a packet to at most one class.  Any
+class can also be marked with the attribute `continue` to allow
+matches to multiple classes.  When a packet is matched to such a
+class, it is distributed to the set of ouput links associated with
+that class but processing of the remaining filter expressions
+continues.  If the packet matches a subsequent class, a copy is
+created and distributed to the corresponding set of output links.
+Processing stops when the packet matches a class that does not have
+the `continue` attribute.
 
 ## Weighted links
 

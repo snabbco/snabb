@@ -505,9 +505,9 @@ function pace_breathing ()
       else
          sleep = math.floor(sleep/2)
       end
-      lastfrees = counter.read(frees)
-      lastfreebytes = counter.read(freebytes)
-      lastfreebits = counter.read(freebits)
+      lastfrees = tonumber(counter.read(frees))
+      lastfreebytes = tonumber(counter.read(freebytes))
+      lastfreebits = tonumber(counter.read(freebits))
    end
 end
 

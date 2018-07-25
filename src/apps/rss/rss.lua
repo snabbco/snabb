@@ -185,8 +185,7 @@ function rss:push ()
       self.rxpackets = self.rxpackets + npackets
       for _ = 1, npackets do
          local p = receive(link)
-         local md = mdadd(p, self.rm_ext_headers, vlan)
-         hash(md)
+         hash(mdadd(p, self.rm_ext_headers, vlan))
          transmit(queue, p)
       end
    end
@@ -196,7 +195,7 @@ function rss:push ()
       -- put on the class' input queue.  If the class is of type
       -- "continue" or the packet doesn't match the filter, it is put
       -- back onto the main queue for inspection by the next class.
-      for j = 1, nreadable(queue) do
+      for _ = 1, nreadable(queue) do
          local p = receive(queue)
          local md = mdget(p)
          if class.match_fn(md.filter_start, md.filter_length) then
@@ -244,7 +243,7 @@ function selftest ()
    local addr_ip = ffi.new("uint8_t[4]")
    local addr_ip6 = ffi.new("uint8_t[16]")
    local function random_ip(addr)
-      for i = 1, ffi.sizeof(addr) do
+      for i = 0, ffi.sizeof(addr) - 1 do
          addr[i] = math.random(255)
       end
       return addr
@@ -377,10 +376,8 @@ function selftest ()
       { name = "ip", n = 4 },
       { name = "ip6", n = 4 },
    }
-   local nsinks = 0
    for g, group in ipairs(sink_groups) do
       for i = 1, group.n do
-         nsinks = nsinks + 1
          local sink_name = "sink"..g..i
          config.app(graph, sink_name, Sink)
          config.link(graph, "rss."..group.name.."_"..i

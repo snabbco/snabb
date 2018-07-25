@@ -27,9 +27,11 @@ devices = {}
 
 --- Initialize (or re-initialize) the `devices` table.
 function scan_devices ()
-   for _,device in ipairs(lib.files_in_directory("/sys/bus/pci/devices")) do
-      local info = device_info(device)
-      if info.driver then table.insert(devices, info) end
+   for device in assert(S.util.ls("/sys/bus/pci/devices")) do
+      if device ~= '.' and device ~= '..' then
+         local info = device_info(device)
+         if info.driver then table.insert(devices, info) end
+      end
    end
 end
 

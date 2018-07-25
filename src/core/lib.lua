@@ -107,14 +107,6 @@ end
 
 function firstline (filename) return readfile(filename, "*l") end
 
-function files_in_directory (dir)
-   local files = {}
-   for line in assert(io.popen('ls -1 "'..dir..'" 2>/dev/null')):lines() do
-      table.insert(files, line)
-   end
-   return files
-end
-
 -- Load Lua value from string.
 function load_string (string)
    return loadstring("return "..string)()
@@ -126,7 +118,8 @@ function load_conf (file)
 end
 
 -- Store Lua representation of value in file.
-function store_conf (file, value)
+function print_object (value, stream)
+   stream = stream or io.stdout
    local indent = 0
    local function print_indent (stream)
       for i = 1, indent do stream:write(" ") end
@@ -159,10 +152,13 @@ function store_conf (file, value)
          stream:write(("%s"):format(value))
       end
    end
-   local stream = assert(io.open(file, "w"))
-   stream:write("return ")
    print_value(value, stream)
    stream:write("\n")
+end
+function store_conf (file, value)
+   local stream = assert(io.open(file, "w"))
+   stream:write("return ")
+   print_object(value, stream)
    stream:close()
 end
 
@@ -733,6 +729,7 @@ function random_bytes_from_dev_urandom (count)
    while written < count do
       written = written + assert(f:read(bytes, count-written))
    end
+   f:close()
    return bytes
 end
 

@@ -53,7 +53,7 @@ traffic will go to a single MAC address.  If this address is provided
 as part of the configuration, no ARP request will be made; otherwise
 it will be determined from the *next_ip* via ARP.
 
-— Key **self_ip**
+— Key **next_ip**
 
 *Optional*.  The IPv4 address of the next-hop host.  Required only if
  *next_mac* is not specified as part of the configuration.
