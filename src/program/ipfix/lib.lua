@@ -69,7 +69,7 @@ out_apps.tap = in_apps.tap
 function in_apps.interlink (name)
    return { input = nil,
             output = "output" },
-   { require("apps.interlink.receiver"), {} }
+   { require("apps.interlink.receiver"), nil }
 end
 
 function in_apps.pci (spec)
