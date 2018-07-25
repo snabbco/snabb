@@ -21,7 +21,6 @@ local htonl, htons = lib.htonl, lib.htons
 local function htonq(v) return bit.bswap(v + 0ULL) end
 local metadata_get = metadata.get
 local ether_header_ptr_t = metadata.ether_header_ptr_t
-local log_pid = string.format("[%5d]", S.getpid())
 
 local function ptr_to(ctype) return ffi.typeof('$*', ctype) end
 
@@ -214,7 +213,7 @@ function make_template_info(spec)
             record_ptr_t = ptr_to(record_t),
             swap_fn = gen_swap_fn(),
             match = pf.compile_filter(spec.filter),
-            logger = lib.logger_new({module = log_pid
+            logger = lib.logger_new({module = ("[%5d]"):format(S.getpid())
                                         .." IPFIX template #"..spec.id }),
             counters = spec.counters,
             counters_names = counters_names,

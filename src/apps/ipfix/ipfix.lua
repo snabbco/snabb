@@ -22,6 +22,7 @@ local ipv6     = require("lib.protocol.ipv6")
 local udp      = require("lib.protocol.udp")
 local ctable   = require("lib.ctable")
 local C        = ffi.C
+local S        = require("syscall")
 
 local htonl, htons = lib.htonl, lib.htons
 local metadata_add, metadata_get = metadata.add, metadata.get
@@ -186,8 +187,10 @@ function FlowSet:new (spec, args)
       value_type = template.value_t,
       max_occupancy_rate = 0.4,
       resize_callback = function(table, old_size)
-         template.logger:log("resize flow cache "..old_size..
-                                " -> "..table.size)
+         if old_size > 0 then
+            template.logger:log("resize flow cache "..old_size..
+                                   " -> "..table.size)
+         end
          require('jit').flush()
          o.table_tb:rate(math.ceil(table.size / o.scan_time))
       end
@@ -435,7 +438,9 @@ function IPFIX:new(config)
                version = config.ipfix_version,
                observation_domain = config.observation_domain,
                instance = config.instance,
-               add_packet_metadata = config.add_packet_metadata }
+               add_packet_metadata = config.add_packet_metadata,
+               logger = lib.logger_new({ module = ("[%5d]"):format(S.getpid())
+                                         .." IPFIX exporter"} ) }
    o.shm = {
       -- Total number of packets received
       received_packets = { counter },
@@ -482,7 +487,7 @@ function IPFIX:new(config)
    o.flow_sets = {}
    for _, template in ipairs(config.templates) do
       table.insert(o.flow_sets, FlowSet:new(template, flow_set_args))
-      print("Added template "..o.flow_sets[#o.flow_sets]:id())
+      o.logger:log("Added template "..o.flow_sets[#o.flow_sets]:id())
    end
 
    o.stats_timer = lib.throttle(5)
