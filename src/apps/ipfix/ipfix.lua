@@ -615,7 +615,9 @@ function selftest()
    local ipfix = IPFIX:new({ exporter_ip = "192.168.1.2",
                              collector_ip = "192.168.1.1",
                              collector_port = 4739,
-                             flush_timeout = 0 })
+                             flush_timeout = 0,
+                             scan_time = 1})
+   ipfix.shm = shm.create_frame("apps/ipfix", ipfix.shm)
 
    -- Mock input and output.
    local input_name, input = new_internal_link('ipfix selftest input')
@@ -719,10 +721,12 @@ function selftest()
 
    -- Template message; no data yet.
    assert(link.nreadable(output) == 1)
-   -- Cause expiry.  By default we do 1e-5th of the table per push,
-   -- so this should be good.
-   for i=1,2e5 do ipfix:push() end
-   -- Template message and data message.
+   -- Wait for a full scan of the table to complete (1 second,
+   -- "scan_time")
+   local now = engine.now()
+   while engine.now() - now < 1 do
+      ipfix:push()
+   end
    assert(link.nreadable(output) == 2)
 
    local filter = require("pf").compile_filter([[

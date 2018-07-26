@@ -783,7 +783,8 @@ function selftest()
 
    local function test(src_ip, dst_ip, src_port, dst_port)
       local is_ipv6 = not not src_ip:match(':')
-      local proto = is_ipv6 and ethertype_ipv6 or ethertype_ipv4
+      local proto = is_ipv6 and consts.ethertype_ipv6 or
+         consts.ethertype_ipv4
       local eth = ether:new({ src = ether:pton("00:11:22:33:44:55"),
                               dst = ether:pton("55:44:33:22:11:00"),
                               type = proto })
@@ -792,9 +793,11 @@ function selftest()
       if is_ipv6 then
          ip = ipv6:new({ src = ipv6:pton(src_ip), dst = ipv6:pton(dst_ip),
                          next_header = IP_PROTO_UDP, ttl = 64 })
+         ip:payload_length(udp:sizeof())
       else
          ip = ipv4:new({ src = ipv4:pton(src_ip), dst = ipv4:pton(dst_ip),
                          protocol = IP_PROTO_UDP, ttl = 64 })
+         ip:total_length(ip:total_length() + udp:sizeof())
       end
       local udp = udp:new({ src_port = src_port, dst_port = dst_port })
       local dg = datagram:new()
@@ -804,13 +807,16 @@ function selftest()
       dg:push(eth)
 
       local pkt = dg:packet()
+      metadata.add(pkt)
       
+      local v4 = make_template_info(templates.v4)
+      local v6 = make_template_info(templates.v6)
       assert(v4.match(pkt.data, pkt.length) == not is_ipv6)
       assert(v6.match(pkt.data, pkt.length) == is_ipv6)
       local templ = is_ipv6 and v6 or v4
       local entry = templ.record_t()
       local timestamp = 13
-      templ.extract(pkt, 13, entry)
+      templ.extract(templ, pkt, 13, entry)
       if is_ipv6 then
          assert(ip:src_eq(entry.key.sourceIPv6Address))
          assert(ip:dst_eq(entry.key.destinationIPv6Address))
@@ -824,7 +830,7 @@ function selftest()
       assert(entry.value.flowStartMilliseconds == timestamp)
       assert(entry.value.flowEndMilliseconds == timestamp)
       assert(entry.value.packetDeltaCount == 1)
-      assert(entry.value.octetDeltaCount == pkt.length - ethernet_header_size)
+      assert(entry.value.octetDeltaCount == pkt.length - consts.ethernet_header_size)
 
       packet.free(pkt)
    end
