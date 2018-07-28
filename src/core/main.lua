@@ -67,6 +67,7 @@ function main ()
          require(modulename(program)).run(args)
       end
    end
+   exit()
 end
 
 -- Take the program name from the first argument, unless the first
@@ -144,6 +145,7 @@ function parse_command_line ()
 end
 
 function exit (status)
+   engine.configure(config.new())
    os.exit(status)
 end
 
