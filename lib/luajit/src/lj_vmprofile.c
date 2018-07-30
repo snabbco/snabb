@@ -88,11 +88,11 @@ static void start_timer(int interval)
   struct sigaction sa;
   tm.it_value.tv_sec = tm.it_interval.tv_sec = interval / 1000;
   tm.it_value.tv_usec = tm.it_interval.tv_usec = (interval % 1000) * 1000;
-  setitimer(ITIMER_PROF, &tm, NULL);
+  setitimer(ITIMER_VIRTUAL, &tm, NULL);
   sa.sa_flags = SA_SIGINFO | SA_RESTART;
   sa.sa_sigaction = vmprofile_signal;
   sigemptyset(&sa.sa_mask);
-  sigaction(SIGPROF, &sa, &state.oldsa);
+  sigaction(SIGVTALRM, &sa, &state.oldsa);
 }
 
 static void stop_timer()
@@ -100,8 +100,8 @@ static void stop_timer()
   struct itimerval tm;
   tm.it_value.tv_sec = tm.it_interval.tv_sec = 0;
   tm.it_value.tv_usec = tm.it_interval.tv_usec = 0;
-  setitimer(ITIMER_PROF, &tm, NULL);
-  sigaction(SIGPROF, NULL, &state.oldsa);
+  setitimer(ITIMER_VIRTUAL, &tm, NULL);
+  sigaction(SIGVTALRM, NULL, &state.oldsa);
 }
 
 /* -- State that the application can manage via FFI ----------------------- */
