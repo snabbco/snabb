@@ -31,6 +31,7 @@ if C.getdirentries then
     basep = basep or t.long1()
     local ret, err = C.getdirentries(getfd(fd), buf, size, basep)
     if ret == -1 then return nil, t.error(err or errno()) end
+    if ret == 0 then return nil, nil end
     return t.dirents(buf, ret)
   end
 end

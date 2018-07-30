@@ -12,7 +12,6 @@ local stream = require('lib.yang.stream')
 local binding_table = require("apps.lwaftr.binding_table")
 local Parser = require("program.lwaftr.migrate_configuration.conf_parser").Parser
 local data = require('lib.yang.data')
-local path = require('lib.yang.path')
 
 local br_address_t = ffi.typeof('uint8_t[16]')
 local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
@@ -276,7 +275,7 @@ local function config_to_string(schema, conf)
       schema = yang.load_schema_by_name(schema)
    end
    -- To keep memory usage as low as possible write it out to a temp file.
-   local memfile = util.string_output_file()
+   local memfile = util.string_io_file()
    yang.print_config_for_schema(schema, conf, memfile)
    conf = memfile:flush()
 

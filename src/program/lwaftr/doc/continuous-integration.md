@@ -23,7 +23,7 @@ instance hosts the lwAftr CI benchmarks. Three jobsets are currently defined:
   `snabb lwaftr bench` command, which executes lwAftr benchmarks with no
   interaction with physical NICs;
 - [lwaftr-nic](https://hydra.snabb.co/jobset/igalia/lwaftr-nic) runs the
-  `snabb lwaftr loadtest` and `snabb lwaftr run` commands: the first command
+  `snabb loadtest transient` and `snabb lwaftr run` commands: the first command
   generates network traffic to a physical NIC, which is then received by
   another NIC and processed by the lwAftr instance launched by the second
   command;

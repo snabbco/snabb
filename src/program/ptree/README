@@ -32,6 +32,7 @@ Optional arguments:
                                 Default is "flush".
        -D       <seconds>       Duration in seconds.
        -v                       Verbose (repeat for more verbosity).
+       -t FILE, --trace FILE    File to which to write a trace of incoming RPCs.
 
 CPUSET is a list of CPU ranges.  For example "3-5,7-9", or "3,4,5,7,8,9"
 both allow the data planes to run on the given CPUs.

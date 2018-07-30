@@ -16,7 +16,7 @@ local scheduling_opts = {
    cpu = {},                  -- CPU index (integer).
    real_time = {},            -- Boolean.
    ingress_drop_monitor = {}, -- Action string: one of 'flush' or 'warn'.
-   busywait = {},             -- Boolean.
+   busywait = {default=true}, -- Boolean.
    eval = {}                  -- String.
 }
 
@@ -74,7 +74,7 @@ end
 function selftest ()
    print('selftest: lib.scheduling')
    loadstring(stage({}))()
-   loadstring(stage({busywait=true}))()
+   loadstring(stage({busywait=false}))()
    loadstring(stage({eval='print("lib.scheduling: eval test")'}))()
    print('selftest: ok')
 end

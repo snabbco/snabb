@@ -14,16 +14,17 @@ local cltable = require("lib.cltable")
 local cpuset = require("lib.cpuset")
 local scheduling = require("lib.scheduling")
 local yang = require("lib.yang.yang")
-local data = require("lib.yang.data")
 local util = require("lib.yang.util")
 local schema = require("lib.yang.schema")
 local rpc = require("lib.yang.rpc")
 local state = require("lib.yang.state")
 local path_mod = require("lib.yang.path")
+local path_data = require("lib.yang.path_data")
 local action_codec = require("lib.ptree.action_codec")
 local alarm_codec = require("lib.ptree.alarm_codec")
 local support = require("lib.ptree.support")
 local channel = require("lib.ptree.channel")
+local trace = require("lib.ptree.trace")
 local alarms = require("lib.yang.alarms")
 
 local Manager = {}
@@ -39,9 +40,10 @@ local manager_config_spec = {
    -- Could relax this requirement.
    initial_configuration = {required=true},
    schema_name = {required=true},
-   worker_default_scheduling = {default={busywait=true}},
+   worker_default_scheduling = {default={}},
    default_schema = {},
    log_level = {default=default_log_level},
+   rpc_trace_file = {},
    cpuset = {default=cpuset.global_cpuset()},
    Hz = {default=100},
 }
@@ -77,8 +79,20 @@ function new_manager (conf)
    ret.worker_default_scheduling = conf.worker_default_scheduling
    ret.workers = {}
    ret.state_change_listeners = {}
+
+   if conf.rpc_trace_file then
+      ret:info("Logging RPCs to %s", conf.rpc_trace_file)
+      ret.trace = trace.new({file=conf.rpc_trace_file})
+
+      -- Start trace with initial configuration.
+      local p = path_data.printer_for_schema_by_name(
+         ret.schema_name, "/", true, "yang", false)
+      local conf_str = p(conf.initial_configuration, yang.string_io_file())
+      ret.trace:record('set-config', {schema=ret.schema_name, config=conf_str})
+   end
+
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
-   ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
+   ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_', ret.trace)
 
    ret:set_initial_configuration(conf.initial_configuration)
 
@@ -258,41 +272,15 @@ function Manager:rpc_get_schema (args)
    if success then return response else return {status=1, error=response} end
 end
 
-local function path_printer_for_grammar(grammar, path, format, print_default)
-   local getter, subgrammar = path_mod.resolver(grammar, path)
-   local printer
-   if format == "xpath" then
-      printer = data.xpath_printer_from_grammar(subgrammar, print_default, path)
-   else
-      printer = data.data_printer_from_grammar(subgrammar, print_default)
-   end
-   return function(data, file)
-      return printer(getter(data), file)
-   end
-end
-
-local function path_printer_for_schema(schema, path, is_config,
-                                       format, print_default)
-   local grammar = data.data_grammar_from_schema(schema, is_config)
-   return path_printer_for_grammar(grammar, path, format, print_default)
-end
-
-local function path_printer_for_schema_by_name(schema_name, path, is_config,
-                                               format, print_default)
-   local schema = yang.load_schema_by_name(schema_name)
-   return path_printer_for_schema(schema, path, is_config, format,
-                                  print_default)
-end
-
 function Manager:rpc_get_config (args)
    local function getter()
       if args.schema ~= self.schema_name then
          return self:foreign_rpc_get_config(
             args.schema, args.path, args.format, args.print_default)
       end
-      local printer = path_printer_for_schema_by_name(
+      local printer = path_data.printer_for_schema_by_name(
          args.schema, args.path, true, args.format, args.print_default)
-      local config = printer(self.current_configuration, yang.string_output_file())
+      local config = printer(self.current_configuration, yang.string_io_file())
       return { config = config }
    end
    local success, response = pcall(getter)
@@ -302,8 +290,7 @@ end
 function Manager:rpc_set_alarm_operator_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
-         return false, ("Set-operator-state operation not supported in"..
-                        "'%s' schema"):format(args.schema)
+         error(("Set-operator-state operation not supported in '%s' schema"):format(args.schema))
       end
       local key = {resource=args.resource, alarm_type_id=args.alarm_type_id,
                    alarm_type_qualifier=args.alarm_type_qualifier}
@@ -317,8 +304,7 @@ end
 function Manager:rpc_purge_alarms (args)
    local function purge()
       if args.schema ~= self.schema_name then
-         return false, ("Purge-alarms operation not supported in"..
-                        "'%s' schema"):format(args.schema)
+         error(("Purge-alarms operation not supported in '%s' schema"):format(args.schema))
       end
       return { purged_alarms = alarms.purge_alarms(args) }
    end
@@ -329,269 +315,12 @@ end
 function Manager:rpc_compress_alarms (args)
    local function compress()
       if args.schema ~= self.schema_name then
-         return false, ("Compress-alarms operation not supported in"..
-                        "'%s' schema"):format(args.schema)
+         error(("Compress-alarms operation not supported in '%s' schema"):format(args.schema))
       end
       return { compressed_alarms = alarms.compress_alarms(args) }
    end
    local success, response = pcall(compress)
    if success then return response else return {status=1, error=response} end
-end
-
-
-local function path_parser_for_grammar(grammar, path)
-   local getter, subgrammar = path_mod.resolver(grammar, path)
-   return data.data_parser_from_grammar(subgrammar)
-end
-
-local function path_parser_for_schema(schema, path)
-   local grammar = data.config_grammar_from_schema(schema)
-   return path_parser_for_grammar(grammar, path)
-end
-
-local function path_parser_for_schema_by_name(schema_name, path)
-   return path_parser_for_schema(yang.load_schema_by_name(schema_name), path)
-end
-
-local function path_setter_for_grammar(grammar, path)
-   if path == "/" then
-      return function(config, subconfig) return subconfig end
-   end
-   local head, tail = lib.dirname(path), lib.basename(path)
-   local tail_path = path_mod.parse_path(tail)
-   local tail_name, query = tail_path[1].name, tail_path[1].query
-   if lib.equal(query, {}) then
-      -- No query; the simple case.
-      local getter, grammar = path_mod.resolver(grammar, head)
-      assert(grammar.type == 'struct')
-      local tail_id = data.normalize_id(tail_name)
-      return function(config, subconfig)
-         getter(config)[tail_id] = subconfig
-         return config
-      end
-   end
-
-   -- Otherwise the path ends in a query; it must denote an array or
-   -- table item.
-   local getter, grammar = path_mod.resolver(grammar, head..'/'..tail_name)
-   if grammar.type == 'array' then
-      local idx = path_mod.prepare_array_lookup(query)
-      return function(config, subconfig)
-         local array = getter(config)
-         assert(idx <= #array)
-         array[idx] = subconfig
-         return config
-      end
-   elseif grammar.type == 'table' then
-      local key = path_mod.prepare_table_lookup(grammar.keys,
-                                                grammar.key_ctype, query)
-      if grammar.string_key then
-         key = key[data.normalize_id(grammar.string_key)]
-         return function(config, subconfig)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = subconfig
-            return config
-         end
-      elseif grammar.key_ctype and grammar.value_ctype then
-         return function(config, subconfig)
-            getter(config):update(key, subconfig)
-            return config
-         end
-      elseif grammar.key_ctype then
-         return function(config, subconfig)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = subconfig
-            return config
-         end
-      else
-         return function(config, subconfig)
-            local tab = getter(config)
-            for k,v in pairs(tab) do
-               if lib.equal(k, key) then
-                  tab[k] = subconfig
-                  return config
-               end
-            end
-            error("Not found")
-         end
-      end
-   else
-      error('Query parameters only allowed on arrays and tables')
-   end
-end
-
-local function path_setter_for_schema(schema, path)
-   local grammar = data.config_grammar_from_schema(schema)
-   return path_setter_for_grammar(grammar, path)
-end
-
-function compute_set_config_fn (schema_name, path)
-   return path_setter_for_schema(yang.load_schema_by_name(schema_name), path)
-end
-
-local function path_adder_for_grammar(grammar, path)
-   local top_grammar = grammar
-   local getter, grammar = path_mod.resolver(grammar, path)
-   if grammar.type == 'array' then
-      if grammar.ctype then
-         -- It's an FFI array; have to create a fresh one, sadly.
-         local setter = path_setter_for_grammar(top_grammar, path)
-         local elt_t = data.typeof(grammar.ctype)
-         local array_t = ffi.typeof('$[?]', elt_t)
-         return function(config, subconfig)
-            local cur = getter(config)
-            local new = array_t(#cur + #subconfig)
-            local i = 1
-            for _,elt in ipairs(cur) do new[i-1] = elt; i = i + 1 end
-            for _,elt in ipairs(subconfig) do new[i-1] = elt; i = i + 1 end
-            return setter(config, util.ffi_array(new, elt_t))
-         end
-      end
-      -- Otherwise we can add entries in place.
-      return function(config, subconfig)
-         local cur = getter(config)
-         for _,elt in ipairs(subconfig) do table.insert(cur, elt) end
-         return config
-      end
-   elseif grammar.type == 'table' then
-      -- Invariant: either all entries in the new subconfig are added,
-      -- or none are.
-      if grammar.key_ctype and grammar.value_ctype then
-         -- ctable.
-         return function(config, subconfig)
-            local ctab = getter(config)
-            for entry in subconfig:iterate() do
-               if ctab:lookup_ptr(entry.key) ~= nil then
-                  error('already-existing entry')
-               end
-            end
-            for entry in subconfig:iterate() do
-               ctab:add(entry.key, entry.value)
-            end
-            return config
-         end
-      elseif grammar.string_key or grammar.key_ctype then
-         -- cltable or string-keyed table.
-         local pairs = grammar.key_ctype and cltable.pairs or pairs
-         return function(config, subconfig)
-            local tab = getter(config)
-            for k,_ in pairs(subconfig) do
-               if tab[k] ~= nil then error('already-existing entry') end
-            end
-            for k,v in pairs(subconfig) do tab[k] = v end
-            return config
-         end
-      else
-         -- Sad quadratic loop.
-         return function(config, subconfig)
-            local tab = getter(config)
-            for key,val in pairs(tab) do
-               for k,_ in pairs(subconfig) do
-                  if lib.equal(key, k) then
-                     error('already-existing entry', key)
-                  end
-               end
-            end
-            for k,v in pairs(subconfig) do tab[k] = v end
-            return config
-         end
-      end
-   else
-      error('Add only allowed on arrays and tables')
-   end
-end
-
-local function path_adder_for_schema(schema, path)
-   local grammar = data.config_grammar_from_schema(schema)
-   return path_adder_for_grammar(grammar, path)
-end
-
-function compute_add_config_fn (schema_name, path)
-   return path_adder_for_schema(yang.load_schema_by_name(schema_name), path)
-end
-compute_add_config_fn = util.memoize(compute_add_config_fn)
-
-local function path_remover_for_grammar(grammar, path)
-   local top_grammar = grammar
-   local head, tail = lib.dirname(path), lib.basename(path)
-   local tail_path = path_mod.parse_path(tail)
-   local tail_name, query = tail_path[1].name, tail_path[1].query
-   local head_and_tail_name = head..'/'..tail_name
-   local getter, grammar = path_mod.resolver(grammar, head_and_tail_name)
-   if grammar.type == 'array' then
-      if grammar.ctype then
-         -- It's an FFI array; have to create a fresh one, sadly.
-         local idx = path_mod.prepare_array_lookup(query)
-         local setter = path_setter_for_grammar(top_grammar, head_and_tail_name)
-         local elt_t = data.typeof(grammar.ctype)
-         local array_t = ffi.typeof('$[?]', elt_t)
-         return function(config)
-            local cur = getter(config)
-            assert(idx <= #cur)
-            local new = array_t(#cur - 1)
-            for i,elt in ipairs(cur) do
-               if i < idx then new[i-1] = elt end
-               if i > idx then new[i-2] = elt end
-            end
-            return setter(config, util.ffi_array(new, elt_t))
-         end
-      end
-      -- Otherwise we can remove the entry in place.
-      return function(config)
-         local cur = getter(config)
-         assert(i <= #cur)
-         table.remove(cur, i)
-         return config
-      end
-   elseif grammar.type == 'table' then
-      local key = path_mod.prepare_table_lookup(grammar.keys,
-                                                grammar.key_ctype, query)
-      if grammar.string_key then
-         key = key[data.normalize_id(grammar.string_key)]
-         return function(config)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = nil
-            return config
-         end
-      elseif grammar.key_ctype and grammar.value_ctype then
-         return function(config)
-            getter(config):remove(key)
-            return config
-         end
-      elseif grammar.key_ctype then
-         return function(config)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = nil
-            return config
-         end
-      else
-         return function(config)
-            local tab = getter(config)
-            for k,v in pairs(tab) do
-               if lib.equal(k, key) then
-                  tab[k] = nil
-                  return config
-               end
-            end
-            error("Not found")
-         end
-      end
-   else
-      error('Remove only allowed on arrays and tables')
-   end
-end
-
-local function path_remover_for_schema(schema, path)
-   local grammar = data.config_grammar_from_schema(schema)
-   return path_remover_for_grammar(grammar, path)
-end
-
-function compute_remove_config_fn (schema_name, path)
-   return path_remover_for_schema(yang.load_schema_by_name(schema_name), path)
 end
 
 function Manager:notify_pre_update (config, verb, path, ...)
@@ -632,7 +361,7 @@ end
 
 function Manager:handle_rpc_update_config (args, verb, compute_update_fn)
    local path = path_mod.normalize_path(args.path)
-   local parser = path_parser_for_schema_by_name(args.schema, path)
+   local parser = path_data.parser_for_schema_by_name(args.schema, path)
    self:update_configuration(compute_update_fn(args.schema, path),
                              verb, path, parser(args.config))
    return {}
@@ -667,9 +396,9 @@ function Manager:foreign_rpc_get_config (schema_name, path, format,
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
    local foreign_config = translate.get_config(self.current_configuration)
-   local printer = path_printer_for_schema_by_name(
+   local printer = path_data.printer_for_schema_by_name(
       schema_name, path, true, format, print_default)
-   local config = printer(foreign_config, yang.string_output_file())
+   local config = printer(foreign_config, yang.string_io_file())
    return { config = config }
 end
 function Manager:foreign_rpc_get_state (schema_name, path, format,
@@ -677,15 +406,15 @@ function Manager:foreign_rpc_get_state (schema_name, path, format,
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
    local foreign_state = translate.get_state(self:get_native_state())
-   local printer = path_printer_for_schema_by_name(
+   local printer = path_data.printer_for_schema_by_name(
       schema_name, path, false, format, print_default)
-   local state = printer(foreign_state, yang.string_output_file())
+   local state = printer(foreign_state, yang.string_io_file())
    return { state = state }
 end
 function Manager:foreign_rpc_set_config (schema_name, path, config_str)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
-   local parser = path_parser_for_schema_by_name(schema_name, path)
+   local parser = path_data.parser_for_schema_by_name(schema_name, path)
    local updates = translate.set_config(self.current_configuration, path,
                                         parser(config_str))
    return self:apply_translated_rpc_updates(updates)
@@ -693,7 +422,7 @@ end
 function Manager:foreign_rpc_add_config (schema_name, path, config_str)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
-   local parser = path_parser_for_schema_by_name(schema_name, path)
+   local parser = path_data.parser_for_schema_by_name(schema_name, path)
    local updates = translate.add_config(self.current_configuration, path,
                                         parser(config_str))
    return self:apply_translated_rpc_updates(updates)
@@ -713,7 +442,8 @@ function Manager:rpc_set_config (args)
       if args.schema ~= self.schema_name then
          return self:foreign_rpc_set_config(args.schema, args.path, args.config)
       end
-      return self:handle_rpc_update_config(args, 'set', compute_set_config_fn)
+      return self:handle_rpc_update_config(
+         args, 'set', path_data.setter_for_schema_by_name)
    end
    local success, response = pcall(setter)
    if success then return response else return {status=1, error=response} end
@@ -727,7 +457,8 @@ function Manager:rpc_add_config (args)
       if args.schema ~= self.schema_name then
          return self:foreign_rpc_add_config(args.schema, args.path, args.config)
       end
-      return self:handle_rpc_update_config(args, 'add', compute_add_config_fn)
+      return self:handle_rpc_update_config(
+         args, 'add', path_data.adder_for_schema_by_name)
    end
    local success, response = pcall(adder)
    if success then return response else return {status=1, error=response} end
@@ -742,8 +473,8 @@ function Manager:rpc_remove_config (args)
          return self:foreign_rpc_remove_config(args.schema, args.path)
       end
       local path = path_mod.normalize_path(args.path)
-      self:update_configuration(compute_remove_config_fn(args.schema, path),
-                              'remove', path)
+      self:update_configuration(
+         path_data.remover_for_schema_by_name(args.schema, path), 'remove', path)
       return {}
    end
    local success, response = pcall(remover)
@@ -767,9 +498,9 @@ function Manager:rpc_get_state (args)
                                            args.format, args.print_default)
       end
       local state = self:get_native_state()
-      local printer = path_printer_for_schema_by_name(
+      local printer = path_data.printer_for_schema_by_name(
          self.schema_name, args.path, false, args.format, args.print_default)
-      return { state = printer(state, yang.string_output_file()) }
+      return { state = printer(state, yang.string_io_file()) }
    end
    local success, response = pcall(getter)
    if success then return response else return {status=1, error=response} end
@@ -778,12 +509,12 @@ end
 function Manager:rpc_get_alarms_state (args)
    local function getter()
       assert(args.schema == "ietf-alarms")
-      local printer = path_printer_for_schema_by_name(
+      local printer = path_data.printer_for_schema_by_name(
          args.schema, args.path, false, args.format, args.print_default)
       local state = {
          alarms = alarms.get_state()
       }
-      state = printer(state, yang.string_output_file())
+      state = printer(state, yang.string_io_file())
       return { state = state }
    end
    local success, response = pcall(getter)

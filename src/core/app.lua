@@ -542,9 +542,9 @@ function pace_breathing ()
       else
          sleep = math.floor(sleep/2)
       end
-      lastfrees = counter.read(frees)
-      lastfreebytes = counter.read(freebytes)
-      lastfreebits = counter.read(freebits)
+      lastfrees = tonumber(counter.read(frees))
+      lastfreebytes = tonumber(counter.read(freebytes))
+      lastfreebits = tonumber(counter.read(freebits))
    end
 end
 
@@ -568,8 +568,11 @@ function breathe ()
       end
    end
    counter.add(breaths)
-   -- Commit counters at a reasonable frequency
-   if counter.read(breaths) % 100 == 0 then counter.commit() end
+   -- Commit counters and rebalance freelists at a reasonable frequency
+   if counter.read(breaths) % 100 == 0 then
+      counter.commit()
+      packet.rebalance_freelists()
+   end
    running = false
 end
 

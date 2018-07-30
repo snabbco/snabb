@@ -65,7 +65,7 @@ Then run a load generator:
 
 ```bash
 $ cd src
-$ sudo ./snabb lwaftr loadtest  \
+$ sudo ./snabb loadtest transient  \
     program/lwaftr/tests/benchdata/ipv4-0550.pcap IPv4 IPv6 0000:01:00.0 \
     program/lwaftr/tests/benchdata/ipv6-0550.pcap IPv6 IPv4 0000:02:00.0
 ```
@@ -89,7 +89,7 @@ $ sudo ./snabb lwaftr run --conf /tmp/icmp_on_fail.conf \
 You can run a load generator in on-a-stick mode:
 
 ```
-$ sudo ./snabb lwaftr loadtest \
+$ sudo ./snabb loadtest transient \
     program/lwaftr/tests/benchdata/ipv4_and_ipv6_stick_imix.pcap ALL ALL \
     0000:82:00.1
 ```
