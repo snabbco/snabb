@@ -298,8 +298,10 @@ function load_on_a_stick(c, conf, args)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
       args.v6_nic_name, args.v4v6, args.mirror
 
-   if queue.external_interface.vlan_tag ~= queue.internal_interface.vlan_tag then
-      assert(queue.external_interface.mac ~= queue.internal_interface.mac,
+   local ext = queue.external_interface
+   local int = queue.internal_interface
+   if ext.vlan_tag ~= int.vlan_tag then
+      assert(ethernet:ntop(ext.mac) ~= ethernet:ntop(int.mac),
              "When using different VLAN tags, external and internal MAC "..
                 "addresses must be different too")
    end
