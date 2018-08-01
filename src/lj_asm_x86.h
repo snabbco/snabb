@@ -2273,7 +2273,7 @@ static RegSet asm_head_side_base(ASMState *as, IRIns *irp, RegSet allow)
 /* -- Tail of trace ------------------------------------------------------- */
 
 /* Fixup the tail code. */
-static void asm_tail_fixup(ASMState *as, TraceNo lnk)
+static void asm_tail_fixup(ASMState *as, TraceNo lnk, int track)
 {
   /* Note: don't use as->mcp swap + emit_*: emit_op overwrites more bytes. */
   MCode *p = as->mctop;
@@ -2304,7 +2304,9 @@ static void asm_tail_fixup(ASMState *as, TraceNo lnk)
     }
   }
   /* Patch exit branch. */
-  target = lnk ? traceref(as->J, lnk)->mcode : (MCode *)lj_vm_exit_interp;
+  target = (lnk ? traceref(as->J, lnk)->mcode :
+            (track ? (MCode *)lj_vm_exit_interp :
+             (MCode *)lj_vm_exit_interp_notrack));
   *(int32_t *)(p-4) = jmprel(p, target);
   p[-5] = XI_JMP;
   /* Drop unused mcode tail. Fill with NOPs to make the prefetcher happy. */
