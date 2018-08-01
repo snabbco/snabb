@@ -1953,6 +1953,23 @@ static void asm_setup_regsp(ASMState *as)
 
 /* -- Assembler core ------------------------------------------------------ */
 
+/* Do we want the profiler to attribute VM time to this trace?
+ *
+ * Not if the root of this trace is a Lua function. We assume that the
+ * root cause of running the interpreter is a loop that failed to
+ * compile somewhere and that entry/exit through function traces is
+ * only noise that should be filtered out.
+ *
+ * This helps the profiler to point out the code that needs to be
+ * changed to reduce time spent in the interpreter.
+ */
+static int asm_should_profile_exit(jit_State *J, GCtrace *T)
+{
+  GCtrace *root = traceref(J, T->root ? T->root : T->traceno);
+  BCOp op = bc_op(root->startins);
+  return op != BC_FUNCF && op != BC_FUNCV;
+}
+
 /* Assemble a trace. */
 void lj_asm_trace(jit_State *J, GCtrace *T)
 {
@@ -2107,7 +2124,8 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   T->mcode = as->mcp;
   T->mcloop = as->mcloop ? (MSize)((char *)as->mcloop - (char *)as->mcp) : 0;
   if (!as->loopref)
-    asm_tail_fixup(as, T->link);  /* Note: this may change as->mctop! */
+    /* Note: this may change as->mctop! */
+    asm_tail_fixup(as, T->link, asm_should_profile_exit(J, T));
   T->szmcode = (MSize)((char *)as->mctop - (char *)as->mcp);
   lj_mcode_sync(T->mcode, origtop);
 }
