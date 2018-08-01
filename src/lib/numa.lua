@@ -21,12 +21,19 @@ function cpu_get_numa_node (cpu)
    local node = 0
    while true do
       local node_dir = S.open(node_path..node, 'rdonly, directory')
-      if not node_dir then return end
+      if not node_dir then return 0 end -- default NUMA node
       local found = S.readlinkat(node_dir, 'cpu'..cpu)
       node_dir:close()
       if found then return node end
       node = node + 1
    end
+end
+
+local function supports_numa ()
+   local node0 = S.open(node_path..tostring(0), 'rdonly, directory')
+   if not node0 then return false end
+   node0:close()
+   return true
 end
 
 function has_numa ()
@@ -41,7 +48,7 @@ function pci_get_numa_node (addr)
    local file = assert(io.open('/sys/bus/pci/devices/'..addr..'/numa_node'))
    local node = assert(tonumber(file:read()))
    -- node can be -1.
-   if node >= 0 then return node end
+   return math.max(0, node)
 end
 
 function choose_numa_node_for_pci_addresses (addrs, require_affinity)
@@ -104,7 +111,9 @@ function bind_to_cpu (cpu)
 end
 
 function unbind_numa_node ()
-   assert(S.set_mempolicy('default'))
+   if supports_numa() then
+      assert(S.set_mempolicy('default'))
+   end
    bound_numa_node = nil
 end
 
@@ -113,11 +122,13 @@ function bind_to_numa_node (node)
    if not node then return unbind_numa_node() end
    assert(not bound_numa_node, "already bound")
 
-   assert(S.set_mempolicy('bind', node))
+   if supports_numa() then
+      assert(S.set_mempolicy('bind', node))
 
-   -- Migrate any pages that might have the wrong affinity.
-   local from_mask = assert(S.get_mempolicy(nil, nil, nil, 'mems_allowed')).mask
-   assert(S.migrate_pages(0, from_mask, node))
+      -- Migrate any pages that might have the wrong affinity.
+      local from_mask = assert(S.get_mempolicy(nil, nil, nil, 'mems_allowed')).mask
+      assert(S.migrate_pages(0, from_mask, node))
+   end
 
    bound_numa_node = node
 end
@@ -145,12 +156,26 @@ function selftest ()
       assert(bound_numa_node == nil)
    end
 
+   function test_pci_affinity (pciaddr)
+      check_affinity_for_pci_addresses({pciaddr})
+      local node = choose_numa_node_for_pci_addresses({pciaddr}, true)
+      bind_to_numa_node(node)
+      assert(bound_numa_node == node)
+      check_affinity_for_pci_addresses({pciaddr})
+      bind_to_numa_node(nil)
+      assert(bound_numa_node == nil)
+   end
+
    print('selftest: numa')
    local cpu_set = S.sched_getaffinity()
    for cpuid = 0, MAX_CPU do
       if cpu_set:get(cpuid) then
          test_cpu(cpuid)
       end
+   end
+   local pciaddr = os.getenv("SNABB_PCI0")
+   if pciaddr then
+      test_pci_affinity(pciaddr)
    end
    print('selftest: numa: ok')
 end
