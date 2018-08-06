@@ -24,6 +24,7 @@
 #include "lj_lex.h"
 #include "lj_parse.h"
 #include "lj_vm.h"
+#include "lj_auditlog.h"
 
 /* -- Parser structures and definitions ----------------------------------- */
 
@@ -1518,6 +1519,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line, char *declname)
   ls->vtop = fs->vbase;  /* Reset variable stack. */
   ls->fs = fs->prev;
   lua_assert(ls->fs != NULL || ls->tok == TK_eof);
+  lj_auditlog_new_prototype(pt);
   return pt;
 }
 
@@ -2649,7 +2651,7 @@ GCproto *lj_parse(LexState *ls)
   parse_chunk(ls);
   if (ls->tok != TK_eof)
     err_token(ls, TK_eof);
-  pt = fs_finish(ls, ls->linenumber, "");
+  pt = fs_finish(ls, ls->linenumber, "<toplevel>");
   L->top--;  /* Drop chunkname. */
   lua_assert(fs.prev == NULL);
   lua_assert(ls->fs == NULL);

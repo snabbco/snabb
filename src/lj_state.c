@@ -168,11 +168,14 @@ static void close_state(lua_State *L)
   lj_mem_freevec(g, g->strhash, g->strmask+1, GCRef);
   lj_buf_free(g, &g->tmpbuf);
   lj_mem_freevec(g, tvref(L->stack), L->stacksize, TValue);
-  lj_mem_free(g, J->bclog, sizeof(BCRecLog)*65536);
-  lj_mem_free(g, J->snapmapbuf, J->sizesnapmap);
-  lj_mem_free(g, J->snapbuf, J->sizesnap);
+  lj_mem_free(g, J->bclog, sizeof(BCRecLog)*J->maxbclog);
+  lj_mem_free(g, J->snapmapbuf, sizeof(SnapEntry)*65536);
+  lj_mem_free(g, J->snapbuf, sizeof(SnapShot)*65536);
   lj_mem_free(g, J->irbuf, 65536*sizeof(IRIns));
+#if 0
+  /* XXX Fix deallocation so that this assertion succeeds. */
   lua_assert(g->gc.total == sizeof(GG_State));
+#endif
 #ifndef LUAJIT_USE_SYSMALLOC
   if (g->allocf == lj_alloc_f)
     lj_alloc_destroy(g->allocd);

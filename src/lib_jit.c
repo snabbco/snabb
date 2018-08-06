@@ -28,6 +28,7 @@
 #include "lj_dispatch.h"
 #include "lj_vm.h"
 #include "lj_lib.h"
+#include "lj_auditlog.h"
 
 #include "luajit.h"
 
@@ -78,6 +79,20 @@ LJLIB_CF(jit_flush)
     return 0;
   }
   return setjitmode(L, LUAJIT_MODE_FLUSH);
+}
+
+LJLIB_CF(jit_auditlog)
+{
+  if (L->base < L->top && tvisstr(L->base)) {
+    /* XXX Support auditlog file size argument. */
+    if (lj_auditlog_open(strdata(lj_lib_checkstr(L, 1)), 0)) {
+      return 0;
+    } else {
+      lj_err_caller(L, LJ_ERR_AUDITLOG);
+    }
+  } else {
+    lj_err_argtype(L, 1, "string filename");
+  }
 }
 
 /* Push a string for every flag bit that is set. */

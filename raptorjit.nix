@@ -12,8 +12,8 @@ mkDerivation rec {
   buildInputs = [ luajit ];  # LuaJIT to bootstrap DynASM
   dontStrip = true;
   installPhase = ''
-    mkdir -p $out/bin
-    cp src/raptorjit $out/bin/raptorjit
+    install -D src/raptorjit $out/bin/raptorjit
+    install -D src/lj_dwarf.dwo $out/lib/raptorjit.dwo
   '';
 
   enableParallelBuilding = true;  # Do 'make -j'
