@@ -30,11 +30,11 @@
 
 #include "lua.h"
 
-#define LUAJIT_VERSION		"LuaJIT 2.1.0-beta2"
-#define LUAJIT_VERSION_NUM	20100  /* Version 2.1.0 = 02.01.00. */
+#define LUAJIT_VERSION		"RaptorJIT 1.0.0-alpha1"
+#define LUAJIT_VERSION_NUM	100000  /* Version 1.0.0 = 01.00.00. */
 #define LUAJIT_VERSION_SYM	luaJIT_version_2_1_0_beta2
-#define LUAJIT_COPYRIGHT	"Copyright (C) 2005-2017 Mike Pall"
-#define LUAJIT_URL		"http://luajit.org/"
+
+#define LUAJIT_URL		"http://github.com/raptorjit/raptorjit"
 
 /* Modes for luaJIT_setmode. */
 #define LUAJIT_MODE_MASK	0x00ff
