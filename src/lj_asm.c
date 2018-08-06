@@ -895,7 +895,7 @@ static uint32_t ir_khash(IRIns *ir)
   } else {
     lua_assert(irt_isgcv(ir->t));
     lo = u32ptr(ir_kgc(ir));
-    hi = lo + HASH_BIAS;
+    hi = (uint32_t)(u64ptr(ir_kgc(ir)) >> 32) | (irt_toitype(ir->t) << 15);
   }
   return hashrot(lo, hi);
 }
@@ -989,7 +989,7 @@ static void asm_bufput(ASMState *as, IRIns *ir)
   const CCallInfo *ci = &lj_ir_callinfo[IRCALL_lj_buf_putstr];
   IRRef args[3];
   IRIns *irs;
-  int kchar = -1;
+  int kchar = -129;
   args[0] = ir->op1;  /* SBuf * */
   args[1] = ir->op2;  /* GCstr * */
   irs = IR(ir->op2);
@@ -997,7 +997,7 @@ static void asm_bufput(ASMState *as, IRIns *ir)
   if (irs->o == IR_KGC) {
     GCstr *s = ir_kstr(irs);
     if (s->len == 1) {  /* Optimize put of single-char string constant. */
-      kchar = strdata(s)[0];
+      kchar = (int8_t)strdata(s)[0];  /* Signed! */
       args[1] = ASMREF_TMP1;  /* int, truncated to char */
       ci = &lj_ir_callinfo[IRCALL_lj_buf_putchar];
     }
@@ -1024,7 +1024,7 @@ static void asm_bufput(ASMState *as, IRIns *ir)
   asm_gencall(as, ci, args);
   if (args[1] == ASMREF_TMP1) {
     Reg tmp = ra_releasetmp(as, ASMREF_TMP1);
-    if (kchar == -1)
+    if (kchar == -129)
       asm_tvptr(as, tmp, irs->op1);
     else
       ra_allockreg(as, kchar, tmp);
@@ -1798,6 +1798,7 @@ static void asm_setup_regsp(ASMState *as)
   for (ir = IR(T->nk), lastir = IR(REF_BASE); ir < lastir; ir++) {
     ir->prev = REGSP_INIT;
     if (irt_is64(ir->t) && ir->o != IR_KNULL) {
+      /* The false-positive of irt_is64() for ASMREF_L (REF_NIL) is OK here. */
       ir->i = 0;  /* Will become non-zero only for RIP-relative addresses. */
       ir++;
     }
@@ -1952,12 +1953,29 @@ static void asm_setup_regsp(ASMState *as)
 
 /* -- Assembler core ------------------------------------------------------ */
 
+/* Do we want the profiler to attribute VM time to this trace?
+ *
+ * Not if the root of this trace is a Lua function. We assume that the
+ * root cause of running the interpreter is a loop that failed to
+ * compile somewhere and that entry/exit through function traces is
+ * only noise that should be filtered out.
+ *
+ * This helps the profiler to point out the code that needs to be
+ * changed to reduce time spent in the interpreter.
+ */
+static int asm_should_profile_exit(jit_State *J, GCtrace *T)
+{
+  GCtrace *root = traceref(J, T->root ? T->root : T->traceno);
+  BCOp op = bc_op(root->startins);
+  return op != BC_FUNCF && op != BC_FUNCV;
+}
+
 /* Assemble a trace. */
 void lj_asm_trace(jit_State *J, GCtrace *T)
 {
   ASMState as_;
   ASMState *as = &as_;
-  MCode *origtop;
+  MCode *origtop, *firstins;
 
   /* Remove nops/renames left over from ASM restart due to LJ_TRERR_MCODELM. */
   {
@@ -1983,6 +2001,10 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   as->realign = NULL;
   as->loopinv = 0;
   as->parent = J->parent ? traceref(J, J->parent) : NULL;
+
+  /* Initialize mcode size of IR instructions array. */
+  T->szirmcode = lj_mem_new(J->L, (T->nins + 1) * sizeof(*T->szirmcode));
+  memset(T->szirmcode, 0, (T->nins + 1) * sizeof(*T->szirmcode));
 
   /* Reserve MCode memory. */
   as->mctop = origtop = lj_mcode_reserve(J, &as->mcbot);
@@ -2043,6 +2065,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
     /* Assemble a trace in linear backwards order. */
     for (as->curins--; as->curins > as->stopins; as->curins--) {
       IRIns *ir = IR(as->curins);
+      MCode *end = as->mcp;
       lua_assert(!(LJ_32 && irt_isint64(ir->t)));  /* Handled by SPLIT. */
       if (!ra_used(ir) && !ir_sideeff(ir) && (as->flags & JIT_F_OPT_DCE))
 	continue;  /* Dead-code elimination can be soooo easy. */
@@ -2051,7 +2074,10 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
       RA_DBG_REF();
       checkmclim(as);
       asm_ir(as, ir);
+      T->szirmcode[as->curins - REF_BIAS] = (uint16_t)((intptr_t)end - (intptr_t)as->mcp);
     }
+
+    firstins = as->mcp;	/* MCode assembled for IR instructions. */
 
     if (as->realign && J->curfinal->nins >= T->nins)
       continue;  /* Retry in case only the MCode needs to be realigned. */
@@ -2077,6 +2103,8 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
       memcpy(J->curfinal->ir + as->orignins, T->ir + as->orignins,
 	     (T->nins - as->orignins) * sizeof(IRIns));  /* Copy RENAMEs. */
       T->nins = J->curfinal->nins;
+      /* Log size of trace head */
+      T->szirmcode[0] = (uint16_t)((intptr_t)firstins - (intptr_t)as->mcp);
       break;  /* Done. */
     }
 
@@ -2096,7 +2124,8 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   T->mcode = as->mcp;
   T->mcloop = as->mcloop ? (MSize)((char *)as->mcloop - (char *)as->mcp) : 0;
   if (!as->loopref)
-    asm_tail_fixup(as, T->link);  /* Note: this may change as->mctop! */
+    /* Note: this may change as->mctop! */
+    asm_tail_fixup(as, T->link, asm_should_profile_exit(J, T));
   T->szmcode = (MSize)((char *)as->mctop - (char *)as->mcp);
   lj_mcode_sync(T->mcode, origtop);
 }

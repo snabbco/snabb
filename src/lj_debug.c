@@ -110,15 +110,7 @@ BCLine lj_debug_line(GCproto *pt, BCPos pc)
 {
   const void *lineinfo = proto_lineinfo(pt);
   if (pc <= pt->sizebc && lineinfo) {
-    BCLine first = pt->firstline;
-    if (pc == pt->sizebc) return first + pt->numline;
-    if (pc-- == 0) return first;
-    if (pt->numline < 256)
-      return first + (BCLine)((const uint8_t *)lineinfo)[pc];
-    else if (pt->numline < 65536)
-      return first + (BCLine)((const uint16_t *)lineinfo)[pc];
-    else
-      return first + (BCLine)((const uint32_t *)lineinfo)[pc];
+    return mref(lineinfo, uint32_t)[pc];
   }
   return 0;
 }
@@ -497,16 +489,12 @@ int lj_debug_getinfo(lua_State *L, const char *what, lj_Debug *ar, int ext)
     if (isluafunc(fn)) {
       GCtab *t = lj_tab_new(L, 0, 0);
       GCproto *pt = funcproto(fn);
-      const void *lineinfo = proto_lineinfo(pt);
+      const uint32_t *lineinfo = proto_lineinfo(pt);
       if (lineinfo) {
 	BCLine first = pt->firstline;
-	int sz = pt->numline < 256 ? 1 : pt->numline < 65536 ? 2 : 4;
 	MSize i, szl = pt->sizebc-1;
 	for (i = 0; i < szl; i++) {
-	  BCLine line = first +
-	    (sz == 1 ? (BCLine)((const uint8_t *)lineinfo)[i] :
-	     sz == 2 ? (BCLine)((const uint16_t *)lineinfo)[i] :
-	     (BCLine)((const uint32_t *)lineinfo)[i]);
+	  BCLine line = first + lineinfo[i];
 	  setboolV(lj_tab_setint(L, t, line), 1);
 	}
       }

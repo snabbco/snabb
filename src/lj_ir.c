@@ -65,49 +65,6 @@ IRCALLDEF(IRCALLCI)
 
 /* -- IR emitter ---------------------------------------------------------- */
 
-/* Grow IR buffer at the top. */
-void lj_ir_growtop(jit_State *J)
-{
-  IRIns *baseir = J->irbuf + J->irbotlim;
-  MSize szins = J->irtoplim - J->irbotlim;
-  if (szins) {
-    baseir = (IRIns *)lj_mem_realloc(J->L, baseir, szins*sizeof(IRIns),
-				     2*szins*sizeof(IRIns));
-    J->irtoplim = J->irbotlim + 2*szins;
-  } else {
-    baseir = (IRIns *)lj_mem_realloc(J->L, NULL, 0, LJ_MIN_IRSZ*sizeof(IRIns));
-    J->irbotlim = REF_BASE - LJ_MIN_IRSZ/4;
-    J->irtoplim = J->irbotlim + LJ_MIN_IRSZ;
-  }
-  J->cur.ir = J->irbuf = baseir - J->irbotlim;
-}
-
-/* Grow IR buffer at the bottom or shift it up. */
-static void lj_ir_growbot(jit_State *J)
-{
-  IRIns *baseir = J->irbuf + J->irbotlim;
-  MSize szins = J->irtoplim - J->irbotlim;
-  lua_assert(szins != 0);
-  lua_assert(J->cur.nk == J->irbotlim || J->cur.nk-1 == J->irbotlim);
-  if (J->cur.nins + (szins >> 1) < J->irtoplim) {
-    /* More than half of the buffer is free on top: shift up by a quarter. */
-    MSize ofs = szins >> 2;
-    memmove(baseir + ofs, baseir, (J->cur.nins - J->irbotlim)*sizeof(IRIns));
-    J->irbotlim -= ofs;
-    J->irtoplim -= ofs;
-    J->cur.ir = J->irbuf = baseir - J->irbotlim;
-  } else {
-    /* Double the buffer size, but split the growth amongst top/bottom. */
-    IRIns *newbase = lj_mem_newt(J->L, 2*szins*sizeof(IRIns), IRIns);
-    MSize ofs = szins >= 256 ? 128 : (szins >> 1);  /* Limit bottom growth. */
-    memcpy(newbase + ofs, baseir, (J->cur.nins - J->irbotlim)*sizeof(IRIns));
-    lj_mem_free(G(J->L), baseir, szins*sizeof(IRIns));
-    J->irbotlim -= ofs;
-    J->irtoplim = J->irbotlim + 2*szins;
-    J->cur.ir = J->irbuf = newbase - J->irbotlim;
-  }
-}
-
 /* Emit IR without any optimizations. */
 TRef lj_ir_emit(jit_State *J)
 {
@@ -161,25 +118,19 @@ LJ_FUNC TRef lj_ir_ggfload(jit_State *J, IRType t, uintptr_t ofs)
 ** comparisons. The same constant must get the same reference.
 */
 
-/* Get ref of next IR constant and optionally grow IR.
-** Note: this may invalidate all IRIns *!
-*/
+/* Get ref of next IR constant. */
 static LJ_AINLINE IRRef ir_nextk(jit_State *J)
 {
   IRRef ref = J->cur.nk;
-  if (LJ_UNLIKELY(ref <= J->irbotlim)) lj_ir_growbot(J);
   J->cur.nk = --ref;
   return ref;
 }
 
-/* Get ref of next 64 bit IR constant and optionally grow IR.
-** Note: this may invalidate all IRIns *!
-*/
+/* Get ref of next 64 bit IR constant. */
 static LJ_AINLINE IRRef ir_nextk64(jit_State *J)
 {
   IRRef ref = J->cur.nk - 2;
   lua_assert(J->state != LJ_TRACE_ASM);
-  if (LJ_UNLIKELY(ref < J->irbotlim)) lj_ir_growbot(J);
   J->cur.nk = ref;
   return ref;
 }

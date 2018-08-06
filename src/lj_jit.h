@@ -56,7 +56,7 @@
 
 /* Optimization parameters and their defaults. Length is a char in octal! */
 #define JIT_PARAMDEF(_) \
-  _(\010, maxtrace,	1000)	/* Max. # of traces in cache. */ \
+  _(\010, maxtrace,	10000)	/* Max. # of traces in cache. */ \
   _(\011, maxrecord,	4000)	/* Max. # of recorded IR instructions. */ \
   _(\012, maxirconst,	500)	/* Max. # of IR constants of a trace. */ \
   _(\007, maxside,	100)	/* Max. # of side traces of a root trace. */ \
@@ -192,6 +192,7 @@ typedef struct GCtrace {
   MSize szmcode;	/* Size of machine code. */
   MCode *mcode;		/* Start of machine code. */
   MSize mcloop;		/* Offset of loop start in machine code. */
+  uint16_t *szirmcode;  /* Bytes of mcode for each IR instruction (array.) */
   uint16_t nchild;	/* Number of child traces (root trace only). */
   uint16_t spadjust;	/* Stack pointer adjustment (offset in bytes). */
   TraceNo1 traceno;	/* Trace number. */
@@ -199,6 +200,8 @@ typedef struct GCtrace {
   TraceNo1 root;	/* Root trace of side trace (or 0 for root traces). */
   TraceNo1 nextroot;	/* Next root trace for same prototype. */
   TraceNo1 nextside;	/* Next side trace of same root trace. */
+  TraceNo1 parent;      /* Parent of this trace (or 0 for root traces). */
+  ExitNo exitno;        /* Exit number in parent (valid for side-traces only). */
   uint8_t sinktags;	/* Trace has SINK tags. */
   uint8_t unused1;
 } GCtrace;
@@ -220,13 +223,13 @@ static LJ_AINLINE MSize snap_nextofs(GCtrace *T, SnapShot *snap)
 /* Round-robin penalty cache for bytecodes leading to aborted traces. */
 typedef struct HotPenalty {
   MRef pc;		/* Starting bytecode PC. */
-  uint16_t val;		/* Penalty value, i.e. hotcount start. */
+  uint32_t val;		/* Penalty value, i.e. hotcount start. */
   uint16_t reason;	/* Abort reason (really TraceErr). */
 } HotPenalty;
 
 #define PENALTY_SLOTS	64	/* Penalty cache slot. Must be a power of 2. */
 #define PENALTY_MIN	(36*2)	/* Minimum penalty value. */
-#define PENALTY_MAX	60000	/* Maximum penalty value. */
+#define PENALTY_MAX	6000000	/* Maximum penalty value. */
 #define PENALTY_RNDBITS	4	/* # of random bits to add to penalty value. */
 
 /* Round-robin backpropagation cache for narrowing conversions. */
@@ -295,6 +298,13 @@ typedef struct FoldState {
   IRIns right[2];	/* Instruction referenced by right operand. */
 } FoldState;
 
+/* Log entry for a bytecode that was recorded. */
+typedef struct BCRecLog {
+  GCproto *pt;		/* Prototype of bytecode function (or NULL). */
+  BCPos pos;		/* Position of bytecode in prototype. */
+  int32_t framedepth;	/* Frame depth when recorded. */
+} BCRecLog;
+
 /* JIT compiler state. */
 typedef struct jit_State {
   GCtrace cur;		/* Current trace. */
@@ -333,14 +343,16 @@ typedef struct jit_State {
   uint32_t k32[LJ_K32__MAX];  /* Ditto for 4 byte constants. */
 
   IRIns *irbuf;		/* Temp. IR instruction buffer. Biased with REF_BIAS. */
-  IRRef irtoplim;	/* Upper limit of instuction buffer (biased). */
-  IRRef irbotlim;	/* Lower limit of instuction buffer (biased). */
   IRRef loopref;	/* Last loop reference or ref of final LOOP (or 0). */
 
   MSize sizesnap;	/* Size of temp. snapshot buffer. */
   SnapShot *snapbuf;	/* Temp. snapshot buffer. */
   SnapEntry *snapmapbuf;  /* Temp. snapshot map buffer. */
   MSize sizesnapmap;	/* Size of temp. snapshot map buffer. */
+
+  BCRecLog *bclog;	/* Start of of recorded bytecode log. */
+  uint32_t nbclog;	/* Number of logged bytecodes. */
+  uint32_t maxbclog;	/* Max entries in the bytecode log. */
 
   PostProc postproc;	/* Required post-processing after execution. */
   uint8_t retryrec;	/* Retry recording. */
@@ -385,7 +397,7 @@ typedef struct jit_State {
   size_t szallmcarea;	/* Total size of all allocated mcode areas. */
 
   TValue errinfo;	/* Additional info element for trace errors. */
-
+  int8_t final;		/* True if trace error is final. */
 }
 jit_State;
 

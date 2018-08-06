@@ -17,5 +17,5 @@ your Pull Request and we will add an appropriate clarification to the
 COPYRIGHT file.
     
 Please also respect the
-[Contributor Covenent Code of Conduct](http://contributor-covenant.org/version/1/4/) 
+[Contributor Covenant Code of Conduct](http://contributor-covenant.org/version/1/4/) 
 in your interactions with the RaptorJIT community.

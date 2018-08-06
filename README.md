@@ -1,49 +1,33 @@
-# RaptorJIT
+<p align="center"><img src="doc/raptorjit.png" alt="RaptorJIT"></p>
 
 [![Build Status](https://travis-ci.org/raptorjit/raptorjit.svg?branch=master)](https://travis-ci.org/raptorjit/raptorjit)
 
-RaptorJIT is a fork of LuaJIT targeting Linux/x86-64 server applications.
+**RaptorJIT** is a fork of LuaJIT focused on _predictably high performance_.
 
-Initial changes (ongoing work):
+Making performance predictable for application developers brings new requirements:
 
-- Support only Linux/x86-64 with `+JIT +FFI +GC64 +NO_UNWIND` and `-GDBJIT
-  -PERFTOOLS -VMEVENT -PROFILE` and otherwise canonical settings.
-  Remove the ~50,000 lines of code for other architectures, operating
-  systems, and features.
-- Remove features that are not the right thing for my use cases:
-  built-in disassemblers, `jit.v`, `jit.p`, `jit.dump`, and the VM
-  features required to support them. These need to be replaced with
-  simple and low-overhead mechanisms that provide data to be analyzed
-  be external tools. (Tools will be developed in
-  the [Studio](https://github.com/studio) project.)
-- Continuous Integration testing
-  with [Travis-CI](https://travis-ci.org/raptorjit/raptorjit) and
-  with [automatic performance regression tests](https://hydra.snabb.co/job/luajit/branchmarks/benchmarkResults/latest/download/2).
+- Minimizing the performance impact of non-deterministic JIT decisions.
+- Providing an accurate mental model of how the JIT works and which programming techniques are effective.
+- Providing diagnostic tools ([Studio](https://hydra.snabb.co/job/lukego/studio-manual/studio-manual-html/latest/download-by-type/file/Manual#view-hot-traces)) consistent with this mental model to make the actual operation transparent.
+- Making profiling completely ubiquitous in development, testing, and production environments.
 
-PRs welcome! Shock me with your radical ideas! :-)
+The development process has to support moving quickly in these directions:
 
-### CPU support
+- Quality assurance based on repeatable standard benchmarks executed by CI.
+- Streamlined codebase: x86-64 architecture, Linux kernel, 64-bit heap (GC64), "no `#ifdef`."
+- Distributed development with many maintainers, forks, and merges.
 
-RaptorJIT is narrowly focused:
-
-- [Intel Core](https://en.wikipedia.org/wiki/Intel_Core) (i3/i5/i7/Xeon-E) is the only supported CPU family.
-- The latest microarchitecture (currently Skylake) is targetted for all new optimizations.
-- The previous microarchitecture (currently Haswell) is supported without regressions.
-- Older microarchitectures (currently Sandy Bridge and Nehalem) are not supported at all.
-
-We are flexible during the transitions between processor generations
-e.g. when the latest microarchitecture is not readily available in all
-product families.
-
-Forks focused on other CPU families (Atom, Xeon Phi, AMD, VIA, etc)
-are encouraged and may be merged in the future.
+Once these requirements have been thoroughly satisfied then new
+requirements can be introduced. For example, new architectures like
+ARM64 and operating systems like MacOS can be supported as the project
+matures.
 
 ### Performance
 
 RaptorJIT takes a quantitive approach to performance. The value of an
-optimization must be demonstrated by a reproducible benchmark.
-Optimizations that are not demonstrably beneficial for the currently
-supported CPUs are removed.
+optimization must be demonstrated with a reproducible benchmark.
+Optimizations that are not demonstrably beneficial on recent CPU
+generations are removed.
 
 This makes the following classes of pull requests very welcome:
 
@@ -53,28 +37,32 @@ This makes the following classes of pull requests very welcome:
 
 The CI benchmark suite will evolve over time starting from the [standard LuaJIT benchmarks](https://hydra.snabb.co/job/luajit/branchmarks/benchmarkResults/latest/download/2) (already covers RaptorJIT) and the [Snabb end-to-end benchmark suite](https://hydra.snabb.co/job/snabb-new-tests/benchmarks-murren-large/benchmark-reports.report-full-matrix/latest/download/2) (must be updated to cover RaptorJIT.)
 
-### Optimization resources
+### Compilation for users
 
-These are the authoritative optimization resources for processors
-supported by RaptorJIT. If you are confused by references to CPU
-details in discussions then these are the places to look for answers.
+Simple build:
 
-- [Computer Architecture: A Quantitiave Approach](https://www.amazon.com/Computer-Architecture-Fifth-Quantitative-Approach/dp/012383872X) by Hennessy and Patterson.
-- [Intel Architectures Optimization Reference Manual](http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html).
-- Agner Fog's [software optimization resources](http://www.agner.org/optimize/):
-    - [Instruction latency and throughput tables](http://www.agner.org/optimize/instruction_tables.pdf).
-    - [Microarchitecture of Intel, AMD, and VIA CPUs](http://www.agner.org/optimize/microarchitecture.pdf).
-    - [Optimizing subroutines in assembly language for x86](http://www.agner.org/optimize/optimizing_assembly.pdf).
+```shell
+$ make  # requires LuaJIT (2.0 or 2.1) to run DynASM
+```
 
-The [AnandTech review of the Haswell microarchitecture](http://www.anandtech.com/show/6355/intels-haswell-architecture) is also excellent lighter reading.
+Alternative if you don't have LuaJIT available and you are building a
+pristine copy from the master branch:
 
-### Compilation
+```shell
+$ make reusevm  # Reuse reference copy of the generated VM code
+$ make          # Does not require LuaJIT now
+```
 
-RaptorJIT uses [nix](http://nixos.org/nix/) to define a reproducible
-build environment that includes Clang for C and LuaJIT 2.0 for
-bootstrapping (see [default.nix](default.nix)). The recommended way to
-build RaptorJIT is with nix, which provides the dependencies
-automatically, but you can build manually if you prefer.
+### Compilation for VM hackers
+
+RaptorJIT uses [Nix](http://nixos.org/nix/) to provide a reference
+build environment. You can use Nix to build/test/benchmark RaptorJIT
+with suitable versions of all dependencies provided.
+
+Note: Building with nix will be slow the first time because it
+downloads the exact reference versions of the toolchain (gcc, etc)
+and all dependencies (glibc, etc). This is all cached for future
+builds.
 
 #### Build with nix
 
@@ -84,10 +72,16 @@ Install nix:
 $ curl https://nixos.org/nix/install | sh
 ```
 
-Build in batch-mode (option 1):
+Build in batch-mode and run the test suite (option 1a):
 
 ```shell
 $ nix-build    # produces result/bin/raptorjit
+```
+
+Build in batch-mode without the test suite (option 1b):
+
+```shell
+$ nix-build -A raptorjit
 ```
 
 Build interactively (option 2):
@@ -104,7 +98,56 @@ $ nix-shell    # start sub-shell with pristine build environment in $PATH
 $ make
 ```
 
-... but make sure you have at least `make`, `clang`, and `luajit` in your `$PATH`.
+... but make sure you have at least `make`, `gcc`, and `luajit` in your `$PATH`.
+
+### Run the benchmarks
+
+Nix can also run the full benchmark suite and generate visualizations
+with R/ggplot2.
+
+The simplest incantation tests one branch:
+
+```shell
+$ nix-build testsuite/bench --arg Asrc ./.   # note: ./. means ./
+```
+
+You can also test several branches (A-E), give them names, specify
+command-line arguments, say how many tests to run, and allow parallel
+execution:
+
+```shell
+# Run the benchmarks and create result visualizations result/
+$ nix-build testsuite/bench                     \
+            --arg    Asrc ~/git/raptorjit       \
+            --argstr Aname master               \
+            --arg    Bsrc ~/git/raptorjit-hack  \
+            --argstr Bname hacked               \
+            --arg    Csrc ~/git/raptorjit-hack2 \
+            --argstr Cname hacked-O1            \
+            --argstr Cargs -O1                  \
+            --arg    runs 100                   \
+            -j 5           # Run up to 5 tests in parallel
+```
+
+If you are using a distributed nix environment such
+as [Hydra](https://nixos.org/hydra/) then the tests can be
+automatically parallelized and distributed across a suitable build
+farm.
+
+### Optimization resources
+
+These are the authoritative optimization resources for processors
+supported by RaptorJIT. If you are confused by references to CPU
+details in discussions then these are the places to look for answers.
+
+- [Computer Architecture: A Quantitiave Approach](https://www.amazon.com/Computer-Architecture-Fifth-Quantitative-Approach/dp/012383872X) by Hennessy and Patterson.
+- [Intel Architectures Optimization Reference Manual](http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html).
+- Agner Fog's [software optimization resources](http://www.agner.org/optimize/):
+    - [Instruction latency and throughput tables](http://www.agner.org/optimize/instruction_tables.pdf).
+    - [Microarchitecture of Intel, AMD, and VIA CPUs](http://www.agner.org/optimize/microarchitecture.pdf).
+    - [Optimizing subroutines in assembly language for x86](http://www.agner.org/optimize/optimizing_assembly.pdf).
+
+The [AnandTech review of the Haswell microarchitecture](http://www.anandtech.com/show/6355/intels-haswell-architecture) is also excellent lighter reading.
 
 ### Quotes
 

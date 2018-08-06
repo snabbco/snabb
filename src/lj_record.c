@@ -81,9 +81,9 @@ static void rec_check_slots(jit_State *J)
   BCReg s, nslots = J->baseslot + J->maxslot;
   int32_t depth = 0;
   cTValue *base = J->L->base - J->baseslot;
-  lua_assert(J->baseslot >= 1+LJ_FR2 && J->baseslot < LJ_MAX_JSLOTS);
+  lua_assert(J->baseslot >= 1+LJ_FR2);
   lua_assert(J->baseslot == 1+LJ_FR2 || (J->slot[J->baseslot-1] & TREF_FRAME));
-  lua_assert(nslots < LJ_MAX_JSLOTS);
+  lua_assert(nslots <= LJ_MAX_JSLOTS);
   for (s = 0; s < nslots; s++) {
     TRef tr = J->slot[s];
     if (tr) {
@@ -568,7 +568,8 @@ static void rec_loop_interp(jit_State *J, const BCIns *pc, LoopEvent ev)
 /* Handle the case when an already compiled loop op is hit. */
 static void rec_loop_jit(jit_State *J, TraceNo lnk, LoopEvent ev)
 {
-  if (J->parent == 0 && J->exitno == 0) {  /* Root trace hit an inner loop. */
+  /* Root trace hit an inner loop. */
+  if (J->parent == 0 && J->exitno == 0 && !innerloopleft(J, J->startpc)) {
     /* Better let the inner loop spawn a side trace back here. */
     lj_trace_err(J, LJ_TRERR_LINNER);
   } else if (ev != LOOPEV_LEAVE) {  /* Side trace enters a compiled loop. */
@@ -652,6 +653,8 @@ void lj_record_call(jit_State *J, BCReg func, ptrdiff_t nargs)
   J->framedepth++;
   J->base += func+1+LJ_FR2;
   J->baseslot += func+1+LJ_FR2;
+  if (J->baseslot + J->maxslot >= LJ_MAX_JSLOTS)
+    lj_trace_err(J, LJ_TRERR_STACKOV);
 }
 
 /* Record tail call. */
@@ -1862,6 +1865,13 @@ void lj_record_ins(jit_State *J)
   BCOp op;
   TRef ra, rb, rc;
 
+  if (J->nbclog < J->maxbclog) {
+    BCRecLog *log = &J->bclog[J->nbclog++];
+    log->pt = J->pt;
+    log->pos = J->pt ? proto_bcpos(J->pt, J->pc) : -1;
+    log->framedepth = J->framedepth;
+  }
+
   /* Perform post-processing action before recording the next instruction. */
   if (LJ_UNLIKELY(J->postproc != LJ_POST_NONE)) {
     switch (J->postproc) {
@@ -2282,8 +2292,6 @@ void lj_record_ins(jit_State *J)
   case BC_IFORL:
   case BC_IITERL:
   case BC_ILOOP:
-  case BC_IFUNCF:
-  case BC_IFUNCV:
     lj_trace_err(J, LJ_TRERR_BLACKL);
     break;
 
@@ -2295,6 +2303,7 @@ void lj_record_ins(jit_State *J)
   /* -- Function headers -------------------------------------------------- */
 
   case BC_FUNCF:
+  case BC_IFUNCF:
     rec_func_lua(J);
     break;
   case BC_JFUNCF:
@@ -2302,6 +2311,7 @@ void lj_record_ins(jit_State *J)
     break;
 
   case BC_FUNCV:
+  case BC_IFUNCV:
     rec_func_vararg(J);
     rec_func_lua(J);
     break;
@@ -2433,6 +2443,8 @@ void lj_record_setup(jit_State *J)
 
   J->bc_min = NULL;  /* Means no limit. */
   J->bc_extent = ~(MSize)0;
+
+  J->nbclog = 0;
 
   /* Emit instructions for fixed references. Also triggers initial IR alloc. */
   emitir_raw(IRT(IR_BASE, IRT_PGC), J->parent, J->exitno);

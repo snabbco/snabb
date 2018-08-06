@@ -344,6 +344,7 @@ static Reg asm_fuseloadk64(ASMState *as, IRIns *ir)
       ir->i = (int32_t)(as->mctop - as->mcbot);
       as->mcbot += 8;
       as->mclim = as->mcbot + MCLIM_REDZONE;
+      lj_mcode_commitbot(as->J, as->mcbot);
     }
     as->mrm.ofs = (int32_t)mcpofs(as, as->mctop - ir->i);
     as->mrm.base = RID_RIP;
@@ -1347,7 +1348,7 @@ static void asm_sload(ASMState *as, IRIns *ir)
       emit_i8(as, irt_toitype(t));
       emit_rr(as, XO_ARITHi8, XOg_CMP, tmp);
       emit_shifti(as, XOg_SAR|REX_64, tmp, 47);
-      emit_rmro(as, XO_MOV, tmp|REX_64, base, ofs+4);
+      emit_rmro(as, XO_MOV, tmp|REX_64, base, ofs);
     }
   }
 }
@@ -1373,7 +1374,7 @@ static void asm_cnew(ASMState *as, IRIns *ir)
     Reg r64 = sz == 8 ? REX_64 : 0;
     if (irref_isk(ir->op2)) {
       IRIns *irk = IR(ir->op2);
-      uint64_t k = (irk->o == IR_KINT64 || irk->o == IR_KPTR || irk->o == IR_KPTR)
+      uint64_t k = (irk->o == IR_KINT64 || irk->o == IR_KPTR || irk->o == IR_KKPTR)
                    ? ir_k64(irk)->u64 : (uint64_t)(uint32_t)irk->i;
       if (sz == 4 || checki32((int64_t)k)) {
 	emit_i32(as, (int32_t)k);
@@ -1710,20 +1711,6 @@ static int asm_lea(ASMState *as, IRIns *ir)
     } else {
       return 0;
     }
-  } else if (ir->op1 != ir->op2 && irl->o == IR_ADD && mayfuse(as, ir->op1) &&
-	     (irref_isk(ir->op2) || irref_isk(irl->op2))) {
-    Reg idx, base = ra_alloc1(as, irl->op1, allow);
-    rset_clear(allow, base);
-    as->mrm.base = (uint8_t)base;
-    if (irref_isk(ir->op2)) {
-      as->mrm.ofs = irr->i;
-      idx = ra_alloc1(as, irl->op2, allow);
-    } else {
-      as->mrm.ofs = IR(irl->op2)->i;
-      idx = ra_alloc1(as, ir->op2, allow);
-    }
-    rset_clear(allow, idx);
-    as->mrm.idx = (uint8_t)idx;
   } else {
     return 0;
   }
@@ -2286,7 +2273,7 @@ static RegSet asm_head_side_base(ASMState *as, IRIns *irp, RegSet allow)
 /* -- Tail of trace ------------------------------------------------------- */
 
 /* Fixup the tail code. */
-static void asm_tail_fixup(ASMState *as, TraceNo lnk)
+static void asm_tail_fixup(ASMState *as, TraceNo lnk, int track)
 {
   /* Note: don't use as->mcp swap + emit_*: emit_op overwrites more bytes. */
   MCode *p = as->mctop;
@@ -2317,7 +2304,9 @@ static void asm_tail_fixup(ASMState *as, TraceNo lnk)
     }
   }
   /* Patch exit branch. */
-  target = lnk ? traceref(as->J, lnk)->mcode : (MCode *)lj_vm_exit_interp;
+  target = (lnk ? traceref(as->J, lnk)->mcode :
+            (track ? (MCode *)lj_vm_exit_interp :
+             (MCode *)lj_vm_exit_interp_notrack));
   *(int32_t *)(p-4) = jmprel(p, target);
   p[-5] = XI_JMP;
   /* Drop unused mcode tail. Fill with NOPs to make the prefetcher happy. */
