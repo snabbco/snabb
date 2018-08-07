@@ -36,22 +36,7 @@ RaptorJIT is used successfully by
 the [Snabb](https://github.com/snabbco/snabb) community to develop
 high-performance production network equipment. Join us!
 
-### Performance
-
-RaptorJIT takes a quantitive approach to performance. The value of an
-optimization must be demonstrated with a reproducible benchmark.
-Optimizations that are not demonstrably beneficial on recent CPU
-generations are removed.
-
-This makes the following classes of pull requests very welcome:
-
-- Adding optimizations that improve a CI benchmark.
-- Adding CI benchmarks that demonstrate the value of optimizations.
-- Removing optimizations without degrading CI benchmark performance.
-
-The CI benchmark suite will evolve over time starting from the [standard LuaJIT benchmarks](https://hydra.snabb.co/job/luajit/branchmarks/benchmarkResults/latest/download/2) (already covers RaptorJIT) and the [Snabb end-to-end benchmark suite](https://hydra.snabb.co/job/snabb-new-tests/benchmarks-murren-large/benchmark-reports.report-full-matrix/latest/download/2) (must be updated to cover RaptorJIT.)
-
-### Compilation for users
+### RaptorJIT compilation for users
 
 Build using LuaJIT to bootstrap the VM:
 
@@ -66,7 +51,42 @@ $ make reusevm  # Reuse reference copy of the generated VM code
 $ make          # Does not require LuaJIT now
 ```
 
-### Compilation for VM hackers
+### Inspecting trace and profiler data interactively
+
+To understand how your program executes you first produce diagnostic data (*auditlog* and *vmprofile* files) and then you inspect them interactively with [Studio](https://github.com/studio/studio).
+
+You can produce diagnostic data on the command line:
+
+```shell
+$ raptorjit -a audit.log -p default.profile ...
+```
+
+Or within your Lua code:
+
+```lua
+jit.auditlog("audit.log")
+local vmprofile = require("jit.vmprofile")
+vmprofile.open("default.profile")
+```
+
+Then you can copy the file `audit.log` and `*.vmprofile` into a
+directory `/somepath` and inspect that with the Studio script:
+
+```
+with import <studio>;
+raptorjit.inspect /somepath
+```
+
+Studio will then parse, analyze, cross-reference, etc, the diagnostic
+data and present an interactive user-interface for browsing how the
+program ran.
+
+Here are tutorial videos for Studio:
+
+- [How to load Snabb diagnostic data into Studio](https://www.youtube.com/watch?v=x6e1vFFpq5Q). Covers installing Studio and running a script. (Uses a Snabb-specific mechanism for producing diagnostic data which is implemented in Lua.)
+- [Inspecting RaptorJIT IR code with Studio](https://www.youtube.com/watch?v=MQyxXSPXcwg). Covers profiling and inspecting small Lua scripts. Runs Lua code directly from the Studio UI.
+
+### RaptorJIT compilation for VM hackers
 
 RaptorJIT uses [Nix](http://nixos.org/nix/) to provide a reference
 build environment. You can use Nix to build/test/benchmark RaptorJIT
