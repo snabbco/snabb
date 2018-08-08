@@ -6,6 +6,7 @@ local app_graph   = require("core.config")
 local worker      = require("core.worker")
 local shm         = require("core.shm")
 local pci         = require("lib.hardware.pci")
+local logger      = require("lib.logger")
 local probe       = require("program.ipfix.lib")
 
 local main_config = {
@@ -233,7 +234,6 @@ end
 
 local long_opts = {
    duration = "D",
-   logfile = "l",
    debug = "d",
    jit = "j",
    help = "h",
@@ -246,7 +246,7 @@ function run (parameters)
    local profiling, traceprofiling
    local jit = { opts = {} }
    local log_pid = string.format("[%5d]", S.getpid())
-   local logger = lib.logger_new({ module = log_pid.." RSS master" })
+   local logger = logger.new({ module = log_pid.." RSS master" })
    local opt = {
       D = function (arg)
          if arg:match("^[0-9]+$") then
@@ -254,10 +254,6 @@ function run (parameters)
          else
             usage()
          end
-      end,
-      l = function (arg)
-         local logfh = assert(io.open(arg, "a"))
-         lib.logger_default.fh = logfh
       end,
       h = function (arg) usage() end,
       d = function (arg) _G.developer_debug = true end,

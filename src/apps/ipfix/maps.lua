@@ -5,6 +5,7 @@ local lib      = require("core.lib")
 local ctable   = require("lib.ctable")
 local ethernet = require("lib.protocol.ethernet")
 local lpm      = require("lib.lpm.lpm4_248").LPM4_248
+local logger   = require("lib.logger")
 
 -- Map MAC addresses to peer AS number
 --
@@ -111,9 +112,9 @@ function mk_map(name, file, log_rate, log_fh)
    end
    local map = { map = map }
    if log_fh then
-      map.logger = lib.logger_new({ rate = log_rate or 0.05,
-                                    fh = log_fh,
-                                    module = info.logger_module })
+      map.logger = logger.new({ rate = log_rate or 0.05,
+                                fh = log_fh,
+                                module = info.logger_module })
    end
    return map
 end

@@ -21,6 +21,8 @@ local ipv4     = require("lib.protocol.ipv4")
 local ipv6     = require("lib.protocol.ipv6")
 local udp      = require("lib.protocol.udp")
 local ctable   = require("lib.ctable")
+local logger   = require("lib.logger")
+local token_bucket = require("lib.token_bucket")
 local C        = ffi.C
 local S        = require("syscall")
 
@@ -192,13 +194,13 @@ function FlowSet:new (spec, args)
                                    " -> "..table.size)
          end
          require('jit').flush()
-         o.table_tb:rate(math.ceil(table.size / o.scan_time))
+         o.table_tb:set(math.ceil(table.size / o.scan_time))
       end
    }
    if args.cache_size then
       params.initial_size = math.ceil(args.cache_size / 0.4)
    end
-   o.table_tb = lib.token_bucket_new()
+   o.table_tb = token_bucket.new({ rate = 1 }) -- Will be set by resize_callback
    o.table = ctable.new(params)
    o.table_tstamp = C.get_unix_time()
    o.table_scan_time = 0
@@ -323,7 +325,7 @@ function FlowSet:expire_records(out, now)
    now_ms = to_milliseconds(now)
    local active = to_milliseconds(self.active_timeout)
    local idle = to_milliseconds(self.idle_timeout)
-   for i = 1, self.table_tb:take_all() do
+   for i = 1, self.table_tb:take_burst() do
       local entry
       cursor, entry = self.table:next_entry(cursor, cursor + 1)
       if entry then
@@ -439,8 +441,8 @@ function IPFIX:new(config)
                observation_domain = config.observation_domain,
                instance = config.instance,
                add_packet_metadata = config.add_packet_metadata,
-               logger = lib.logger_new({ module = ("[%5d]"):format(S.getpid())
-                                         .." IPFIX exporter"} ) }
+               logger = logger.new({ module = ("[%5d]"):format(S.getpid())
+                                        .." IPFIX exporter"} ) }
    o.shm = {
       -- Total number of packets received
       received_packets = { counter },

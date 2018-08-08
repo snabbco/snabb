@@ -11,6 +11,7 @@ local lib      = require("core.lib")
 local counter  = require("core.counter")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
+local logger   = require("lib.logger")
 local metadata = require("apps.rss.metadata")
 local strings  = require("apps.ipfix.strings")
 local dns      = require("apps.ipfix.dns")
@@ -213,8 +214,8 @@ function make_template_info(spec)
             record_ptr_t = ptr_to(record_t),
             swap_fn = gen_swap_fn(),
             match = pf.compile_filter(spec.filter),
-            logger = lib.logger_new({module = ("[%5d]"):format(S.getpid())
-                                        .." IPFIX template #"..spec.id }),
+            logger = logger.new({module = ("[%5d]"):format(S.getpid())
+                                    .." IPFIX template #"..spec.id }),
             counters = spec.counters,
             counters_names = counters_names,
             extract = spec.extract,
