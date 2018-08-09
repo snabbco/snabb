@@ -58,7 +58,7 @@ To understand how your program executes you first produce diagnostic data (*audi
 You can produce diagnostic data on the command line:
 
 ```shell
-$ raptorjit -a audit.log -p default.profile ...
+$ raptorjit -a audit.log -p default.vmprofile ...
 ```
 
 Or within your Lua code:
@@ -66,7 +66,7 @@ Or within your Lua code:
 ```lua
 jit.auditlog("audit.log")
 local vmprofile = require("jit.vmprofile")
-vmprofile.open("default.profile")
+vmprofile.open("default.vmprofile")
 ```
 
 Then you can copy the file `audit.log` and `*.vmprofile` into a
