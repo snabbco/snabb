@@ -99,6 +99,7 @@ GCtrace * lj_trace_alloc(lua_State *L, GCtrace *T)
   T2->nk = T->nk;
   T2->nsnap = T->nsnap;
   T2->nsnapmap = T->nsnapmap;
+  T2->szirmcode = T->szirmcode;
   memcpy(p, T->ir + T->nk, szins);
   return T2;
 }
