@@ -1995,7 +1995,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   /* Setup initial state. Copy some fields to reduce indirections. */
   as->J = J;
   as->T = T;
-  J->curfinal = lj_trace_alloc(J->L, T);  /* This copies the IR, too. */
+  J->curfinal = lj_trace_alloc(J->L, T);  /* Copies IR and moves szirmcode. */
   as->flags = J->flags;
   as->loopref = J->loopref;
   as->realign = NULL;
@@ -2003,8 +2003,9 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   as->parent = J->parent ? traceref(J, J->parent) : NULL;
 
   /* Initialize mcode size of IR instructions array. */
-  T->szirmcode = lj_mem_new(J->L, (T->nins + 1) * sizeof(*T->szirmcode));
-  memset(T->szirmcode, 0, (T->nins + 1) * sizeof(*T->szirmcode));
+  /* +2 extra spaces for the last instruction and the trace header at [0]. */
+  T->szirmcode = lj_mem_new(J->L, (T->nins + 2 - REF_BIAS) * sizeof(*T->szirmcode));
+  memset(T->szirmcode, 0, (T->nins + 2 - REF_BIAS) * sizeof(*T->szirmcode));
 
   /* Reserve MCode memory. */
   as->mctop = origtop = lj_mcode_reserve(J, &as->mcbot);

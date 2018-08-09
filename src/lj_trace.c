@@ -99,6 +99,7 @@ GCtrace * lj_trace_alloc(lua_State *L, GCtrace *T)
   T2->nk = T->nk;
   T2->nsnap = T->nsnap;
   T2->nsnapmap = T->nsnapmap;
+  T2->szirmcode = T->szirmcode;
   memcpy(p, T->ir + T->nk, szins);
   return T2;
 }
@@ -136,6 +137,7 @@ void lj_trace_free(global_State *g, GCtrace *T)
     lj_gdbjit_deltrace(J, T);
     setgcrefnull(J->trace[T->traceno]);
   }
+  lj_mem_free(g, T->szirmcode, (T->nins + 2 - REF_BIAS) * sizeof(*T->szirmcode));
   lj_mem_free(g, T,
     ((sizeof(GCtrace)+7)&~7) + (T->nins-T->nk)*sizeof(IRIns) +
     T->nsnap*sizeof(SnapShot) + T->nsnapmap*sizeof(SnapEntry));
