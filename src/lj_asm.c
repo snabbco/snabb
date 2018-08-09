@@ -1995,7 +1995,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   /* Setup initial state. Copy some fields to reduce indirections. */
   as->J = J;
   as->T = T;
-  J->curfinal = lj_trace_alloc(J->L, T);  /* This copies the IR, too. */
+  J->curfinal = lj_trace_alloc(J->L, T);  /* Copies IR and moves szirmcode. */
   as->flags = J->flags;
   as->loopref = J->loopref;
   as->realign = NULL;
