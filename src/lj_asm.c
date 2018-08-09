@@ -2003,8 +2003,9 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   as->parent = J->parent ? traceref(J, J->parent) : NULL;
 
   /* Initialize mcode size of IR instructions array. */
-  T->szirmcode = lj_mem_new(J->L, (T->nins + 1) * sizeof(*T->szirmcode));
-  memset(T->szirmcode, 0, (T->nins + 1) * sizeof(*T->szirmcode));
+  /* +2 extra spaces for the last instruction and the trace header at [0]. */
+  T->szirmcode = lj_mem_new(J->L, (T->nins + 2 - REF_BIAS) * sizeof(*T->szirmcode));
+  memset(T->szirmcode, 0, (T->nins + 2 - REF_BIAS) * sizeof(*T->szirmcode));
 
   /* Reserve MCode memory. */
   as->mctop = origtop = lj_mcode_reserve(J, &as->mcbot);

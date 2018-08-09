@@ -136,6 +136,7 @@ void lj_trace_free(global_State *g, GCtrace *T)
     lj_gdbjit_deltrace(J, T);
     setgcrefnull(J->trace[T->traceno]);
   }
+  lj_mem_free(g, T->szirmcode, (T->nins + 2 - REF_BIAS) * sizeof(*T->szirmcode));
   lj_mem_free(g, T,
     ((sizeof(GCtrace)+7)&~7) + (T->nins-T->nk)*sizeof(IRIns) +
     T->nsnap*sizeof(SnapShot) + T->nsnapmap*sizeof(SnapEntry));
