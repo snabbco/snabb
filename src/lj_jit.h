@@ -206,9 +206,11 @@ typedef struct GCtrace {
   uint8_t unused1;
 } GCtrace;
 
+#define TRACE_MAX 65535
+
 #define gco2trace(o)	check_exp((o)->gch.gct == ~LJ_TTRACE, (GCtrace *)(o))
 #define traceref(J, n) \
-  check_exp((n)>0 && (MSize)(n)<J->sizetrace, (GCtrace *)gcref(J->trace[(n)]))
+  check_exp((n)>0 && (MSize)(n)<TRACE_MAX, (GCtrace *)gcref(J->trace[(n)]))
 
 LJ_STATIC_ASSERT(offsetof(GChead, gclist) == offsetof(GCtrace, gclist));
 
@@ -359,7 +361,7 @@ typedef struct jit_State {
 
   GCRef *trace;		/* Array of traces. */
   TraceNo freetrace;	/* Start of scan for next free trace. */
-  MSize sizetrace;	/* Size of trace array. */
+  uint16_t ntraces;	/* Number of traces created since last flush. */
   IRRef1 ktrace;	/* Reference to KGC with GCtrace. */
 
   IRRef1 chain[IR__MAX];  /* IR instruction skip-list chain anchors. */
