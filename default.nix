@@ -15,8 +15,12 @@
 let
   callPackage = (pkgs.lib.callPackageWith { inherit pkgs source version; });
   raptorjit = (callPackage ./raptorjit.nix {});
-  test = name: args: (callPackage ./test.nix { inherit raptorjit name args; });
+  raptorjit-assert = raptorjit.overrideAttrs(
+                       old: { NIX_CFLAGS_COMPILE = " -DLUA_USE_ASSERT"; });
+  test = name: args: (callPackage ./test.nix { inherit name args; raptorjit = raptorjit-assert; });
   check-generated-code = (callPackage ./check-generated-code.nix { inherit raptorjit; });
+  nowarnings = raptorjit.overrideAttrs(
+                 old: { NIX_CFLAGS_COMPILE = "-Werror"; });
 in
 
 # Build RaptorJIT and run mulitple test suites.
@@ -27,5 +31,5 @@ in
   test-O1    = test "O1"    "-O1";
   test-nojit = test "nojit" "-joff";
 } //
-(if check then { inherit check-generated-code; } else {})
+(if check then { inherit nowarnings check-generated-code; } else {})
 
