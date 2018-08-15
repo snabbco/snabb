@@ -161,15 +161,8 @@ function selftest ()
       return ("elapse: %.6f; ns_per_csum: %.2f; ns_per_byte: %.2f"):format(ret.elapse, ret.ns_per_csum, ret.ns_per_byte)
    end
    local function benchmark_report (size, mpps)
-      local function hex (num)
-         return ("0x%.2x"):format(num)
-      end
-      local ntohs = lib.ntohs
       local times = mpps*10^6
       local pkt = create_packet(size)
-      -- Verify checksum is correct.
-      assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
-      assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
       print(mpps.."M; "..size.." bytes")
       -- Benchmark for different architectures.
       print("Gen: ", benchmark(function() return C.cksum_generic(pkt.data, pkt.length, 0), pkt end, times))
@@ -181,8 +174,20 @@ function selftest ()
       end
       print("New: ", benchmark(function() return newchecksum(pkt.data, pkt.length), pkt end, times))
    end
+   local function verify_correctness ()
+      local function hex (num)
+         return ("0x%.2x"):format(num)
+      end
+      local ntohs = lib.ntohs
+      for size=44,1500 do
+         local pkt = create_packet(size)
+         assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
+         assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
+      end
+   end
 
    print("selftest: newchecksum")
+   verify_correctness()
    benchmark_report(44, 14.4)
    benchmark_report(550, 2)
    benchmark_report(1500, 1)
