@@ -35,10 +35,11 @@ local function gen_checksum ()
       | push rbp
       | mov rbp, rsp
       -- Accumulative sum.
-      | xor rax, rax                -- Clear out rax. Stores accumulated sum.
+      | mov rax, rdx                -- Dx (3rd argument: initial).
+      | xchg al, ah                 -- Swap to convert to host-bytes order.
+      | mov rcx, rsi                -- Rsi (2nd argument; size).
       | xor r9, r9                  -- Clear out r9. Stores value of array.
       | xor r8, r8                  -- Clear out r8. Stores array index.
-      | mov rcx, rsi                -- Rsi (2nd argument; size). Assign rsi to rcx.
       | 1:
       | cmp rcx, 32                 -- If index is less than 16.
       | jl >2                       -- Jump to branch '2'.
@@ -99,6 +100,8 @@ local function gen_checksum ()
       -- One's complement.
       | not rax                     -- One-complement of rax.
       | and rax, 0xffff             -- Clear out higher part of rax.
+      -- Swap.
+      | xchg al, ah
       -- Epilogue.
       | mov rsp, rbp
       | pop rbp
@@ -106,8 +109,6 @@ local function gen_checksum ()
       | ret
    end
 end
-
-local newchecksum = assemble("newchecksum", "uint32_t(*)(uint8_t*, uint32_t)", gen_checksum())
 
 -- Reference implementation in Lua.
 local function checksum_lua (data, size)
@@ -132,12 +133,10 @@ local function checksum_lua (data, size)
    return bit.band(bit.bnot(csum), 0xffff)
 end
 
+checksum = assemble("checksum", "uint32_t(*)(uint8_t*, uint32_t, uint16_t)", gen_checksum())
+
 function selftest ()
    require("lib.checksum_h")
-   local cpuinfo = lib.readfile("/proc/cpuinfo", "*a")
-   assert(cpuinfo, "failed to read /proc/cpuinfo for hardware check")
-   local have_avx2 = cpuinfo:match("avx2")
-   local have_sse2 = cpuinfo:match("sse2")
    local function create_packet (size)
       local pkt = {
          data = ffi.new("uint8_t[?]", size),
@@ -165,14 +164,8 @@ function selftest ()
       local pkt = create_packet(size)
       print(mpps.."M; "..size.." bytes")
       -- Benchmark for different architectures.
-      print("Gen: ", benchmark(function() return C.cksum_generic(pkt.data, pkt.length, 0), pkt end, times))
-      if have_sse2 then
-         print("SSE2: ", benchmark(function() return C.cksum_sse2(pkt.data, pkt.length, 0), pkt end, times))
-      end
-      if have_avx2 then
-         print("AVX2: ", benchmark(function() return C.cksum_avx2(pkt.data, pkt.length, 0), pkt end, times))
-      end
-      print("New: ", benchmark(function() return newchecksum(pkt.data, pkt.length), pkt end, times))
+      print("C: ", benchmark(function() return C.cksum_generic(pkt.data, pkt.length, 0), pkt end, times))
+      print("ASM: ", benchmark(function() return checksum(pkt.data, pkt.length, 0), pkt end, times))
    end
    local function verify_correctness ()
       local function hex (num)
@@ -181,12 +174,12 @@ function selftest ()
       local ntohs = lib.ntohs
       for size=44,1500 do
          local pkt = create_packet(size)
-         assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
-         assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
+         assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
+         assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
       end
    end
 
-   print("selftest: newchecksum")
+   print("selftest: checksum")
    verify_correctness()
    benchmark_report(44, 14.4)
    benchmark_report(550, 2)
