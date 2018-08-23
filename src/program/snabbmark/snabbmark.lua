@@ -27,6 +27,8 @@ function run (args)
       hash(unpack(args))
    elseif command == 'ctable' and #args == 0 then
       ctable(unpack(args))
+   elseif command == 'checksum' and #args == 0 then
+      checksum_bench(unpack(args))
    else
       print(usage) 
       main.exit(1)
@@ -570,4 +572,42 @@ function ctable ()
                 'streaming lookup, stride='..stride)
       stride = stride * 2
    until stride > 256
+end
+
+function checksum_bench ()
+   require("lib.checksum_h")
+   local checksum = require('arch.checksum').checksum
+   local function create_packet (size)
+      local pkt = {
+         data = ffi.new("uint8_t[?]", size),
+         length = size
+      }
+      for i=0,size-1 do
+         pkt.data[i] = math.random(255)
+      end
+      return pkt
+   end
+   local function benchmark (fn, times)
+      local now = os.clock()
+      local csum
+      for i=1,times do
+         csum, pkt = fn()
+      end
+      local elapse = os.clock() - now
+      local ns_per_csum = elapse * 10e9 / times
+      local ns_per_byte = ns_per_csum / pkt.length
+      local ret = {elapse = elapse, ns_per_csum = ns_per_csum, ns_per_byte = ns_per_byte, csum = csum}
+      return ("%.2f ns per checksum; %.2f ns per byte"):format(ret.ns_per_csum, ret.ns_per_byte)
+   end
+   local function benchmark_report (size, mpps)
+      local times = mpps*10^6
+      local pkt = create_packet(size)
+      io.stdout:write("C:   ", "Size="..size.." bytes".."; MPPS="..mpps.."M; ")
+      print(benchmark(function() return C.cksum_generic(pkt.data, pkt.length, 0), pkt end, times))
+      io.stdout:write("ASM: ", "Size="..size.." bytes".."; MPPS="..mpps.."M; ")
+      print(benchmark(function() return checksum(pkt.data, pkt.length, 0), pkt end, times))
+   end
+   benchmark_report(44, 14.4)
+   benchmark_report(550, 2)
+   benchmark_report(1516, 1)
 end
