@@ -587,25 +587,36 @@ function checksum_bench ()
       end
       return pkt
    end
-   local function benchmark (fn, times)
-      local now = os.clock()
-      local csum
-      for i=1,times do
-         csum, pkt = fn()
+   local function test_perf (f, iterations, what)
+      require('jit').flush()
+      io.write(tostring(what or f)..': ')
+      io.flush()
+      local cycles, ns, res = measure(f, iterations)
+      if cycles then
+         cycles = cycles/iterations
+         io.write(('%.2f cycles, '):format(cycles))
       end
-      local elapse = os.clock() - now
-      local ns_per_csum = elapse * 10e9 / times
-      local ns_per_byte = ns_per_csum / pkt.length
-      local ret = {elapse = elapse, ns_per_csum = ns_per_csum, ns_per_byte = ns_per_byte, csum = csum}
-      return ("%.2f ns per checksum; %.2f ns per byte"):format(ret.ns_per_csum, ret.ns_per_byte)
+      ns = ns/iterations
+      io.write(('%.2f ns per iteration (result: %s)'):format(
+            ns, tostring(res)))
+      return res, ns
    end
    local function benchmark_report (size, mpps)
       local times = mpps*10^6
       local pkt = create_packet(size)
-      io.stdout:write("C:   ", "Size="..size.." bytes".."; MPPS="..mpps.."M; ")
-      print(benchmark(function() return C.cksum_generic(pkt.data, pkt.length, 0), pkt end, times))
-      io.stdout:write("ASM: ", "Size="..size.." bytes".."; MPPS="..mpps.."M; ")
-      print(benchmark(function() return checksum(pkt.data, pkt.length, 0), pkt end, times))
+      local header = "Size=%d bytes; MPPS=%d M"
+      local _, ns = test_perf(function(times)
+         local ret
+         for i=1,times do ret = C.cksum_generic(pkt.data, pkt.length, 0) end
+         return ret
+      end, times, "C: "..header:format(size, mpps))
+      print(('; %.2f ns per byte'):format(ns/size))
+      local _, ns = test_perf(function(times)
+         local ret
+         for i=1,times do ret = checksum(pkt.data, pkt.length, 0) end
+         return ret
+      end, times, "ASM: "..header:format(size, mpps))
+      print(('; %.2f ns per byte'):format(ns/size))
    end
    benchmark_report(44, 14.4)
    benchmark_report(550, 2)
