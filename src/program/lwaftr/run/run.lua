@@ -205,7 +205,7 @@ function run(args)
          local ipv4_rx = opts.hydra and 'ipv4tx' or 'IPv4 TX'
          local ipv6_tx = opts.hydra and 'ipv6rx' or 'IPv6 RX'
          local ipv6_rx = opts.hydra and 'ipv6tx' or 'IPv6 TX'
-         if requires_splitter(opts, conf) then
+         if requires_splitter(conf) then
             csv:add_app('v4v6', { 'v4', 'v4' }, { tx=ipv4_tx, rx=ipv4_rx })
             csv:add_app('v4v6', { 'v6', 'v6' }, { tx=ipv6_tx, rx=ipv6_rx })
          else
