@@ -532,7 +532,8 @@ function Manager:update_configuration (update_fn, verb, path, ...)
    self.current_configuration = new_config
    self.current_in_place_dependencies =
       self.support.update_mutable_objects_embedded_in_app_initargs (
-         self.current_in_place_dependencies, new_graphs, verb, path, ...)
+         self.current_in_place_dependencies, new_graphs, self.schema_name,
+         verb, path, ...)
 end
 
 function Manager:handle_rpc_update_config (args, verb, compute_update_fn)
