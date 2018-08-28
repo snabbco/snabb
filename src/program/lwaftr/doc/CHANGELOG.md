@@ -1,5 +1,30 @@
 # Change Log
 
+## [2018.06.01]
+
+### Features
+
+* Add support for the `snabb lwaftr compile-config` command
+
+* Improve the handling of statistics counters on the intel_mp NIC driver.
+  This change makes queue counters show up for each NIC app in `snabb top`'s
+  tree view.
+
+### Bug fixes
+
+* Fixes the conditions in which the lwAFTR uses a V4V6 splitter app. This
+  fix should allow certain configurations with a different external & internal
+  MAC to work correctly.
+
+### Other enhancements from upstream
+
+  * Adds software-based receive-side scaling (RSS) with an app
+
+      https://github.com/snabbco/snabb/pull/1309
+
+Thanks to Alexander Gall, Luke Gorrie, Max Rottenkolber, R. Matthew Emerson, and
+hepeng for their upstream contributions in this release.
+
 ## [2018.04.02]
 
 ### Features
