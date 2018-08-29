@@ -163,10 +163,40 @@ function initialize ()
    _G.main   = getfenv()
 end
 
+local function archive (src)
+   local function isdir (path)
+      local stat = S.stat(path)
+      return stat.isdir
+   end
+   local function copy (src, dst)
+      for _, each in ipairs(S.util.dirtable(src, true)) do
+         if isdir(src..'/'..each) then
+            local src, dst = src..'/'..each, dst..'/'..each
+            S.mkdir(dst, tonumber(755, 8))
+            copy(src, dst)
+         else
+            local src, dst = src..'/'..each, dst..'/'..each
+            S.util.touch(dst)
+            S.util.cp(src, dst)
+         end
+      end
+   end
+   src = src or shm.root..'/'..S.getpid()
+   assert(isdir(src))
+   local dst = shm.root..'/crash'
+   if not S.stat(dst) then
+      S.mkdir(dst, tonumber(755, 8))
+   end
+   dst = dst..'/'..lib.basename(src)
+   S.mkdir(dst, tonumber(755, 8))
+   copy(src, dst)
+end
+
 function handler (reason)
    print(reason)
    print(STP.stacktrace())
    if debug_on_error then debug.debug() end
+   archive()
    os.exit(1)
 end
 
