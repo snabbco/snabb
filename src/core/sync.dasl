@@ -1,0 +1,103 @@
+module(...,package.seeall)
+
+-- core.sync: Multiprocessing synchronization primitives for x86_64.
+
+local dasm = require("dasm")
+local ffi = require("ffi")
+
+| .arch x64
+| .actionlist actions
+| .globalnames globalnames
+
+-- This module happens to use 32-bit arguments only.
+|.define arg1, edi
+|.define arg2, esi
+|.define arg3, edx
+
+-- cas(dst, old, new) -> true|false
+--    Atomic compare-and-swap; compare old with value pointed to by dst. If
+--    equal, stores new at dst and returns true. Else, returns false.
+local cas_t = "bool (*) (int *, int, int)"
+local function cas (Dst)
+   | mov eax, arg2
+   | lock; cmpxchg [arg1], arg3 -- compare-and-swap; sets ZF flag on success
+   | mov eax, 0                 -- clear eax for return value
+   | setz al                    -- set eax to 1 (true) if ZF is set
+   | ret
+end
+
+-- lock(dst)
+-- unlock(dst)
+--    Acquire/release spinlock at dst. Acquiring implies busy-waiting until the
+--    lock is available.
+local lock_t = "void (*) (int *)"
+local function lock (Dst)
+   -- attempt to acquire
+   | mov eax, 1
+   | xchg eax, [arg1]
+   | test eax, eax              -- was it 0 (unlocked)?
+   | jnz >1                     -- no, go spin
+   | ret
+   -- spin
+   |1:
+   | pause
+   | cmp dword [arg1], 1        -- does it look locked?
+   | je <1                      -- spin if it does
+   | jmp ->lock                 -- otherwise try to acquire
+end
+local unlock_t = "void (*) (int *)"
+local function unlock (Dst)
+   | mov dword [arg1], 0
+   | ret
+end
+
+local function generate (Dst)
+   Dst:growpc(16)
+   | .align 16
+   |->cas:
+   || cas(Dst)
+   | .align 16
+   |->lock:
+   || lock(Dst)
+   | .align 16
+   |->unlock:
+   || unlock(Dst)
+end
+
+local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
+generate(Dst)
+local code, size = Dst:build()
+
+if nil then
+   dasm.dump(code, size)
+end
+
+local entry = dasm.globals(globals, globalnames)
+
+local sync = {
+   cas = ffi.cast(cas_t, entry.cas),
+   lock = ffi.cast(lock_t, entry.lock),
+   unlock = ffi.cast(unlock_t, entry.unlock)
+}
+
+sync.selftest = function ()
+   -- cas
+   local box = ffi.new(
+      "struct { unsigned int pad1, state[1], pad2; } __attribute__((packed))"
+   )
+   assert(sync.cas(box.state, 0, 1) and box.state[0] == 1)
+   assert(not sync.cas(box.state, 0, 2) and box.state[0] == 1)
+   assert(sync.cas(box.state, 1, 2) and box.state[0] == 2)
+   assert(sync.cas(box.state, 2, 0x5555555555555555)
+             and box.state[0] == 2147483648
+             and box.pad1 == 0
+             and box.pad2 == 0)
+   -- lock / unlock
+   local spinlock = ffi.new("int[1]")
+   sync.lock(spinlock)
+   sync.unlock(spinlock)
+   sync.lock(spinlock)
+   sync.unlock(spinlock)
+end
+
+return setmetatable(sync, {_anchor = code})
