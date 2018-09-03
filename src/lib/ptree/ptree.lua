@@ -171,11 +171,7 @@ end
 
 function Manager:start ()
    if self.name then engine.claim_name(self.name) end
-   local cpu = self.cpuset:bind_to_first_available_cpu()
-   if cpu then
-      print(('Binding manager plane PID %s to CPU %s.'):format(
-              tonumber(S.getpid()), cpu))
-   end
+   self.cpuset:bind_to_numa_node()
    require('lib.fibers.file').install_poll_io_handler()
    self.sched = fiber.current_scheduler
    fiber.spawn(function () self:accept_rpc_peers() end)

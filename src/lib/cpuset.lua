@@ -47,13 +47,12 @@ local function parse_cpulist_from_file (path)
    return ret
 end
 
-local function set (t)
-   local ret = {}
-   for _,v in pairs(t) do ret[tostring(v)] = true end
-   return ret
-end
-
 local function available_cpus (node)
+   local function set (t)
+      local ret = {}
+      for _,v in pairs(t) do ret[tostring(v)] = true end
+      return ret
+   end
    local function cpus_in_node (node)
       local node_path = '/sys/devices/system/node/node'..node
       return parse_cpulist_from_file(node_path..'/cpulist')
@@ -72,18 +71,6 @@ local function available_cpus (node)
    return ret
 end
 
-function CPUSet:bind_to_first_available_cpu()
-   local nodes = {}
-   for node, _ in pairs(self.by_node) do table.insert(nodes, node) end
-   if #nodes > 0 then
-      local numa_node = nodes[1]
-      local cpus = available_cpus(numa_node)
-      local cpu = cpus[1]
-      if cpu then numa.bind_to_cpu(cpu) end
-      return cpu
-   end
-end
-
 function CPUSet:bind_to_numa_node()
    local nodes = {}
    for node, _ in pairs(self.by_node) do table.insert(nodes, node) end
@@ -91,7 +78,10 @@ function CPUSet:bind_to_numa_node()
       print("No CPUs available; not binding to any NUMA node.")
    elseif #nodes == 1 then
       numa.bind_to_numa_node(nodes[1])
-      print("Bound main process to NUMA node: ", nodes[1])
+      local cpus = available_cpus(nodes[1])
+      assert(#cpus > 0, 'Not available CPUs')
+      numa.bind_to_cpu(cpus[1])
+      print(("Bound main process to NUMA node: %s (CPU %s)"):format(nodes[1], cpus[1]))
    else
       print("CPUs available from multiple NUMA nodes: "..table.concat(nodes, ","))
       print("Not binding to any NUMA node.")
@@ -163,7 +153,7 @@ end
 
 function selftest ()
    print('selftest: cpuset')
-   local cpus = set(parse_cpulist("0-5,7"))
-   assert(cpus["3"] and cpus["7"])
+   local cpus = parse_cpulist("0-5,7")
+   assert(#cpus == 7 and cpus[6] == 5 and cpus[7] == 7)
    print('selftest: ok')
 end
