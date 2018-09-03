@@ -5,6 +5,21 @@
 #
 # Set SNABB_PCI0 to SNABB_PCI7 when calling
 
+if [ ! $SNABB_PCI0 ] || [ ! $SNABB_PCI1 ]; then
+    echo ">> At least SNABB_PCI0 and SNABB_PCI1 must be set"
+    exit 1
+fi
+
+if [ ! $SNABB_PCI2 ] || [ ! $SNABB_PCI3 ]; then
+    echo ">> SNABB_PCI2 or SNABB_PCI3 not set, only running on-a-stick tests"
+    ON_A_STICK_ONLY=1
+fi
+
+if [ ! $SNABB_PCI4 ] || [ ! $SNABB_PCI5 ] || [ ! $SNABB_PCI6 ] || [ ! $SNABB_PCI7]; then
+    echo ">> SNABB_PCI4 through SNABB_PCI7 need to be set for 2 instance, 2 NIC test"
+    ONE_INSTANCE_ONLY=1
+fi
+
 # directory this script lives in
 # https://stackoverflow.com/questions/59895/getting-the-source-directory-of-a-bash-script-from-within
 DIR=$(dirname "$(readlink -f "$0")")
@@ -89,17 +104,19 @@ do
     $SNABB lwaftr compile-configuration $conf
 done
 
-run_benchmark "1 instance, 2 NIC interface" \
-              "lwaftr.conf" \
-              "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2" \
-              "$FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
-               $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3"
+if [ ! $ON_A_STICK_ONLY ]; then
+    run_benchmark "1 instance, 2 NIC interface" \
+                  "lwaftr.conf" \
+                  "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2" \
+                  "$FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
+                   $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3"
 
-run_benchmark "1 instance, 2 NIC interfaces (from config)" \
-              "lwaftr2.conf" \
-              "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2" \
-              "$FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
-               $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3"
+    run_benchmark "1 instance, 2 NIC interfaces (from config)" \
+                  "lwaftr2.conf" \
+                  "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2" \
+                  "$FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
+                   $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3"
+fi
 
 run_benchmark "1 instance, 1 NIC (on a stick)" \
               "lwaftr.conf" \
@@ -111,19 +128,22 @@ run_benchmark "1 instance, 1 NIC (on-a-stick, from config file)" \
               "" \
               "$FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1"
 
-run_benchmark "2 instances, 2 NICs (from config)" \
-              "lwaftr4.conf" \
-              "" \
-              "--cpu 2 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
-               $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3" \
-              "--cpu 3 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI5 \
-               $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI7"
+if [ ! $ONE_INSTANCE_ONLY ]; then
+    run_benchmark "2 instances, 2 NICs (from config)" \
+                  "lwaftr4.conf" \
+                  "" \
+                  "--cpu 2 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
+                   $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3" \
+                  "--cpu 3 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI5 \
+                   $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI7"
 
-run_benchmark "2 instances, 1 NIC (on a stick, from config)" \
-              "lwaftr5.conf" \
-              "" \
-              "--cpu 2 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
-              "--cpu 3 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI5"
+    run_benchmark "2 instances, 1 NIC (on a stick, from config)" \
+                  "lwaftr5.conf" \
+                  "" \
+                  "--cpu 2 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
+                  "--cpu 3 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI5"
+fi
+
 
 run_benchmark "1 instance, 1 NIC, 2 queues" \
               "lwaftr6.conf" \
