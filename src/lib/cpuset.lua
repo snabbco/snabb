@@ -55,20 +55,21 @@ local function available_cpus (node)
    end
    local function cpus_in_node (node)
       local node_path = '/sys/devices/system/node/node'..node
-      return parse_cpulist_from_file(node_path..'/cpulist')
+      return set(parse_cpulist_from_file(node_path..'/cpulist'))
    end
    local function isolated_cpus ()
-      return parse_cpulist_from_file('/sys/devices/system/cpu/isolated')
+      return set(parse_cpulist_from_file('/sys/devices/system/cpu/isolated'))
    end
-   local ret = {}
-   local isolated_cpus = set(isolated_cpus())
-   for _, cpu in ipairs(cpus_in_node(node)) do
-      if not isolated_cpus[tostring(cpu)] then
-         table.insert(ret, cpu)
+   local function subtract (s, t)
+      local ret = {}
+      for k,_ in pairs(s) do
+         if not t[k] then table.insert(ret, k) end
       end
+      table.sort(ret)
+      return ret
    end
-   table.sort(ret)
-   return ret
+   -- XXX: Add sched_getaffinity cpus.
+   return subtract(cpus_in_node(node), isolated_cpus())
 end
 
 function CPUSet:bind_to_numa_node()
@@ -80,7 +81,7 @@ function CPUSet:bind_to_numa_node()
       numa.bind_to_numa_node(nodes[1])
       local cpus = available_cpus(nodes[1])
       assert(#cpus > 0, 'Not available CPUs')
-      numa.bind_to_cpu(cpus[1])
+      numa.bind_to_cpu(cpus)
       print(("Bound main process to NUMA node: %s (CPU %s)"):format(nodes[1], cpus[1]))
    else
       print("CPUs available from multiple NUMA nodes: "..table.concat(nodes, ","))
