@@ -3,12 +3,13 @@
 #
 # This script runs the lwAFTR release benchmarks
 #
-# Set SNABB_CPU0 to pick the CPU for the lwAFTR
+# Set SNABB_LWAFTR_CPU0 to pick the CPU for the lwAFTR
+# Set SNABB_LOADTEST_CPU0, SNABB_LOADTEST_CPU1 for two instance test
 # Set SNABB_PCI0 to SNABB_PCI7 when calling
 
-if [ ! $SNABB_CPU0 ]; then
-    echo ">> SNABB_CPU0 not set, defaulting to 0"
-    SNABB_CPU0=0
+if [ ! $SNABB_LWAFTR_CPU0 ]; then
+    echo ">> SNABB_LWAFTR_CPU0 not set, defaulting to 0"
+    SNABB_LWAFTR_CPU0=0
 fi
 
 if [ ! $SNABB_PCI0 ] || [ ! $SNABB_PCI1 ]; then
@@ -24,6 +25,11 @@ fi
 if [ ! $SNABB_PCI4 ] || [ ! $SNABB_PCI5 ] || [ ! $SNABB_PCI6 ] || [ ! $SNABB_PCI7 ]; then
     echo ">> SNABB_PCI4 through SNABB_PCI7 need to be set for 2 instance, 2 NIC test"
     ONE_INSTANCE_ONLY=1
+else
+    if [ ! $SNABB_LOADTEST_CPU0 ] || [ ! $SNABB_LOADTEST_CPU1 ]; then
+        echo ">> SNABB_LOADTEST_CPU0 and SNABB_LOADTEST_CPU1 must be set for 2 instance tests"
+        exit 1
+    fi
 fi
 
 # directory this script lives in
@@ -60,7 +66,7 @@ function run_benchmark {
     loadtest2_args="$5"
 
     lwaftr_log=`mktemp -p $TMPDIR`
-    $SNABB lwaftr run --cpu $SNABB_CPU0 --name lwaftr --conf \
+    $SNABB lwaftr run --cpu $SNABB_LWAFTR_CPU0 --name lwaftr --conf \
            $dataset/$config $lwaftr_args > $lwaftr_log &
     lwaftr_pid=$!
 
@@ -145,16 +151,16 @@ if [ ! $ONE_INSTANCE_ONLY ]; then
     run_benchmark "2 instances, 2 NICs (from config)" \
                   "lwaftr4.conf" \
                   "" \
-                  "--cpu 2 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
+                  "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
                    $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3" \
-                  "--cpu 3 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI5 \
+                  "--cpu $SNABB_LOADTEST_CPU1 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI5 \
                    $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI7"
 
     run_benchmark "2 instances, 1 NIC (on a stick, from config)" \
                   "lwaftr5.conf" \
                   "" \
-                  "--cpu 2 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
-                  "--cpu 3 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI5"
+                  "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
+                  "--cpu $SNABB_LOADTEST_CPU1 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI5"
 fi
 
 
