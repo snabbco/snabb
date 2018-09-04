@@ -33,7 +33,7 @@ local mem = require('lib.stream.mem')
 
 Parser = {}
 function Parser.new(stream)
-   local ret = {pos=0, str='', stream=stream, line=1, column=0}
+   local ret = {pos=0, str='', stream=stream, line=1, column=0, name=stream:filename()}
    ret = setmetatable(ret, {__index = Parser})
    ret.peek_char = ret:read_char()
    return ret
@@ -47,7 +47,8 @@ end
 function Parser:error(msg, ...)
    print(self.str:match("[^\n]*"))
    print(string.rep(" ", self.column).."^")
-   error(('%s: error: '..msg):format(self:loc(), ...))
+   print(('%s: error: '..msg):format(self:loc(), ...))
+   main.exit(1)
 end
 
 function Parser:read_char()
