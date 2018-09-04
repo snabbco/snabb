@@ -3,7 +3,13 @@
 #
 # This script runs the lwAFTR release benchmarks
 #
+# Set SNABB_CPU0 to pick the CPU for the lwAFTR
 # Set SNABB_PCI0 to SNABB_PCI7 when calling
+
+if [ ! $SNABB_CPU0 ]; then
+    echo ">> SNABB_CPU0 not set, defaulting to 0"
+    SNABB_CPU0=0
+fi
 
 if [ ! $SNABB_PCI0 ] || [ ! $SNABB_PCI1 ]; then
     echo ">> At least SNABB_PCI0 and SNABB_PCI1 must be set"
@@ -53,7 +59,7 @@ function run_benchmark {
     loadtest_args="$4"
     loadtest2_args="$5"
 
-    $SNABB lwaftr run --cpu 11 --name lwaftr --conf \
+    $SNABB lwaftr run --cpu $SNABB_CPU0 --name lwaftr --conf \
            $dataset/$config $lwaftr_args > /dev/null &
     lwaftr_pid=$!
 
