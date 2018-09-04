@@ -99,19 +99,14 @@ function Fragmenter:new(conf)
    o.next_fragment_id = deterministic_first_fragment_id or
       math.random(0, 0xffffffff)
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='outgoing-ipv6-fragments'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Outgoing IPv6 fragments over N fragments/s',
-      }
-   }
-   local outgoing_fragments_alarm = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='outgoing-ipv6-fragments'}] = {
-         perceived_severity='warning',
-         alarm_text='More than 10,000 outgoing IPv6 fragments per second',
-      }
-   }
+   alarms.add_to_inventory(
+      {alarm_type_id='outgoing-ipv6-fragments'},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description='Outgoing IPv6 fragments over N fragments/s'})
+   local outgoing_fragments_alarm = alarms.declare_alarm(
+      {resource=tostring(S.getpid()),alarm_type_id='outgoing-ipv6-fragments'},
+      {perceived_severity='warning',
+       alarm_text='More than 10,000 outgoing IPv6 fragments per second'})
    o.outgoing_ipv6_fragments_alarm = CounterAlarm.new(outgoing_fragments_alarm,
       1, 1e4, o, "out-ipv6-frag")
 

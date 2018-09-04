@@ -31,19 +31,14 @@ local ipv6     = require("lib.protocol.ipv6")
 local alarms = require("lib.yang.alarms")
 local S = require("syscall")
 
-alarms.add_to_inventory {
-   [{alarm_type_id='ndp-resolution'}] = {
-      resource=tostring(S.getpid()),
-      has_clear=true,
-      description='Raise up if NDP app cannot resolve IPv6 address'
-   }
-}
-local resolve_alarm = alarms.declare_alarm {
-   [{resource=tostring(S.getpid()), alarm_type_id='ndp-resolution'}] = {
-      perceived_severity = 'critical',
-      alarm_text = 'Make sure you can NDP resolve IP addresses on NIC',
-   },
-}
+alarms.add_to_inventory(
+   {alarm_type_id='ndp-resolution'},
+   {resource=tostring(S.getpid()), has_clear=true,
+    description='Raise up if NDP app cannot resolve IPv6 address'})
+local resolve_alarm = alarms.declare_alarm(
+   {resource=tostring(S.getpid()), alarm_type_id='ndp-resolution'},
+   {perceived_severity = 'critical',
+    alarm_text = 'Make sure you can NDP resolve IP addresses on NIC'})
 
 local htons, ntohs = lib.htons, lib.ntohs
 local htonl, ntohl = lib.htonl, lib.ntohl
@@ -150,13 +145,13 @@ local ipv6_unspecified_addr = ipv6:pton("0::0") -- aka ::/128
 -- Really just the first 13 bytes of the following...
 local ipv6_solicited_multicast = ipv6:pton("ff02:0000:0000:0000:0000:0001:ff00:00")
 
+local scratch_ph = ipv6_pseudoheader_t()
 local function checksum_pseudoheader_from_header(ipv6_fixed_header)
-   local ph = ipv6_pseudoheader_t()
-   ph.src_ip = ipv6_fixed_header.src_ip
-   ph.dst_ip = ipv6_fixed_header.dst_ip
-   ph.ulp_length = htonl(ntohs(ipv6_fixed_header.payload_length))
-   ph.next_header = htonl(ipv6_fixed_header.next_header)
-   return checksum.ipsum(ffi.cast('char*', ph),
+   scratch_ph.src_ip = ipv6_fixed_header.src_ip
+   scratch_ph.dst_ip = ipv6_fixed_header.dst_ip
+   scratch_ph.ulp_length = htonl(ntohs(ipv6_fixed_header.payload_length))
+   scratch_ph.next_header = htonl(ipv6_fixed_header.next_header)
+   return checksum.ipsum(ffi.cast('char*', scratch_ph),
                          ffi.sizeof(ipv6_pseudoheader_t), 0)
 end
 

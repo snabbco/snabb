@@ -23,19 +23,14 @@ local ipv4     = require("lib.protocol.ipv4")
 local alarms = require("lib.yang.alarms")
 local S = require("syscall")
 
-alarms.add_to_inventory {
-  [{alarm_type_id='arp-resolution'}] = {
-    resource=tostring(S.getpid()),
-    has_clear=true,
-    description='Raise up if ARP app cannot resolve IP address',
-  }
-}
-local resolve_alarm = alarms.declare_alarm {
-   [{resource=tostring(S.getpid()), alarm_type_id='arp-resolution'}] = {
-      perceived_severity = 'critical',
-      alarm_text = 'Make sure you can ARP resolve IP addresses on NIC',
-   },
-}
+alarms.add_to_inventory(
+   {alarm_type_id='arp-resolution'},
+   {resource=tostring(S.getpid()), has_clear=true,
+    description='Raise up if ARP app cannot resolve IP address'})
+local resolve_alarm = alarms.declare_alarm(
+   {resource=tostring(S.getpid()), alarm_type_id='arp-resolution'},
+   {perceived_severity = 'critical',
+    alarm_text = 'Make sure you can ARP resolve IP addresses on NIC'})
 
 local C = ffi.C
 local receive, transmit = link.receive, link.transmit

@@ -432,38 +432,28 @@ function LwAftr:new(conf)
    o.icmpv6_error_count = 0
    o.icmpv6_error_rate_limit_start = 0
 
-   alarms.add_to_inventory {
-     [{alarm_type_id='bad-ipv4-softwires-matches'}] = {
-       resource=tostring(S.getpid()),
-       has_clear=true,
+   alarms.add_to_inventory(
+      {alarm_type_id='bad-ipv4-softwires-matches'},
+      {resource=tostring(S.getpid()), has_clear=true,
        description="lwAFTR's bad matching softwires due to not found destination "..
-         "address for IPv4 packets",
-     }
-   }
-   alarms.add_to_inventory {
-     [{alarm_type_id='bad-ipv6-softwires-matches'}] = {
-       resource=tostring(S.getpid()),
-       has_clear=true,
+          "address for IPv4 packets"})
+   alarms.add_to_inventory(
+      {alarm_type_id='bad-ipv6-softwires-matches'},
+      {resource=tostring(S.getpid()), has_clear=true,
        description="lwAFTR's bad matching softwires due to not found source"..
-         "address for IPv6 packets",
-     }
-   }
-   local bad_ipv4_softwire_matches = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()), alarm_type_id='bad-ipv4-softwires-matches'}] = {
-         perceived_severity = 'major',
-         alarm_text = "lwAFTR's bad softwires matches due to non matching destination"..
-            "address for incoming packets (IPv4) has reached over 100,000 softwires "..
-            "binding-table.  Please review your lwAFTR's configuration binding-table."
-      },
-   }
-   local bad_ipv6_softwire_matches = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()), alarm_type_id='bad-ipv6-softwires-matches'}] = {
-         perceived_severity = 'major',
-         alarm_text = "lwAFTR's bad softwires matches due to non matching source "..
-            "address for outgoing packets (IPv6) has reached over 100,000 softwires "..
-            "binding-table.  Please review your lwAFTR's configuration binding-table."
-      },
-   }
+          "address for IPv6 packets"})
+   local bad_ipv4_softwire_matches = alarms.declare_alarm(
+      {resource=tostring(S.getpid()), alarm_type_id='bad-ipv4-softwires-matches'},
+      {perceived_severity = 'major',
+       alarm_text = "lwAFTR's bad softwires matches due to non matching destination"..
+         "address for incoming packets (IPv4) has reached over 100,000 softwires "..
+         "binding-table.  Please review your lwAFTR's configuration binding-table."})
+   local bad_ipv6_softwire_matches = alarms.declare_alarm(
+      {resource=tostring(S.getpid()), alarm_type_id='bad-ipv6-softwires-matches'},
+      {perceived_severity = 'major',
+       alarm_text = "lwAFTR's bad softwires matches due to non matching source "..
+         "address for outgoing packets (IPv6) has reached over 100,000 softwires "..
+         "binding-table.  Please review your lwAFTR's configuration binding-table."})
    o.bad_ipv4_softwire_matches_alarm = CounterAlarm.new(bad_ipv4_softwire_matches,
       5, 1e5, o, 'drop-no-dest-softwire-ipv4-packets')
    o.bad_ipv6_softwire_matches_alarm = CounterAlarm.new(bad_ipv6_softwire_matches,

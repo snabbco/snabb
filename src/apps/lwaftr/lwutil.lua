@@ -36,6 +36,11 @@ function parse_instance(conf)
    return device, id, queue
 end
 
+function is_on_a_stick(device, queue)
+   if not queue.external_interface.device and device then return true end
+   return device == queue.external_interface.device
+end
+
 function get_ihl_from_offset(pkt, offset)
    local ver_and_ihl = pkt.data[offset]
    return band(ver_and_ihl, 0xf) * 4
