@@ -59,12 +59,19 @@ function run_benchmark {
     loadtest_args="$4"
     loadtest2_args="$5"
 
+    lwaftr_log=`mktemp -p $TMPDIR`
     $SNABB lwaftr run --cpu $SNABB_CPU0 --name lwaftr --conf \
-           $dataset/$config $lwaftr_args > /dev/null &
+           $dataset/$config $lwaftr_args > $lwaftr_log &
     lwaftr_pid=$!
 
     # wait briefly to let lwaftr start up
     sleep 1
+
+    # make sure lwAFTR has't errored out, if not then exit
+    if ! ps -p $lwaftr_pid > /dev/null; then
+        echo ">> lwAFTR terminated unexpectedly, ending test (log: $lwaftr_log)"
+        exit 1
+    fi
 
     log=`mktemp -p $TMPDIR`
     echo ">> Running loadtest: $name (log: $log)"
