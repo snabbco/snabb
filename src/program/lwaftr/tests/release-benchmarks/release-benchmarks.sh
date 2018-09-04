@@ -21,7 +21,7 @@ if [ ! $SNABB_PCI2 ] || [ ! $SNABB_PCI3 ]; then
     ON_A_STICK_ONLY=1
 fi
 
-if [ ! $SNABB_PCI4 ] || [ ! $SNABB_PCI5 ] || [ ! $SNABB_PCI6 ] || [ ! $SNABB_PCI7]; then
+if [ ! $SNABB_PCI4 ] || [ ! $SNABB_PCI5 ] || [ ! $SNABB_PCI6 ] || [ ! $SNABB_PCI7 ]; then
     echo ">> SNABB_PCI4 through SNABB_PCI7 need to be set for 2 instance, 2 NIC test"
     ONE_INSTANCE_ONLY=1
 fi
