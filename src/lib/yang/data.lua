@@ -396,7 +396,8 @@ local function struct_parser(keyword, members, ctype)
          -- Scalar/array parser responsible for requiring whitespace
          -- after keyword.  Struct/table don't need it as they have
          -- braces.
-         local sub = assert(expanded_members[k], 'unrecognized parameter: '..k)
+         local sub = expanded_members[k]
+         if not sub then P:error('unrecognized parameter: '..k) end
          local id = normalize_id(k)
          ret[id] = sub.parse(P, ret[id], k)
          P:skip_whitespace()
@@ -661,7 +662,8 @@ function data_parser_from_grammar(production)
             if P:is_eof() then break end
             local k = P:parse_identifier()
             if k == '' then P:error("Expected a keyword") end
-            local sub = assert(members[k], 'unrecognized parameter: '..k)
+            local sub = members[k]
+            if not sub then P:error('unrecognized parameter: '..k) end
             local id = normalize_id(k)
             ret[id] = sub.parse(P, ret[id], k)
          end
@@ -682,7 +684,8 @@ function data_parser_from_grammar(production)
             if P:is_eof() then break end
             local k = P:parse_identifier()
             P:consume_whitespace()
-            local sub = assert(members[k], 'unrecognized rpc: '..k)
+            local sub = assert(members[k])
+            if not sub then P:error('unrecognized rpc: '..k) end
             local data = sub.finish(sub.parse(P, sub.init(), k))
             table.insert(ret, {id=k, data=data})
          end

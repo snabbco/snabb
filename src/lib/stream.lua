@@ -434,6 +434,9 @@ function Stream:write(...)
    for _, arg in ipairs({ ... }) do write1(self, arg) end
 end
 
+-- The result may be nil.
+function Stream:filename() return self.io.filename end
+
 function selftest()
    print('selftest: lib.stream')
 
