@@ -3,7 +3,7 @@
 #
 # This script runs the lwAFTR release benchmarks
 #
-# Set SNABB_LWAFTR_CPU0 to pick the CPU for the lwAFTR
+# Set SNABB_LWAFTR_CPU0, SNABB_LWAFTR_CPU1 to pick CPUs for the lwAFTR
 # Set SNABB_LOADTEST_CPU0, SNABB_LOADTEST_CPU1 for two instance test
 # Set SNABB_PCI0 to SNABB_PCI7 when calling
 
@@ -64,10 +64,12 @@ function run_benchmark {
     lwaftr_args="$3"
     loadtest_args="$4"
     loadtest2_args="$5"
+    cpu=${6:-$SNABB_LWAFTR_CPU0}
 
     lwaftr_log=`mktemp -p $TMPDIR`
-    $SNABB lwaftr run --cpu $SNABB_LWAFTR_CPU0 --name lwaftr --conf \
-           $dataset/$config $lwaftr_args > $lwaftr_log &
+    $SNABB lwaftr run --cpu $cpu \
+           --name lwaftr-release-benchmarks \
+           --conf $dataset/$config $lwaftr_args > $lwaftr_log &
     lwaftr_pid=$!
 
     # wait briefly to let lwaftr start up
@@ -164,10 +166,16 @@ if [ ! $ONE_INSTANCE_ONLY ]; then
 fi
 
 
-run_benchmark "1 instance, 1 NIC, 2 queues" \
-              "lwaftr6.conf" \
-              "" \
-              "$FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1"
+if [ ! $SNABB_LWAFTR_CPU1 ]; then
+    echo ">> Not running RSS test, SNABB_LWAFTR_CPU1 not set"
+else
+    run_benchmark "1 instance, 1 NIC, 2 queues" \
+                  "lwaftr6.conf" \
+                  "" \
+                  "$FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
+                  "" \
+                  "$SNABB_LWAFTR_CPU0,$SNABB_LWAFTR_CPU1"
+fi
 
 # cleanup
 rm -r $TMPDIR
