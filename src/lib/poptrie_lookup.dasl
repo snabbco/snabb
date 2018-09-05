@@ -1,0 +1,127 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(..., package.seeall)
+
+local debug = false
+
+local ffi = require("ffi")
+local dasm = require("dasm")
+
+|.arch x64
+|.actionlist actions
+|.globalnames globalnames
+
+-- Table keeping machine code alive to the GC.
+local anchor = {}
+
+-- Assemble a lookup routine
+function generate (Poptrie, keysize)
+   local offsets = 
+   -- Assert assumptions about lib.poptrie
+   assert(Poptrie.k == 6)
+   assert(ffi.sizeof(Poptrie.leaf_t) == 2)
+   assert(ffi.sizeof(Poptrie.vector_t) == 8)
+   assert(ffi.sizeof(Poptrie.base_t) == 4)
+   assert(ffi.offsetof(Poptrie.node_t, 'leafvec') == 0)
+   assert(ffi.offsetof(Poptrie.node_t, 'vector') == 8)
+   assert(ffi.offsetof(Poptrie.node_t, 'base0') == 16)
+   assert(ffi.offsetof(Poptrie.node_t, 'base1') == 20)
+
+   local name = "poptrie_lookup(k="..Poptrie.k..", keysize="..keysize..")"
+
+   local Dst = dasm.new(actions)
+   lookup(Dst, Poptrie, keysize)
+   local mcode, size = Dst:build()
+   table.insert(anchor, mcode)
+
+   if debug then
+      print("mcode dump: "..name)
+      dasm.dump(mcode, size)
+   end
+
+   local prototype
+   if keysize <= 64 then
+      prototype = ffi.typeof("$ (*) ($ *, $ *, uint64_t)",
+                             Poptrie.leaf_t, Poptrie.leaf_t, Poptrie.node_t)
+   else error("NYI") end
+
+   return ffi.cast(prototype, mcode)
+end
+
+|.define leaves,  rdi -- pointer to leaves array
+|.define nodes,   rsi -- pointer to nodes array
+|.define key,     rdx -- key to look up
+|.define index,   r8d -- index into node array
+|.define node,    r8  -- pointer into node array 
+|.define offset,  r9  -- offset into key
+|.define v,       r10 -- k bits extracted from key
+|.define vec,     r11 -- 64-bit vector or leafvec
+
+-- lookup(leaf_t *leaves, node_t *nodes, key) -> leaf_t
+function lookup (Dst, Poptrie, keysize)
+   -- index, node, offset = 0, nodes[index], 0
+   | mov index, 0
+   | lea node, [nodes+0] -- nodes[0]
+   | mov offset, 0
+   -- while band(vec, lshift(1ULL, v)) ~= 0
+   |1:
+   -- v = extract(key, offset, k=6)
+   if keysize <= 64 then
+      -- v = rshift(key, offset)
+      | mov v, key
+      | mov rcx, offset
+      | shr v, cl
+      -- v = band(v, lshift(1, k=6) - 1)
+      | and v, 63
+   else error("NYI") end
+   -- vec = nodes[index].vector
+   | mov vec, qword [node+8]
+   -- rax = lshift(1ULL, v)
+   | mov rax, 1
+   | mov rcx, v
+   | shl rax, cl
+   -- rax = band(vec, rax)
+   | and rax, vec
+   -- is bit v set in vec?
+   | cmp rax, 0
+   | je >2 -- reached leaf, exit loop
+   -- rax = lshift(2ULL, v) - 1
+   | mov rax, 2
+   | mov rcx, v
+   | shl rax, cl
+   | sub rax, 1
+   -- rax = popcnt(band(vec, rax))
+   | and rax, vec
+   | popcnt rax, rax
+   -- index = base + bc - 1
+   | mov index, dword [node+20] -- nodes[index].base1
+   | add index, eax
+   | sub index, 1
+   -- node = nodes[index]
+   | imul index, 24 -- multiply by node size
+   | lea node, [nodes+index]
+   -- offset = offset + k
+   | add offset, 6
+   | jmp <1 -- loop
+   -- end while
+   |2:
+   -- rax = lshift(2ULL, v) - 1
+   | mov rax, 2
+   | mov rcx, v
+   | shl rax, cl
+   | sub rax, 1
+   if Poptrie.leaf_compression then
+      -- vec = nodes[index].leafvec
+      | mov vec, qword [node+0]
+   else error("NYI") end
+   -- rax = popcnt(band(vec, rax)) - 1
+   | and rax, vec
+   | popcnt rax, rax
+   -- return leaves[base + bc - 1]
+   | mov index, dword [node+16] -- nodes[index].base0
+   | add index, eax
+   | sub index, 1
+   -- assumption: at most ax is set at this point because popcnt(qword) < byte
+   | mov ax, word [leaves+index*2] -- leaves[index]
+   | ret
+end
