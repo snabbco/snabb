@@ -90,15 +90,22 @@ function unbind_cpu ()
 end
 
 function bind_to_cpu (cpu)
-   if cpu == bound_cpu then return end
+   local function contains (t, e)
+      for k,v in ipairs(t) do
+         if tonumber(v) == tonumber(e) then return true end
+      end
+      return false
+   end
    if not cpu then return unbind_cpu() end
+   if cpu == bound_cpu then return end
    assert(not bound_cpu, "already bound")
 
+   if type(cpu) ~= 'table' then cpu = {cpu} end
    assert(S.sched_setaffinity(0, cpu),
-      ("Couldn't set affinity for cpu %s"):format(cpu))
+      ("Couldn't set affinity for cpuset %s"):format(table.concat(cpu, ',')))
    local cpu_and_node = S.getcpu()
-   assert(cpu_and_node.cpu == cpu)
-   bound_cpu = cpu
+   assert(contains(cpu, cpu_and_node.cpu))
+   bound_cpu = cpu_and_node.cpu
 
    bind_to_numa_node (cpu_and_node.node)
 end
