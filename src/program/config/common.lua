@@ -58,7 +58,8 @@ end
 function validate_path(schema_name, path, is_config)
    local succ, err = pcall(path_grammar, schema_name, path, is_config)
    if succ == false then
-      error_and_quit(err)
+      local filename, lineno, msg = err:match("(.+):(%d+):(.+)$")
+      error_and_quit(("Invalid path:"..msg) or err)
    end
 end
 
