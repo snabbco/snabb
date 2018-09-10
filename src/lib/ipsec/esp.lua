@@ -194,6 +194,8 @@ function decrypt:new (conf)
 
    o.auditing = conf.auditing
 
+   o.copy = packet.allocate()
+
    return setmetatable(o, {__index=decrypt})
 end
 
@@ -320,13 +322,12 @@ function decrypt:resync (ptr, length, seq_low, seq_high)
       )
    end
 
-   local p_orig = packet.from_pointer(ptr, length)
+   local p_orig = packet.append(packet.resize(self.copy, 0), ptr, length)
    for i = 1, self.resync_attempts do
       seq_high = seq_high + 1
       if self.cipher:decrypt(
          ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length
       ) then
-         packet.free(p_orig)
          return seq_high
       else
          ffi.copy(ptr, p_orig.data, length)
