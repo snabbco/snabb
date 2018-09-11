@@ -317,6 +317,36 @@ byPciID = {
 -- order to interchangeably use NIC drivers.
 driver = Intel
 
+local function shared_counter(srcdir, targetdir)
+   local mod = { type = "counter" }
+   local function dirsplit(name)
+      return name:match("^(.*)/([^/]+)$")
+   end
+   local function source(name)
+      if name:match('/') then
+         local head, tail = dirsplit(name)
+         return head..'/'..srcdir..'/'..tail
+      else
+         return srcdir..'/'..name
+      end
+   end
+   local function target(name)
+      if name:match('/') then
+         local head, tail = dirsplit(name)
+         return targetdir..'/'..tail
+      else
+         return targetdir..'/'..name
+      end
+   end
+   function mod.create(name)
+      shm.alias(source(name), target(name))
+   end
+   function mod.delete(name)
+      S.unlink(shm.resolve(source(name)))
+   end
+   return mod
+end
+
 function Intel:new (conf)
    local self = {
       r = {},
@@ -377,54 +407,81 @@ function Intel:new (conf)
    self:set_txstats()
    self:set_tx_rate()
 
-   -- Initialize per app statistics
-   self.shm = {
-      mtu       = {counter, self.mtu},
-      rxcounter = {counter, self.rxcounter},
-      txcounter = {counter, self.txcounter},
-      txdrop    = {counter}
-   }
-
    -- Figure out if we are supposed to collect device statistics
    self.run_stats = conf.run_stats or (self.master and conf.master_stats)
-
-   -- Expose per-device statistics from master
    if self.run_stats then
-      local frame = {
-         dtime     = {counter, C.get_unix_time()},
+      self.sync_timer = lib.throttle(0.01)
+      local stats_frame = {
          -- Keep a copy of the mtu here to have all
          -- data available in a single shm frame
          mtu       = {counter, self.mtu},
+         type      = {counter, 0x1000}, -- ethernetCsmacd
+         macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
          speed     = {counter},
          status    = {counter, 2}, -- Link down
-         type      = {counter, 0x1000}, -- ethernetCsmacd
          promisc   = {counter},
-         macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
          rxbytes   = {counter},
          rxpackets = {counter},
          rxmcast   = {counter},
          rxbcast   = {counter},
          rxdrop    = {counter},
          rxerrors  = {counter},
+         rxdmapackets = {counter},
          txbytes   = {counter},
          txpackets = {counter},
          txmcast   = {counter},
          txbcast   = {counter},
          txdrop    = {counter},
          txerrors  = {counter},
-         rxdmapackets = {counter}
       }
-      self:init_queue_stats(frame)
-      self.stats = shm.create_frame(self.shm_root.."stats", frame)
-      self.sync_timer = lib.throttle(0.01)
+      self:init_queue_stats(stats_frame)
+      self.stats = shm.create_frame(self.shm_root.."stats", stats_frame)
    end
 
-   -- Alias to the shared stats frame in each process's pci dir
-   -- The conditional checks if the symlink exists with lstat since
-   -- shm.exists requires the target exist, and the run_stats process
-   -- could go down and make the target cease to exist
-   if not S.lstat(shm.root.."/"..S.getpid().."/pci/"..self.pciaddress) then
-      shm.alias("pci/"..self.pciaddress, self.shm_root.."stats")
+   -- Expose per-device statistics from master
+   local shared_counter = shared_counter(
+      'pci/'..self.pciaddress, self.shm_root..'stats')
+   self.shm = {
+      dtime     = {counter, C.get_unix_time()},
+      -- Keep a copy of the mtu here to have all
+      -- data available in a single shm frame
+      mtu       = {counter, self.mtu},
+      type      = {counter, 0x1000}, -- ethernetCsmacd
+      macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
+      speed     = {shared_counter},
+      status    = {shared_counter},
+      promisc   = {shared_counter}
+   }
+   if self.rxq then
+      self.shm.rxcounter = {counter, self.rxcounter}
+      self.shm.rxbytes   = {shared_counter}
+      self.shm.rxpackets = {shared_counter}
+      self.shm.rxmcast   = {shared_counter}
+      self.shm.rxbcast   = {shared_counter}
+      self.shm.rxdrop    = {shared_counter}
+      self.shm.rxerrors  = {shared_counter}
+      self.shm.rxdmapackets = {shared_counter}
+      if self.rxcounter then
+         for _,k in pairs { 'drops', 'packets', 'bytes' } do
+            local name = "q" .. self.rxcounter .. "_rx" .. k
+            self.shm[name] = {shared_counter}
+         end
+      end
+   end
+   if self.txq then
+      self.shm.txcounter = {counter, self.txcounter}
+      self.shm.txbytes   = {shared_counter}
+      self.shm.txpackets = {shared_counter}
+      self.shm.txmcast   = {shared_counter}
+      self.shm.txbcast   = {shared_counter}
+      self.shm.txdrop    = {shared_counter}
+      self.shm.txerrors  = {shared_counter}
+      if self.txcounter then
+         for _,k in pairs { 'packets', 'bytes' } do
+            local name = "q" .. self.txcounter .. "_tx" .. k
+            self.shm[name] = {shared_counter}
+         end
+      end
    end
 
    alarms.add_to_inventory(
@@ -450,6 +507,41 @@ function Intel:new (conf)
       1, 2e6, function() return self:rxpackets() end)
 
    return self
+end
+
+function Intel:create_stats_symlinks ()
+   local exts = {}
+   for ext, mod in pairs(shm.types) do exts[mod] = ext end
+   local head = 'pci/'..self.pciaddress..'/'
+
+   for k, v in pairs(self.shm_frame) do
+      local mod, init = unpack(v)
+      local ext = assert(exts[mod])
+      local q, dir = k:match('^q(%d+)_([rt]x)')
+      if q and q ~= tostring(self[dir..'q']) then
+         -- Don't symlink in counters for queues not used by this app.
+      else
+         local tail = k..'.'..ext
+         -- This may fail if there are multiple apps that use this NIC,
+         -- e.g. one RX app and one TX app.
+         pcall(shm.alias, head..tail, self.shm_root.."stats/"..tail)
+      end
+   end
+end
+
+function Intel:remove_stats_symlinks ()
+   local exts = {}
+   for ext, mod in pairs(shm.types) do exts[mod] = ext end
+   local head = 'pci/'..self.pciaddress..'/'
+
+   for k, v in pairs(self.shm_frame) do
+      local mod, init = unpack(v)
+      local ext = assert(exts[mod])
+      local tail = k..'.'..ext
+      S.unlink(shm.resolve(head..tail))
+   end
+   -- Leave the empty dir; there could be other files there (e.g. RRD
+   -- files).
 end
 
 function Intel:disable_interrupts ()
@@ -803,6 +895,7 @@ function Intel:stop ()
       self:unset_pool()
    end
    self:unset_tx_rate()
+   self:remove_stats_symlinks()
    if self.fd:flock("nb, ex") then
       -- delete shm state for this NIC
       shm.unlink(self.shm_root)
@@ -810,9 +903,6 @@ function Intel:stop ()
       --self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
       pci.set_bus_master(self.pciaddress, false)
       pci.close_pci_resource(self.fd, self.base)
-   end
-   if self.run_stats then
-      shm.delete_frame(self.stats)
    end
 end
 
