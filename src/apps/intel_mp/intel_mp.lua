@@ -340,6 +340,7 @@ local function shared_counter(srcdir, targetdir)
    end
    function mod.create(name)
       shm.alias(source(name), target(name))
+      return counter.open(target(name))
    end
    function mod.delete(name)
       S.unlink(shm.resolve(source(name)))
@@ -1290,7 +1291,7 @@ end
 
 function Intel1g:get_rxstats ()
    assert(self.rxq, "cannot retrieve rxstats without rxq")
-   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local frame = self.shm
    local rxc   = self.rxq
    return {
       counter_id = rxc,
@@ -1302,7 +1303,7 @@ end
 
 function Intel1g:get_txstats ()
    assert(self.txq, "cannot retrieve rxstats without txq")
-   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local frame = self.shm
    local txc   = self.txq
    return {
       counter_id = txc,
@@ -1739,7 +1740,7 @@ end
 -- is in control of the counter registers (and clears them on read)
 function Intel82599:get_rxstats ()
    assert(self.rxcounter and self.rxq, "cannot retrieve rxstats")
-   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local frame = self.shm
    local rxc   = self.rxcounter
    return {
       counter_id = rxc,
@@ -1751,7 +1752,7 @@ end
 
 function Intel82599:get_txstats ()
    assert(self.txcounter and self.txq, "cannot retrieve txstats")
-   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local frame = self.shm
    local txc   = self.txcounter
    return {
       counter_id = txc,
