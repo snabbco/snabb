@@ -9,7 +9,7 @@ arriving on a free input port may be forwarded to all other output
 ports. Packets arriving on an input port that belongs to a split-horizon
 group are never forwarded to any output port belonging to the same
 split-horizon group. There are two `bridge` implementations available:
-`apps.bridge.flooding` and apps.bridge.learning`.
+`apps.bridge.flooding` and `apps.bridge.learning`.
 
     DIAGRAM: bridge
                +----------+
