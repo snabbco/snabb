@@ -41,8 +41,9 @@ argument. The following keys are defined:
 
 — Key **aead**
 
-*Optional*. The AEAD to use for encryption and authentication. For now, only
-the default `"aes-gcm-128-12"` is supported.
+*Optional*. The identifier of the AEAD to use for encryption and
+authentication. For now, only the default `"aes-gcm-16-icv"` (AES-GCM with a 16
+octet ICV) is supported.
 
 — Key **spi**
 

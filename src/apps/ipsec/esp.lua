@@ -1,7 +1,7 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
--- This app implements a point-to-point encryption tunnel using ESP with
--- AES128GCM12 in transport mode over IPv6.
+-- Apps that implements point-to-point ESP tunnels in transport and tunnel mode
+-- for IPv6.
 
 module(..., package.seeall)
 local esp = require("lib.ipsec.esp")
@@ -12,7 +12,7 @@ local ipv6 = require("lib.protocol.ipv6")
 Transport6 = {
    config = {
       spi = {required=true},
-      aead = {default="aes-gcm-128-12"},
+      aead = {default="aes-gcm-16-icv"},
       transmit_key = {required=true},
       transmit_salt =  {required=true},
       receive_key = {required=true},
@@ -32,12 +32,12 @@ function Transport6:new (conf)
    assert(conf.transmit_salt ~= conf.receive_salt,
           "Refusing to operate with transmit_salt == receive_salt")
    self.encrypt = esp.encrypt:new{
-      mode = conf.aead,
+      aead = conf.aead,
       spi = conf.spi,
       key = conf.transmit_key,
       salt = conf.transmit_salt}
    self.decrypt = esp.decrypt:new{
-      mode = conf.aead,
+      aead = conf.aead,
       spi = conf.spi,
       key = conf.receive_key,
       salt = conf.receive_salt,
@@ -82,7 +82,7 @@ Tunnel6 = {
       self_ip = {required=true},
       nexthop_ip = {required=true},
       spi = {required=true},
-      aead = {default="aes-gcm-128-12"},
+      aead = {default="aes-gcm-16-icv"},
       transmit_key = {required=true},
       transmit_salt =  {required=true},
       receive_key = {required=true},
@@ -105,13 +105,13 @@ function Tunnel6:new (conf)
    assert(conf.selftest or conf.transmit_salt ~= conf.receive_salt,
           "Refusing to operate with transmit_salt == receive_salt")
    self.encrypt = esp.encrypt:new{
-      mode = conf.aead,
+      aead = conf.aead,
       spi = conf.spi,
       key = conf.transmit_key,
       salt = conf.transmit_salt
    }
    self.decrypt = esp.decrypt:new{
-      mode = conf.aead,
+      aead = conf.aead,
       spi = conf.spi,
       key = conf.receive_key,
       salt = conf.receive_salt,

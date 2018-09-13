@@ -51,8 +51,9 @@ ID_REV="$SDP_REV $SPISTR"
 
 REPLAY="replay-window 128"
 FLAG="flag esn"
-RALGO="aead rfc4106\(gcm\(aes\)\) 0x$RKS 96"
-TALGO="aead rfc4106\(gcm\(aes\)\) 0x$TKS 96"
+#          |aead                   |keymat  |icv bits
+RALGO="aead rfc4106\(gcm\(aes\)\)   0x$RKS   128"
+TALGO="aead rfc4106\(gcm\(aes\)\)   0x$TKS   128"
 
 cmd="echo 'spdflush; flush;' | setkey -c"
 cmd="$cmd; ip xfrm state add   $ID_FWD  mode $MODE  $REPLAY  $FLAG   $TALGO"
