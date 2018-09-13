@@ -111,21 +111,25 @@ end
 
 -- Table of request code -> name of handler method
 handler_names = {
-   [C.VHOST_USER_NONE]            = 'none',
-   [C.VHOST_USER_GET_FEATURES]    = 'get_features',
-   [C.VHOST_USER_SET_FEATURES]    = 'set_features',
-   [C.VHOST_USER_SET_OWNER]       = 'set_owner',
-   [C.VHOST_USER_RESET_OWNER]     = 'reset_owner',
-   [C.VHOST_USER_SET_MEM_TABLE]   = 'set_mem_table',
-   [C.VHOST_USER_SET_LOG_BASE]    = 'set_log_base',
-   [C.VHOST_USER_SET_LOG_FD]      = 'set_log_fd',
-   [C.VHOST_USER_SET_VRING_NUM]   = 'set_vring_num',
-   [C.VHOST_USER_SET_VRING_ADDR]  = 'set_vring_addr',
-   [C.VHOST_USER_SET_VRING_BASE]  = 'set_vring_base',
-   [C.VHOST_USER_GET_VRING_BASE]  = 'get_vring_base',
-   [C.VHOST_USER_SET_VRING_KICK]  = 'set_vring_kick',
-   [C.VHOST_USER_SET_VRING_CALL]  = 'set_vring_call',
-   [C.VHOST_USER_SET_VRING_ERR]   = 'set_vring_err'
+   [C.VHOST_USER_NONE]                  = 'none',
+   [C.VHOST_USER_GET_FEATURES]          = 'get_features',
+   [C.VHOST_USER_SET_FEATURES]          = 'set_features',
+   [C.VHOST_USER_SET_OWNER]             = 'set_owner',
+   [C.VHOST_USER_RESET_OWNER]           = 'reset_owner',
+   [C.VHOST_USER_SET_MEM_TABLE]         = 'set_mem_table',
+   [C.VHOST_USER_SET_LOG_BASE]          = 'set_log_base',
+   [C.VHOST_USER_SET_LOG_FD]            = 'set_log_fd',
+   [C.VHOST_USER_SET_VRING_NUM]         = 'set_vring_num',
+   [C.VHOST_USER_SET_VRING_ADDR]        = 'set_vring_addr',
+   [C.VHOST_USER_SET_VRING_BASE]        = 'set_vring_base',
+   [C.VHOST_USER_GET_VRING_BASE]        = 'get_vring_base',
+   [C.VHOST_USER_SET_VRING_KICK]        = 'set_vring_kick',
+   [C.VHOST_USER_SET_VRING_CALL]        = 'set_vring_call',
+   [C.VHOST_USER_SET_VRING_ERR]         = 'set_vring_err',
+   [C.VHOST_USER_GET_PROTOCOL_FEATURES] = 'get_protocol_features',
+   [C.VHOST_USER_SET_PROTOCOL_FEATURES] = 'set_protocol_features',
+   [C.VHOST_USER_GET_QUEUE_NUM]         = 'get_queue_num',
+   [C.VHOST_USER_SET_VRING_ENABLE]      = 'set_vring_enable'
 }
 
 -- Process all vhost_user requests from QEMU.
@@ -176,6 +180,26 @@ function VhostUser:set_features (msg)
    -- Check if we have an up-to-date feature to override with
    local features = self:update_features(tonumber(msg.u64))
    self.dev:set_features(features)
+end
+
+function VhostUser:get_protocol_features (msg)
+   msg.u64 = 0ULL -- no extensions supported for now
+   msg.size = ffi.sizeof("uint64_t")
+   self:reply(msg)
+end
+
+function VhostUser:set_protocol_features (msg)
+   -- ignore protocol features for now (FIXME)
+end
+
+function VhostUser:get_queue_num (msg)
+   -- ignore for now (FIXME)
+end
+
+-- Handle VHOST_USER_SET_VRING_ENABLE, which explicitly enables/disables the
+-- ring (this msg is only used if VHOST_USER_F_PROTOCOL_FEATURES is used)
+function VhostUser:set_vring_enable (msg)
+   self.vhost_ready = msg.u64 ~= 0
 end
 
 -- Feature cache: A kludge to be compatible with a "QEMU reconnect" patch.
