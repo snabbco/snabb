@@ -303,8 +303,7 @@ Intel = {
       pciaddr = {required=true},
       ring_buffer_size = {default=2048},
       vmdq = {default=false},
-      vmdq_queueing_mode = {default="rss-64-2"},
-      vmdq_queuing_mode = {}, -- legacy misspelling
+      vmdq_queuing_mode = {default="rss-64-2"},
       macaddr = {},
       poolnum = {},
       vlan = {},
@@ -340,9 +339,9 @@ driver = Intel
 vmdq_enabled_t = ffi.typeof("struct { uint8_t enabled; }")
 -- C type for shared memory indicating which pools are used
 local vmdq_pools_t = ffi.typeof("struct { uint8_t pools[64]; }")
--- C type for VMDq queueing mode
+-- C type for VMDq queuing mode
 -- mode = 0 for 32 pools/4 queues, 1 for 64 pools/2 queues
-local vmdq_queueing_mode_t = ffi.typeof("struct { uint8_t mode; }")
+local vmdq_queuing_mode_t = ffi.typeof("struct { uint8_t mode; }")
 
 function Intel:new (conf)
    local self = {
@@ -370,7 +369,7 @@ function Intel:new (conf)
       -- processes
       shm_root = "/intel-mp/" .. pci.canonical(conf.pciaddr) .. "/",
       -- only used for main process, affects max pool number
-      vmdq_queueing_mode = conf.vmdq_queuing_mode or conf.vmdq_queueing_mode
+      vmdq_queuing_mode = conf.vmdq_queuing_mode
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -400,14 +399,14 @@ function Intel:new (conf)
          for i=0, 63 do vmdq_shm.pools[i] = 0 end
          shm.unmap(vmdq_shm)
          -- set VMDq pooling method for all instances on this NIC
-         local mode_shm = shm.create(self.shm_root .. "vmdq_queueing_mode",
-                                     vmdq_queueing_mode_t)
-         if self.vmdq_queueing_mode == "rss-32-4" then
+         local mode_shm = shm.create(self.shm_root .. "vmdq_queuing_mode",
+                                     vmdq_queuing_mode_t)
+         if self.vmdq_queuing_mode == "rss-32-4" then
             mode_shm.mode = 0
-         elseif self.vmdq_queueing_mode == "rss-64-2" then
+         elseif self.vmdq_queuing_mode == "rss-64-2" then
             mode_shm.mode = 1
          else
-            error("Invalid VMDq queueing mode")
+            error("Invalid VMDq queuing mode")
          end
          shm.unmap(mode_shm)
       end
@@ -558,9 +557,9 @@ function Intel:select_pool()
    elseif self.registers == "82599ES" then
       -- max queue number is different in VMDq mode
       self.max_q = 128
-      -- check the queueing mode in shm, adjust max pools based on that
-      local mode_shm = shm.open(self.shm_root .. "vmdq_queueing_mode",
-                                vmdq_queueing_mode_t)
+      -- check the queuing mode in shm, adjust max pools based on that
+      local mode_shm = shm.open(self.shm_root .. "vmdq_queuing_mode",
+                                vmdq_queuing_mode_t)
       if mode_shm.mode == 0 then
          self.max_pool = 32
       else
@@ -1231,8 +1230,8 @@ function Intel1g:vmdq_enable ()
    -- 4.6.11.1.1 Global Filtering and Offload Capabilities
    assert(self.registers == "i350", "VMDq not supported by "..self.registers)
    -- 011b = Multiple receive queues as defined by VMDq based on packet
-   -- destination MAC address (RAH.POOLSEL) and Ether-type queueing decision
-   -- filters. NB: ignore self.vmdq_queueing_mode, i350 only supports 8 pools
+   -- destination MAC address (RAH.POOLSEL) and Ether-type queuing decision
+   -- filters. NB: ignore self.vmdq_queuing_mode, i350 only supports 8 pools
    -- with one queue each.
    self.r.MRQC:bits(0, 3, 0x3)
    -- No packet splitting
@@ -1599,7 +1598,7 @@ function Intel82599:vmdq_enable ()
    -- must be set prior to setting MTQC (7.2.1.2.1)
    self.r.RTTDCS:set(bits { ARBDIS=6 })
 
-   if self.vmdq_queueing_mode == "rss-32-4" then
+   if self.vmdq_queuing_mode == "rss-32-4" then
       -- 1010 -> 32 pools, 4 RSS queues each
       self.r.MRQC:bits(0, 4, 0xA)
       -- Num_TC_OR_Q=10b -> 32 pools (4.6.11.3.3 and 8.2.3.9.15)
