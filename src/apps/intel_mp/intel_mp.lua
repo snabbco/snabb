@@ -896,7 +896,6 @@ function Intel:stop ()
       self:unset_pool()
    end
    self:unset_tx_rate()
-   self:remove_stats_symlinks()
    if self.fd:flock("nb, ex") then
       -- delete shm state for this NIC
       shm.unlink(self.shm_root)
