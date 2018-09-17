@@ -15,8 +15,9 @@ config.app(c, "nic", intel.Intel,
            {pciaddr=pciaddr, txq=qno, wait_for_link=true})
 
 if os.getenv("SNABB_SEND_BLAST") then
-	local basic = require("apps.basic.basic_apps")
-	config.app(c, "repeat", basic.Repeater)
+	local loadgen =  require("apps.lwaftr.loadgen")
+        local rate = tonumber(os.getenv("SNABB_SEND_BLAST_RATE")) or 10e9
+	config.app(c, "repeat", loadgen.RateLimitedRepeater,{rate=rate})
 	config.link(c, "pcap.output -> repeat.input")
 	config.link(c, "repeat.output -> nic.input")
 else
