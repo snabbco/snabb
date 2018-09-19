@@ -554,7 +554,7 @@ function compute_display_tree.tree(tree, prev, dt, t)
                   local rate = compute_rate(v, prev, rrd, t, dt)
                   local v, tag = scale(rate)
                   out = lchars("%s: %.3f %s%s", k, v, tag, units or "/sec")
-               elseif k == 'macaddr' then
+               elseif k:match('macaddr') then
                   out = lchars("%s: %s", k, macaddr_string(v))
                else
                   out = lchars("%s: %s", k, lib.comma_value(v))
