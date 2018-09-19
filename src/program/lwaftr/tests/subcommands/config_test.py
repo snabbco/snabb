@@ -11,6 +11,8 @@ from subprocess import PIPE, Popen
 import time
 import unittest
 import re
+import random
+import string
 
 from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, \
                      DAEMON_STARTUP_WAIT, BaseTestCase, nic_names
@@ -26,6 +28,26 @@ DAEMON_ARGS = [
 ]
 LISTEN_SOCKET_PATH = '/tmp/snabb-lwaftr-listen-sock-%s' % DAEMON_PROC_NAME
 MANAGER_SOCKET_PATH = '/var/run/snabb/by-name/%s/config-leader-socket' % DAEMON_PROC_NAME
+
+def random_string(n=8):
+    return ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(n))
+
+def set_random_name(test):
+    global DAEMON_PROC_NAME
+    global LISTEN_SOCKET_PATH
+    global MANAGER_SOCKET_PATH
+
+    # Create random name.
+    name = 'config-test-daemon-' + random_string()
+
+    DAEMON_PROC_NAME = name
+    LISTEN_SOCKET_PATH = '/tmp/snabb-lwaftr-listen-sock-%s' % DAEMON_PROC_NAME
+    MANAGER_SOCKET_PATH = '/var/run/snabb/by-name/%s/config-leader-socket' % DAEMON_PROC_NAME
+
+    # Update test arguments name.
+    test.daemon_args[6] = name
+    test.config_args = list(test.config_args)
+    test.config_args[4] = name
 
 def wait_for_socket(socket_path, timeout=5, step=0.1):
     for i in range(0, int(timeout/step)):
@@ -122,6 +144,8 @@ class TestConfigMultiproc(BaseTestCase):
         """ Starts the daemon with a specific config """
         if self.daemon is not None:
             raise Exception("Daemon already started")
+
+        set_random_name(self)
 
         daemon_args = list(self.daemon_args)
         daemon_args[7] = config
