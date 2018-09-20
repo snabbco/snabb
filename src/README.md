@@ -258,6 +258,10 @@ following keys are recognized:
    printed.
 
 
+— Function **engine.stop**
+
+Stop all apps in the engine by loading an empty configuration.
+
 — Function **engine.now**
 
 Returns monotonic time in seconds as a floating point number. Suitable

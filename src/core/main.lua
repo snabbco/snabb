@@ -172,17 +172,19 @@ end
 
 -- Cleanup after Snabb process.
 function shutdown (pid)
+   -- simple pcall helper to print error and continue
+   local function safely (f)
+      local ok, err = pcall(f)
+      if not ok then print(err) end
+   end
+   -- Run cleanup hooks
+   safely(function () require("apps.interlink.receiver").shutdown(pid) end)
+   safely(function () require("apps.interlink.transmitter").shutdown(pid) end)
    -- Parent process performs additional cleanup steps.
    -- (Parent is the process whose 'group' folder is not a symlink.)
    local st, err = S.lstat(shm.root.."/"..pid.."/group")
    local is_parent = st and st.isdir
    if is_parent then
-      -- simple pcall helper to print error and continue
-      local function safely (f)
-         local ok, err = pcall(f)
-         if not ok then print(err) end
-      end
-      -- Run cleanup hooks
       safely(function () require("lib.hardware.pci").shutdown(pid) end)
       safely(function () require("core.memory").shutdown(pid) end)
    end

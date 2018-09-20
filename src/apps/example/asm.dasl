@@ -19,7 +19,8 @@ local asm_status = ffi.new("uint32_t[1]")
 |.arch x64
 |.actionlist actions
 local Dst = dasm.new(actions)
-| mov dword [asm_status], 0xdeadbeef
+| mov64 rax, asm_status
+| mov dword [rax], 0xdeadbeef
 | ret
 code = Dst:build() -- assign to 'code' to avoid machine code being GC'd
 fptr = ffi.cast("void(*)()", code)
