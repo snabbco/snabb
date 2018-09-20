@@ -58,7 +58,7 @@ function gen(count, size)
          tail_mask = ffi.new("uint8_t[32]")
          for i=0,tail_size-1 do tail_mask[i]=255 end
          table.insert(anchor, tail_mask)
-         | mov rax, tail_mask
+         | mov64 rax, tail_mask
          | vmovdqu ymm15, [rax]
       end
 

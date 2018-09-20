@@ -146,12 +146,12 @@ function allocate_huge_page (size,  persistent)
    local fd = syscall.open(tmpfile, "creat, rdwr", "RWXU")
    assert(fd, "create hugetlb")
    assert(syscall.ftruncate(fd, size), "ftruncate")
-   local tmpptr = syscall.mmap(nil, size, "read, write", "shared, hugetlb", fd, 0)
+   local tmpptr = syscall.mmap(nil, size, "read, write", "shared", fd, 0)
    assert(tmpptr, "mmap hugetlb")
    assert(syscall.mlock(tmpptr, size))
    local phys = resolve_physical(tmpptr)
    local virt = bit.bor(phys, tag)
-   local ptr = syscall.mmap(virt, size, "read, write", "shared, hugetlb, fixed", fd, 0)
+   local ptr = syscall.mmap(virt, size, "read, write", "shared, fixed", fd, 0)
    local filename = ("/var/run/snabb/hugetlbfs/%012x.dma"):format(tonumber(phys))
    if persistent then
       assert(syscall.rename(tmpfile, filename))
@@ -160,6 +160,7 @@ function allocate_huge_page (size,  persistent)
    else
       assert(syscall.unlink(tmpfile))
    end
+   syscall.munmap(tmpptr, size)
    syscall.close(fd)
    return ptr, filename
 end

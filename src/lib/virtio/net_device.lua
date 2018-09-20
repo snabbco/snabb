@@ -54,7 +54,8 @@ local invalid_header_id = 0xffff
 local supported_features = C.VIRTIO_F_ANY_LAYOUT +
                            C.VIRTIO_NET_F_CTRL_VQ +
                            C.VIRTIO_NET_F_MQ +
-                           C.VIRTIO_NET_F_CSUM
+                           C.VIRTIO_NET_F_CSUM +
+                           C.VHOST_USER_F_PROTOCOL_FEATURES
 --[[
    The following offloading flags are also available:
    VIRTIO_NET_F_CSUM
@@ -229,6 +230,7 @@ end
 
 function VirtioNetDevice:tx_packet_start(addr, len)
    local l = self.owner.input.rx
+   assert(l, "input port not found")
    if link.empty(l) then return nil, nil end
    local tx_p = link.receive(l)
 
@@ -265,6 +267,7 @@ end
 function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
    local tx_mrg_hdr = ffi.cast(virtio_net_hdr_mrg_rxbuf_type, self:map_from_guest(addr))
    local l = self.owner.input.rx
+   assert(l, "input port not found")
    local tx_p = self.tx.p
    ffi.fill(tx_mrg_hdr, virtio_net_hdr_mrg_rxbuf_size)
 
@@ -494,7 +497,9 @@ feature_names = {
    [C.VIRTIO_NET_F_CTRL_MAC_ADDR]               = "VIRTIO_NET_F_CTRL_MAC_ADDR",
    [C.VIRTIO_NET_F_CTRL_GUEST_OFFLOADS]         = "VIRTIO_NET_F_CTRL_GUEST_OFFLOADS",
 
-   [C.VIRTIO_NET_F_MQ]                          = "VIRTIO_NET_F_MQ"
+   [C.VIRTIO_NET_F_MQ]                          = "VIRTIO_NET_F_MQ",
+
+   [C.VHOST_USER_F_PROTOCOL_FEATURES]           = "VHOST_USER_F_PROTOCOL_FEATURES"
 }
 
 -- Request fresh Just-In-Time compilation of the vring processing code.

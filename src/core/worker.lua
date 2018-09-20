@@ -65,7 +65,8 @@ function status ()
       local infop = S.waitid("pid", info.pid, "nohang, exited")
       status[name] = {
          pid = info.pid,
-         alive = infop and infop.code == 0 or false
+         alive = infop and infop.code == 0 or false,
+         status = infop and infop.status
       }
    end
    return status

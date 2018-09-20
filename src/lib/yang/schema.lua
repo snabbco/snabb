@@ -51,7 +51,11 @@ end
 local function parse_range_or_length_arg(loc, kind, range)
    local function parse_part(part)
       local l, r = part:match("^%s*([^%.]*)%s*%.%.%s*([^%s]*)%s*$")
-      assert_with_loc(l, loc, 'bad range component: %s', part)
+      if not r then
+         l = part:match("^%s*([^%.]*)%s*$")
+         r = (l ~= 'min') and l
+      end
+      assert_with_loc(l and r, loc, 'bad range component: %s', part)
       if l ~= 'min' then l = util.tointeger(l) end
       if r ~= 'max' then r = util.tointeger(r) end
       if l ~= 'min' and l < 0 and kind == 'length' then
@@ -459,7 +463,7 @@ local function init_type(node, loc, argument, children)
    node.id = require_argument(loc, argument)
    node.range = maybe_child(loc, children, 'range')
    node.fraction_digits = maybe_child_property(loc, children, 'fraction-digits', 'value')
-   node.length = maybe_child_property(loc, children, 'length', 'value')
+   node.length = maybe_child(loc, children, 'length')
    node.patterns = collect_children(children, 'pattern')
    node.enums = collect_children(children, 'enum')
    -- !!! path
@@ -1189,5 +1193,9 @@ function selftest()
    assert(icschema.body.grault.body.quuz.config == true)
    assert(icschema.body.garply.config == false)
    assert(icschema.body.garply.body.quuz.config == false)
+
+   -- Test Range with explicit value.
+   assert(lib.equal(parse_range_or_length_arg(nil, nil, "42"), {{42, 42}}))
+
    print('selftest: ok')
 end
