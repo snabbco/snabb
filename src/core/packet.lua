@@ -10,7 +10,9 @@ local C = ffi.C
 
 local lib      = require("core.lib")
 local memory   = require("core.memory")
+local shm      = require("core.shm")
 local counter  = require("core.counter")
+local sync     = require("core.sync")
 
 require("core.packet_h")
 
@@ -45,18 +47,25 @@ end
 
 -- Freelist containing empty packets ready for use.
 
-ffi.cdef[[
+local max_packets = 1e6
+
+ffi.cdef([[
 struct freelist {
+    int32_t lock[1];
     uint64_t nfree;
     uint64_t max;
-    struct packet *list[?];
+    struct packet *list[]]..max_packets..[[];
 };
-]]
+]])
+
+local function freelist_full(freelist)
+   return freelist.nfree == freelist.max
+end
 
 local function freelist_add(freelist, element)
    -- Safety check
    if _G.developer_debug then
-      assert(freelist.nfree < freelist.max, "freelist overflow")
+      assert(not freelist_full(freelist), "freelist overflow")
    end
    freelist.list[freelist.nfree] = element
    freelist.nfree = freelist.nfree + 1
@@ -75,15 +84,53 @@ local function freelist_nfree(freelist)
    return freelist.nfree
 end
 
-local max_packets = 1e6
+local function freelist_lock(freelist)
+   sync.lock(freelist.lock)
+end
+
+local function freelist_unlock(freelist)
+   sync.unlock(freelist.lock)
+end
+
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = ffi.new("struct freelist", max_packets, 0, max_packets)
+local packets_fl = ffi.new("struct freelist", {max=max_packets})
+local group_fl -- Initialized on demand.
+
+-- Call to ensure group freelist is enabled.
+function enable_group_freelist ()
+   if not group_fl then
+      group_fl = shm.create("group/packets.freelist", "struct freelist")
+      group_fl.max = max_packets
+   end
+end
+
+-- Return borrowed packets to group freelist.
+function rebalance_freelists ()
+   if group_fl and freelist_nfree(packets_fl) > packets_allocated then
+      freelist_lock(group_fl)
+      while freelist_nfree(packets_fl) > packets_allocated
+      and not freelist_full(group_fl) do
+         freelist_add(group_fl, freelist_remove(packets_fl))
+      end
+      freelist_unlock(group_fl)
+   end
+end
 
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
-      preallocate_step()
+      if group_fl then
+         freelist_lock(group_fl)
+         while freelist_nfree(group_fl) > 0
+         and freelist_nfree(packets_fl) < packets_allocated do
+            freelist_add(packets_fl, freelist_remove(group_fl))
+         end
+         freelist_unlock(group_fl)
+      end
+      if freelist_nfree(packets_fl) == 0 then
+         preallocate_step()
+      end
    end
    return freelist_remove(packets_fl)
 end
@@ -173,12 +220,16 @@ local function free_internal (p)
    freelist_add(packets_fl, p)
 end   
 
-function free (p)
+function account_free (p)
    counter.add(engine.frees)
    counter.add(engine.freebytes, p.length)
    -- Calculate bits of physical capacity required for packet on 10GbE
    -- Account for minimum data size and overhead of CRC and inter-packet gap
    counter.add(engine.freebits, (math.max(p.length, 46) + 4 + 5) * 8)
+end
+
+function free (p)
+   account_free(p)
    free_internal(p)
 end
 
