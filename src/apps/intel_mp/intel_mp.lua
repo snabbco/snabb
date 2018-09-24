@@ -510,41 +510,6 @@ function Intel:new (conf)
    return self
 end
 
-function Intel:create_stats_symlinks ()
-   local exts = {}
-   for ext, mod in pairs(shm.types) do exts[mod] = ext end
-   local head = 'pci/'..self.pciaddress..'/'
-
-   for k, v in pairs(self.shm_frame) do
-      local mod, init = unpack(v)
-      local ext = assert(exts[mod])
-      local q, dir = k:match('^q(%d+)_([rt]x)')
-      if q and q ~= tostring(self[dir..'q']) then
-         -- Don't symlink in counters for queues not used by this app.
-      else
-         local tail = k..'.'..ext
-         -- This may fail if there are multiple apps that use this NIC,
-         -- e.g. one RX app and one TX app.
-         pcall(shm.alias, head..tail, self.shm_root.."stats/"..tail)
-      end
-   end
-end
-
-function Intel:remove_stats_symlinks ()
-   local exts = {}
-   for ext, mod in pairs(shm.types) do exts[mod] = ext end
-   local head = 'pci/'..self.pciaddress..'/'
-
-   for k, v in pairs(self.shm_frame) do
-      local mod, init = unpack(v)
-      local ext = assert(exts[mod])
-      local tail = k..'.'..ext
-      S.unlink(shm.resolve(head..tail))
-   end
-   -- Leave the empty dir; there could be other files there (e.g. RRD
-   -- files).
-end
-
 function Intel:disable_interrupts ()
    self.r.EIMC(0xffffffff)
 end
