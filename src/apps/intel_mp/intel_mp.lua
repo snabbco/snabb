@@ -1488,6 +1488,7 @@ function Intel82599:check_vmdq ()
    if not self.vmdq then
       assert(not self.macaddr, "VMDq must be set to use MAC address")
       assert(not self.mirror, "VMDq must be set to specify mirroring rules")
+
       if not self.master then
          assert(vmdq_shm.enabled == 0,
                 "VMDq was set by the main process for this NIC")
@@ -1495,6 +1496,7 @@ function Intel82599:check_vmdq ()
    else
       assert(self.driver == "Intel82599", "VMDq only supported on 82599")
       assert(self.macaddr, "MAC address must be set in VMDq mode")
+
       if not self.master then
          assert(vmdq_shm.enabled == 1,
                 "VMDq not set by the main process for this NIC")
