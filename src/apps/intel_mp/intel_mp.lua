@@ -412,7 +412,7 @@ function Intel:new (conf)
    self.run_stats = conf.run_stats or (self.master and conf.master_stats)
    if self.run_stats then
       self.sync_timer = lib.throttle(0.01)
-      local stats_frame = {
+      local frame = {
          -- Keep a copy of the mtu here to have all
          -- data available in a single shm frame
          mtu       = {counter, self.mtu},
@@ -435,8 +435,8 @@ function Intel:new (conf)
          txdrop    = {counter},
          txerrors  = {counter},
       }
-      self:init_queue_stats(stats_frame)
-      self.stats = shm.create_frame(self.shm_root.."stats", stats_frame)
+      self:init_queue_stats(frame)
+      self.stats = shm.create_frame(self.shm_root.."stats", frame)
    end
 
    -- Expose per-device statistics from master
