@@ -411,7 +411,6 @@ function Intel:new (conf)
    -- Figure out if we are supposed to collect device statistics
    self.run_stats = conf.run_stats or (self.master and conf.master_stats)
    if self.run_stats then
-      self.sync_timer = lib.throttle(0.01)
       local frame = {
          -- Keep a copy of the mtu here to have all
          -- data available in a single shm frame
@@ -437,6 +436,7 @@ function Intel:new (conf)
       }
       self:init_queue_stats(frame)
       self.stats = shm.create_frame(self.shm_root.."stats", frame)
+      self.sync_timer = lib.throttle(0.01)
    end
 
    -- Expose per-device statistics from master
@@ -868,6 +868,9 @@ function Intel:stop ()
       --self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
       pci.set_bus_master(self.pciaddress, false)
       pci.close_pci_resource(self.fd, self.base)
+   end
+   if self.run_stats then
+      shm.delete_frame(self.stats)
    end
 end
 
