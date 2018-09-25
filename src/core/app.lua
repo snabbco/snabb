@@ -137,6 +137,12 @@ function configure (new_config)
    counter.add(configs)
 end
 
+
+-- Stop all apps by loading an empty configuration.
+function stop ()
+   configure(config.new())
+end
+
 -- Removes the claim on a name, freeing it for other programs.
 --
 -- This relinquish a claim on a name if one exists. if the name does not
@@ -723,6 +729,11 @@ function selftest ()
    assert(app_table.app3 == orig_app3) -- should be the same
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
+
+   -- Check engine stop
+   assert(not lib.equal(app_table, {}))
+   engine.stop()
+   assert(lib.equal(app_table, {}))
 
    -- Check one can't unclaim a name if no name is claimed.
    assert(not pcall(unclaim_name))
