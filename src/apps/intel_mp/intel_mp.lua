@@ -340,7 +340,13 @@ local function shared_counter(srcdir, targetdir)
    end
    function mod.create(name)
       shm.alias(source(name), target(name))
-      return counter.open(target(name))
+      local c
+      local function read_shared_counter ()
+         if not c then c = pcall(counter.open, target(name)) end
+         if not c then return 0ULL end
+         return counter.read(c)
+      end
+      return read_shared_counter
    end
    function mod.delete(name)
       S.unlink(shm.resolve(source(name)))
@@ -1258,24 +1264,22 @@ end
 
 function Intel1g:get_rxstats ()
    assert(self.rxq, "cannot retrieve rxstats without rxq")
-   local frame = self.shm
-   local rxc   = self.rxq
+   local rxc = self.rxq
    return {
       counter_id = rxc,
-      packets = counter.read(frame["q"..rxc.."_rxpackets"]),
-      dropped = counter.read(frame["q"..rxc.."_rxdrops"]),
-      bytes = counter.read(frame["q"..rxc.."_rxbytes"])
+      packets = self.shm["q"..rxc.."_rxpackets"](),
+      dropped = self.shm["q"..rxc.."_rxdrops"](),
+      bytes = self.shm["q"..rxc.."_rxbytes"]()
    }
 end
 
 function Intel1g:get_txstats ()
    assert(self.txq, "cannot retrieve rxstats without txq")
-   local frame = self.shm
-   local txc   = self.txq
+   local txc = self.txq
    return {
       counter_id = txc,
-      packets = counter.read(frame["q"..txc.."_txpackets"]),
-      bytes = counter.read(frame["q"..txc.."_txbytes"])
+      packets = self.shm["q"..txc.."_txpackets"](),
+      bytes = self.shm["q"..txc.."_txbytes"]()
    }
 end
 
@@ -1707,24 +1711,22 @@ end
 -- is in control of the counter registers (and clears them on read)
 function Intel82599:get_rxstats ()
    assert(self.rxcounter and self.rxq, "cannot retrieve rxstats")
-   local frame = self.shm
-   local rxc   = self.rxcounter
+   local rxc = self.rxcounter
    return {
       counter_id = rxc,
-      packets = counter.read(frame["q"..rxc.."_rxpackets"]),
-      dropped = counter.read(frame["q"..rxc.."_rxdrops"]),
-      bytes = counter.read(frame["q"..rxc.."_rxbytes"])
+      packets = self.shm["q"..rxc.."_rxpackets"](),
+      dropped = self.shm["q"..rxc.."_rxdrops"](),
+      bytes = self.shm["q"..rxc.."_rxbytes"]()
    }
 end
 
 function Intel82599:get_txstats ()
    assert(self.txcounter and self.txq, "cannot retrieve txstats")
-   local frame = self.shm
-   local txc   = self.txcounter
+   local txc = self.txcounter
    return {
       counter_id = txc,
-      packets = counter.read(frame["q"..txc.."_txpackets"]),
-      bytes = counter.read(frame["q"..txc.."_txbytes"])
+      packets = self.shm["q"..txc.."_txpackets"](),
+      bytes = self.shm["q"..txc.."_txbytes"]()
    }
 end
 
