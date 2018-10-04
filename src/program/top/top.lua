@@ -130,23 +130,6 @@ local function monitor_snabb_instance(pid, instance, counters, histograms, rrds)
                instance.group = nil
             end
             needs_redisplay()
-         -- if a link to a pci folder is created, then monitor it too
-         elseif event.name:match('^'..dir..'/pci/[%d:%.]+$') then
-            local pciaddr = event.name:match('/pci/([%d:%.]+)$')
-            local target = S.readlink(event.name)
-            if target and event.kind == 'creat' then
-               local pci_rx = inotify.recursive_directory_inventory_events(target)
-               local pci_op = pci_rx:get_operation()
-               -- make snabb top think the path is relative to the link, not the target
-               local function relocate(v)
-                  return { name = v.name:gsub("intel%-mp/[%d:%.]+/stats",
-                                              pid.."/pci/"..pciaddr),
-                           kind = v.kind }
-               end
-               pci_op = pci_op:wrap(relocate)
-               rx_op = op.choice(pci_op, rx_op)
-            end
-            needs_redisplay()
          elseif event.name:match('%.histogram$') then
             local name = event.name:sub(#dir + 2):match('^(.*)%.histogram')
             if event.kind == 'creat' then
@@ -372,36 +355,6 @@ local function compute_histograms_tree(histograms)
    return ret
 end
 
--- given a table of apps in the process & table of sets of pci counters,
--- remove the counters not used by the apps in the process
-local function filter_queue_counters(apps, pcis)
-   local enabled_rx = 0
-   local enabled_tx = 0
-   for _, app in pairs(apps) do
-      for name, leaf in pairs(app) do
-         if name == "rxcounter" then
-            enabled_rx = lib.bits({bit=leaf.value()}, enabled_rx)
-         elseif name == "txcounter" then
-            enabled_tx = lib.bits({bit=leaf.value()}, enabled_tx)
-         end
-      end
-   end
-   for _, pci in pairs(pcis) do
-      for i=0, 15 do
-         if not lib.bitset(enabled_rx, i) then
-            pci["q"..i.."_".."rxpackets"] = nil
-            pci["q"..i.."_".."rxdrops"] = nil
-            pci["q"..i.."_".."rxbytes"] = nil
-         end
-         if not lib.bitset(enabled_tx, i) then
-            pci["q"..i.."_".."txpackets"] = nil
-            pci["q"..i.."_".."txdrops"] = nil
-            pci["q"..i.."_".."txbytes"] = nil
-         end
-      end
-   end
-end
-
 local function compute_counters_tree(counters, rrds)
    if counters == nil then return {} end
    local ret = {}
@@ -416,9 +369,6 @@ local function compute_counters_tree(counters, rrds)
          parent[leaf] = make_leaf(
             function() return counter.read(v) end, rrds[k])
       end
-   end
-   if ret.pci and ret.apps then
-      filter_queue_counters(ret.apps, ret.pci)
    end
    -- The rxpackets and rxbytes link counters are redundant.
    if ret.links then
@@ -691,7 +641,32 @@ function compute_display_tree.interface(tree, prev, dt, t)
       show_traffic('rx', pci, prev)
       show_traffic('tx', pci, prev)
    end
+   local function union(dst, src)
+      if type(src) == 'table' and not is_leaf(src) then
+         for k, v in pairs(src) do
+            if dst[k] == nil then
+               dst[k] = v
+            elseif not is_leaf(v) and not is_leaf(dst[k]) then
+               union(dst[k], v)
+            end
+         end
+      end
+   end
+   local function find_pci_devices(node, ret)
+      ret = ret or {}
+      if type(node) == 'table' and not is_leaf(node) then
+         for k, v in pairs(node) do
+            if k == 'pci' then
+               union(ret, v)
+            else
+               find_pci_devices(v, ret)
+            end
+         end
+      end
+      return ret
+   end
    local function show_instance(label, instance, prev)
+      local pci, prev_pci = find_pci_devices(instance), find_pci_devices(prev)
       local engine, prev_engine = instance.engine, prev and prev.engine
       local latency = engine and engine.latency and engine.latency.value
       local latency_str = ''
@@ -713,9 +688,8 @@ function compute_display_tree.interface(tree, prev, dt, t)
          end
       else
          -- Note, PCI tree only shown on instances without workers.
-         for addr, pci in sortedpairs(instance.pci or {}) do
-            local prev = prev and prev.pci and prev.pci[addr]
-            show_pci(addr, pci, prev)
+         for addr, pci in sortedpairs(pci) do
+            show_pci(addr, pci, prev_pci[addr])
          end
       end
    end

@@ -251,7 +251,7 @@ local driver_helpers = {
          return 'input', 'output'
       end,
       stats_path = function (intf)
-         return 'pci/'..intf.pci_address
+         return 'apps/'..intf.app:name()..'/pci/'..intf.pci_address
       end
    },
    ['apps.tap.tap.Tap'] = {
