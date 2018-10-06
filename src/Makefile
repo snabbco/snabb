@@ -126,12 +126,12 @@ $(OBJDIR) bin testlog $(OBJDIR/doc):
 
 $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 	$(E) "LUA       $@"
-	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
+	$(Q) luajit -bg $< $@
 
 $(PFLUAOBJ): obj/%_lua.o: ../lib/pflua/src/%.lua Makefile
 	$(E) "LUA       $@"
 	$(Q) mkdir -p $(dir $@)
-	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
+	$(Q) luajit -bg $< $@
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
@@ -150,12 +150,12 @@ $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	@(echo -n "module(...,package.seeall); require(\"ffi\").cdef[=============["; \
 	 cat $<; \
 	 echo "]=============]") > $(basename $@).luah
-	$(Q) luajit -bg -n $(subst /,.,$*)_h $(basename $@).luah $@
+	$(Q) luajit -bg $(basename $@).luah $@
 
 $(ASMOBJ): obj/%_dasl.o: %.dasl $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
 	$(Q) luajit dynasm.lua -o $@.gen $<
-	$(Q) luajit -bg -n $(subst /,.,$*) $@.gen $@
+	$(Q) luajit -bg $@.gen $@
 
 $(PFLUAASMOBJ): obj/%_dasl.o: ../lib/pflua/src/%.dasl $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
@@ -176,7 +176,7 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	@(echo -n "return [=============["; \
 	 cat $<; \
 	 echo "]=============]") > $(basename $@).luainc
-	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
+	$(Q) luajit -bg $(basename $@).luainc $@
 
 $(YANGOBJ): obj/%_yang.o: %.yang Makefile | $(OBJDIR)
 	$(E) "YANG      $@"
