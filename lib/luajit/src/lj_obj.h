@@ -598,7 +598,8 @@ typedef struct global_State {
   lua_Alloc allocf;	/* Memory allocator. */
   void *allocd;		/* Memory allocator data. */
   GCState gc;		/* Garbage collector. */
-  volatile int32_t vmstate;  /* VM state or current JIT code trace number. */
+  volatile int32_t vmstate;   /* VM state or current JIT code trace number. */
+  volatile int32_t gcvmstate; /* Previous VM state (only when state is GC). */
   SBuf tmpbuf;		/* Temporary string buffer. */
   GCstr strempty;	/* Empty string. */
   uint8_t stremptyz;	/* Zero terminator of empty string. */
