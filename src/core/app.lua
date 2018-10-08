@@ -50,6 +50,14 @@ function timeline ()
    return timeline_log
 end
 
+-- Breath latency histogram
+local latency -- initialized on demand
+function enable_latency_histogram ()
+   if latency == nil then
+      latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)
+   end
+end
+
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
 -- Timeline events specific to app instances
@@ -529,10 +537,10 @@ function main (options)
    -- Ensure timeline is created and initialized
    timeline()
 
-   -- Enable latency histogram if requested
+   -- Enable latency histogram unless explicitly disabled
    local breathe = breathe
    if options.measure_latency or options.measure_latency == nil then
-      local latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)
+      enable_latency_histogram()
       breathe = latency:wrap_thunk(breathe, now)
    end
 
