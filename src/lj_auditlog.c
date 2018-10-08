@@ -173,7 +173,7 @@ static void log_GCtrace(GCtrace *T)
   log_mem("SnapShot[]", T->snap, T->nsnap * sizeof(*T->snap));
   log_mem("SnapEntry[]", T->snapmap, T->nsnapmap * sizeof(*T->snapmap));
   log_mem("IRIns[]", &T->ir[T->nk], (T->nins - T->nk + 1) * sizeof(IRIns));
-  log_mem("uint16_t[]", T->szirmcode, (T->nins - REF_BIAS - 1) * sizeof(uint16_t));
+  log_mem("uint16_t[]", T->szirmcode, T->nszirmcode * sizeof(uint16_t));
   for (ref = T->nk; ref < REF_TRUE; ref++) {
     IRIns *ir = &T->ir[ref];
     if (ir->o == IR_KGC) {
