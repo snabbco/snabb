@@ -173,10 +173,7 @@ static void close_state(lua_State *L)
   lj_mem_free(g, J->snapbuf, sizeof(SnapShot)*65536);
   lj_mem_free(g, J->irbuf, 65536*sizeof(IRIns));
   lj_mem_free(g, J->trace, TRACE_MAX * sizeof(GCRef *));
-#if 0
-  /* XXX Fix deallocation so that this assertion succeeds. */
   lua_assert(g->gc.total == sizeof(GG_State));
-#endif
 #ifndef LUAJIT_USE_SYSMALLOC
   if (g->allocf == lj_alloc_f)
     lj_alloc_destroy(g->allocd);

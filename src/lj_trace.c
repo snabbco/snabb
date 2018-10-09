@@ -91,7 +91,12 @@ GCtrace * lj_trace_alloc(lua_State *L, GCtrace *T)
   T2->nk = T->nk;
   T2->nsnap = T->nsnap;
   T2->nsnapmap = T->nsnapmap;
-  T2->szirmcode = T->szirmcode;
+  /* Set szirmcode into T2 allocated memory. May be unallocated in T.
+  ** +2 extra spaces for the last instruction and the trace header at [0].
+  */
+  T2->nszirmcode = T->nins+2-REF_BIAS;
+  T2->szirmcode = lj_mem_newt(L, T2->nszirmcode*sizeof(uint16_t), uint16_t);
+  memset(T2->szirmcode, 0, T2->nszirmcode*sizeof(uint16_t));
   memcpy(p, T->ir + T->nk, szins);
   return T2;
 }
@@ -101,6 +106,8 @@ static void trace_save(jit_State *J, GCtrace *T)
 {
   size_t sztr = ((sizeof(GCtrace)+7)&~7);
   size_t szins = (J->cur.nins-J->cur.nk)*sizeof(IRIns);
+  size_t nszirmcode = T->nszirmcode;
+  uint16_t *szirmcode = T->szirmcode;
   char *p = (char *)T + sztr;
   memcpy(T, &J->cur, sizeof(GCtrace));
   T->parent = J->parent;
@@ -113,6 +120,9 @@ static void trace_save(jit_State *J, GCtrace *T)
   p += szins;
   TRACE_APPENDVEC(snap, nsnap, SnapShot)
   TRACE_APPENDVEC(snapmap, nsnapmap, SnapEntry)
+  /* Set szirmcode into T2 allocated memory. May be unallocated in T. */
+  T->nszirmcode = nszirmcode;
+  T->szirmcode = szirmcode;
   J->cur.traceno = 0;
   J->curfinal = NULL;
   setgcrefp(J->trace[T->traceno], T);
@@ -129,7 +139,7 @@ void lj_trace_free(global_State *g, GCtrace *T)
     lj_gdbjit_deltrace(J, T);
     setgcrefnull(J->trace[T->traceno]);
   }
-  lj_mem_free(g, T->szirmcode, (T->nins + 2 - REF_BIAS) * sizeof(*T->szirmcode));
+  lj_mem_free(g, T->szirmcode, T->nszirmcode*sizeof(uint16_t));
   lj_mem_free(g, T,
     ((sizeof(GCtrace)+7)&~7) + (T->nins-T->nk)*sizeof(IRIns) +
     T->nsnap*sizeof(SnapShot) + T->nsnapmap*sizeof(SnapEntry));
@@ -391,6 +401,8 @@ static void trace_start(jit_State *J)
   J->cur.ir = J->irbuf;
   J->cur.snap = J->snapbuf;
   J->cur.snapmap = J->snapmapbuf;
+  J->cur.nszirmcode = 0;	/* Only present in assembled trace. */
+  J->cur.szirmcode = NULL;
   J->mergesnap = 0;
   J->needsnap = 0;
   J->bcskip = 0;
