@@ -533,6 +533,10 @@ static void ctype_repr(CTRepr *ctr, CTypeID id)
       ctr->ok = 0;
       return;
     }
+    if (ctype_cid(info) == 0) {
+      ctr->ok = 0;
+      return;
+    }
     newct = ctype_get(ctr->cts, ctype_cid(info));
     /* Detect ctypes that are not OK due to looping. */
     if (newct == ct) {
