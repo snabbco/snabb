@@ -120,8 +120,12 @@ ffi.metatype(histogram_t, {__index = {
    iterate = iterate,
    snapshot = snapshot,
    wrap_thunk = wrap_thunk,
-   clear = clear
-}})
+   clear = clear,
+   summarize = summarize
+},
+__tostring = function (histogram)
+   return ("min: %f / avg: %f / max: %f"):format(summarize(histogram))
+end})
 
 function selftest ()
    print("selftest: histogram")
