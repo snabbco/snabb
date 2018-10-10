@@ -100,6 +100,21 @@ function wrap_thunk(histogram, thunk, now)
    end
 end
 
+function summarize (histogram, prev)
+   local total = histogram.total
+   if prev then total = total - prev.total end
+   if total == 0 then return 0, 0, 0 end
+   local min, max, cumulative = nil, 0, 0
+   for count, lo, hi in histogram:iterate(prev) do
+      if count ~= 0 then
+	 if not min then min = lo end
+	 max = hi
+	 cumulative = cumulative + (lo + hi) / 2 * tonumber(count)
+      end
+   end
+   return min, cumulative / tonumber(total), max
+end
+
 ffi.metatype(histogram_t, {__index = {
    add = add,
    iterate = iterate,
