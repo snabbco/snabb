@@ -58,22 +58,14 @@ void lj_trace_err_info(jit_State *J, TraceError e)
 /* Find a free trace number. */
 static TraceNo trace_findfree(jit_State *J)
 {
-  MSize osz, lim;
   if (J->freetrace == 0)
     J->freetrace = 1;
-  for (; J->freetrace < J->sizetrace; J->freetrace++)
+  /* Search for a free slot. */
+  for (; J->freetrace < TRACE_MAX; J->freetrace++)
     if (traceref(J, J->freetrace) == NULL)
       return J->freetrace++;
-  /* Need to grow trace array. */
-  lim = (MSize)J->param[JIT_P_maxtrace] + 1;
-  if (lim < 2) lim = 2; else if (lim > 65535) lim = 65535;
-  osz = J->sizetrace;
-  if (osz >= lim)
-    return 0;  /* Too many traces. */
-  lj_mem_growvec(J->L, J->trace, J->sizetrace, lim, GCRef);
-  for (; osz < J->sizetrace; osz++)
-    setgcrefnull(J->trace[osz]);
-  return J->freetrace;
+  /* No free slot in trace array. */
+  return 0;
 }
 
 #define TRACE_APPENDVEC(field, szfield, tp) \
@@ -99,6 +91,12 @@ GCtrace * lj_trace_alloc(lua_State *L, GCtrace *T)
   T2->nk = T->nk;
   T2->nsnap = T->nsnap;
   T2->nsnapmap = T->nsnapmap;
+  /* Set szirmcode into T2 allocated memory. May be unallocated in T.
+  ** +2 extra spaces for the last instruction and the trace header at [0].
+  */
+  T2->nszirmcode = T->nins+2-REF_BIAS;
+  T2->szirmcode = lj_mem_newt(L, T2->nszirmcode*sizeof(uint16_t), uint16_t);
+  memset(T2->szirmcode, 0, T2->nszirmcode*sizeof(uint16_t));
   memcpy(p, T->ir + T->nk, szins);
   return T2;
 }
@@ -108,6 +106,8 @@ static void trace_save(jit_State *J, GCtrace *T)
 {
   size_t sztr = ((sizeof(GCtrace)+7)&~7);
   size_t szins = (J->cur.nins-J->cur.nk)*sizeof(IRIns);
+  size_t nszirmcode = T->nszirmcode;
+  uint16_t *szirmcode = T->szirmcode;
   char *p = (char *)T + sztr;
   memcpy(T, &J->cur, sizeof(GCtrace));
   T->parent = J->parent;
@@ -120,6 +120,9 @@ static void trace_save(jit_State *J, GCtrace *T)
   p += szins;
   TRACE_APPENDVEC(snap, nsnap, SnapShot)
   TRACE_APPENDVEC(snapmap, nsnapmap, SnapEntry)
+  /* Set szirmcode into T2 allocated memory. May be unallocated in T. */
+  T->nszirmcode = nszirmcode;
+  T->szirmcode = szirmcode;
   J->cur.traceno = 0;
   J->curfinal = NULL;
   setgcrefp(J->trace[T->traceno], T);
@@ -136,6 +139,7 @@ void lj_trace_free(global_State *g, GCtrace *T)
     lj_gdbjit_deltrace(J, T);
     setgcrefnull(J->trace[T->traceno]);
   }
+  lj_mem_free(g, T->szirmcode, T->nszirmcode*sizeof(uint16_t));
   lj_mem_free(g, T,
     ((sizeof(GCtrace)+7)&~7) + (T->nins-T->nk)*sizeof(IRIns) +
     T->nsnap*sizeof(SnapShot) + T->nsnapmap*sizeof(SnapEntry));
@@ -221,7 +225,7 @@ static void trace_flushroot(jit_State *J, GCtrace *T)
 /* Flush a trace. Only root traces are considered. */
 void lj_trace_flush(jit_State *J, TraceNo traceno)
 {
-  if (traceno > 0 && traceno < J->sizetrace) {
+  if (traceno > 0 && traceno < TRACE_MAX) {
     GCtrace *T = traceref(J, traceno);
     if (T && T->root == 0)
       trace_flushroot(J, T);
@@ -244,17 +248,20 @@ int lj_trace_flushall(lua_State *L)
   if ((J2G(J)->hookmask & HOOK_GC))
     return 1;
   lj_auditlog_trace_flushall(J);
-  for (i = (ptrdiff_t)J->sizetrace-1; i > 0; i--) {
-    GCtrace *T = traceref(J, i);
-    if (T) {
-      if (T->root == 0)
-	trace_flushroot(J, T);
-      lj_gdbjit_deltrace(J, T);
-      T->traceno = T->link = 0;  /* Blacklist the link for cont_stitch. */
-      setgcrefnull(J->trace[i]);
+  if (J->trace) {
+    for (i = (ptrdiff_t)TRACE_MAX-1; i > 0; i--) {
+      GCtrace *T = traceref(J, i);
+      if (T) {
+        if (T->root == 0)
+          trace_flushroot(J, T);
+        lj_gdbjit_deltrace(J, T);
+        T->traceno = T->link = 0;  /* Blacklist the link for cont_stitch. */
+        setgcrefnull(J->trace[i]);
+      }
     }
   }
   J->cur.traceno = 0;
+  J->ntraces = 0;
   J->freetrace = 0;
   g->lasttrace = 0;
   /* Unpatch blacklisted byte codes. */
@@ -304,12 +311,11 @@ void lj_trace_freestate(global_State *g)
 #ifdef LUA_USE_ASSERT
   {  /* This assumes all traces have already been freed. */
     ptrdiff_t i;
-    for (i = 1; i < (ptrdiff_t)J->sizetrace; i++)
+    for (i = 1; i < (ptrdiff_t)TRACE_MAX-1; i++)
       lua_assert(i == (ptrdiff_t)J->cur.traceno || traceref(J, i) == NULL);
   }
 #endif
   lj_mcode_free(J);
-  lj_mem_freevec(g, J->trace, J->sizetrace, GCRef);
 }
 
 /* -- Penalties and blacklisting ------------------------------------------ */
@@ -379,7 +385,7 @@ static void trace_start(jit_State *J)
 
   /* Get a new trace number. */
   traceno = trace_findfree(J);
-  if (LJ_UNLIKELY(traceno == 0)) {  /* No free trace? */
+  if (traceno == 0 || J->ntraces >= J->param[JIT_P_maxtrace]) {  /* No free trace? */
     lua_assert((J2G(J)->hookmask & HOOK_GC) == 0);
     lj_trace_flushall(J->L);
     J->state = LJ_TRACE_IDLE;  /* Silently ignored. */
@@ -395,6 +401,8 @@ static void trace_start(jit_State *J)
   J->cur.ir = J->irbuf;
   J->cur.snap = J->snapbuf;
   J->cur.snapmap = J->snapmapbuf;
+  J->cur.nszirmcode = 0;	/* Only present in assembled trace. */
+  J->cur.szirmcode = NULL;
   J->mergesnap = 0;
   J->needsnap = 0;
   J->bcskip = 0;
@@ -467,6 +475,7 @@ static void trace_stop(jit_State *J)
   lj_mcode_commit(J, J->cur.mcode);
   J->postproc = LJ_POST_NONE;
   trace_save(J, T);
+  J->ntraces++;
 
   /* Clear any penalty after successful recording. */
   for (i = 0; i < PENALTY_SLOTS; i++)

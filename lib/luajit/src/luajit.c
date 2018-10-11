@@ -55,8 +55,8 @@ static void print_usage(void)
   "  -e chunk  Execute string " LUA_QL("chunk") ".\n"
   "  -l name   Require library " LUA_QL("name") ".\n"
   "  -b ...    Save or list bytecode.\n"
-  "  -j cmd    Perform LuaJIT control command.\n"
-  "  -O[opt]   Control LuaJIT optimizations.\n"
+  "  -j cmd    Perform RaptorJIT control command.\n"
+  "  -O[opt]   Control RaptorJIT optimizations.\n"
   "  -i        Enter interactive mode after executing " LUA_QL("script") ".\n"
   "  -p file   Enable trace profiling to a VMProfile file.\n"
   "  -v        Show version information.\n"
@@ -115,7 +115,7 @@ static int docall(lua_State *L, int narg, int clear)
 
 static void print_version(void)
 {
-  fputs(LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT ". " LUAJIT_URL "\n", stdout);
+  fputs(LUAJIT_VERSION " -- " LUAJIT_URL "\n", stdout);
 }
 
 static void print_jit_status(lua_State *L)

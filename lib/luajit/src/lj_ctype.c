@@ -447,6 +447,7 @@ static void ctype_repr(CTRepr *ctr, CTypeID id)
   for (;;) {
     CTInfo info = ct->info;
     CTSize size = ct->size;
+    CType *newct;
     switch (ctype_type(info)) {
     case CT_NUM:
       if ((info & CTF_BOOL)) {
@@ -532,7 +533,17 @@ static void ctype_repr(CTRepr *ctr, CTypeID id)
       ctr->ok = 0;
       return;
     }
-    ct = ctype_get(ctr->cts, ctype_cid(info));
+    if (ctype_cid(info) == 0) {
+      ctr->ok = 0;
+      return;
+    }
+    newct = ctype_get(ctr->cts, ctype_cid(info));
+    /* Detect ctypes that are not OK due to looping. */
+    if (newct == ct) {
+      ctr->ok = 0;
+      return;
+    }
+    ct = newct;
   }
 }
 

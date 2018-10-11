@@ -372,7 +372,6 @@ static void usage(void)
 {
   int i;
   fprintf(stderr, LUAJIT_VERSION " VM builder.\n");
-  fprintf(stderr, LUAJIT_COPYRIGHT ", " LUAJIT_URL "\n");
   fprintf(stderr, "Target architecture: " LJ_ARCH_NAME "\n\n");
   fprintf(stderr, "Usage: buildvm -m mode [-o outfile] [infiles...]\n\n");
   fprintf(stderr, "Available modes:\n");

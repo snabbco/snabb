@@ -1,5 +1,5 @@
 ##############################################################################
-# LuaJIT Makefile. Requires GNU Make.
+# RaptorJIT Makefile. Requires GNU Make.
 #
 # Please read doc/install.html before changing any variables!
 #
