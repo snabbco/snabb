@@ -10,6 +10,7 @@ module(...,package.seeall)
 
 local S = require("syscall")
 local pci = require("lib.hardware.pci")
+local lib = require("core.lib")
 
 local bound_cpu
 local bound_numa_node
@@ -89,6 +90,19 @@ function unbind_cpu ()
    bound_cpu = nil
 end
 
+local blacklisted_kernels = {
+   '4.15.0-36-generic',
+}
+local function sys_kernel ()
+   return lib.readfile('/proc/sys/kernel/osrelease', '*all'):gsub('%s$', '')
+end
+function is_blacklisted_kernel (v)
+   for _, each in ipairs(blacklisted_kernels) do
+      if each == v then return true end
+   end
+   return false
+end
+
 function bind_to_cpu (cpu)
    local function contains (t, e)
       for k,v in ipairs(t) do
@@ -116,6 +130,11 @@ function unbind_numa_node ()
 end
 
 function bind_to_numa_node (node, policy)
+   local kernel = sys_kernel()
+   if is_blacklisted_kernel(kernel) then
+      print(("WARNING: Buggy kernel '%s'. Not binding CPU to NUMA node."):format(kernel))
+      return
+   end
    if node == bound_numa_node then return end
    if not node then return unbind_numa_node() end
    assert(not bound_numa_node, "already bound")
