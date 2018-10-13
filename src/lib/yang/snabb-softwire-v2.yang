@@ -725,6 +725,7 @@ module snabb-softwire-v2 {
 
       leaf flow-label {
         type uint32;
+        default 0;
         description
           "IPv6 flow label";
       }
