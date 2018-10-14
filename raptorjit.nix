@@ -11,9 +11,12 @@ mkDerivation rec {
   src = source;
   buildInputs = [ luajit ];  # LuaJIT to bootstrap DynASM
   dontStrip = true;
+  patchPhase = ''
+    substituteInPlace Makefile --replace "/usr/local" "$out"
+  '';
+  configurePhase = false;
   installPhase = ''
-    install -D src/raptorjit $out/bin/raptorjit
-    install -D src/lj_dwarf.dwo $out/lib/raptorjit.dwo
+    make install PREFIX="$out"
   '';
 
   enableParallelBuilding = true;  # Do 'make -j'
