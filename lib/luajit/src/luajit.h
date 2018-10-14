@@ -31,7 +31,7 @@
 #include "lua.h"
 
 #define LUAJIT_VERSION		"RaptorJIT 1.0.0-alpha1"
-#define LUAJIT_VERSION_NUM	100000  /* Version 1.0.0 = 01.00.00. */
+#define LUAJIT_VERSION_NUM	10000  /* Version 1.0.0 = 01.00.00. */
 #define LUAJIT_VERSION_SYM	luaJIT_version_2_1_0_beta2
 
 #define LUAJIT_URL		"http://github.com/raptorjit/raptorjit"
