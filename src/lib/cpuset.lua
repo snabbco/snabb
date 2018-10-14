@@ -19,8 +19,14 @@ do
    end
 end
 
+local function trim (str)
+   return str:gsub("^%s", ""):gsub("%s$", "")
+end
+
 local function parse_cpulist (cpus)
    local ret = {}
+   cpus = trim(cpus)
+   if #cpus == 0 then return ret end
    for range in cpus:split(',') do
       local lo, hi = range:match("^%s*([^%-]*)%s*-%s*([^%-%s]*)%s*$")
       if lo == nil then lo = range:match("^%s*([^%-]*)%s*$") end
@@ -156,5 +162,9 @@ function selftest ()
    print('selftest: cpuset')
    local cpus = parse_cpulist("0-5,7")
    assert(#cpus == 7 and cpus[6] == 5 and cpus[7] == 7)
+   cpus = parse_cpulist("1")
+   assert(#cpus == 1 and cpus[1] == 1)
+   assert(#parse_cpulist("\n") == 0)
+   assert(#parse_cpulist("") == 0)
    print('selftest: ok')
 end
