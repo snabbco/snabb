@@ -656,6 +656,8 @@ local function compute_state_reader(schema_name)
          local instance_state = instance_state_reader(counters)
          ret.softwire_config.instance[device] = {}
          ret.softwire_config.instance[device].softwire_state = instance_state
+         -- TODO: Copy queue[id].external_interface.next_hop.ip.resolved_mac.
+         -- TODO: Copy queue[id].internal_interface.next_hop.ip.resolved_mac.
       end
 
       return ret
