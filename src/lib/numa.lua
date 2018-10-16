@@ -10,6 +10,7 @@ module(...,package.seeall)
 
 local S = require("syscall")
 local pci = require("lib.hardware.pci")
+local lib = require("core.lib")
 
 local bound_cpu
 local bound_numa_node
@@ -89,6 +90,57 @@ function unbind_cpu ()
    bound_cpu = nil
 end
 
+local blacklisted_kernels = {
+   '>=4.15',
+}
+local function sys_kernel ()
+   return lib.readfile('/proc/sys/kernel/osrelease', '*all'):gsub('%s$', '')
+end
+local function parse_version_number (str)
+   local t = {}
+   for each in str:gmatch("([^.]+)") do
+      table.insert(t, tonumber(each) or 0)
+   end
+   return t
+end
+local function equals (v1, v2)
+   for i, p1 in ipairs(v1) do
+      local p2 = v2[i] or 0
+      if p1 ~= p2 then return false end
+   end
+   return true
+end
+local function greater_or_equals (v1, v2)
+   for i, p1 in ipairs(v1) do
+      local p2 = v2[i] or 0
+      if p2 > p1 then return false end
+   end
+   return true
+end
+local function greater (v1, v2)
+   return greater_or_equals(v1, v2) and not equals(v1, v2)
+end
+function is_blacklisted_kernel (v)
+   for _, each in ipairs(blacklisted_kernels) do
+      -- Greater or equal.
+      if each:sub(1, 2) == '>=' then
+         each = each:sub(3, #each)
+         local v1, v2 = parse_version_number(v), parse_version_number(each)
+         if greater_or_equals(v1, v2) then return true end
+      -- Greater than.
+      elseif each:sub(1, 1) == '>' then
+         each = each:sub(2, #each)
+         local v1, v2 = parse_version_number(v), parse_version_number(each)
+         if greater(v1, v2) then return true end
+      -- Equals.
+      else
+         local v1, v2 = parse_version_number(v), parse_version_number(each)
+         if equals(v1, v2) then return true end
+      end
+   end
+   return false
+end
+
 function bind_to_cpu (cpu)
    local function contains (t, e)
       for k,v in ipairs(t) do
@@ -116,6 +168,11 @@ function unbind_numa_node ()
 end
 
 function bind_to_numa_node (node, policy)
+   local kernel = sys_kernel()
+   if is_blacklisted_kernel(kernel) then
+      print(("WARNING: Buggy kernel '%s'. Not binding CPU to NUMA node."):format(kernel))
+      return
+   end
    if node == bound_numa_node then return end
    if not node then return unbind_numa_node() end
    assert(not bound_numa_node, "already bound")
@@ -164,5 +221,10 @@ function selftest ()
          test_cpu(cpuid)
       end
    end
+
+   assert(greater(parse_version_number('4.15'), parse_version_number('4.4.80')))
+   assert(greater_or_equals(parse_version_number('4.15'), parse_version_number('4.15')))
+   assert(not greater(parse_version_number('4.14'), parse_version_number('4.15')))
+
    print('selftest: numa: ok')
 end
