@@ -178,7 +178,11 @@ printer_for_schema_by_name = util.memoize(printer_for_schema_by_name)
 
 local function parser_for_grammar(grammar, path)
    local getter, subgrammar = resolver(grammar, path)
-   return data.data_parser_from_grammar(subgrammar)
+   return function (production)
+      local data = data.data_parser_from_grammar(subgrammar)(production)
+      consistency_checker_from_grammar(subgrammar)(data)
+      return data
+   end
 end
 
 local function parser_for_schema(schema, path)
