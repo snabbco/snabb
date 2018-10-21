@@ -14,7 +14,7 @@ local lib = require('core.lib')
 local regexp = require("lib.xsd_regexp")
 
 function normalize_id(id)
-   return id:gsub('[^%w_]', '_')
+   return (id:gsub('[^%w_]', '_'))
 end
 
 -- Helper for parsing C type declarations.
