@@ -465,7 +465,7 @@ local function init_type(node, loc, argument, children)
    node.id = require_argument(loc, argument)
    node.range = maybe_child(loc, children, 'range')
    node.fraction_digits = maybe_child_property(loc, children, 'fraction-digits', 'value')
-   node.length = maybe_child_property(loc, children, 'length', 'value')
+   node.length = maybe_child(loc, children, 'length')
    node.patterns = collect_children(children, 'pattern')
    node.enums = collect_children(children, 'enum')
    -- !!! path
