@@ -1888,28 +1888,32 @@ function selftest()
    }]])
 
    -- Test range validation. (should fail)
-   local success, err = pcall(load_config_for_schema, range_length_schema, [[
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
       range_test 9;
       range_test 35;
    ]])
    assert(success == false)
 
    -- Test length validation. (should fail)
-   local success, err = pcall(load_config_for_schema, range_length_schema, [[
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
       length_test "+++++++++++++++++++++++++++++++++++";
       length_test "...............";
    ]])
    assert(success == false)
 
    -- Test range validation. (should succeed)
-   local success, err = pcall(load_config_for_schema, range_length_schema, [[
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
       range_test 9;
       range_test 22;
    ]])
    assert(success)
 
    -- Test length validation. (should succeed)
-   local success, err = pcall(load_config_for_schema, range_length_schema, [[
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
       length_test ".........";
       length_test "++++++++++++++++++++++";
    ]])
