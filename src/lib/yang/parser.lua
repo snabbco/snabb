@@ -48,7 +48,8 @@ function Parser:error(msg, ...)
    print(self.str:match("[^\n]*"))
    print(string.rep(" ", self.column).."^")
    print(('%s: error: '..msg):format(self:loc(), ...))
-   main.exit(1)
+   -- use an empty error to avoid printing stack trace
+   error()
 end
 
 function Parser:read_char()
