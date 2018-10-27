@@ -1,5 +1,56 @@
 # Change Log
 
+## [2018.09.01]
+
+### Features
+
+* Allow setting the IPv6 flow-label header field on ingress packets, allowing
+  packets from different lwAFTR instances to be distinguished via the field.
+  This adds a new `flow-label` field that can be used in YANG configurations.
+
+    https://github.com/Igalia/snabb/pull/1183
+
+* Next hop MAC addresses (`next-hop-macaddr-v4` and `next-hop-macaddr-v6`) are now
+  shown in the `snabb top` view and are added to the YANG model so that they
+  can be queried using `snabb config get-state`.
+
+    https://github.com/Igalia/snabb/pull/1182
+
+### Bug fixes
+
+* Fix RRD recording for intel_mp stats counters. This fixes issues discovered
+  with the statistics counter improvements from v2018.06.01 and improves the
+  functionality of `snabb top`.
+
+    https://github.com/Igalia/snabb/pull/1179
+
+* Add a workaround for a bug in Linux kernel version 4.15.0-36 with memory
+  binding to avoid segmentation faults.
+
+    https://github.com/Igalia/snabb/pull/1187
+
+* Improved error messages for invalid config files and for `snabb config`.
+
+    https://github.com/Igalia/snabb/pull/1159
+    https://github.com/Igalia/snabb/pull/1160
+
+* Ensure leader process is bound to the correct NUMA node.
+
+    https://github.com/Igalia/snabb/pull/1133
+
+### Other enhancements from upstream
+
+  * Integrates Snabb 2018.09 "Eggplant".
+
+      https://github.com/snabbco/snabb/releases/tag/v2018.09
+
+  * Includes updates to vhost-user driver, PMU support for some AMD CPUs,
+    hash table improvements, a token bucket implementation, and support for
+    time stamp counters.
+
+Thanks to Alexander Gall, Ben Agricola, Luke Gorrie, Max Rottenkolber, and
+kullanici0606 for their upstream contributions in this release.
+
 ## [2018.06.01]
 
 ### Features
