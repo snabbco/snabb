@@ -104,8 +104,13 @@ end
 
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = freelist_create("engine/packets.freelist")
-local group_fl -- Initialized on demand.
+ -- Initialized on demand.
+local packets_fl, group_fl
+
+-- Call to ensure packet freelist is enabled.
+function initialize ()
+   packets_fl = freelist_create("engine/packets.freelist")
+end
 
 -- Call to ensure group freelist is enabled.
 function enable_group_freelist ()

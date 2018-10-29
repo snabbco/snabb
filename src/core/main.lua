@@ -158,7 +158,7 @@ function initialize ()
    _G.engine = require("core.app")
    _G.memory = require("core.memory")
    _G.link   = require("core.link")
-   _G.packet = require("core.packet")
+   _G.packet = require("core.packet"); _G.packet.initialize()
    _G.timer  = require("core.timer")
    _G.main   = getfenv()
 end
