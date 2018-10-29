@@ -198,7 +198,6 @@ function shutdown (pid)
       S.unlink(backlink)
 
       shm.unlink("/"..pid)
-      shm.unlink("/"..S.getpid())
    end
 end
 
