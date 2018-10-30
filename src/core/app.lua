@@ -52,9 +52,8 @@ end
 
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
--- Timeline events specific to app and link instances
+-- Timeline events specific to app instances
 app_events  = setmetatable({}, { __mode = 'k' })
-link_events = setmetatable({}, { __mode = 'k' })
 
 configuration = config.new()
 
@@ -368,8 +367,6 @@ function apply_config_actions (actions)
       local link = link.new(linkspec)
       link_table[linkspec] = link
       configuration.links[linkspec] = true
-      link_events[link] =
-         timeline_mod.load_events(timeline(), "core.link", {linkspec=linkspec})
    end
    function ops.link_output (appname, linkname, linkspec)
       local app = app_table[appname]
