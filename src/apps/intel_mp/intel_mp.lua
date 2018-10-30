@@ -340,10 +340,10 @@ local function shared_counter(srcdir, targetdir)
    end
    function mod.create(name)
       shm.alias(source(name), target(name))
-      local c
+      local status, c
       local function read_shared_counter ()
-         if not c then c = pcall(counter.open, target(name)) end
-         if not c then return 0ULL end
+         if not c then status, c = pcall(counter.open, target(name)) end
+         if not status then return 0ULL end
          return counter.read(c)
       end
       return read_shared_counter

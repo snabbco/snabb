@@ -46,24 +46,28 @@ local function make_entry_type(key_type, value_type)
    else
       entry_types[key_type] = {}
    end
+   local raw_size = ffi.sizeof(key_type) + ffi.sizeof(value_type) + 4
+   local padding = 2^ceil(math.log(raw_size)/math.log(2)) - raw_size
    local ret = ffi.typeof([[struct {
          uint32_t hash;
          $ key;
          $ value;
+         uint8_t padding[$];
       } __attribute__((packed))]],
       key_type,
-      value_type)
+      value_type,
+      padding)
    entry_types[key_type][value_type] = ret
    return ret
 end
 
 local function make_entries_type(entry_type)
-   return ffi.typeof('$[?]', entry_type)
+   return (ffi.typeof('$[?]', entry_type))
 end
 
 -- hash := [0,HASH_MAX); scale := size/HASH_MAX
 local function hash_to_index(hash, scale)
-   return floor(hash*scale)
+   return (floor(hash*scale))
 end
 
 local function make_equal_fn(key_type)
@@ -122,7 +126,8 @@ local optional_params = {
    hash_seed = false,
    initial_size = 8,
    max_occupancy_rate = 0.9,
-   min_occupancy_rate = 0.0
+   min_occupancy_rate = 0.0,
+   resize_callback = false
 }
 
 function new(params)
@@ -143,6 +148,7 @@ function new(params)
    ctab.occupancy = 0
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
+   ctab.resize_callback = params.resize_callback
    ctab = setmetatable(ctab, { __index = CTable })
    ctab:reseed_hash_function(params.hash_seed)
    ctab:resize(params.initial_size)
@@ -227,6 +233,9 @@ function CTable:resize(size)
       if old_entries[i].hash ~= HASH_MAX then
          self:add(old_entries[i].key, old_entries[i].value)
       end
+   end
+   if self.resize_callback then
+      self.resize_callback(self, old_size)
    end
 end
 

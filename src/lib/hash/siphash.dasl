@@ -172,7 +172,7 @@ local function SSE(stride)
    function asm.init(key)
       local initial_state = load_initial_state(key)
       table.insert(__anchor, initial_state)
-      | mov rax, initial_state
+      | mov64 rax, initial_state
       | movddup xmm0, [rax]
       | movddup xmm1, [rax+8]
       | movddup xmm2, [rax+16]
@@ -253,7 +253,7 @@ local function AVX2(stride)
       local initial_state = load_initial_state(key)
       table.insert(__anchor, initial_state)
       | vzeroupper
-      | mov rax, initial_state
+      | mov64 rax, initial_state
       | vbroadcastsd ymm0, qword [rax]
       | vbroadcastsd ymm1, qword [rax+8]
       | vbroadcastsd ymm2, qword [rax+16]
@@ -345,7 +345,7 @@ local function AVX2(stride)
       -- write out.
       local control = ffi.new('uint32_t[8]', 1, 3, 5, 7, 0, 0, 0, 0)
       table.insert(__anchor, control)
-      | mov rax, control
+      | mov64 rax, control
       | vmovdqu ymm5, [rax]
       | vpermd ymm(reg), ymm5, ymm(reg)
       | vpslld xmm(reg), xmm(reg), 1

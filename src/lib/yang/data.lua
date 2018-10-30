@@ -298,7 +298,7 @@ local function length_validator(length, f)
    if not length then return f end
    local is_in_range = range_predicate(length.value)
    return function(val, P)
-      if is_in_range(string.length(val)) then return f(val, P) end
+      if is_in_range(string.len(val)) then return f(val, P) end
       P:error('length of string '..val..' is out of the valid range')
    end
 end
@@ -1873,6 +1873,51 @@ function selftest()
       }
    ]])
    assert(success == false)
+
+   -- Test range / length restrictions.
+   local range_length_schema = schema.load_schema([[module range-length-schema {
+      namespace "urn:ietf:params:xml:ns:yang:range-length-schema";
+      prefix "test";
+
+      leaf-list range_test {
+         type uint8 { range 1..10|20..30; }
+      }
+      leaf-list length_test {
+         type string { length 1..10|20..30; }
+      }
+   }]])
+
+   -- Test range validation. (should fail)
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
+      range_test 9;
+      range_test 35;
+   ]])
+   assert(success == false)
+
+   -- Test length validation. (should fail)
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
+      length_test "+++++++++++++++++++++++++++++++++++";
+      length_test "...............";
+   ]])
+   assert(success == false)
+
+   -- Test range validation. (should succeed)
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
+      range_test 9;
+      range_test 22;
+   ]])
+   assert(success)
+
+   -- Test length validation. (should succeed)
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
+      length_test ".........";
+      length_test "++++++++++++++++++++++";
+   ]])
+   assert(success)
 
    influxdb_printer_tests()
 
