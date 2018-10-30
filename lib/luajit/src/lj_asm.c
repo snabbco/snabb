@@ -1953,6 +1953,23 @@ static void asm_setup_regsp(ASMState *as)
 
 /* -- Assembler core ------------------------------------------------------ */
 
+/* Do we want the profiler to attribute VM time to this trace?
+ *
+ * Not if the root of this trace is a Lua function. We assume that the
+ * root cause of running the interpreter is a loop that failed to
+ * compile somewhere and that entry/exit through function traces is
+ * only noise that should be filtered out.
+ *
+ * This helps the profiler to point out the code that needs to be
+ * changed to reduce time spent in the interpreter.
+ */
+static int asm_should_profile_exit(jit_State *J, GCtrace *T)
+{
+  GCtrace *root = traceref(J, T->root ? T->root : T->traceno);
+  BCOp op = bc_op(root->startins);
+  return op != BC_FUNCF && op != BC_FUNCV;
+}
+
 /* Assemble a trace. */
 void lj_asm_trace(jit_State *J, GCtrace *T)
 {
@@ -1978,16 +1995,12 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   /* Setup initial state. Copy some fields to reduce indirections. */
   as->J = J;
   as->T = T;
-  J->curfinal = lj_trace_alloc(J->L, T);  /* This copies the IR, too. */
+  J->curfinal = lj_trace_alloc(J->L, T);
   as->flags = J->flags;
   as->loopref = J->loopref;
   as->realign = NULL;
   as->loopinv = 0;
   as->parent = J->parent ? traceref(J, J->parent) : NULL;
-
-  /* Initialize mcode size of IR instructions array. */
-  T->szirmcode = lj_mem_new(J->L, (T->nins + 1) * sizeof(*T->szirmcode));
-  memset(T->szirmcode, 0, (T->nins + 1) * sizeof(*T->szirmcode));
 
   /* Reserve MCode memory. */
   as->mctop = origtop = lj_mcode_reserve(J, &as->mcbot);
@@ -2057,7 +2070,8 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
       RA_DBG_REF();
       checkmclim(as);
       asm_ir(as, ir);
-      T->szirmcode[as->curins - REF_BIAS] = (uint16_t)((intptr_t)end - (intptr_t)as->mcp);
+      lua_assert(as->curins-REF_BIAS < J->curfinal->nszirmcode);
+      J->curfinal->szirmcode[as->curins-REF_BIAS] = (uint16_t)(end - as->mcp);
     }
 
     firstins = as->mcp;	/* MCode assembled for IR instructions. */
@@ -2087,7 +2101,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
 	     (T->nins - as->orignins) * sizeof(IRIns));  /* Copy RENAMEs. */
       T->nins = J->curfinal->nins;
       /* Log size of trace head */
-      T->szirmcode[0] = (uint16_t)((intptr_t)firstins - (intptr_t)as->mcp);
+      J->curfinal->szirmcode[0] = (uint16_t)((intptr_t)firstins - (intptr_t)as->mcp);
       break;  /* Done. */
     }
 
@@ -2095,6 +2109,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
     lj_trace_free(J2G(J), J->curfinal);
     J->curfinal = NULL;  /* In case lj_trace_alloc() OOMs. */
     J->curfinal = lj_trace_alloc(J->L, T);
+    lua_assert(J->curfinal->nszirmcode);
     as->realign = NULL;
   }
 
@@ -2107,7 +2122,8 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   T->mcode = as->mcp;
   T->mcloop = as->mcloop ? (MSize)((char *)as->mcloop - (char *)as->mcp) : 0;
   if (!as->loopref)
-    asm_tail_fixup(as, T->link);  /* Note: this may change as->mctop! */
+    /* Note: this may change as->mctop! */
+    asm_tail_fixup(as, T->link, asm_should_profile_exit(J, T));
   T->szmcode = (MSize)((char *)as->mctop - (char *)as->mcp);
   lj_mcode_sync(T->mcode, origtop);
 }

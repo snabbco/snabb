@@ -162,7 +162,7 @@ function open_frame (path)
       local module = types[type]
       if module then
          assert(frame[name] == nil, "shm: duplicate name: "..name)
-         frame[name] = module.open(frame.path..file)
+         frame[name] = module.open(frame.path..file, 'readonly')
          frame.specs[name] = {module}
       end
    end

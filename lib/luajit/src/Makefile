@@ -1,5 +1,5 @@
 ##############################################################################
-# LuaJIT Makefile. Requires GNU Make.
+# RaptorJIT Makefile. Requires GNU Make.
 #
 # Please read doc/install.html before changing any variables!
 #
@@ -197,7 +197,7 @@ endif
 
 TARGET_XCFLAGS+= -fno-stack-protector
 TARGET_XLIBS+= -ldl
-HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_LINUX
+Host_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_LINUX
 
 ##############################################################################
 # Files and pathnames.

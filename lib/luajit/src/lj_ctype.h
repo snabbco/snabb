@@ -173,6 +173,7 @@ typedef LJ_ALIGN(8) struct CCallback {
 typedef struct CTState {
   CType *tab;		/* C type table. */
   CTypeID top;		/* Current top of C type table. */
+  CTypeID log;		/* Current top of logged C types table. */
   MSize sizetab;	/* Size of C type table. */
   lua_State *L;		/* Lua state (needed for errors and allocations). */
   global_State *g;	/* Global state. */
@@ -432,6 +433,7 @@ LJ_FUNC GCstr *lj_ctype_repr(lua_State *L, CTypeID id, GCstr *name);
 LJ_FUNC GCstr *lj_ctype_repr_int64(lua_State *L, uint64_t n, int isunsigned);
 LJ_FUNC GCstr *lj_ctype_repr_complex(lua_State *L, void *sp, CTSize size);
 LJ_FUNC CTState *lj_ctype_init(lua_State *L);
+LJ_FUNC void lj_ctype_log(lua_State *L);
 LJ_FUNC void lj_ctype_freestate(global_State *g);
 
 

@@ -2,20 +2,19 @@
 
 module(...,package.seeall)
 
-local packet    = require("core.packet")
-local lib       = require("core.lib")
-local link      = require("core.link")
-local config    = require("core.config")
-local timer     = require("core.timer")
-local shm       = require("core.shm")
-local histogram = require('core.histogram')
-local counter   = require("core.counter")
-local jit       = require("jit")
-local S         = require("syscall")
-local vmprofile = require("jit.vmprofile")
-local ffi       = require("ffi")
-local C         = ffi.C
-local timeline_mod = require("core.timeline") -- avoid collision with timeline()
+local packet       = require("core.packet")
+local lib          = require("core.lib")
+local link         = require("core.link")
+local config       = require("core.config")
+local timer        = require("core.timer")
+local shm          = require("core.shm")
+local histogram    = require('core.histogram')
+local counter      = require("core.counter")
+local timeline_mod = require("core.timeline") -- avoid collision with timeline
+local jit          = require("jit")
+local S            = require("syscall")
+local ffi          = require("ffi")
+local C            = ffi.C
 
 require("core.packet_h")
 
@@ -36,6 +35,20 @@ program_name = false
 
 -- Auditlog state
 local auditlog_enabled = false
+function enable_auditlog ()
+   jit.auditlog(shm.path("audit.log"))
+   auditlog_enabled = true
+end
+
+-- Timeline event log
+local timeline_log, events -- initialized on demand
+function timeline ()
+   if timeline_log == nil then
+      timeline_log = timeline_mod.new("engine/timeline")
+      events = timeline_mod.load_events(timeline_log, "core.engine")
+   end
+   return timeline_log
+end
 
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
@@ -51,17 +64,6 @@ frees     = counter.create("engine/frees.counter")     -- Total packets freed
 freebits  = counter.create("engine/freebits.counter")  -- Total packet bits freed (for 10GbE)
 freebytes = counter.create("engine/freebytes.counter") -- Total packet bytes freed
 configs   = counter.create("engine/configs.counter")   -- Total configurations loaded
-
--- Timeline event log
-local timeline_log, events -- initialized on demand
-
-function timeline ()
-   if timeline_log == nil then
-      timeline_log = timeline_mod.new("engine/timeline")
-      events = timeline_mod.load_events(timeline_log, "core.engine")
-   end
-   return timeline_log
-end
 
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
@@ -105,7 +107,7 @@ local function getvmprofile (name)
    return vmprofiles[name]
 end
 
-local function setvmprofile (name)
+function setvmprofile (name)
    C.vmprofile_set_profile(getvmprofile(name))
 end
 
@@ -391,7 +393,8 @@ function apply_config_actions (actions)
                   name, tostring(app)))
       end
       local zone = app.zone or getfenv(class.new)._NAME or name
-      app_events[app] = timeline_mod.load_events(timeline(), "core.app", {app=name})
+      app_events[app] =
+         timeline_mod.load_events(timeline(), "core.app", {app=name})
       app.appname = name
       app.output = {}
       app.input = {}
@@ -507,8 +510,6 @@ end
 
 -- Call this to "run snabb switch".
 function main (options)
-   timeline() -- ensure timeline is created and initialized
-   events.engine_started()
    options = options or {}
    local done = options.done
    local no_timers = options.no_timers
@@ -519,20 +520,23 @@ function main (options)
 
    -- Enable auditlog
    if not auditlog_enabled then
-      jit.auditlog(shm.path("audit.log"))
-      auditlog_enabled = true
+      enable_auditlog()
    end
 
-   -- Setup vmprofile
-   setvmprofile("engine")
-   vmprofile.start()
+   -- Ensure timeline is created and initialized
+   timeline()
 
+   -- Enable latency histogram if requested
    local breathe = breathe
    if options.measure_latency or options.measure_latency == nil then
       local latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)
       breathe = latency:wrap_thunk(breathe, now)
    end
 
+   -- Setup vmprofile
+   setvmprofile("engine")
+
+   events.engine_started()
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
@@ -542,6 +546,9 @@ function main (options)
    counter.commit()
    if not options.no_report then report(options.report) end
    events.engine_stopped()
+
+   -- Switch to catch-all profile
+   setvmprofile("program")
 end
 
 local nextbreath
@@ -582,10 +589,10 @@ function breathe ()
                        counter.read(freebits))
    running = true
    monotonic_now = C.get_monotonic_time()
+   events.got_monotonic_time(C.get_time_ns())
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
-   events.got_monotonic_time(C.get_time_ns())
    for i = 1, #breathe_pull_order do
       local app = breathe_pull_order[i]
       if app.pull and not app.dead then
@@ -619,9 +626,10 @@ function breathe ()
    local freed_bytes_per_packet = freed_bytes / math.max(tonumber(freed_packets), 1)
    events.breath_end(counter.read(breaths), freed_packets, freed_bytes_per_packet)
    counter.add(breaths)
-   -- Commit counters at a reasonable frequency
+   -- Commit counters and rebalance freelists at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then
       counter.commit()
+      packet.rebalance_freelists()
       events.commited_counters()
    end
    -- Randomize the log level. Enable each level in 5x more breaths

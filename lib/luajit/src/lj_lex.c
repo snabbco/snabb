@@ -58,7 +58,9 @@ static LJ_NOINLINE LexChar lex_more(LexState *ls)
 /* Get next character. */
 static LJ_AINLINE LexChar lex_next(LexState *ls)
 {
-  return (ls->c = ls->p < ls->pe ? (LexChar)(uint8_t)*ls->p++ : lex_more(ls));
+  LexChar c = (ls->c = ls->p < ls->pe ? (LexChar)(uint8_t)*ls->p++ : lex_more(ls));
+  if (ls->log && ls->log < ls->logend) *ls->log++ = c;
+  return c;
 }
 
 /* Save character. */
@@ -403,6 +405,8 @@ int lj_lex_setup(lua_State *L, LexState *ls)
   ls->lookahead = TK_eof;  /* No look-ahead token. */
   ls->linenumber = 1;
   ls->lastline = 1;
+  ls->log = NULL;
+  ls->logend = NULL;
   lex_next(ls);  /* Read-ahead first char. */
   if (ls->c == 0xef && ls->p + 2 <= ls->pe && (uint8_t)ls->p[0] == 0xbb &&
       (uint8_t)ls->p[1] == 0xbf) {  /* Skip UTF-8 BOM (if buffered). */
@@ -491,6 +495,20 @@ void lj_lex_error(LexState *ls, LexToken tok, ErrMsg em, ...)
   va_start(argp, em);
   lj_err_lex(ls->L, ls->chunkname, tokstr, ls->linenumber, em, argp);
   va_end(argp);
+}
+
+/* Log the next input characters to a bounded buffer. */
+void lj_lex_log(LexState *ls, char *log, int size)
+{
+  ls->log = log;
+  ls->logend = log + size-1;
+}
+
+/* Stop logging input characters. */
+void lj_lex_endlog(LexState *ls)
+{
+  ls->log = NULL;
+  ls->logend = NULL;
 }
 
 /* Initialize strings for reserved words. */

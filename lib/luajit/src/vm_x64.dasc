@@ -2046,14 +2046,13 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov PC, [RA+CFRAME_OFS_PC]	// Get SAVE_PC.
   |  jmp >1
   |->vm_exit_interp:
+  |  // Record which trace exited to the interpreter.
+  |  mov TMPRd, dword [DISPATCH+DISPATCH_GL(vmstate)]
+  |  mov dword [DISPATCH+DISPATCH_GL(lasttrace)], TMPRd
+  |->vm_exit_interp_notrack:
   |  // RD = MULTRES or negated error code, BASE, PC and DISPATCH set.
   |  // Restore additional callee-save registers only used in compiled code.
   |  lea RA, [rsp+16]
-  |  // Record which trace exited to the interpreter (if called from a trace)
-  |  mov TMPRd, dword [DISPATCH+DISPATCH_GL(vmstate)]
-  |  cmp TMPRd, 1
-  |  jb >1
-  |  mov dword [DISPATCH+DISPATCH_GL(lasttrace)], TMPRd
   |1:
   |  mov r13, [RA-8]
   |  mov r12, [RA]
