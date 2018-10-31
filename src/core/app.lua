@@ -632,8 +632,8 @@ function breathe ()
    -- Commit counters and rebalance freelists at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then
       counter.commit()
-      packet.rebalance_freelists()
       events.commited_counters()
+      packet.rebalance_freelists()
    end
    -- Randomize the log level. Enable each level in 5x more breaths
    -- than the level below by randomly picking from log5() distribution.

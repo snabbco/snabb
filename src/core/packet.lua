@@ -13,6 +13,9 @@ local memory   = require("core.memory")
 local shm      = require("core.shm")
 local counter  = require("core.counter")
 local sync     = require("core.sync")
+local timeline = require("core.timeline")
+
+local events = timeline.load_events(timeline.log(), "core.packet")
 
 require("core.packet_h")
 
@@ -107,13 +110,18 @@ end
 
 -- Return borrowed packets to group freelist.
 function rebalance_freelists ()
-   if group_fl and freelist_nfree(packets_fl) > packets_allocated then
+   local free_packets = freelist_nfree(packets_fl)
+   if group_fl and free_packets > packets_allocated then
+      events.group_freelist_wait()
       freelist_lock(group_fl)
+      events.group_freelist_locked()
       while freelist_nfree(packets_fl) > packets_allocated
       and not freelist_full(group_fl) do
          freelist_add(group_fl, freelist_remove(packets_fl))
       end
       freelist_unlock(group_fl)
+      events.group_freelist_unlocked()
+      events.group_freelist_released(free_packets - freelist_nfree(packets_fl))
    end
 end
 
@@ -121,17 +129,22 @@ end
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
       if group_fl then
+         events.group_freelist_wait()
          freelist_lock(group_fl)
+         events.group_freelist_locked()
          while freelist_nfree(group_fl) > 0
          and freelist_nfree(packets_fl) < packets_allocated do
             freelist_add(packets_fl, freelist_remove(group_fl))
          end
          freelist_unlock(group_fl)
+         events.group_freelist_unlocked()
+         events.group_freelist_reclaimed(freelist_nfree(packets_fl))
       end
       if freelist_nfree(packets_fl) == 0 then
          preallocate_step()
       end
    end
+   events.packet_allocated()
    return freelist_remove(packets_fl)
 end
 
@@ -229,6 +242,7 @@ function account_free (p)
 end
 
 function free (p)
+   events.packet_freed(p.length)
    account_free(p)
    free_internal(p)
 end
@@ -250,6 +264,7 @@ function preallocate_step()
    end
    packets_allocated = packets_allocated + packet_allocation_step
    packet_allocation_step = 2 * packet_allocation_step
+   events.packets_preallocated(packet_allocation_step)
 end
 
 function selftest ()
