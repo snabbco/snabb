@@ -43,8 +43,8 @@ end
 -- Timeline event log
 local timeline_log, events -- initialized on demand
 function timeline ()
-   if timeline_log == nil then
-      timeline_log = timeline_mod.new("engine/timeline")
+   if not timeline_log then
+      timeline_log = timeline_mod.log()
       events = timeline_mod.load_events(timeline_log, "core.engine")
    end
    return timeline_log

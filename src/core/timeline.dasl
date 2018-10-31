@@ -10,6 +10,15 @@ local S = require("syscall")
 local shm = require("core.shm")
 local lib = require("core.lib")
 
+-- Initialize and return the timeline log.
+local timeline_log
+function log ()
+   if timeline_log == nil then
+      timeline_log = new("engine/timeline")
+   end
+   return timeline_log
+end
+
 -- Load a set of events for logging onto a timeline.
 -- Returns a set of logging functions.
 --
