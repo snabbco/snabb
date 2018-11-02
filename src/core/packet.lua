@@ -15,8 +15,6 @@ local counter  = require("core.counter")
 local sync     = require("core.sync")
 local timeline = require("core.timeline")
 
-local events = timeline.load_events(timeline.log(), "core.packet")
-
 require("core.packet_h")
 
 local packet_t = ffi.typeof("struct packet")
@@ -108,11 +106,12 @@ end
 local packet_allocation_step = 1000
 local packets_allocated = 0
  -- Initialized on demand.
-local packets_fl, group_fl
+local packets_fl, group_fl, events
 
 -- Call to ensure packet freelist is enabled.
 function initialize ()
    packets_fl = freelist_create("engine/packets.freelist")
+   events = timeline.load_events(engine.timeline(), "core.packet")
 end
 
 -- Call to ensure group freelist is enabled.
