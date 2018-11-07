@@ -553,6 +553,7 @@ function main (options)
       breathe()
       if not no_timers then timer.run() events.polled_timers() end
       if not busywait then pace_breathing() end
+      set_log_level() -- roll random log level
    until done and done()
    counter.commit()
    if not options.no_report then report(options.report) end
@@ -560,6 +561,19 @@ function main (options)
 
    -- Switch to catch-all profile
    setvmprofile("program")
+end
+
+function set_log_level (level)
+   if not level then
+      -- Randomize the log level. Enable each level in 5x more breaths
+      -- than the level below by randomly picking from log5() distribution.
+      -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
+      --
+      -- Could be better to reduce the log level over time to "stretch"
+      -- logs for long running processes? Improvements possible :-).
+      level = math.max(1, math.ceil(math.log(math.random(5^9))/math.log(5)))
+   end
+   timeline_mod.level(timeline_log, level)
 end
 
 local nextbreath
@@ -643,14 +657,6 @@ function breathe ()
       events.commited_counters()
       packet.rebalance_freelists()
    end
-   -- Randomize the log level. Enable each level in 5x more breaths
-   -- than the level below by randomly picking from log5() distribution.
-   -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
-   --
-   -- Could be better to reduce the log level over time to "stretch"
-   -- logs for long running processes? Improvements possible :-).
-   local level = math.max(1, math.ceil(math.log(math.random(5^9))/math.log(5)))
-   timeline_mod.level(timeline_log, level)
    running = false
 end
 
