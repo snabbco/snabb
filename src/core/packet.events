@@ -1,31 +1,32 @@
-2|packet_allocated:
-  A packet has been allocated from the packet freelist.
+9,6|packets_preallocated: packets
+DMA memory for packets had been preallocated from the operating system.
 
-2|packet_freed: length
- A packet has been freed to the packet freelist.
+'packets' is the number of packets for which space has been reserved.
 
- 'length' is the byte size of the packet.
+9,1|packet_allocated:
+A packet has been allocated from the packet freelist.
 
-6|packets_preallocated: packets
- DMA memory for packets had been preallocated from the operating system.
+9,1|packet_freed: length
+A packet has been freed to the packet freelist.
 
- 'packets' is the number of packets for which space has been reserved.
+'length' is the byte size of the packet.
 
-4|group_freelist_wait:
- The process is waiting to acquire the group freelist’s lock.
 
-4|group_freelist_locked:
- The process has acquired the group freelist’s lock.
+9,4|group_freelist_wait:
+The process is waiting to acquire the group freelist’s lock.
 
-4|group_freelist_unlocked:
- The process has released the group freelist’s lock.
+9,4|group_freelist_locked:
+The process has acquired the group freelist’s lock.
 
-4|group_freelist_released: packets
-  The packet freelist was rebalanced with the group freelist.
+9,4|group_freelist_released: packets
+The packet freelist was rebalanced with the group freelist.
 
-  'packets' is the number of packets released to the group freelist.
+'packets' is the number of packets released to the group freelist.
 
-4|group_freelist_reclaimed: packets
-  The packet freelist was refilled from the group freelist.
+9,4|group_freelist_reclaimed: packets
+The packet freelist was refilled from the group freelist.
 
-  'packets' is the number of packets reclaimed from the group freelist.
+'packets' is the number of packets reclaimed from the group freelist.
+
+9,4|group_freelist_unlocked:
+The process has released the group freelist’s lock.

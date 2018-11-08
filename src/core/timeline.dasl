@@ -29,7 +29,7 @@ end
 function load_events_from_string (tl, spec, category, extra)
    local events = {}
    -- Insert a delimiter character (\a "alarm") between log messages.
-   spec = spec:gsub("\n(%d|)", "\n\a%1")
+   spec = spec:gsub("\n(%d,%d|)", "\n\a%1")
    for message in spec:gmatch("[^\a]+") do
       message = message:gsub("(.-)%s*$", "%1") -- trim trailing spaces
       local event = message:match("([%w_]+):")
@@ -67,7 +67,7 @@ ffi.cdef[[
   struct timeline_state {
     // state for the entries ring buffer
     struct timeline_entry *entries;
-    uint32_t level;
+    uint32_t rate;
     uint32_t next_entry;
     uint32_t num_entries;
     // state for the string table
@@ -106,7 +106,7 @@ function new (shmpath,  num_entries, size_stringtable)
    -- Private state
    local state = ffi.new("struct timeline_state")
    state.entries = ring
-   state.level = 0
+   state.rate = 0
    state.next_entry = 0
    state.num_entries = num_entries
    state.stringtable = stringtable
@@ -117,13 +117,13 @@ function new (shmpath,  num_entries, size_stringtable)
 end
 
 function mkevent (timeline, category, message, attrs)
-   if not message:match("^%d|([^:]+):") then
+   if not message:match("^%d,%d|([^:]+):") then
       error(("event syntax error: %q"):format(message))
    end
-   -- Extract the log level for the message
-   local level = tonumber(message:match("^(%d)|"))
-   -- Insert the category ("0|event:" -> "0|category.event:")
-   message = message:gsub("^(%d|)", "%1"..category..".")
+   -- Extract the sampling rate for the message
+   local rate = tonumber(message:match("^%d,(%d)|"))
+   -- Insert the category ("0,3|event:" -> "0,3|category.event:")
+   message = message:gsub("|", "|"..category..".", 1)
    -- Insert the additional attributes.
    -- e.g. "1|foo: arg" with {a1="x",a2="y"} becomes "1|foo a1=x a2=y: arg"
    for k,v in pairs(attrs or {}) do
@@ -135,20 +135,20 @@ function mkevent (timeline, category, message, attrs)
    local id = intern(timeline, message)
    local event = event -- move asm function into local scope
    local log = timeline
-   if n==0 then return function ()            event(log,level,id,0,0,0,0,0,0) end end
-   if n==1 then return function (a)           event(log,level,id,a,0,0,0,0,0) end end
-   if n==2 then return function (a,b)         event(log,level,id,a,b,0,0,0,0) end end
-   if n==3 then return function (a,b,c)       event(log,level,id,a,b,c,0,0,0) end end
-   if n==4 then return function (a,b,c,d)     event(log,level,id,a,b,c,d,0,0) end end
-   if n==5 then return function (a,b,c,d,e)   event(log,level,id,a,b,c,d,e,0) end end
-   if n==6 then return function (a,b,c,d,e,f) event(log,level,id,a,b,c,d,e,f) end end
+   if n==0 then return function ()            event(log,rate,id,0,0,0,0,0,0) end end
+   if n==1 then return function (a)           event(log,rate,id,a,0,0,0,0,0) end end
+   if n==2 then return function (a,b)         event(log,rate,id,a,b,0,0,0,0) end end
+   if n==3 then return function (a,b,c)       event(log,rate,id,a,b,c,0,0,0) end end
+   if n==4 then return function (a,b,c,d)     event(log,rate,id,a,b,c,d,0,0) end end
+   if n==5 then return function (a,b,c,d,e)   event(log,rate,id,a,b,c,d,e,0) end end
+   if n==6 then return function (a,b,c,d,e,f) event(log,rate,id,a,b,c,d,e,f) end end
    error("illegal number of arguments: "..n)
 end
 
--- Get or set the current timeline log level.
-function level (timeline,  level)
-   if level then timeline.level = level end
-   return timeline.level
+-- Get or set the current timeline log rate.
+function rate (timeline, rate)
+   if rate then timeline.rate = rate end
+   return timeline.rate
 end
 
 ------------------------------------------------------------
@@ -199,11 +199,11 @@ end
 
 |.type log, struct timeline_state
 |.type msg, struct timeline_entry
--- void log(timeline, level, msg, arg0, ..., arg5)
+-- void log(timeline, rate, msg, arg0, ..., arg5)
 local function asmlog (Dst)
    |->log:
-   -- Check that the enabled log level is >= the event log level
-   | mov eax, log:p0->level
+   -- Check that the enabled log rate is >= the event log rate
+   | mov eax, log:p0->rate
    | cmp p1, rax
    | jge >1
    | ret
@@ -253,17 +253,17 @@ _anchor = mcode
 --dasm.dump(mcode, size)
 
 local test_events = [[
-6|six:
-event with level 6 (0 args)
+0,6|six:
+event with rate 6 (0 args)
 
-5|five: a b c
-event with level 5 (3 args)
+0,5|five: a b c
+event with rate 5 (3 args)
 
-4|four: a b c d e f
-event with level 4 (6 args)
+0,4|four: a b c d e f
+event with rate 4 (6 args)
 
-3|three:
-event with level 3
+0,3|three:
+event with rate 3 (0 args)
 ]]
 
 -- selftest is designed mostly to check that timeline logging does not
@@ -275,7 +275,7 @@ function selftest ()
    local tl = new("selftest/timeline")
    local e = load_events_from_string(tl, test_events, "selftest",
                                      {module="timeline", func="selftest"})
-   level(tl, 4) -- won't log event three
+   rate(tl, 4) -- won't log event three
 
    print("check logging individual messages")
    -- First check that log entries are created
@@ -296,7 +296,7 @@ function selftest ()
    -- overflow the string table
    print("overflowing string table")
    for i = 1, 1e5 do
-      mkevent(tl, "selftest", "9|dummy_event_definition:", {i=i})
+      mkevent(tl, "selftest", "0,9|dummy_event_definition:", {i=i})
    end
    -- report median logging time
    local sample = {}

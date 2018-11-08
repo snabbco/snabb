@@ -553,7 +553,7 @@ function main (options)
       breathe()
       if not no_timers then timer.run() events.polled_timers() end
       if not busywait then pace_breathing() end
-      set_log_level() -- roll random log level
+      randomize_log_rate() -- roll random log rate
    until done and done()
    counter.commit()
    if not options.no_report then report(options.report) end
@@ -563,17 +563,15 @@ function main (options)
    setvmprofile("program")
 end
 
-function set_log_level (level)
-   if not level then
-      -- Randomize the log level. Enable each level in 5x more breaths
-      -- than the level below by randomly picking from log5() distribution.
-      -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
-      --
-      -- Could be better to reduce the log level over time to "stretch"
-      -- logs for long running processes? Improvements possible :-).
-      level = math.max(1, math.ceil(math.log(math.random(5^9))/math.log(5)))
-   end
-   timeline_mod.level(timeline_log, level)
+function randomize_log_rate ()
+   -- Randomize the log rate. Enable each rate in 5x more breaths
+   -- than the rate below by randomly picking from log5() distribution.
+   -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
+   --
+   -- Could be better to reduce the log rate over time to "stretch"
+   -- logs for long running processes? Improvements possible :-).
+   local rate = math.max(1, math.ceil(math.log(math.random(5^9))/math.log(5)))
+   timeline_mod.rate(timeline_log, rate)
 end
 
 local nextbreath
@@ -621,7 +619,7 @@ function breathe ()
    for i = 1, #breathe_pull_order do
       local app = breathe_pull_order[i]
       if app.pull and not app.dead then
-         if timeline_mod.level(timeline_log) <= 3 then
+         if timeline_mod.rate(timeline_log) <= 3 then
             app_events[app].pull(linkstats(app))
             with_restart(app, app.pull)
             app_events[app].pulled(linkstats(app))
@@ -635,7 +633,7 @@ function breathe ()
    for i = 1, #breathe_push_order do
       local app = breathe_push_order[i]
       if app.push and not app.dead then
-         if timeline_mod.level(timeline_log) <= 3 then
+         if timeline_mod.rate(timeline_log) <= 3 then
             app_events[app].push(linkstats(app))
             with_restart(app, app.push)
             app_events[app].pushed(linkstats(app))
