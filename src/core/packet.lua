@@ -123,18 +123,18 @@ end
 
 -- Return borrowed packets to group freelist.
 function rebalance_freelists ()
-   local free_packets = freelist_nfree(packets_fl)
-   if group_fl and free_packets > packets_allocated then
+   if group_fl and freelist_nfree(packets_fl) > packets_allocated then
       events.group_freelist_wait()
       freelist_lock(group_fl)
       events.group_freelist_locked()
+      local nfree0 = freelist_nfree(packets_fl)
       while freelist_nfree(packets_fl) > packets_allocated
       and not freelist_full(group_fl) do
          freelist_add(group_fl, freelist_remove(packets_fl))
       end
+      events.group_freelist_released(nfree0 - freelist_nfree(packets_fl))
       freelist_unlock(group_fl)
       events.group_freelist_unlocked()
-      events.group_freelist_released(free_packets - freelist_nfree(packets_fl))
    end
 end
 
