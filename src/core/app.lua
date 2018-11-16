@@ -45,9 +45,23 @@ local timeline_log, events -- initialized on demand
 function timeline ()
    if timeline_log == nil then
       timeline_log = timeline_mod.new("engine/timeline")
+      timeline_mod.rate(timeline_log, 7) -- initialize rate to "no logging"
       events = timeline_mod.load_events(timeline_log, "core.engine")
    end
    return timeline_log
+end
+
+function randomize_log_rate ()
+   -- Randomize the log rate. Enable each rate in 5x more breaths
+   -- than the rate below by randomly picking from log5() distribution.
+   -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
+   --
+   -- Could be better to reduce the log rate over time to "stretch"
+   -- logs for long running processes? Improvements possible :-).
+   --
+   -- We use rates 0-6 where 6 means "log always", and 0 means "log never."
+   local rate = math.max(1, math.ceil(math.log(math.random(5^9))/math.log(5)))
+   timeline_mod.rate(timeline_log, rate)
 end
 
 -- Breath latency histogram
@@ -561,17 +575,6 @@ function main (options)
 
    -- Switch to catch-all profile
    setvmprofile("program")
-end
-
-function randomize_log_rate ()
-   -- Randomize the log rate. Enable each rate in 5x more breaths
-   -- than the rate below by randomly picking from log5() distribution.
-   -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
-   --
-   -- Could be better to reduce the log rate over time to "stretch"
-   -- logs for long running processes? Improvements possible :-).
-   local rate = math.max(1, math.ceil(math.log(math.random(5^9))/math.log(5)))
-   timeline_mod.rate(timeline_log, rate)
 end
 
 local nextbreath
