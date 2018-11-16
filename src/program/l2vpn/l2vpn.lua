@@ -528,7 +528,7 @@ function parse_config (main_config)
       local fragmenter = fragmenters[uplink]
       if not dispatcher then
          dispatcher = App:new('disp_'..normalize_name(uplink),
-                              dispatch, {})
+                              dispatch, { afi = "ipv6", links = {} })
          dispatchers[uplink] = dispatcher
          local south = dispatcher:connector('south')
 
@@ -568,8 +568,8 @@ function parse_config (main_config)
          assert(pw.address, "Missing remote address configuration")
          print("      Address: "..pw.address)
          local link_name = vpls_name..'_'..name
-         dispatcher:arg()[link_name] = { source = ipv6:pton(pw.address),
-                                         destination = ipv6:pton(vpls.address) }
+         dispatcher:arg().links[link_name] = { src = ipv6:pton(pw.address),
+                                               dst = ipv6:pton(vpls.address) }
          local app = App:new('pw_'..vpls_name..'_'..name,
                              pseudowire,
                              { name = link_name,
