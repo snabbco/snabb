@@ -10,6 +10,9 @@ local S = require("syscall")
 local shm = require("core.shm")
 local lib = require("core.lib")
 
+-- Set to false to disable timeline logging
+enabled = true
+
 -- Load a set of events for logging onto a timeline.
 -- Returns a set of logging functions.
 --
@@ -86,6 +89,7 @@ local major, minor = 2, 1
 
 -- Create a new timeline under the given shared memory path.
 function new (shmpath,  num_entries, size_stringtable)
+   if not enabled then return false end
    num_entries = num_entries or 1e6
    size_stringtable = size_stringtable or 1e6
    -- Calculate size based on number of log entries
@@ -132,6 +136,8 @@ function mkevent (timeline, category, message, attrs)
    -- Count the number of arguments.
    -- (See http://stackoverflow.com/a/11158158/1523491)
    local _, n = (message:match(":([^\n]*)")):gsub("[^%s]+","")
+   assert(n >= 0 and n <= 6, "illegal number of arguments: "..n)
+   if not enabled then return function () end end
    local id = intern(timeline, message)
    local event = event -- move asm function into local scope
    local log = timeline
@@ -142,11 +148,11 @@ function mkevent (timeline, category, message, attrs)
    if n==4 then return function (a,b,c,d)     event(log,rate,id,a,b,c,d,0,0) end end
    if n==5 then return function (a,b,c,d,e)   event(log,rate,id,a,b,c,d,e,0) end end
    if n==6 then return function (a,b,c,d,e,f) event(log,rate,id,a,b,c,d,e,f) end end
-   error("illegal number of arguments: "..n)
 end
 
 -- Get or set the current timeline log rate.
 function rate (timeline, rate)
+   if not enabled then return 1/0 end
    if rate then timeline.rate = rate end
    return timeline.rate
 end
