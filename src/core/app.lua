@@ -346,6 +346,7 @@ function compute_config_actions (old, new)
       end
    end
 
+   events.config_actions_computed()
    return actions
 end
 
@@ -371,14 +372,14 @@ function apply_config_actions (actions)
       local link = app.output[linkname]
       app.output[linkname] = nil
       remove_link_from_array(app.output, link)
-      if app.link then app:link() end
+      if app.link then app:link() app_events[app].linked() end
    end
    function ops.unlink_input (appname, linkname)
       local app = app_table[appname]
       local link = app.input[linkname]
       app.input[linkname] = nil
       remove_link_from_array(app.input, link)
-      if app.link then app:link() end
+      if app.link then app:link() app_events[app].linked() end
    end
    function ops.free_link (linkspec)
       link.free(link_table[linkspec], linkspec)
@@ -395,19 +396,20 @@ function apply_config_actions (actions)
       local link = assert(link_table[linkspec])
       app.output[linkname] = link
       table.insert(app.output, link)
-      if app.link then app:link() end
+      if app.link then app:link() app_events[app].linked() end
    end
    function ops.link_input (appname, linkname, linkspec)
       local app = app_table[appname]
       local link = assert(link_table[linkspec])
       app.input[linkname] = link
       table.insert(app.input, link)
-      if app.link then app:link() end
+      if app.link then app:link() app_events[app].linked() end
    end
    function ops.stop_app (name)
       local app = app_table[name]
-      if app.stop then app:stop() end
+      if app.stop then app:stop() app_events[app].stopped() end
       if app.shm then shm.delete_frame(app.shm) end
+      app_events[app] = nil
       app_table[name] = nil
       configuration.apps[name] = nil
    end
@@ -430,21 +432,25 @@ function apply_config_actions (actions)
          app.shm = shm.create_frame("apps/"..name, app.shm)
       end
       configuration.apps[name] = { class = class, arg = arg }
+      app_events[app].started()
    end
    function ops.reconfig_app (name, class, arg)
       local app = app_table[name]
-      app:reconfig(arg)
+      app:reconfig(arg) app_events[app].reconfigured()
       configuration.apps[name].arg = arg
    end
 
+   events.configure(counter.read(configs) + 1)
    -- Dispatch actions.
    for _, action in ipairs(actions) do
       local name, args = unpack(action)
       if log then io.write("engine: ", name, " ", args[1], "\n") end
       assert(ops[name], name)(unpack(args))
    end
+   events.config_applied()
 
    compute_breathe_order ()
+   events.breath_order_computed()
 end
 
 -- Sort the NODES topologically according to SUCCESSORS via

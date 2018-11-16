@@ -1,3 +1,16 @@
+1,6|started:
+The app has been started. (Returned from new() callback.)
+
+1,6|linked:
+The app has been linked. (Returned from link() callback.)
+
+1,6|reconfigured:
+The app has been reconfigured. (Returned from reconfig() callback.)
+
+1,6|stopped:
+The app has been stopped. (Returned from stop() callback.)
+
+
 3,3|pull:   inpackets inbytes outpackets outbytes droppackets dropbytes
 Entering app pull() callback.
 
