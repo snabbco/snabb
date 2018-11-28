@@ -1,8 +1,8 @@
 -- This program provisions a complete endpoint for one or more L2 VPNs.
 --
--- Each VPN provides essentially a multi-point L2 VPN over IPv6,
--- a.k.a. Virtual Private LAN Service (VPLS). A point-to-point VPN,
--- a.k.a. Virtual Private Wire Service (VPWS) is provided as a
+-- Each VPN provides essentially a multi-point L2 VPN over IPv6 or
+-- IPv4, a.k.a. Virtual Private LAN Service (VPLS). A point-to-point
+-- VPN, a.k.a. Virtual Private Wire Service (VPWS) is provided as a
 -- degenerate case of a VPLS with exactly two endpoints (i.e. a single
 -- pseudowire).  The general framework is described in RFC4664.
 --
@@ -21,8 +21,10 @@
 -- For each interface, the corresponding driver is instantiated with
 -- the given configuration.  In non-trunking mode and without a L3
 -- configuration, initialization is finished and other apps can link
--- directly to the driver.  For a L3 interface, the nd_light app is
--- attached to the driver and other apps attach to nd_light instead.
+-- directly to the driver.  For a L3 interface, traffic is spearated
+-- by address family and a neighbor discovery app and a
+-- fragmentation/reassembly app for PMTUD are added for each
+-- configured family.
 --
 -- If the interface is in trunking mode, an instance of the VlanMux
 -- app from apps.vlan.vlan is instantiated and its "trunk" port is
@@ -31,15 +33,19 @@
 -- the appropriate "vlan" link of the VlanMux app (for vlan = 0, the
 -- corresponding VlanMux link is called "native").
 --
--- Each uplink of the VPLS configuration must reference a
--- L3-(sub-)interface of a previously defined physical interface.  For
--- each VPLS, the "uplink" link of the pseudowire-dispatch app is
--- connected to the "north" link of the ND module of its uplink
--- interface.
---
--- The dispatch app provides the demultiplexing of incoming packets
--- based on the source and destination IPv6 addresses, which uniquely
--- identify a single pseudowire within one of the VPLS instances.
+-- Each pseudowire is uniquely identified by the triple (source
+-- address, destination address, VC ID).  The multiplexing is handled
+-- in three stages.  In the first stage, a "dispatcher" is connected
+-- to the L3 interface and partitions the packets according to the
+-- tuple (source address, destination address), leaving the packet
+-- untouched.  In the second stage, the IP (v4 or v6) header is
+-- removed and the packets are further partitioned according to the
+-- "upper layer" protocol, i.e. the encapsulation.  In the third step,
+-- the encapsulation header is removed and the packet is assigned to a
+-- pseudowire endpoint based on an element specific to the
+-- encapsulation mechanism (e.g. the "key" field of a GRE header).
+-- This is also where the control channel is separated from the data
+-- plane.
 --
 -- An instance of apps.bridge.learning or apps.bridge.flooding is
 -- created for every VPLS, depending on the selected bridge type.  The
@@ -54,97 +60,9 @@
 -- In trunking mode, the corresponding "vlan" links of the VlanMux app
 -- are connected to the bridge instead.
 --
--- Every pseudowire can have its own tunnel configuration or it can
--- inherit a default configuration for the entire VPLS instance.
---
--- Finally, all pseudowires of the VPLS instance are connected to the
--- dispatcher on the "ac" side.
---
 -- If a VPLS consists of a single PW and a single AC, the resulting
 -- two-port bridge is optimized away by creating a direct link between
 -- the two.  The VPLS thus turns into a VPWS.
-
--- config = {
---   [ shmem_dir = <shmem_dir> , ]
---   [ snmp = { enable = true | false,
---              interval = <interval> }, ]
---   interfaces = {
---     {
---       name = <name>,
---       [ description = <description>, ]
---       driver = {
---         path = <path>,
---         name = <name>,
---         config = {
---           pciaddr = <pciaddress>,
---         },
---         [ extra_config = <extra_config>, ]
---       },
---       [ mirror = {
---           [ rx = true | false | <rx_name>, ]
---           [ tx = true | false | <tx_name>, ]
---           [ type = 'tap' | 'pcap', ]
---         }, ]
---       mtu = <mtu>,
---       [ -- only allowed if trunk.enable == false
---         afs = {
---           ipv6 = {
---             address = <address>,
---             next_hop = <next_hop>,
---             [ next_hop_mac = <neighbor_mac> ]
---           }
---         }, ]
---       [ trunk = {
---           enable = true | false,
---           encapsulation = "dot1q" | "dot1ad" | <number>,
---           vlans = {
---             {
---               [ description = <description>, ]
---               [ mtu = mtu, ]
---               vid = <vid>,
---               [ afs = {
---                   ipv6 = {
---                     address = <address>,
---                     next_hop = <next_hop>,
---                     [ next_hop_mac = <next_hop_mac> ]
---                   }
---                 } ]
---              },
---              ...
---           }
---         } ]
---     }
---   },
---   vpls = {
---     <vpls1> = {
---       [ description = <description> ,]
---       vc_id = <vc_id>,
---       mtu = <mtu>,
---       af  = 'ipv4' | 'ipv6',
---       address = <address>,
---       uplink = <int>,
---       bridge = {
---         type = "flooding"|"learning",
---         [ config = <bridge-config> ]
---       },
---       [ tunnel = <tunnel-config>, ]
---       [ cc = <cc-config>, ]
---       ac = {
---         <ac1> = <int>
---         <ac2> = ...
---       },
---       pw = {
---         <pw1> = {
---            address = <address>,
---            [ tunnel = <tunnel-config> ],
---            [ cc = <cc-config> ]
---         },
---         <pw2> = ...
---       },
---     },
---     <vpls2> = ...
---   }
--- }
 module(...,package.seeall)
 
 local ffi = require("ffi")
@@ -160,7 +78,6 @@ local app_graph = require("core.config")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local ipv4 = require("lib.protocol.ipv4")
-local dipatch = require("program.l2vpn.dispatch").dispatch
 local Tap = require("apps.tap.tap").Tap
 local Tee = require("apps.basic.basic_apps").Tee
 local PcapWriter = require("apps.pcap.pcap").PcapWriter
@@ -169,11 +86,113 @@ local VlanMux = require("apps.vlan.vlan").VlanMux
 local nd_light = require("apps.ipv6.nd_light").nd_light
 local arp = require("apps.ipv4.arp").ARP
 local af_mux = require("program.l2vpn.af_mux").af_mux
-local dispatch = require("program.l2vpn.dispatch").dispatch
-local pseudowire = require("program.l2vpn.pseudowire").pseudowire
 local ifmib = require("lib.ipc.shmem.iftable_mib")
 local frag_ipv6 = require("apps.ipv6.fragment").Fragmenter
 local reass_ipv6 = require("apps.ipv6.reassemble").Reassembler
+
+local afs_params = {
+   default = {},
+   keysof = {
+      address = { required = true },
+      next_hop = { required = true },
+      next_hop_mac = { default = nil }
+   },
+}
+
+local tunnel_params = {
+   type = { required = true },
+   config = { default = {} }
+}
+
+local params = {
+   shmem_dir = { default = nil },
+   snmp = {
+      config =
+         {
+            enable = { default = false },
+            interval = { default = 5 },
+         }
+   },
+   interfaces = {
+      required = true,
+      listof = {
+         name = { required = true },
+         description = { default = '' },
+         driver = {
+            required = { true },
+            config = {
+               path = { required = true },
+               name = { required = true },
+               config = {{ default = {} }
+               },
+               extra_config = { default = {} }
+            }
+         },
+         mirror = {
+            config = {
+               rx = { default = false },
+               tx = { default = false },
+               type = { default = 'tap' }
+            }
+         },
+         mtu = { required = true },
+         afs = afs_params,
+         trunk = {
+            enable = { default = false },
+            encapsulation = { default = 'dot1q' },
+            vlans = {
+               required = true,
+               listof = {
+                  description = { default = '' },
+                  mtu = { default = nil },
+                  vid = { required = true },
+                  afs = afs_params,
+               }
+            }
+         }
+      }
+   },
+   vpls = {
+      required = true,
+      keysof = {
+         description = { default = '' },
+         vc_id = { required = true },
+         mtu = { required = true },
+         afi = { required = true },
+         address = { required = true },
+         uplink = { required = true },
+         bridge = {
+            config = {
+               type = { default = 'learning' },
+               config = { default = {} }
+            }
+         },
+         tunnel = {
+            default = {
+               type = "gre"
+            },
+            config = tunnel_params
+         },
+         cc = { default = {} },
+         ac = {
+            required = true,
+            keysof = {
+               name = { required = true }
+            }
+         },
+         pw = {
+            required = true,
+            keysof = {
+               address = { required = true },
+               tunnel = {
+                  config = tunnel_params
+               },
+               cc = { default = {} },
+            }
+         }
+      }
+   }
+}
 
 local bridge_types = { flooding = true, learning = true }
 
@@ -195,7 +214,7 @@ end
 
 local App = {}
 function App:new (name, class, initial_arg)
-   -- assert(not state.apps[name], "Duplicate app "..name)
+   assert(not state.apps[name], "Duplicate app "..name)
    local self = setmetatable({}, { __index = App })
    state.apps[name] = self
    self._name = name
@@ -217,7 +236,7 @@ function App:arg (arg)
    self._arg = arg
 end
 
-function connector (app_in, input, app_out, output)
+function socket (app_in, input, app_out, output)
    assert(input)
    local output = output or input
    return {
@@ -230,8 +249,8 @@ function connector (app_in, input, app_out, output)
    }
 end
 
-function App:connector (input, output)
-   return connector(self, input, self, output)
+function App:socket (input, output)
+   return socket(self, input, self, output)
 end
 
 local function connect (from, to)
@@ -282,8 +301,16 @@ af_classes = {
    ipv6 = ipv6,
 }
 
+local function nil_or_empty_p (t)
+   if not t then return true end
+   assert(type(t) == "table", type(t))
+   for _, _ in pairs(t) do
+      return(false)
+   end
+   return(true)
+end
+
 function parse_intf(config)
-   assert(config.name, "Missing interface name")
    print("Setting up interface "..config.name)
    print("  Description: "..(config.description or "<none>"))
    local intf = {
@@ -294,10 +321,7 @@ function parse_intf(config)
    }
 
    -- NIC driver
-   assert(config.driver, "Missing driver configuration")
    local drv_c = config.driver
-   assert(drv_c.path and drv_c.name and
-             drv_c.config, "Incomplete driver configuration")
    if type(drv_c.config) == "table" then
       if (drv_c.config.pciaddr) then
          print("  PCI address: "..drv_c.config.pciaddr)
@@ -323,11 +347,10 @@ function parse_intf(config)
           "Unsupported driver (missing driver helper)"
              ..drv_c.path.."."..drv_c.name)
    intf.driver_helper = driver_helper
-   intf.l2 = intf.app:connector(driver_helper.link_names())
+   intf.l2 = intf.app:socket(driver_helper.link_names())
 
    -- L2 configuration
    print("  L2 configuration")
-   assert(config.mtu, "Missing MTU")
    print("    MTU: "..config.mtu)
    intf.mtu = config.mtu
 
@@ -337,7 +360,7 @@ function parse_intf(config)
       local mtype = mirror.type or 'tap'
       assert(type(mtype) == "string", "Mirror type must be a string")
       for _, dir in ipairs({ 'rx', 'tx' }) do
-         local mirror_connector
+         local mirror_socket
          if mirror[dir] then
             if mtype == "pcap" then
                local file
@@ -349,7 +372,7 @@ function parse_intf(config)
                end
                local mirror = App:new('tap_'..intf.nname..'_pcap_'..dir,
                                       PcapWriter, file)
-               mirror_connector = mirror:connector('input')
+               mirror_socket = mirror:socket('input')
                print("    "..dir.." port-mirror on pcap file "..file)
             elseif mtype == "tap" then
                local tap_name
@@ -361,22 +384,22 @@ function parse_intf(config)
                end
                local mirror = App:new('tap_'..intf.nname..'_'..dir,
                                       Tap, { name = tap_name, mtu = config.mtu})
-               mirror_connector = mirror:connector('input', 'output')
+               mirror_socket = mirror:socket('input', 'output')
                local sink = App:new('sink_'..intf.nname..'_tap_'..dir,
                                     Sink)
-               connect(mirror_connector, sink:connector('input'))
+               connect(mirror_socket, sink:socket('input'))
                print("    "..dir.." port-mirror on tap interface "..tap_name)
             else
                error("Illegal mirror type: "..mtype)
             end
             local tee = App:new('tee_'..intf.nname..'_'..dir, Tee)
-            connect(tee:connector('mirror'), mirror_connector)
+            connect(tee:socket('mirror'), mirror_socket)
             if dir == "rx" then
-               connect(intf.l2, tee:connector('input'))
-               intf.l2.output = tee:connector('pass').output
+               connect(intf.l2, tee:socket('input'))
+               intf.l2.output = tee:socket('pass').output
             else
-               connect(tee:connector('pass'), intf.l2)
-               intf.l2.input = tee:connector('input').input
+               connect(tee:socket('pass'), intf.l2)
+               intf.l2.input = tee:socket('input').input
             end
          end
       end
@@ -387,9 +410,7 @@ function parse_intf(config)
    end
 
    local afs_procs = {
-      ipv6 = function (config, vid, connector_in, indent)
-         assert(config.address, "Missing address")
-         assert(config.next_hop, "Missing next-hop")
+      ipv6 = function (config, vid, socket_in, indent)
          -- FIXME: check fo uniqueness of subnet
          print(indent.."    Address: "..config.address.."/64")
          print(indent.."    Next-Hop: "..config.next_hop)
@@ -406,7 +427,7 @@ function parse_intf(config)
                               next_hop = ipv6:pton(config.next_hop),
                               quiet = true })
          state.nds[nd:name()] = { app = nd, intf = intf }
-         connect_duplex(nd:connector('south'), connector_in)
+         connect_duplex(nd:socket('south'), socket_in)
 
          fragmenter = App:new('frag_'..intf.nname..vid_suffix(vid),
                               frag_ipv6,
@@ -415,17 +436,15 @@ function parse_intf(config)
          local reassembler = App:new('reass_'..intf.nname..vid_suffix(vid),
                                      reass_ipv6,
                                      {})
-         local nd_north = nd:connector('north')
-         connect(nd_north, fragmenter:connector('south'))
-         connect(fragmenter:connector('output'), nd_north)
-         connect(fragmenter:connector('north'),
-                 reassembler:connector('input'))
-         return connector(fragmenter, 'input', reassembler, 'output'), fragmenter
+         local nd_north = nd:socket('north')
+         connect(nd_north, fragmenter:socket('south'))
+         connect(fragmenter:socket('output'), nd_north)
+         connect(fragmenter:socket('north'),
+                 reassembler:socket('input'))
+         return socket(fragmenter, 'input', reassembler, 'output'), fragmenter
       end,
 
-      ipv4 = function (config, vid, connector_in, indent)
-         assert(config.address, "Missing address")
-         assert(config.next_hop, "Missing next-hop")
+      ipv4 = function (config, vid, socket_in, indent)
          -- FIXME: check fo uniqueness of subnet
          print(indent.."    Address: "..config.address.."/24")
          print(indent.."    Next-Hop: "..config.next_hop)
@@ -442,22 +461,22 @@ function parse_intf(config)
                                   ethernet:pton(config.next_hop_mac or nil),
                                next_ip = ipv4:pton(config.next_hop) })
          state.arps[arp:name()] = { app = arp, intf = intf }
-         connect_duplex(arp:connector('south'), connector_in)
-         return arp:connector('north')
+         connect_duplex(arp:socket('south'), socket_in)
+         return arp:socket('north')
       end
    }
 
-   local function process_afs (af_configs, vid, connector, indent)
+   local function process_afs (af_configs, vid, socket, indent)
       print(indent.."  Address family configuration")
       local afs = {
          ipv4 = {
             name = 'IPv4',
-            conn_in = connector,
+            socket_in = socket,
             configured = false,
          },
          ipv6 = {
             name = 'IPv6',
-            conn_in = connector,
+            socket_in = socket,
             configured = false,
          }
       }
@@ -466,17 +485,17 @@ function parse_intf(config)
          -- Add a demultiplexer for IPv4/IPv6
          local afd = App:new('af_mux_'..intf.nname..vid_suffix(vid),
                              af_mux)
-         connect_duplex(afd:connector('south'), connector)
+         connect_duplex(afd:socket('south'), socket)
          for _, afi in ipairs({ 'ipv4', 'ipv6' }) do
-            afs[afi].conn_in = afd:connector(afi)
+            afs[afi].socket_in = afd:socket(afi)
          end
       end
       for afi, config in pairs(af_configs) do
          local af = afs[afi]
          assert(af, "Unsupported address family "..afi)
          print(indent.."    "..af.name)
-         af.conn_out, af.fragmenter =
-            afs_procs[afi](config, vid, af.conn_in, indent.."  ")
+         af.socket_out, af.fragmenter =
+            afs_procs[afi](config, vid, af.socket_in, indent.."  ")
          af.configured = true
       end
       return afs
@@ -489,7 +508,7 @@ function parse_intf(config)
       -- instance of the VLAN multiplexer.
       print("    Trunking mode: enabled")
       intf.subintfs = {}
-      assert(not config.afs,
+      assert(#config.afs == 0,
              "Address family configuration not allowed in trunking mode")
       local encap = trunk.encapsulation or "dot1q"
       assert(encap == "dot1q" or encap == "dot1ad" or
@@ -500,14 +519,12 @@ function parse_intf(config)
                    or string.format("ether-type 0x%04x", encap)))
       local vmux = App:new('vmux_'..intf.nname, VlanMux,
                            { encapsulation = encap })
-      connect_duplex(vmux:connector('trunk'), intf.l2)
+      connect_duplex(vmux:socket('trunk'), intf.l2)
 
       -- Process VLANs and create sub-interfaces
-      assert(trunk.vlans, "Missing VLAN configuration on trunk port")
       print("  Sub-Interfaces")
       for n, vlan in ipairs(trunk.vlans) do
          local vid = vlan.vid
-         assert(vid, "Missing VLAN ID for sub-interface #"..n)
          assert(type(vid) == "number" and vid >= 0 and vid < 4095,
                 "Invalid VLAN ID "..vid.." for sub-interface #"..n)
          local name = config.name..'.'..vid
@@ -533,21 +550,21 @@ function parse_intf(config)
          print("      L2 configuration")
          print("        VLAN ID: "..(vid > 0 and vid or "<untagged>"))
          print("        MTU: "..subintf.mtu)
-         local connector = vmux:connector((vid == 0 and 'native') or 'vlan'..vid)
-         if vlan.afs then
+         local socket = vmux:socket((vid == 0 and 'native') or 'vlan'..vid)
+         if not nil_or_empty_p(vlan.afs) then
             subintf.l3 = process_afs(vlan.afs, vid,
-                                     connector, "    ")
+                                     socket, "    ")
          else
-            subintf.l2 = connector
+            subintf.l2 = socket
          end
 
-         -- Store a copy of the vmux connector to find the proper shm
+         -- Store a copy of the vmux socket to find the proper shm
          -- frame for the interface counters later on
-         subintf.vmux_connector = connector
+         subintf.vmux_socket = socket
       end
    else
       print("    Trunking mode: disabled")
-      if config.afs then
+      if not nil_or_empty_p(config.afs) then
          intf.l3 = process_afs(config.afs, nil, intf.l2, "")
       end
    end
@@ -555,11 +572,10 @@ function parse_intf(config)
    return intf
 end
 
-function parse_config (main_config)
-   local intfs_config = main_config.interfaces
-   assert(intfs_config, "Missing interfaces configuration")
+function parse_config (args)
+   local main_config = lib.parse(args, params)
    local intfs = state.intfs
-   for _, config in ipairs(intfs_config) do
+   for _, config in ipairs(main_config.interfaces) do
       local intf = parse_intf(config)
       assert(not intfs[intf.name], "Duplicate interface name: "..intf.name)
       intfs[intf.name] = intf
@@ -568,36 +584,146 @@ function parse_config (main_config)
       end
    end
 
-   local vpls_config = main_config.vpls
-   assert(vpls_config, "Missing VPLS configuration")
-
+   -- A pseudowire is uniquely identified by the triple (source,
+   -- destination, vcid).  If a tunnel protocol does not support a VC
+   -- ID, the vcid is set to 0 and the identifier is effectively the
+   -- pair (source, destination). An integer called the sd_index is
+   -- assigned to each (source, destination) pair to identify it
+   -- uniquely.
+   local pws = {}
    local dispatchers = { ipv4 = {}, ipv6 = {} }
+   local tunnel_infos = {
+      l2tpv3 = {
+         class = require("program.l2vpn.tunnels.l2tpv3").tunnel,
+         proto = 115,
+         mk_vc_config_fn = function (vc_id, cc_vc_id, tunnel_config)
+            return {
+               [vc_id] = tunnel_config,
+               [cc_vc_id] = {
+                   local_session = 0xFFFFFFFE,
+                   remote_session = 0xFFFFFFFE,
+                   local_cookie = '\x00\x00\x00\x00\x00\x00\x00\x00',
+                   remote_cookie = '\x00\x00\x00\x00\x00\x00\x00\x00',
+               }
+            }
+         end,
+         afs = {
+            ipv6 = true
+         }
+      },
+      gre = {
+         class = require("program.l2vpn.tunnels.gre").tunnel,
+         proto = 47,
+         mk_vc_config_fn = function (vc_id, cc_vc_id, tunnel_config)
+            return {
+               [vc_id] = {},
+               [cc_vc_id] = {}
+            }
+         end,
+         vc_id_max = 0xFFFFFFFF,
+         afs = {
+            ipv4 = true,
+            ipv6 = true
+         }
+      }
+   }
+   local function add_pw (afi, intf, uplink, local_addr, remote_addr,
+                          vc_id, tunnel_config)
+      local dispatch = dispatchers[afi][uplink]
+      if not dispatch then
+         dispatch = App:new('disp_'..normalize_name(uplink).."_"..afi,
+                            require("program.l2vpn.dispatch").dispatch,
+                            { afi = afi, links = {} })
+         connect_duplex(dispatch:socket('south'),
+                        intf.l3[afi].socket_out)
+         intf.l3[afi].used = true
+         dispatchers[afi][uplink] = dispatch
+      end
+
+      local type = tunnel_config.type
+      local tunnel_info = assert(tunnel_infos[type],
+                                 "Unsupported tunnel type :"..type)
+      assert(tunnel_info.afs[afi],
+             "Tunnel type "..type.." not supported for "
+                .."address family "..afi)
+      if not tunnel_info.vc_id_max then
+         assert(vc_id == 0, "VC ID must be 0 for tunnel type "..type)
+      else
+         assert(vc_id > 0 and vc_id <= tunnel_info.vc_id_max,
+                "Invalid VC ID "..vc_id
+                   .." (range 1.."..tunnel_info.vc_id_max..")")
+      end
+
+      local af = af_classes[afi]
+      local sd_pair = string.format("%s%s", af:ntop(remote_addr),
+                                    af:ntop(local_addr))
+      local sd_entry
+      for index, entry in ipairs(pws) do
+         if entry.sd_pair == sd_pair then
+            assert(not entry.vc_ids[vc_id],
+                   "Non-unique pseudowire: ", af:ntop(remote_addr),
+                   af:ntop(local_addr), vc_id)
+            entry.vc_ids[vc_id] = vc_id
+            sd_entry = entry
+            break
+         end
+      end
+      if not sd_entry then
+         local index = #pws + 1
+
+         -- Each (source, destination) pair connects to a dedicated
+         -- protocol multiplexer.
+         local protomux = App:new('pmux_'..index,
+                                  require("program.l2vpn.transports."..afi).transport,
+                                  { src = local_addr, dst = remote_addr, links = {} })
+         dispatch:arg().links['sd_'..index] = { src = remote_addr,
+                                                dst = local_addr }
+         connect_duplex(dispatch:socket('sd_'..index),
+                        protomux:socket('south'))
+         sd_entry = { sd_pair = sd_pair,
+                      index = index,
+                      protomux = protomux,
+                      tunnels = {},
+                      vc_ids = { vc_id = true } }
+         table.insert(pws, sd_entry)
+      end
+
+      local tunnel = sd_entry.tunnels[type]
+      if not tunnel then
+         tunnel = App:new(type.."_"..sd_entry.index,
+                          tunnel_info.class,
+                          { vcs =
+                               tunnel_info.mk_vc_config_fn(vc_id,
+                                                           vc_id + 0x8000,
+                                                           tunnel_config.config) })
+         sd_entry.protomux:arg().links[type] = { proto = tunnel_info.proto }
+         connect_duplex(sd_entry.protomux:socket(type),
+                        tunnel:socket('south'))
+      end
+
+      return tunnel:socket(('vc_%d'):format(vc_id)),
+      tunnel:socket(('vc_%d'):format(vc_id + 0x8000))
+   end
+
    local bridge_groups = {}
-   for vpls_name, vpls in pairs(vpls_config) do
+   for vpls_name, vpls in pairs(main_config.vpls) do
       local function assert_vpls (cond, msg)
          assert(cond, "VPLS "..vpls_name..": "..msg)
       end
 
       print("Creating VPLS instance "..vpls_name
             .." ("..(vpls.description or "<no description>")..")")
-      assert_vpls(vpls.vc_id, "Missing VC ID")
       print("  VC ID: "..vpls.vc_id)
-      assert_vpls(vpls.mtu, "Missing MTU")
       print("  MTU: "..vpls.mtu)
 
-      assert(vpls.afi, "Missing address family identifier")
       local af = af_classes[vpls.afi]
       assert(af, "Invalid address family identifier"..vpls.afi)
-      assert_vpls(vpls.address, "Mssing address")
       assert(af:pton(vpls.address),
              "Invalid "..vpls.afi.." address "..vpls.address)
+      print("  Address family: "..vpls.afi)
       print("  Address: "..vpls.address)
 
-      assert_vpls(vpls.ac, "Missing ac configuration")
-      assert_vpls(vpls.pw, "Missing pseudowire configuration")
-
       local uplink = vpls.uplink
-      assert_vpls(uplink, "missing uplink")
       assert(type(uplink) == "string",
              "Uplink interface specifier must be a string")
       local intf = intfs[uplink]
@@ -609,67 +735,65 @@ function parse_config (main_config)
       assert(intf.l3[vpls.afi],
              "Address family "..vpls.afi.." not enabled on uplink")
 
-      local tunnel = vpls.tunnel
-      local cc = vpls.cc
-
-      local dispatcher = dispatchers[vpls.afi][uplink]
-      if not dispatcher then
-         dispatcher = App:new('disp_'..normalize_name(uplink).."_"..vpls.afi,
-                              dispatch, { afi = vpls.afi, links = {} })
-         dispatchers[vpls.afi][uplink] = dispatcher
-         local south = dispatcher:connector('south')
-         connect_duplex(south, intf.l3[vpls.afi].conn_out)
-         intf.l3[vpls.afi].used = true
-      end
       local bridge_group = {
-         config = vpls.bridge or { type = 'flooding' },
+         config = vpls.bridge,
          pws = {},
          acs = {}
       }
       assert(bridge_types[bridge_group.config.type],
              "Invalid bridge type: "..bridge_group.config.type)
       bridge_groups[vpls_name] = bridge_group
+
       print("  Creating pseudowires")
       for name, pw in pairs(vpls.pw) do
          print("    "..name)
-         assert(tunnel or pw.tunnel,
-                "Missing tunnel configuration for pseudowire"
-                   .." and no default specified")
-         assert(pw.address, "Missing remote address configuration")
          assert(af:pton(pw.address),
                 "Invalid "..vpls.afi.." address "..pw.address)
          print("      Address: "..pw.address)
-         local link_name = vpls_name..'_'..name
-         dispatcher:arg().links[link_name] = { src = af:pton(pw.address),
-                                               dst = af:pton(vpls.address) }
-         local app = App:new('pw_'..vpls_name..'_'..name,
-                             pseudowire,
-                             { name = link_name,
-                               vc_id = vpls.vc_id,
-                               mtu = vpls.mtu,
-                               shmem_dir = main_config.shmem_dir,
-                               description = vpls.description,
-                               transport = { type = vpls.afi,
-                                             src = vpls.address,
-                                             dst = pw.address },
-                               tunnel = pw.tunnel or tunnel,
-                               cc = pw.cc or cc or nil })
-         connect_duplex(dispatcher:connector(link_name),
-                        app:connector('uplink'))
-         table.insert(bridge_group.pws, app)
+         local tunnel_config = pw.tunnel or vpls.tunnel
+         print("      Encapsulation: "..tunnel_config.type)
+
+         local socket, cc_socket =
+            add_pw(vpls.afi, intf, uplink, af:pton(vpls.address),
+                   af:pton(pw.address),
+                   vpls.vc_id, tunnel_config)
+         local cc_app
+         if cc_socket then
+            local cc_config = pw.cc or vpls.cc or {}
+            cc_app = App:new('cc_'..vpls_name..'_'..name,
+                             require("program.l2vpn.control_channel").control_channel,
+                             {
+                                enable = pw.cc or vpls.cc,
+                                heartbeat = cc_config.heartbeat,
+                                dead_factor = cc_config.dead_factor,
+                                name = vpls_name..'_'..name,
+                                description = vpls.description,
+                                mtu = vpls.mtu,
+                                vc_id = vpls.vc_id,
+                                afi = vpls.afi,
+                                peer_addr = pw.address })
+            connect_duplex(cc_socket, cc_app:socket('south'))
+         end
+         table.insert(bridge_group.pws,
+                      { name = vpls_name..'_'..name,
+                        socket = socket,
+                        cc_app = cc_app,
+                        cc_socket = cc_socket })
+
       end
-      -- XXX remove once frag for ipv4 is implemented
+      -- XXX remove conditional once frag for ipv4 is implemented
       if intf.l3[vpls.afi].fragmenter then
          table.insert(intf.l3[vpls.afi].fragmenter:arg().pmtu_local_addresses,
                       vpls.address)
       end
 
       print("  Creating attachment circuits")
-      for name, ac in pairs(vpls.ac) do
+      for name, t in pairs(vpls.ac) do
+         local ac = t.name
          print("    "..name)
          assert(type(ac) == "string",
                 "AC interface specifier must be a string")
-         print("      AC is on "..ac)
+         print("      Interface: "..ac)
          local intf = intfs[ac]
          assert_vpls(intf, "AC interface "..ac.." does not exist")
          assert_vpls(not intf.l3, "AC interface "..ac
@@ -693,12 +817,14 @@ function parse_config (main_config)
       if #bridge_group.pws == 1 and #bridge_group.acs == 1 then
          -- No bridge needed for a p2p VPN
          local pw, ac = bridge_group.pws[1], bridge_group.acs[1]
-         local pw_connector = pw:connector('ac')
-         connect_duplex(pw:connector('ac'), ac.l2)
-         -- For a p2p VPN, pass the name of the AC
-         -- interface so the PW module can set up the
-         -- proper service-specific MIB
-         pw:arg().interface = bridge_group.acs[1].name
+         connect_duplex(pw.socket, ac.l2)
+         -- For a p2p VPN, pass the name and description of the AC
+         -- interface so the PW module can set up the proper
+         -- service-specific MIB
+         bridge_group.pws[1].cc_app:arg().local_if_name =
+            bridge_group.acs[1].name
+         bridge_group.pws[1].cc_app:arg().local_if_alias =
+            bridge_group.acs[1].description
       else
          local bridge =
             App:new('bridge_'..vpls_name,
@@ -707,14 +833,13 @@ function parse_config (main_config)
                       split_horizon_groups = { pw = {} },
                       config = bridge_group.config.config })
          for _, pw in ipairs(bridge_group.pws) do
-            connect_duplex(pw:connector('ac'),
-                           bridge:connector(pw:name()))
-            table.insert(bridge:arg().split_horizon_groups.pw, pw:name())
+            connect_duplex(pw.socket, bridge:socket(pw.name))
+            table.insert(bridge:arg().split_horizon_groups.pw, pw.name)
          end
          for _, ac in ipairs(bridge_group.acs) do
             local ac_name = normalize_name(ac.name)
             connect_duplex(ac.l2,
-                           bridge:connector(ac_name))
+                           bridge:socket(ac_name))
             table.insert(bridge:arg().ports, ac_name)
          end
       end
@@ -725,7 +850,7 @@ function parse_config (main_config)
          -- Create sink for interfaces not used as uplink or AC
          local sink = App:new('sink_'..intf.nname,
                               Sink, {})
-         connect_duplex(intf.l2, sink:connector('input'))
+         connect_duplex(intf.l2, sink:socket('input'))
       else
          if intf.l3 then
             for afi, state in pairs(intf.l3) do
@@ -734,7 +859,7 @@ function parse_config (main_config)
                   -- a dispatcher
                   local sink = App:new('sink_'..intf.nname..'_'..afi,
                                        Sink, {})
-                  connect_duplex(state.conn_out, sink:connector('input'))
+                  connect_duplex(state.socket_out, sink:socket('input'))
                end
             end
          end
@@ -808,10 +933,10 @@ local function setup_shm_and_snmp (main_config)
             end
             local tstats = shm.open_frame(
                'links/'..
-                  find_linkspec('^'..intf.vmux_connector.output()))
+                  find_linkspec('^'..intf.vmux_socket.output()))
             local rstats = shm.open_frame(
                'links/'..
-                  find_linkspec(intf.vmux_connector.input()..'$'))
+                  find_linkspec(intf.vmux_socket.input()..'$'))
             counters.rxpackets = map(tstats.txpackets)
             counters.rxbytes = map(tstats.txbytes)
             counters.rxdrop = map(tstats.txdrop)

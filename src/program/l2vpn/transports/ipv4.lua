@@ -1,12 +1,19 @@
 module(..., package.seeall)
 local ffi = require("ffi")
+local C = ffi.C
 local lib = require("core.lib")
+local counter = require("core.counter")
 local packet = require("core.packet")
 local ethernet = require("lib.protocol.ethernet")
-local ipv6 = require("lib.protocol.ipv6")
+local ipv4 = require("lib.protocol.ipv4")
+local ipsum = require("lib.checksum").ipsum
 local datagram = require("lib.protocol.datagram")
 
-transport = {}
+transport = {
+   shm = {
+      ["bad-checksum"] = { counter }
+   }
+}
 
 local params = {
    src = { required = true },
@@ -18,14 +25,17 @@ local proto_params = {
 }
 
 local ether_header_size = ethernet:sizeof()
-local ipv6_header_size = ipv6:sizeof()
-local ipv6_header_ptr_t = ipv6._header.ptr_t
-local combined_header_size = ether_header_size + ipv6_header_size
+local ipv4_header_size = ipv4:sizeof()
+local ipv4_header_ptr_t = ipv4._header.ptr_t
+local combined_header_size = ether_header_size + ipv4_header_size
+-- Offsets in units of uint16_t
+local csum_offset = ffi.offsetof(ipv4._header.t, 'checksum')/2
+local length_offset = ffi.offsetof(ipv4._header.t, 'total_length')/2
 
 function transport:new (arg)
    local conf = lib.parse(arg, params)
    local o = {}
-   o._discard_link = link.new("ipv6_proto_discard")
+   o._discard_link = link.new("ipv4_proto_discard")
    o._proto_links_out = ffi.new("struct link *[256]", o._discard_link)
 
    o._proto_infos = {}
@@ -34,24 +44,23 @@ function transport:new (arg)
       local proto = lib.parse(arg, proto_params).proto
       assert(proto > 0 and proto < 255, "Illegal protocol: "..proto)
 
-      -- Construct a combined Ethernet/IPv6 header which will be
+      -- Construct a combined Ethernet/IPv4 header which will be
       -- prepended to downstream packets.
       local dgram = datagram:new()
-      dgram:push(ipv6:new({ src = conf.src,
+      dgram:push(ipv4:new({ src = conf.src,
                             dst = conf.dst,
-                            next_header = proto }))
-      dgram:push(ethernet:new({ type = 0x86dd }))
+                            ttl = 64,
+                            protocol = proto }))
+      dgram:push(ethernet:new({ type = 0x0800 }))
       dgram:new(dgram:packet(), ethernet) -- Reset parse stack
-
-      -- Provide access to the IPv6 header to set the payload_length
-      -- field in the push() loop.
-      local header = dgram:parse_n(2)
 
       local proto_info = { link_name = name,
                            proto = proto,
-                           header = header,
                            combined_header = {
-                              data = ffi.cast("uint8_t *", dgram:packet().data),
+                              ptr = ffi.cast("uint8_t *", dgram:packet().data),
+                              ipv4_ptr = ffi.cast("uint16_t *",
+                                                  dgram:packet().data
+                                                     + ether_header_size),
                               length = dgram:packet().length } }
       table.insert(o._proto_infos, proto_info)
       o._proto_infos_by_name[name] = proto_info
@@ -80,12 +89,17 @@ function transport:push ()
    for _ = 1, link.nreadable(sin) do
       local p = link.receive(sin)
       -- Precondition: incoming packets must have at least an Ethernet
-      -- and an IPv6 header
+      -- and an IPv4 header
       assert(p.length >= combined_header_size)
-      local ipv6 = ffi.cast(ipv6_header_ptr_t, p.data + ether_header_size)
-      local proto = ipv6.next_header
-      p = packet.shiftleft(p, combined_header_size)
-      link.transmit(links_out[proto], p)
+      local ipv4 = ffi.cast(ipv4_header_ptr_t, p.data + ether_header_size)
+      if ipsum(ffi.cast("uint8_t *", ipv4), ipv4_header_size, 0) == 0 then
+         local proto = ipv4.protocol
+         p = packet.shiftleft(p, combined_header_size)
+         link.transmit(links_out[proto], p)
+      else
+         counter.add(self.shm["bad-checksum"])
+         packet.free(p)
+      end
    end
 
    for _ = 1, link.nreadable(discard) do
@@ -97,9 +111,12 @@ function transport:push ()
       local pin = assert(self.input[proto_info.link_name])
       for _ = 1, link.nreadable(pin) do
          local p = link.receive(pin)
-         proto_info.header:payload_length(p.length)
+         local total_length = p.length + ipv4_header_size
          local header = proto_info.combined_header
-         p = packet.prepend(p, header.data, header.length)
+         C.checksum_update_incremental_16(header.ipv4_ptr + csum_offset,
+                                          header.ipv4_ptr + length_offset,
+                                          total_length)
+         p = packet.prepend(p, header.ptr, header.length)
          link.transmit(sout, p)
       end
    end
@@ -114,9 +131,9 @@ function selftest ()
    local SourceProto = {}
    function SourceProto:new (proto)
       local dgram = require("lib.protocol.datagram"):new()
-      local ether = require("lib.protocol.ethernet"):new({ type = 0x86dd })
-      local ipv6 = ipv6:new({ next_header = proto })
-      dgram:push(ipv6)
+      local ether = require("lib.protocol.ethernet"):new({ type = 0x0800 })
+      local ipv4 = ipv4:new({ protocol = proto })
+      dgram:push(ipv4)
       dgram:push(ether)
       return setmetatable({ dgram = dgram }, { __index = SourceProto })
    end
@@ -141,8 +158,8 @@ function selftest ()
       end
    end
    config.app(app_graph, "join", Join)
-   config.app(app_graph, "mux", transport, { src = ipv6:pton("::1"),
-                                             dst = ipv6:pton("::2"),
+   config.app(app_graph, "mux", transport, { src = ipv4:pton("127.0.0.1"),
+                                             dst = ipv4:pton("127.0.0.2"),
                                              links = mux_links })
    config.link(app_graph, "join.output -> mux.south")
    config.app(app_graph, "sink", Sink)

@@ -14,8 +14,7 @@ local lib = require("core.lib")
 local ethernet = require("lib.protocol.ethernet")
 local C = ffi.C
 
-dispatch = subClass(nil)
-dispatch._name = "IP dispatcher"
+dispatch = {}
 
 local dispatch_config_params = {
    afi = { required = true },
@@ -57,7 +56,7 @@ local afs = {
   }
 }
 function dispatch:new (arg)
-   local o = dispatch:superClass().new(self)
+   local o = {}
    local conf = lib.parse(arg, dispatch_config_params)
    local af = afs[conf.afi]
    assert(af, "Invalid address family identifier "..conf.afi)
@@ -69,37 +68,37 @@ function dispatch:new (arg)
       local conf = lib.parse(link, link_config_params)
       local template = af.type()
       C.memcpy(template.addrs.src, conf.src, ffi.sizeof(conf.src))
-      C.memcpy(template.addrs.dst, conf.dst, ffi.sizeof(conf.src))
+      C.memcpy(template.addrs.dst, conf.dst, ffi.sizeof(conf.dst))
       table.insert(o._targets, { template = template, link = name })
    end
    o._ntargets = #o._targets
 
-   return o
+   return setmetatable(o, { __index = dispatch })
 end
 
-local receive, transmit = link.receive, link.transmit
-local nreadable = link.nreadable
 function dispatch:push()
    local sin = self.input.south
+   local sout = self.output.south
 
    for i = 1, self._ntargets do
       local t = self._targets[i]
-      for _ = 1, nreadable(sin) do
-         local p = receive(sin)
+      local tout = self.output[t.link]
+      for _ = 1, link.nreadable(sin) do
+         local p = link.receive(sin)
          if C.memcmp(t.template, p.data + self._offset, self._size) == 0 then
-            transmit(self.output[t.link], p)
+            link.transmit(tout, p)
          else
-            transmit(sin, p)
+            link.transmit(sin, p)
          end
       end
 
       local tin = self.input[t.link]
-      for _ = 1, nreadable(tin) do
-         transmit(self.output.south, receive(tin))
+      for _ = 1, link.nreadable(tin) do
+         link.transmit(sout, link.receive(tin))
       end
    end
 
-   for _ = 1, nreadable(sin) do
-      packet.free(receive(sin))
+   for _ = 1, link.nreadable(sin) do
+      packet.free(link.receive(sin))
    end
 end
