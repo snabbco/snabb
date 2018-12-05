@@ -701,20 +701,56 @@ end
 -- CONFIG all of the required keys are present, fill in any missing values for
 -- optional keys, and error if any unknown keys are found.
 --
--- ARG := { key=vaue, ... }
--- CONFIG := { key = {[required=boolean], [default=value]}, ... }
-function parse (arg, config)
+-- ARG := { key=value, ... }
+-- CONFIG := { key = {[required=boolean], [default=value]},
+--             [config=subconfig], [listof=subconfig}], [keysof=subconfig], ... }
+function parse (arg, config, arg_path, config_path)
+   local arg_path = arg_path or ''
+   local config_path = config_path or ''
    local ret = {}
    if arg == nil then arg = {} end
+   assert(type(arg) == "table",
+          "table expected at '"..arg_path.."'")
+   assert(type(config) == "table",
+          "table expected at template '"..config_path.."'")
    for k, o in pairs(config) do
-      assert(arg[k] ~= nil or not o.required, "missing required parameter '"..k.."'")
+      assert(arg[k] ~= nil or not o.required,
+             "missing required parameter '"..arg_path..k.."'")
    end
    for k, v in pairs(arg) do
-      assert(config[k], "unrecognized parameter '"..k.."'")
+      assert(config[k], "unrecognized parameter '"..arg_path..k.."'")
       ret[k] = v
    end
    for k, o in pairs(config) do
       if ret[k] == nil then ret[k] = o.default end
+
+      if ret[k] ~= nil then
+         if o.config then
+            ret[k] = parse(ret[k], o.config,
+                           arg_path..k..'.', config_path..k..'<config>')
+         else
+            if o.listof then
+               assert(type(ret[k]) == "table",
+                      "table expected at '"..arg_path..k.."'")
+               for i, subarg in ipairs(ret[k]) do
+                  ret[k][i] = parse(subarg, o.listof,
+                                    arg_path..k..'.entry-'..i..'.',
+                                    config_path..k..'<listof>')
+               end
+            end
+            if o.keysof then
+               assert(type(ret[k]) == "table",
+                      "table expected at '"..arg_path..k.."'")
+               for subk, subarg in pairs(ret[k]) do
+                  if type(subk) == "string" then
+                     ret[k][subk] = parse(subarg, o.keysof,
+                                          arg_path..k..'.'..subk..'.',
+                                          config_path..k..'<keysof>')
+                  end
+               end
+            end
+         end
+      end
    end
    return ret
 end
