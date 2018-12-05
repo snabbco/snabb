@@ -26,13 +26,16 @@ local provided_counters = {
    "dtime", "rxpackets", "rxbytes", "txpackets", "txbytes", "txdrop"
 }
 
+local link_anchors = {}
 function new (name)
    local r = ffi.new(link_t)
    for _, c in ipairs(provided_counters) do
       r.stats[c] = counter.create("links/"..name.."/"..c..".counter")
    end
    counter.set(r.stats.dtime, C.get_unix_time())
-   return r
+   local r_ptr = ffi.cast("struct link *", r)
+   table.insert(link_anchors, { link = r, ptr = r_ptr })
+   return r_ptr
 end
 
 function free (r, name)
@@ -43,6 +46,12 @@ function free (r, name)
       counter.delete("links/"..name.."/"..c..".counter")
    end
    shm.unlink("links/"..name)
+   for i, link in ipairs(link_anchors) do
+      if link.r_ptr == r then
+         table.remove(link_anchors, i)
+         break
+      end
+   end
 end
 
 function receive (r)
