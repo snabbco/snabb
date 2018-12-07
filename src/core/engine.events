@@ -63,16 +63,16 @@ The engine resumes operation after sleeping voluntarily.
 The engine stops the traffic processing loop.
 
 
-0,6|config_actions_computed:
+0,9|config_actions_computed:
 The engine has computed the actions required for applying a new configuration.
 
-0,6|configure: config
+0,9|configure: config
 The engine begins to apply a new configuration.
 
 'config' is the number of this configuration.
 
-0,6|config_applied:
+0,9|config_applied:
 The engine has applied a new configuration.
 
-0,6|breath_order_computed:
+0,9|breathe_order_computed:
 The engine has computed the breath order of a new configuration.

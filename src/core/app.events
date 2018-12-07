@@ -1,13 +1,13 @@
-1,6|started:
+1,9|started:
 The app has been started. (Returned from new() callback.)
 
-1,6|linked:
+1,9|linked:
 The app has been linked. (Returned from link() callback.)
 
-1,6|reconfigured:
+1,9|reconfigured:
 The app has been reconfigured. (Returned from reconfig() callback.)
 
-1,6|stopped:
+1,9|stopped:
 The app has been stopped. (Returned from stop() callback.)
 
 

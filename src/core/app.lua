@@ -45,7 +45,7 @@ local timeline_log, events -- initialized on demand
 function timeline ()
    if timeline_log == nil then
       timeline_log = timeline_mod.new("engine/timeline")
-      timeline_mod.rate(timeline_log, 7) -- initialize rate to "no logging"
+      timeline_mod.rate(timeline_log, 9) -- initially log events with rate >= 9
       events = timeline_mod.load_events(timeline_log, "core.engine")
    end
    return timeline_log
@@ -59,7 +59,7 @@ function randomize_log_rate ()
    -- Could be better to reduce the log rate over time to "stretch"
    -- logs for long running processes? Improvements possible :-).
    --
-   -- We use rates 0-6 where 6 means "log always", and 0 means "log never."
+   -- We use rates 0-9 where 9 means "log always", and 0 means "log never."
    local rate = math.max(1, math.ceil(math.log(math.random(5^9))/math.log(5)))
    timeline_mod.rate(timeline_log, rate)
 end
@@ -450,7 +450,7 @@ function apply_config_actions (actions)
    events.config_applied()
 
    compute_breathe_order ()
-   events.breath_order_computed()
+   events.breathe_order_computed()
 end
 
 -- Sort the NODES topologically according to SUCCESSORS via

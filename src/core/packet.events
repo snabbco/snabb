@@ -1,5 +1,5 @@
-9,6|packets_preallocated: packets
-DMA memory for packets had been preallocated from the operating system.
+9,9|packets_preallocated: packets
+DMA memory for packets has been preallocated from the operating system.
 
 'packets' is the number of packets for which space has been reserved.
 
