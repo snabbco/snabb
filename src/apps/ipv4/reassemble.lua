@@ -22,6 +22,8 @@ local link       = require("core.link")
 local ipsum      = require("lib.checksum").ipsum
 local ctable     = require('lib.ctable')
 local ctablew    = require('apps.lwaftr.ctable_wrapper')
+local token_bucket = require('lib.token_bucket')
+local tsc        = require('lib.tsc')
 local alarms     = require('lib.yang.alarms')
 local S          = require('syscall')
 
@@ -129,6 +131,8 @@ local reassembler_config_params = {
    max_concurrent_reassemblies = { default=20000 },
    -- Maximum number of fragments to reassemble.
    max_fragments_per_reassembly = { default=40 },
+   -- Maximum number of seconds to keep a partially reassembled packet
+   reassembly_timeout = { default = 60 },
 }
 
 
@@ -151,6 +155,7 @@ function Reassembler:new(conf)
             uint16_t final_start;
             uint16_t reassembly_base;
             uint32_t running_length; // bytes copied so far
+            uint64_t tstamp; // creation time in TSC ticks
             struct packet *packet;
          } __attribute((packed))]],
          o.max_fragments_per_reassembly,
@@ -162,6 +167,16 @@ function Reassembler:new(conf)
    o.scratch_fragment_key = params.key_type()
    o.scratch_reassembly = params.value_type()
    o.next_counter_update = -1
+
+   local scan_time = o.reassembly_timeout / 2
+   local scan_chunks = 100
+   o.scan_tb = token_bucket.new({ rate = math.ceil(o.ctab.size / scan_time),
+                                  burst_size = o.ctab.size / scan_chunks})
+   o.tsc = tsc.new()
+   o.ticks_per_timeout = o.tsc:tps() * o.reassembly_timeout
+   o.scan_cursor = 0
+   o.scan_tstamp = o.tsc:stamp()
+   o.scan_interval = o.tsc:tps() * scan_time / scan_chunks + 0ULL
 
    alarms.add_to_inventory {
       [{alarm_type_id='incoming-ipv4-fragments'}] = {
@@ -225,6 +240,7 @@ function Reassembler:lookup_reassembly(h, pkt)
    ffi.fill(reassembly, ffi.sizeof(reassembly))
    reassembly.reassembly_base = headers_len
    reassembly.running_length = headers_len
+   reassembly.tstamp = self.tsc:stamp()
    reassembly.packet = packet.allocate()
    packet.append(reassembly.packet, pkt.data, headers_len)
 
@@ -304,10 +320,32 @@ function Reassembler:handle_fragment(h, fragment)
    end
 end
 
+function Reassembler:expire (now)
+   local cursor = self.scan_cursor
+   for i = 1, self.scan_tb:take_burst() do
+      local entry
+      cursor, entry = self.ctab:next_entry(cursor, cursor + 1)
+      if entry then
+         if now - entry.value.tstamp > self.ticks_per_timeout then
+            self:reassembly_error(entry)
+         else
+            cursor = cursor + 1
+         end
+      end
+   end
+   self.scan_cursor = cursor
+   self.scan_tstamp = now
+end
+
 function Reassembler:push ()
    local input, output = self.input.input, self.output.output
 
    self.incoming_ipv4_fragments_alarm:check()
+
+   local now = self.tsc:stamp()
+   if now - self.scan_tstamp > self.scan_interval then
+      self:expire(now)
+   end
 
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
