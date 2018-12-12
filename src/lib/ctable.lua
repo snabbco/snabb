@@ -427,6 +427,7 @@ function CTable:remove(key, missing_allowed)
 end
 
 function CTable:make_lookup_streamer(width)
+   assert(width > 0 and width <= 262144, "Width value out of range: "..width)
    local res = {
       all_entries = self.entries,
       width = width,
