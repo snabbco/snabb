@@ -4,9 +4,13 @@ local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
 local lib = require("core.lib")
+local util = require("lib.yang.util")
 local binary_search = require("lib.binary_search")
 local multi_copy = require("lib.multi_copy")
 local siphash = require("lib.hash.siphash")
+
+-- TODO: Move to core/lib.lua.
+local memoize = util.memoize
 local min, max, floor, ceil = math.min, math.max, math.floor, math.ceil
 
 CTable = {}
@@ -426,6 +430,21 @@ function CTable:remove(key, missing_allowed)
    return true
 end
 
+local function generate_multi_copy(width, size)
+   return multi_copy.gen(width, size)
+end
+generate_multi_copy = memoize(generate_multi_copy)
+
+local function generate_multi_hash(self, width)
+   return self.make_multi_hash_fn(width)
+end
+generate_multi_hash = memoize(generate_multi_hash)
+
+local function generate_binary_search(entries_per_lookup, entry_type)
+   return binary_search.gen(entries_per_lookup, entry_type)
+end
+generate_binary_search = memoize(generate_binary_search)
+
 function CTable:make_lookup_streamer(width)
    local res = {
       all_entries = self.entries,
@@ -455,9 +474,9 @@ function CTable:make_lookup_streamer(width)
    -- Compile multi-copy and binary-search procedures that are
    -- specialized for this table and this width.
    local entry_size = ffi.sizeof(self.entry_type)
-   res.multi_copy = multi_copy.gen(width, res.entries_per_lookup * entry_size)
-   res.multi_hash = self.make_multi_hash_fn(width)
-   res.binary_search = binary_search.gen(res.entries_per_lookup, self.entry_type)
+   res.multi_copy = generate_multi_copy(width, res.entries_per_lookup * entry_size)
+   res.multi_hash = generate_multi_hash(self, width)
+   res.binary_search = generate_binary_search(res.entries_per_lookup, self.entry_type)
 
    return setmetatable(res, { __index = LookupStreamer })
 end
