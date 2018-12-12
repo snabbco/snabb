@@ -18,11 +18,11 @@ local tlv_ptr_t = ffi.typeof("$ *", tlv_t)
 tlv._types = {
    [1] = {
       name  = "src_ll_addr",
-      class = "lib.protocol.icmp.nd.options.lladdr"
+      class = "lib.protocol.icmp.ipv6.nd.options.lladdr"
    },
    [2] = {
       name  = "tgt_ll_addr",
-      class = "lib.protocol.icmp.nd.options.lladdr"
+      class = "lib.protocol.icmp.ipv6.nd.options.lladdr"
    },
 }
 

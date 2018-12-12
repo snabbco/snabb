@@ -3,7 +3,7 @@
 module(..., package.seeall)
 local ffi = require("ffi")
 local proto_header = require("lib.protocol.header")
-local tlv = require("lib.protocol.icmp.nd.options.tlv")
+local tlv = require("lib.protocol.icmp.ipv6.nd.options.tlv")
 
 -- This header implements the common structure of IPv6 ND options.
 -- They are *not* of type lib.protocol.header.  Instead, this is a

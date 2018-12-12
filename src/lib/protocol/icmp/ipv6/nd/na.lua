@@ -4,7 +4,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local bitfield = require("core.lib").bitfield
-local nd_header = require("lib.protocol.icmp.nd.header")
+local nd_header = require("lib.protocol.icmp.ipv6.nd.header")
 local proto_header = require("lib.protocol.header")
 
 local na = subClass(nd_header)
