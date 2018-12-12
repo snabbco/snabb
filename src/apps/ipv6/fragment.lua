@@ -15,7 +15,7 @@ local ctable     = require('lib.ctable')
 local datagram   = require('lib.protocol.datagram')
 local ethernet   = require('lib.protocol.ethernet')
 local ipv6_hdr   = require('lib.protocol.ipv6')
-local ptb        = require('lib.protocol.icmp.ptb')
+local ptb        = require('lib.protocol.icmp.ipv6.ptb')
 local tsc        = require('lib.tsc')
 local S          = require('syscall')
 
