@@ -487,9 +487,17 @@ end
 
 function S.get_mempolicy(mode, mask, addr, flags)
   mode = mode or t.int1()
-  mask = mktype(t.bitmask, mask)
-  -- Size should be at least equals to maxnumnodes.
-  local size = ffi.cast("uint64_t", math.max(tonumber(mask.size), get_maxnumnodes()))
+  local size
+  if ffi.istype(t.bitmask, mask) then
+    -- if mask was provided by the caller, then use its size
+    -- and let the syscall error if it's too small
+    size = ffi.cast("uint64_t", tonumber(mask.size))
+  else
+    local mask_for_size = t.bitmask(mask)
+    -- Size should be at least equals to maxnumnodes.
+    size = ffi.cast("uint64_t", math.max(tonumber(mask_for_size.size), get_maxnumnodes()))
+    mask = t.bitmask(mask, tonumber(size))
+  end
   local ret, err = C.get_mempolicy(mode, mask.mask, size, addr or 0, c.MPOL_FLAG[flags])
   if ret == -1 then return nil, t.error(err or errno()) end
   return { mode=mode[0], mask=mask }
