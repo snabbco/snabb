@@ -191,19 +191,27 @@ function Fragmenter:unfragmentable_packet(p)
    -- TODO: Send an error packet.
 end
 
-function Fragmenter:fragment_and_transmit(in_h, in_pkt, mtu)
-   local in_flags = bit.rshift(ntohs(in_h.ipv4.flags_and_fragment_offset),
-                               ipv4_fragment_offset_bits)
+function Fragmenter:fragment_and_transmit(in_pkt_box, mtu)
+   local in_flags, header_length
+   do
+      local in_h = ffi.cast(ether_ipv4_header_ptr_t, in_pkt_box[0].data)
+      in_flags = bit.rshift(ntohs(in_h.ipv4.flags_and_fragment_offset),
+                            ipv4_fragment_offset_bits)
+      header_length = ipv4_header_length(in_h.ipv4)
+   end
    if not self.pmtud and bit.band(in_flags, ipv4_flag_dont_fragment) ~= 0 then
-      return self:unfragmentable_packet(in_pkt)
+      return self:unfragmentable_packet(in_pkt_box[0])
    end
 
    local mtu_with_l2 = mtu + ether_header_len
-   local header_size = ether_header_len + ipv4_header_length(in_h.ipv4)
-   local total_payload_size = in_pkt.length - header_size
+   local header_size = ether_header_len + header_length
+   local total_payload_size = in_pkt_box[0].length - header_size
    local offset, id = 0, self:fresh_fragment_id()
 
+   -- Use explicit boxing to avoid garbage when passing the packet
+   -- pointer in case this loop gets compiled first.
    while offset < total_payload_size do
+      local in_pkt = in_pkt_box[0]
       local out_pkt = packet.allocate()
       packet.append(out_pkt, in_pkt.data, header_size)
       local out_h = ffi.cast(ether_ipv4_header_ptr_t, out_pkt.data)
@@ -282,6 +290,7 @@ function Fragmenter:expire_pmtu ()
    until cursor == 0
 end
 
+local pkt_box = ffi.new("struct packet *[1]")
 function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
    local south, north = self.input.south, self.output.north
@@ -301,23 +310,39 @@ function Fragmenter:push ()
          -- counter here.
          packet.free(pkt)
       else
-         local mtu = self.mtu
-          if self.pmtud then
-             local entry = self.dcache:lookup_ptr(h.ipv4.dst_ip)
-             if entry then
-                mtu = entry.value.mtu
-             end
-          end
-          if pkt.length <= mtu + ether_header_len then
-             -- No need to fragment; forward it on.
-             counter.add(self.shm["out-ipv4-frag-not"])
-             link.transmit(output, pkt)
-          else
-             -- Packet doesn't fit into MTU; need to fragment.
-             self:fragment_and_transmit(h, pkt, mtu)
-             packet.free(pkt)
-          end
+         link.transmit(input, pkt)
        end
+   end
+
+   for _ = 1, link.nreadable(input) do
+      local pkt = link.receive(input)
+      local mtu = self.mtu
+      if self.pmtud then
+         local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
+         local entry = self.dcache:lookup_ptr(h.ipv4.dst_ip)
+         if entry then
+            mtu = entry.value.mtu
+         end
+      end
+      -- FIXME: assumes that there is always room to store the MTU at
+      -- the end of the payload.
+      ffi.cast("uint16_t *", pkt.data + pkt.length)[0] = mtu
+      if pkt.length <= mtu + ether_header_len then
+         -- No need to fragment; forward it on.
+         counter.add(self.shm["out-ipv4-frag-not"])
+         link.transmit(output, pkt)
+      else
+         -- Packet doesn't fit into MTU; need to fragment.
+         link.transmit(input, pkt)
+      end
+   end
+
+   for _ = 1,  link.nreadable(input) do
+      local pkt  = link.receive(input)
+      local mtu = ffi.cast("uint16_t *", pkt.data + pkt.length)[0]
+      pkt_box[0] = pkt
+      self:fragment_and_transmit(pkt_box, mtu)
+      packet.free(pkt_box[0])
    end
 
    if self.pmtud then
