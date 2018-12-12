@@ -251,7 +251,8 @@ function Reassembler:lookup_reassembly(h, pkt)
    return entry
 end
 
-function Reassembler:handle_fragment(h, fragment)
+function Reassembler:handle_fragment(fragment)
+   local h = ffi.cast(ether_ipv4_header_ptr_t, fragment.data)
    local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    local headers_len = ether_header_len + ihl * 4
    local flags_and_fragment_offset = ntohs(h.ipv4.flags_and_fragment_offset)
@@ -367,9 +368,14 @@ function Reassembler:push ()
       else
          -- A fragment; try to reassemble.
          counter.add(self.shm["in-ipv4-frag-needs-reassembly"])
-         self:handle_fragment(h, pkt)
-         packet.free(pkt)
+         link.transmit(input, pkt)
       end
+   end
+
+   for _ = 1, link.nreadable(input) do
+      local pkt = link.receive(input)
+      self:handle_fragment(pkt)
+      packet.free(pkt)
    end
 
    if self.next_counter_update < engine.now() then
