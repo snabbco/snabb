@@ -50,6 +50,7 @@ function transport:new (arg)
       dgram:push(ipv4:new({ src = conf.src,
                             dst = conf.dst,
                             ttl = 64,
+                            flags = 0x2, -- Don't fragment
                             protocol = proto }))
       dgram:push(ethernet:new({ type = 0x0800 }))
       dgram:new(dgram:packet(), ethernet) -- Reset parse stack

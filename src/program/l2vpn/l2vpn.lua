@@ -89,6 +89,8 @@ local af_mux = require("program.l2vpn.af_mux").af_mux
 local ifmib = require("lib.ipc.shmem.iftable_mib")
 local frag_ipv6 = require("apps.ipv6.fragment").Fragmenter
 local reass_ipv6 = require("apps.ipv6.reassemble").Reassembler
+local frag_ipv4 = require("apps.ipv4.fragment").Fragmenter
+local reass_ipv4 = require("apps.ipv4.reassemble").Reassembler
 
 local afs_params = {
    default = {},
@@ -462,7 +464,20 @@ function parse_intf(config)
                                next_ip = ipv4:pton(config.next_hop) })
          state.arps[arp:name()] = { app = arp, intf = intf }
          connect_duplex(arp:socket('south'), socket_in)
-         return arp:socket('north')
+
+         fragmenter = App:new('frag_'..intf.nname..vid_suffix(vid),
+                              frag_ipv4,
+                              { mtu = intf.mtu - 14, pmtud = true,
+                                pmtu_local_addresses = {} })
+         local reassembler = App:new('reass_'..intf.nname..vid_suffix(vid),
+                                     reass_ipv4,
+                                     {})
+         local arp_north = arp:socket('north')
+         connect(arp_north, fragmenter:socket('south'))
+         connect(fragmenter:socket('output'), arp_north)
+         connect(fragmenter:socket('north'),
+                 reassembler:socket('input'))
+         return socket(fragmenter, 'input', reassembler, 'output'), fragmenter
       end
    }
 
