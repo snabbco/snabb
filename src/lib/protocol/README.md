@@ -205,6 +205,12 @@ Returns the binary representation of IPv4 address denoted by *string*.
 
 Returns the string representation of *ip* address.
 
+— Function **ipv4:pton** *string*
+
+Returns the binary representation of the IPv4 address prefix and prefix length
+encoded denoted by *string* of the form `<ipv4address>/<length>`.
+See [CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing).
+
 
 ### IPv6 (lib.protocol.ipv6)
 

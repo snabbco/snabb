@@ -101,6 +101,13 @@ function ipv4:ntop (n)
    return ffi.string(c_str)
 end
 
+function ipv4:pton_cidr (p)
+   local prefix, length = p:match("([^/]*)/([0-9]*)")
+   return
+      ipv4:pton(prefix),
+      assert(tonumber(length), "Invalid length "..length)
+end
+
 function ipv4:set(addr)
    return ipv4:pton(addr)
 end
