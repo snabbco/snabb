@@ -12,7 +12,6 @@ local counter    = require("core.counter")
 local link       = require("core.link")
 local alarms     = require('lib.yang.alarms')
 local ctable     = require('lib.ctable')
-local filter     = require('lib.pcap.filter')
 local datagram   = require('lib.protocol.datagram')
 local ethernet   = require('lib.protocol.ethernet')
 local ipv6_hdr   = require('lib.protocol.ipv6')
@@ -141,8 +140,6 @@ function Fragmenter:new(conf)
       o.tsc = tsc.new()
       o.pmtu_timeout_ticks = o.tsc:tps() * o.pmtu_timeout
       o.pmtu_timer = lib.throttle(o.pmtu_timeout/10)
-      -- ICMP6 Packet Too Big (Type 2)
-      o.ptb_filter = filter:new("icmp6 and ip6[40] = 2")
       o.dgram = datagram:new()
       packet.free(o.dgram:packet())
 
@@ -206,7 +203,8 @@ function Fragmenter:fragment_and_transmit(in_next_header, in_pkt_box, mtu)
    while offset < total_payload_size do
       local in_pkt = in_pkt_box[0]
       local out_pkt = packet.allocate()
-      packet.append(out_pkt, in_pkt.data, ether_ipv6_header_len)
+      packet.append(out_pkt, ffi.cast("uint8_t *", in_pkt.data),
+                    ether_ipv6_header_len)
       local out_h = ffi.cast(ether_ipv6_header_ptr_t, out_pkt.data)
       local fragment_h = ffi.cast(fragment_header_ptr_t, out_h.ipv6.payload)
       out_pkt.length = out_pkt.length + fragment_header_len
@@ -218,7 +216,8 @@ function Fragmenter:fragment_and_transmit(in_next_header, in_pkt_box, mtu)
       else
          payload_size = total_payload_size - offset
       end
-      packet.append(out_pkt, in_pkt.data + ether_ipv6_header_len + offset,
+      packet.append(out_pkt, ffi.cast("uint8_t *", in_pkt.data +
+                                         ether_ipv6_header_len + offset),
                     payload_size)
 
       out_h.ipv6.next_header = fragment_proto
@@ -234,11 +233,13 @@ function Fragmenter:fragment_and_transmit(in_next_header, in_pkt_box, mtu)
 end
 
 function Fragmenter:process_ptb (pkt)
-   counter.add(self.shm["ipv6-pmtud-ptb-received"])
    local dgram = self.dgram:new(pkt, ethernet)
    dgram:parse_n(3)
    local _, ipv6, icmp = unpack(dgram:stack())
    local payload, length = dgram:payload()
+   if not icmp:type() == 2 then return false end
+   local ptb = dgram:parse()
+   counter.add(self.shm["ipv6-pmtud-ptb-received"])
 
    if (#self.pmtu_local_addresses > 0 and
        not self.pmtu_local_address_table:lookup_ptr(ipv6:dst())) then
@@ -247,7 +248,6 @@ function Fragmenter:process_ptb (pkt)
    end
 
    if icmp:checksum_check(payload, length, ipv6) then
-      local ptb = dgram:parse()
       local mtu = ptb:mtu()
       local payload, length = dgram:payload()
       local orig_hdr = self.ipv6_hdr:new_from_mem(payload, length)
@@ -346,7 +346,8 @@ function Fragmenter:push ()
    if self.pmtud then
       for _ = 1, link.nreadable(south) do
          local pkt = link.receive(south)
-         if self.ptb_filter:match(pkt.data, pkt.length) then
+         local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
+         if h.ipv6.next_header == 58 then -- ICMP6
             if self:process_ptb(pkt) then
                packet.free(pkt)
             else
