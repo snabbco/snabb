@@ -257,8 +257,8 @@ function Reassembler:handle_fragment(h, fragment)
    end
    reassembly.fragment_starts[fcount] = frag_start
    reassembly.fragment_ends[fcount] = frag_start + frag_size
-   if reassembly.fragment_starts[fcount] <
-      reassembly.fragment_starts[fcount - 1] then
+   if (fcount > 0 and reassembly.fragment_starts[fcount] <
+       reassembly.fragment_starts[fcount - 1]) then
       sort_array(reassembly.fragment_starts, fcount)
       sort_array(reassembly.fragment_ends, fcount)
    end
