@@ -34,8 +34,7 @@ ipv4._ulp = {
        [6] = "lib.protocol.tcp",
       [17] = "lib.protocol.udp",
       [47] = "lib.protocol.gre",
-      [58] = "lib.protocol.icmp.header",
-      [1] = "lib.protocol.icmp.header",
+      [1]  = "lib.protocol.icmp.ipv4.header",
    },
    method    = 'protocol' }
 ipv4:init(

@@ -38,7 +38,7 @@ ipv6._ulp = {
        [6] = "lib.protocol.tcp",
       [17] = "lib.protocol.udp",
       [47] = "lib.protocol.gre",
-      [58] = "lib.protocol.icmp.header",
+      [58] = "lib.protocol.icmp.ipv6.header",
       [115] = "lib.protocol.keyed_ipv6_tunnel",
    },
    method    = 'next_header' }

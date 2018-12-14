@@ -3,7 +3,7 @@
 module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
-local nd_header = require("lib.protocol.icmp.nd.header")
+local nd_header = require("lib.protocol.icmp.ipv6.nd.header")
 local proto_header = require("lib.protocol.header")
 
 local ns = subClass(nd_header)
