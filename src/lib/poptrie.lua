@@ -95,38 +95,36 @@ function Poptrie:rib_lookup (key, length, root)
    return lookup(root or self.rib or {}, 0)
 end
 
--- Compress RIB into Poptrie
-function Poptrie:build (rib, node_index, leaf_base, node_base)
-   local function allocate_leaf ()
-      while leaf_base >= self.num_leaves do
-         self:grow_leaves()
-      end
-      leaf_base = leaf_base + 1
-      return leaf_base - 1
+function Poptrie:clear_fib ()
+   self.leaf_base, self.node_base = 0, 0
+   ffi.fill(self.leaves, ffi.sizeof(self.leaves), 0)
+   ffi.fill(self.nodes,  ffi.sizeof(self.nodes),  0)
+end
+
+function Poptrie:allocate_leaf ()
+   while self.leaf_base >= self.num_leaves do
+      self:grow_leaves()
    end
-   local function allocate_node ()
-      while node_base >= self.num_nodes do
-         self:grow_nodes()
-      end
-      node_base = node_base + 1
-      return node_base - 1
+   self.leaf_base = self.leaf_base + 1
+   return self.leaf_base - 1
+end
+
+function Poptrie:allocate_node ()
+   while self.node_base >= self.num_nodes do
+      self:grow_nodes()
    end
-   local function node ()
-      return self.nodes[node_index]
-   end
-   -- When called without arguments, create the root node.
-   if not rib then
-      -- Clear previous FIB
-      ffi.fill(self.leaves, ffi.sizeof(self.leaves))
-      ffi.fill(self.nodes, ffi.sizeof(self.nodes))
-   end
-   rib = rib or self.rib
-   leaf_base = leaf_base or 0
-   node_base = node_base or 0
-   node_index = node_index or allocate_node()
+   self.node_base = self.node_base + 1
+   return self.node_base - 1
+end
+
+function Poptrie:build_node (rib, node_index)
    -- Initialize node base pointers.
-   node().base0 = leaf_base
-   node().base1 = node_base
+   do local node = self.nodes[node_index]
+      -- Note: have to be careful about keeping direct references of nodes
+      -- around as they can get invalidated when the backing array is grown.
+      node.base0 = self.leaf_base
+      node.base1 = self.node_base
+   end
    -- Compute children
    local children = {}
    for index = 0, 2^Poptrie.k - 1 do
@@ -140,10 +138,11 @@ function Poptrie:build (rib, node_index, leaf_base, node_base)
          local value = child.value or 0
          if value ~= last_leaf_value then -- always true when leaf_compression=false
             if Poptrie.leaf_compression then
-               node().leafvec = bor(node().leafvec, lshift(1ULL, index))
+               local node = self.nodes[node_index]
+               node.leafvec = bor(node.leafvec, lshift(1ULL, index))
                last_leaf_value = value
             end
-            local leaf_index = allocate_leaf()
+            local leaf_index = self:allocate_leaf()
             self.leaves[leaf_index] = value
          end
       end
@@ -155,20 +154,26 @@ function Poptrie:build (rib, node_index, leaf_base, node_base)
    for index = 0, 2^Poptrie.k - 1 do
       local child = children[index]
       if child.left or child.right then
-         child_nodes[index] = allocate_node()
+         child_nodes[index] = self:allocate_node()
       end
    end
    -- Initialize node.vector and child nodes.
    for index = 0, 2^Poptrie.k - 1 do
       local child = children[index]
       if child.left or child.right then
-         node().vector = bor(node().vector, lshift(1ULL, index))
-         leaf_base, node_base =
-            self:build(child, child_nodes[index], leaf_base, node_base)
+         local node = self.nodes[node_index]
+         node.vector = bor(node.vector, lshift(1ULL, index))
+         self:build_node(child, child_nodes[index])
       end
    end
-   -- Return new leaf_base and node_base indices.
-   return leaf_base, node_base
+end
+
+-- Compress RIB into Poptrie
+function Poptrie:build ()
+   -- Clear previous FIB
+   self:clear_fib()
+   -- Build root node (and children)
+   self:build_node(self.rib, self:allocate_node())
 end
 
 -- http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetNaive
@@ -252,6 +257,17 @@ function Poptrie:lookup64 (key)
    return Poptrie.asm_lookup64(self.leaves, self.nodes, key)
 end
 
+function Poptrie:fib_info ()
+   for i=0, self.node_base-1 do
+      print("node:", i)
+      print(self.nodes[i].base0, bin(self.nodes[i].leafvec))
+      print(self.nodes[i].base1, bin(self.nodes[i].vector))
+   end
+   for i=0, self.leaf_base-1 do
+      print("leaf:", i, self.leaves[i])
+   end
+end
+
 function selftest ()
    local t = new{}
    -- Tets building empty RIB
@@ -277,17 +293,8 @@ function selftest ()
    local n = t:rib_lookup(0x3F, 8)
    assert(n.value == 5 and not (n.left or n.right))
    -- Test FIB
-   local leaf_base, node_base = t:build()
-   if debug then
-      for i=0, node_base-1 do
-         print("node:", i)
-         print(t.nodes[i].base0, bin(t.nodes[i].leafvec))
-         print(t.nodes[i].base1, bin(t.nodes[i].vector))
-      end
-      for i=0, leaf_base-1 do
-         print("leaf:", i, t.leaves[i])
-      end
-   end
+   t:build()
+   if debug then t:fib_info() end
    assert(t:lookup(0x00) == 1) -- 00000000
    assert(t:lookup(0x03) == 0) -- 00000011
    assert(t:lookup(0x07) == 3) -- 00000111
@@ -313,15 +320,8 @@ function selftest ()
          print("prefix:", entry, bin(case[1], case[2]))
          t:add(case[1], case[2], entry)
       end
-      local leaf_base, node_base = t:build()
-      for i=0, node_base-1 do
-         print("node:", i)
-         print(t.nodes[i].base0, bin(t.nodes[i].leafvec))
-         print(t.nodes[i].base1, bin(t.nodes[i].vector))
-      end
-      for i=0, leaf_base-1 do
-         if t.leaves[i] > 0 then print("leaf:", i, t.leaves[i]) end
-      end
+      t:build()
+      t:fib_info()
       for _, case in ipairs(cases) do
          print("rib:", t:rib_lookup(case[1]).value)
          print("fib:", t:lookup(case[1]))
