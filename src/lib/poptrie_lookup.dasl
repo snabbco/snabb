@@ -16,9 +16,12 @@ local anchor = {}
 
 -- Assemble a lookup routine
 function generate (Poptrie, keysize)
-   local offsets = 
    -- Assert assumptions about lib.poptrie
    assert(Poptrie.k == 6)
+   if Poptrie.direct_pointing then
+      assert(Poptrie.s == 18)
+      assert(Poptrie.leaf_tag == bit.lshift(1, 31))
+   end
    assert(ffi.sizeof(Poptrie.leaf_t) == 2)
    assert(ffi.sizeof(Poptrie.vector_t) == 8)
    assert(ffi.sizeof(Poptrie.base_t) == 4)
@@ -40,9 +43,11 @@ function generate (Poptrie, keysize)
    end
 
    local prototype
-   if keysize <= 64 then
-      prototype = ffi.typeof("$ (*) ($ *, $ *, uint64_t)",
-                             Poptrie.leaf_t, Poptrie.leaf_t, Poptrie.node_t)
+   if keysize <= 64 and Poptrie.direct_pointing then
+      prototype = ffi.typeof(
+         "$ (*) ($ *, $ *, uint64_t, $ *)",
+         Poptrie.leaf_t, Poptrie.leaf_t, Poptrie.node_t, Poptrie.base_t
+      )
    else error("NYI") end
 
    return ffi.cast(prototype, mcode)
@@ -51,20 +56,46 @@ end
 |.define leaves,  rdi -- pointer to leaves array
 |.define nodes,   rsi -- pointer to nodes array
 |.define key,     rdx -- key to look up
+|.define dmap,    rcx -- pointer to directmap
 |.define index,   r8d -- index into node array
 |.define node,    r8  -- pointer into node array 
 |.define offset,  r9  -- offset into key
-|.define v,       r10 -- k bits extracted from key
+|.define v,       r10 -- k or s bits extracted from key
 |.define vec,     r11 -- 64-bit vector or leafvec
 
 -- lookup(leaf_t *leaves, node_t *nodes, key) -> leaf_t
 function lookup (Dst, Poptrie, keysize)
-   -- index, node, offset = 0, nodes[index], 0
-   | mov index, 0
-   | lea node, [nodes+0] -- nodes[0]
-   | mov offset, 0
+   if Poptrie.direct_pointing then
+      -- v = extract(key, 0, s=18)
+      -- v = band(key, lshift(1, s=18) - 1)
+      | mov v, 0x3FFFF
+      | and v, key
+      -- index = dmap[v]
+      | mov index, dword [dmap+v*4]
+      -- eax = band(index, leaf_tag)
+      | mov eax, 0x80000000
+      | and eax, index
+      -- is leaf_tag set?
+      | cmp eax, 0
+      | je >1 -- leaf_tag not set, index is a node
+      -- eax = leaf_tag - 1 (tag inverted)
+      | mov eax, 0x7FFFFFFF
+      | and eax, index
+      | ret
+      -- node, offset = nodes[index], s
+      |1:
+      | imul index, 24 -- multiply by node size
+      | lea node, [nodes+index]
+      -- offset = s
+      | mov offset, 18
+   else
+      -- index, node, offset = 0, nodes[index], 0
+      | mov index, 0
+      | lea node, [nodes+0] -- nodes[0]
+      | mov offset, 0
+   end
    -- while band(vec, lshift(1ULL, v)) ~= 0
-   |1:
+   |2:
    -- v = extract(key, offset, k=6)
    if keysize <= 64 then
       -- v = rshift(key, offset)
@@ -72,7 +103,7 @@ function lookup (Dst, Poptrie, keysize)
       | mov rcx, offset
       | shr v, cl
       -- v = band(v, lshift(1, k=6) - 1)
-      | and v, 63
+      | and v, 0x3F
    else error("NYI") end
    -- vec = nodes[index].vector
    | mov vec, qword [node+8]
@@ -84,7 +115,7 @@ function lookup (Dst, Poptrie, keysize)
    | and rax, vec
    -- is bit v set in vec?
    | cmp rax, 0
-   | je >2 -- reached leaf, exit loop
+   | je >3 -- reached leaf, exit loop
    -- rax = lshift(2ULL, v) - 1
    | mov rax, 2
    | mov rcx, v
@@ -102,9 +133,9 @@ function lookup (Dst, Poptrie, keysize)
    | lea node, [nodes+index]
    -- offset = offset + k
    | add offset, 6
-   | jmp <1 -- loop
+   | jmp <2 -- loop
    -- end while
-   |2:
+   |3:
    -- rax = lshift(2ULL, v) - 1
    | mov rax, 2
    | mov rcx, v
