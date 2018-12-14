@@ -227,7 +227,8 @@ local function cleanup_evicted_entry (entry)
    packet.free(entry.value.packet)
 end
 
-function Reassembler:lookup_reassembly(h, fragment_id)
+function Reassembler:lookup_reassembly(h, fragment)
+   local fragment_id = ntohl(fragment.id)
    local key = self.scratch_fragment_key
    key.src_addr, key.dst_addr, key.fragment_id =
       h.ipv6.src_ip, h.ipv6.dst_ip, fragment_id
@@ -241,8 +242,8 @@ function Reassembler:lookup_reassembly(h, fragment_id)
    reassembly.running_length = ether_ipv6_header_len
    reassembly.tstamp = self.tsc:stamp()
    reassembly.packet = packet.allocate()
-   -- Fragment 0 will fill in the contents of this data.
-   reassembly.packet.length = ether_ipv6_header_len
+   packet.append(reassembly.packet, ffi.cast("uint8_t *", h),
+                 ether_ipv6_header_len)
 
    local did_evict = false
    entry, did_evict = self.ctab:add(key, reassembly, false,
@@ -257,20 +258,12 @@ function Reassembler:handle_fragment(pkt)
    -- Note: keep the number of local variables to a minimum when
    -- calling lookup_reassembly to avoid "register coalescing too
    -- complex" trace aborts in ctable.
-   local entry = self:lookup_reassembly(h, ntohl(fragment.id))
+   local entry = self:lookup_reassembly(h, fragment)
    local reassembly = entry.value
    local fragment_offset_and_flags = ntohs(fragment.fragment_offset_and_flags)
    local frag_start = bit.band(fragment_offset_and_flags, fragment_offset_mask)
    local frag_size = ntohs(h.ipv6.payload_length) - fragment_header_len
 
-
-   -- Header comes from unfragmentable part of packet 0.
-   if frag_start == 0 then
-      local header = ffi.cast(ether_ipv6_header_ptr_t, reassembly.packet.data)
-      ffi.copy(header, h, ether_ipv6_header_len)
-      header.ipv6.next_header = fragment.next_header
-      -- Payload length will be overwritten at end.
-   end
    local fcount = reassembly.fragment_count
    if fcount + 1 > self.max_fragments_per_reassembly then
       -- Too many fragments to reassembly this packet; fail.
@@ -326,6 +319,7 @@ function Reassembler:handle_fragment(pkt)
       do
          local header = ffi.cast(ether_ipv6_header_ptr_t, reassembly.packet.data)
          header.ipv6.payload_length = htons(reassembly.packet.length - ether_ipv6_header_len)
+         header.ipv6.next_header = fragment.next_header
       end
       return self:reassembly_success(entry)
    end
