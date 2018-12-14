@@ -278,8 +278,8 @@ function Reassembler:handle_fragment(pkt)
    end
    reassembly.fragment_starts[fcount] = frag_start
    reassembly.fragment_ends[fcount] = frag_start + frag_size
-   if reassembly.fragment_starts[fcount] <
-      reassembly.fragment_starts[fcount - 1] then
+   if (fcount > 0 and reassembly.fragment_starts[fcount] <
+       reassembly.fragment_starts[fcount - 1]) then
       sort_array(reassembly.fragment_starts, fcount)
       sort_array(reassembly.fragment_ends, fcount)
    end
@@ -291,7 +291,7 @@ function Reassembler:handle_fragment(pkt)
       else
          reassembly.final_start = frag_start
       end
-   elseif frag_size % 8 ~= 0 then
+   elseif bit.band(frag_size, 0x7) ~= 0 then
       -- The size of all non-terminal fragments must be a multiple of 8.
       -- Here we should send "ICMP Parameter Problem, Code 0 to the
       -- source of the fragment, pointing to the Payload Length field of
