@@ -223,6 +223,10 @@ function Reassembler:reassembly_error(entry, icmp_error)
    end
 end
 
+local function cleanup_evicted_entry (entry)
+   packet.free(entry.value.packet)
+end
+
 function Reassembler:lookup_reassembly(h, fragment_id)
    local key = self.scratch_fragment_key
    key.src_addr, key.dst_addr, key.fragment_id =
@@ -241,7 +245,8 @@ function Reassembler:lookup_reassembly(h, fragment_id)
    reassembly.packet.length = ether_ipv6_header_len
 
    local did_evict = false
-   entry, did_evict = self.ctab:add(key, reassembly, false)
+   entry, did_evict = self.ctab:add(key, reassembly, false,
+                                    cleanup_evicted_entry)
    if did_evict then self:record_eviction() end
    return entry
 end
