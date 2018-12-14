@@ -92,7 +92,7 @@ function Poptrie:rib_lookup (key, length, root)
          return {value=value}
       end
    end
-   return lookup(root or self.rib, 0)
+   return lookup(root or self.rib or {}, 0)
 end
 
 -- Compress RIB into Poptrie
@@ -115,6 +115,11 @@ function Poptrie:build (rib, node_index, leaf_base, node_base)
       return self.nodes[node_index]
    end
    -- When called without arguments, create the root node.
+   if not rib then
+      -- Clear previous FIB
+      ffi.fill(self.leaves, ffi.sizeof(self.leaves))
+      ffi.fill(self.nodes, ffi.sizeof(self.nodes))
+   end
    rib = rib or self.rib
    leaf_base = leaf_base or 0
    node_base = node_base or 0
@@ -249,6 +254,8 @@ end
 
 function selftest ()
    local t = new{}
+   -- Tets building empty RIB
+   t:build()
    -- Test RIB
    t:add(0x00, 8, 1) -- 00000000
    t:add(0x0F, 8, 2) -- 00001111
