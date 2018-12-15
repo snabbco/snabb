@@ -16,13 +16,15 @@ local poptrie_lookup = require("lib.poptrie_lookup")
 
 local Poptrie = {
    leaf_compression = true,
-   direct_pointing = true,
+   direct_pointing = false,
    k = 6,
    s = 18,
    leaf_tag = lshift(1, 31),
    leaf_t = ffi.typeof("uint16_t"),
    vector_t = ffi.typeof("uint64_t"),
    base_t = ffi.typeof("uint32_t"),
+   num_leaves = 100,
+   num_nodes = 10
 }
 Poptrie.node_t = ffi.typeof([[struct {
    $ leafvec, vector;
@@ -34,15 +36,29 @@ local function array (t, n)
 end
 
 function new (init)
-   local num_default = 4
-   local pt = {
-      nodes = init.nodes or array(Poptrie.node_t, num_default),
-      num_nodes = (init.nodes and assert(init.num_nodes)) or num_default,
-      leaves = init.leaves or array(Poptrie.leaf_t, num_default),
-      num_leaves = (init.leaves and assert(init.num_leaves)) or num_default,
-      directmap = init.directmap or array(Poptrie.base_t, 2^Poptrie.s)
-   }
-   return setmetatable(pt, {__index=Poptrie})
+   local self = setmetatable({}, {__index=Poptrie})
+   if init.leaves and init.nodes then
+      self.leaves, self.num_leaves = init.leaves, assert(init.num_leaves)
+      self.nodes, self.num_nodes = init.nodes, assert(init.num_nodes)
+   elseif init.nodes or init.leaves or init.directmap then
+      error("partial init")
+   else
+      self.leaves = array(Poptrie.leaf_t, Poptrie.num_leaves)
+      self.nodes = array(Poptrie.node_t, Poptrie.num_nodes)
+   end
+   if init.directmap then
+      self.directmap = init.directmap
+      self.direct_pointing = true
+   else
+      if init.direct_pointing ~= nil then
+         self.direct_pointing = init.direct_pointing
+      end
+      if self.direct_pointing then
+         self.directmap = array(Poptrie.base_t, 2^Poptrie.s)
+      end
+   end
+   self.asm_lookup64 = poptrie_lookup.generate(self, 64)
+   return self
 end
 
 function Poptrie:grow_nodes ()
@@ -61,7 +77,7 @@ end
 
 -- XXX - Generalize for key=uint8_t[?]
 local function extract (key, offset, length)
-   return band(rshift(key+0ULL, offset), lshift(1ULL, length) - 1)
+   return band(rshift(key+0ULL, offset), lshift(1, length) - 1)
 end
 
 -- Add key/value pair to RIB (intermediary binary trie)
@@ -86,17 +102,32 @@ function Poptrie:rib_lookup (key, length, root)
    local function lookup (node, offset, value)
       value = node.value or value
       if offset == length then
-         return {value=value, left=node.left, right=node.right}
-      elseif extract(key, offset, 1) == 0 and node.left then
+         return value, (node.left or node.right) and node
+      elseif node.left and extract(key, offset, 1) == 0 then
          return lookup(node.left, offset + 1, value)
-      elseif extract(key, offset, 1) == 1 and node.right then
+      elseif node.right and extract(key, offset, 1) == 1 then
          return lookup(node.right, offset + 1, value)
       else
-         -- No match: return longest prefix key value, but no child nodes.
-         return {value=value}
+         -- No match: return longest prefix key value, but no node.
+         return value
       end
    end
-   return lookup(root or self.rib or {}, 0)
+   return lookup(root or self.rib, 0)
+end
+
+-- Map f over keys of length in RIB
+function Poptrie:rib_map (f, length, root)
+   local function map (node, offset, key, value)
+      value = (node and node.value) or value
+      local left, right = node and node.left, node and node.right
+      if offset == length then
+         f(key, value, (left or right) and node)
+      else
+         map(left, offset + 1, key, value)
+         map(right, offset + 1, bor(key, lshift(1, offset)), value)
+      end
+   end
+   return map(root or self.rib, 0, 0)
 end
 
 function Poptrie:clear_fib ()
@@ -114,7 +145,7 @@ function Poptrie:allocate_leaf ()
 end
 
 function Poptrie:allocate_node ()
-   if Poptrie.direct_pointing then
+   if self.direct_pointing then
       -- When using direct_pointing, the node index space is split into half in
       -- favor of a bit used for disambiguation in Poptrie:build_directmap.
       assert(band(self.node_base, Poptrie.leaf_tag) == 0, "Node overflow")
@@ -126,7 +157,7 @@ function Poptrie:allocate_node ()
    return self.node_base - 1
 end
 
-function Poptrie:build_node (rib, node_index)
+function Poptrie:build_node (rib, node_index, default)
    -- Initialize node base pointers.
    do local node = self.nodes[node_index]
       -- Note: have to be careful about keeping direct references of nodes
@@ -134,17 +165,17 @@ function Poptrie:build_node (rib, node_index)
       node.base0 = self.leaf_base
       node.base1 = self.node_base
    end
-   -- Compute children
-   local children = {}
-   for index = 0, 2^Poptrie.k - 1 do
-      children[index] = self:rib_lookup(index, Poptrie.k, rib)
+   -- Compute leaves and children
+   local leaves, children = {}, {}
+   local function collect (key, value, node)
+      leaves[key], children[key] = value, node
    end
+   self:rib_map(collect, Poptrie.k, rib)
    -- Allocate and initialize node.leafvec and leaves.
    local last_leaf_value = nil
    for index = 0, 2^Poptrie.k - 1 do
-      local child = children[index]
-      if not (child.left or child.right) then
-         local value = child.value or 0
+      if not children[index] then
+         local value = leaves[index] or default or 0
          if value ~= last_leaf_value then -- always true when leaf_compression=false
             if Poptrie.leaf_compression then
                local node = self.nodes[node_index]
@@ -161,38 +192,39 @@ function Poptrie:build_node (rib, node_index)
    -- and build() will advance the node_base.)
    local child_nodes = {}
    for index = 0, 2^Poptrie.k - 1 do
-      local child = children[index]
-      if child.left or child.right then
+      if children[index] then
          child_nodes[index] = self:allocate_node()
       end
    end
    -- Initialize node.vector and child nodes.
    for index = 0, 2^Poptrie.k - 1 do
-      local child = children[index]
-      if child.left or child.right then
+      if children[index] then
          local node = self.nodes[node_index]
          node.vector = bor(node.vector, lshift(1ULL, index))
-         self:build_node(child, child_nodes[index])
+         self:build_node(children[index],
+                         child_nodes[index],
+                         leaves[index] or default)
       end
    end
 end
 
+-- Build direct index array for RIB
 function Poptrie:build_directmap (rib)
-   for index = 0, 2^Poptrie.s - 1 do
-      local child = self:rib_lookup(index, Poptrie.s)
-      if child.left or child.right then
+   local function build (index, value, node)
+      if node then
          self.directmap[index] = self:allocate_node()
-         self:build_node(child, self.directmap[index])
+         self:build_node(node, self.directmap[index], value)
       else
-         self.directmap[index] = bor(child.value or 0, Poptrie.leaf_tag)
+         self.directmap[index] = bor(value or 0, Poptrie.leaf_tag)
       end
    end
+   self:rib_map(build, Poptrie.s, rib)
 end
 
 -- Compress RIB into Poptrie
 function Poptrie:build ()
    self:clear_fib()
-   if Poptrie.direct_pointing then
+   if self.direct_pointing then
       self:build_directmap(self.rib)
    else
       self:build_node(self.rib, self:allocate_node())
@@ -250,7 +282,7 @@ end
 function Poptrie:lookup (key)
    local N, L, D = self.nodes, self.leaves, self.directmap
    local index, offset = 0, 0
-   if Poptrie.direct_pointing then
+   if self.direct_pointing then
       offset = Poptrie.s
       index = D[extract(key, 0, offset)]
       if debug then print(bin(index), band(index, Poptrie.leaf_tag - 1)) end
@@ -282,9 +314,8 @@ function Poptrie:lookup (key)
    return L[base + bc - 1]
 end
 
-Poptrie.asm_lookup64 = poptrie_lookup.generate(Poptrie, 64)
 function Poptrie:lookup64 (key)
-   return Poptrie.asm_lookup64(self.leaves, self.nodes, key, self.directmap)
+   return self.asm_lookup64(self.leaves, self.nodes, key, self.directmap)
 end
 
 function Poptrie:fib_info ()
@@ -301,6 +332,7 @@ function Poptrie:fib_info ()
 end
 
 function selftest ()
+   -- To test direct pointing: Poptrie.direct_pointing = true
    local t = new{}
    -- Tets building empty RIB
    t:build()
@@ -310,20 +342,20 @@ function selftest ()
    t:add(0x07, 4, 3) --     0111
    t:add(0xFF, 8, 4) -- 11111111
    t:add(0xFF, 5, 5) --    11111
-   local n = t:rib_lookup(0x0, 1)
-   assert(not n.value and n.left and not n.right)
-   local n = t:rib_lookup(0x00, 8)
-   assert(n.value == 1 and not (n.left or n.right))
-   local n = t:rib_lookup(0x07, 3)
-   assert(not n.value and (n.left and n.right))
-   local n = t:rib_lookup(0x0, 1, n)
-   assert(n.value == 3 and not (n.left or n.right))
-   local n = t:rib_lookup(0xFF, 5)
-   assert(n.value == 5 and (not n.left) and n.right)
-   local n = t:rib_lookup(0x0F, 3, n)
-   assert(n.value == 4 and not (n.left or n.right))
-   local n = t:rib_lookup(0x3F, 8)
-   assert(n.value == 5 and not (n.left or n.right))
+   local v, n = t:rib_lookup(0x0, 1)
+   assert(not v and n.left and not n.right)
+   local v, n = t:rib_lookup(0x00, 8)
+   assert(v == 1 and not n)
+   local v, n = t:rib_lookup(0x07, 3)
+   assert(not v and (n.left and n.right))
+   local v, n = t:rib_lookup(0x0, 1, n)
+   assert(v == 3 and not n)
+   local v, n = t:rib_lookup(0xFF, 5)
+   assert(v == 5 and (not n.left) and n.right)
+   local v, n = t:rib_lookup(0x0F, 3, n)
+   assert(v == 4 and not n)
+   local v, n = t:rib_lookup(0x3F, 8)
+   assert(v == 5 and not n)
    -- Test FIB
    t:build()
    if debug then t:fib_info() end
@@ -355,7 +387,7 @@ function selftest ()
       t:build()
       t:fib_info()
       for _, case in ipairs(cases) do
-         print("rib:", t:rib_lookup(case[1]).value)
+         print("rib:", t:rib_lookup(case[1]))
          print("fib:", t:lookup(case[1]))
          print("64:",  t:lookup64(case[1]))
       end
@@ -368,16 +400,16 @@ function selftest ()
    end
    local lib = require("core.lib")
    local seed = lib.getenv("SNABB_RANDOM_SEED") or 0
-   for _, keysize in ipairs{33} do
+   for keysize = 1, 64 do
       print("keysize:", keysize)
       -- ramp up the geometry below to crank up test coverage
-      for entries = 1, 2 do
-         for i = 1, 2 do
+      for entries = 1, 3 do
+         for i = 1, 10 do
             math.randomseed(seed+i)
             cases = {}
             local t = new{}
             local k = {}
-            for entry= 1, entries do
+            for entry = 1, entries do
                local a, l = math.random(2^keysize - 1), math.random(keysize)
                cases[entry] = {a, l}
                t:add(a, l, entry)
@@ -385,7 +417,7 @@ function selftest ()
             end
             local v = {}
             for entry, a in ipairs(k) do
-               v[entry] = t:rib_lookup(a, keysize).value
+               v[entry] = t:rib_lookup(a, keysize)
                r_assert(v[entry] > 0, cases)
             end
             t:build()
@@ -410,8 +442,12 @@ function selftest ()
                     tab.cycles / iterations,
                     tab.instructions / iterations))
    end
+   local function time (description, f)
+      local start = os.clock(); f()
+      print(("%s: %.4f seconds"):format(description, os.clock() - start))
+   end
    if pmu.is_available() then
-      local t = new{}
+      local t = new{direct_pointing=false}
       local k = {}
       local numentries = 10000
       local keysize = 64
@@ -420,19 +456,27 @@ function selftest ()
          t:add(a, l, entry)
          k[entry] = a
       end
-      t:build()
+      local function build ()
+         t:build()
+      end
+      local function lookup (iter)
+         for i=1,iter do t:lookup(k[i%#k+1]) end
+      end
+      local function lookup64 (iter)
+         for i=1,iter do t:lookup64(k[i%#k+1]) end
+      end
       print("PMU analysis (numentries="..numentries..", keysize="..keysize..")")
       pmu.setup()
-      measure("lookup",
-              function (iter)
-                 for i=1,iter do t:lookup(k[i%#k+1]) end
-              end,
-              1e5)
-      measure("lookup64",
-              function (iter)
-                 for i=1,iter do t:lookup64(k[i%#k+1]) end
-              end,
-              1e7)
+      time("build", build)
+      measure("lookup", lookup, 1e5)
+      measure("lookup64", lookup64, 1e7)
+      do local rib = t.rib
+         t = new{direct_pointing=true}
+         t.rib = rib
+      end
+      time("build(direct_pointing)", build)
+      measure("lookup(direct_pointing)", lookup, 1e5)
+      measure("lookup64(direct_pointing)", lookup64, 1e7)
    else
       print("No PMU available.")
    end

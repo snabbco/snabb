@@ -43,7 +43,7 @@ function generate (Poptrie, keysize)
    end
 
    local prototype
-   if keysize <= 64 and Poptrie.direct_pointing then
+   if keysize <= 64 then
       prototype = ffi.typeof(
          "$ (*) ($ *, $ *, uint64_t, $ *)",
          Poptrie.leaf_t, Poptrie.leaf_t, Poptrie.node_t, Poptrie.base_t

@@ -8,7 +8,7 @@ as a hand-written, optimized assembler lookup routine.
 #### Example usage
 
 ```lua
-local pt = poptrie.new{}
+local pt = poptrie.new{direct_pointing=true}
 -- Associate prefixes of length to values (uint16_t)
 pt:add(0x00FF, 8, 1)
 pt:add(0x000F, 4, 2)
@@ -17,21 +17,30 @@ pt:lookup64(0x001F) ⇒ 2
 pt:lookup64(0x10FF) ⇒ 1
 -- The value zero denotes "no match"
 pt:lookup64(0x0000) ⇒ 0
--- You can create a pre-built poptrie from nodes and leaves arrays.
-local pt2 = poptrie.new{nodes=pt.nodes, leaves=pt.leaves}
+-- You can create a pre-built poptrie from its backing memory.
+local pt2 = poptrie.new{
+   nodes = pt.nodes,
+   leaves = pt.leaves,
+   directmap = pt.directmap
+}
 ```
 
 #### Known bugs and limitations
 
  - Only supports keys up to 64 bits wide
- - *Direct pointing* is not yet implemented
 
 #### Performance
 
+- Intel(R) Xeon(R) CPU E3-1246 v3 @ 3.50GHz (Haswell, Turbo off)
+
 ```
-PMU analysis (numentries=10000, keysize=64)
-lookup: 30001.41 cycles/lookup 59357.23 instructions/lookup
-lookup64: 179.39 cycles/lookup 205.72 instructions/lookup
+PMU analysis (numentries=10000, keysize=32)
+build: 0.1290 seconds
+lookup: 13217.09 cycles/lookup 28014.35 instructions/lookup
+lookup64: 122.94 cycles/lookup 133.22 instructions/lookup
+build(direct_pointing): 0.1056 seconds
+lookup(direct_pointing): 5519.01 cycles/lookup 11412.01 instructions/lookup
+lookup64(direct_pointing): 89.82 cycles/lookup 70.72 instructions/lookup
 ```
 
 #### Interface
@@ -42,10 +51,15 @@ Creates and returns a new `Poptrie` object.
 
 *Init* is a table with the following keys:
 
+* `direct_pointing` - *Optional*. Boolean that governs whether to use the
+  *direct pointing* optimization. Default is `false`.
 * `leaves` - *Optional*. An array of leaves. When *leaves* is supplied *nodes*
    must be supplied as well.
 * `nodes` - *Optional*. An array of nodes. When *nodes* is supplied *leaves*
    must be supplied as well.
+* `directmap` - *Optional*. A direct map array. When *directmap* is supplied,
+   *nodes* and *leaves* must be supplied as well and *direct_pointing* is
+   implicit.
 
 — Method **Poptrie:add** *prefix* *length* *value*
 
