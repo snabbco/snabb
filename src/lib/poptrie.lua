@@ -294,7 +294,9 @@ function Poptrie:fib_info ()
       print(self.nodes[i].base1, bin(self.nodes[i].vector))
    end
    for i=0, self.leaf_base-1 do
-      print("leaf:", i, self.leaves[i])
+      if self.leaves[i] > 0 then
+         print("leaf:", i, self.leaves[i])
+      end
    end
 end
 
