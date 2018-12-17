@@ -415,8 +415,6 @@ LwAftr.shm = {
    ["out-ipv4-packets"]                                = {counter},
    ["out-ipv6-bytes"]                                  = {counter},
    ["out-ipv6-packets"]                                = {counter},
-   ["next-hop-macaddr-v4"]                             = {counter},
-   ["next-hop-macaddr-v6"]                             = {counter},
 }
 
 function LwAftr:new(conf)
@@ -1071,10 +1069,6 @@ function LwAftr:from_b4(pkt)
    return self:enqueue_decapsulation(pkt, ipv4, port)
 end
 
-local macaddr_t = ffi.typeof('union { uint64_t u64; uint8_t bytes[6]; }')
-local next_hop_macaddr_v6 = ffi.new(macaddr_t)
-local next_hop_macaddr_v4 = ffi.new(macaddr_t)
-
 function LwAftr:push ()
    local i4, i6, ih = self.input.v4, self.input.v6, self.input.hairpin_in
    local o4, o6 = self.output.v4, self.output.v6
@@ -1082,15 +1076,6 @@ function LwAftr:push ()
 
    self.bad_ipv4_softwire_matches_alarm:check()
    self.bad_ipv6_softwire_matches_alarm:check()
-
-   if next_hop_macaddr_v6.u64 == 0 and self.conf.internal_interface.next_hop.mac then
-      next_hop_macaddr_v6.bytes = self.conf.internal_interface.next_hop.mac
-      counter.set(self.shm["next-hop-macaddr-v6"], next_hop_macaddr_v6.u64)
-   end
-   if next_hop_macaddr_v4.u64 == 0 and self.conf.external_interface.next_hop.mac then
-      next_hop_macaddr_v4.bytes = self.conf.external_interface.next_hop.mac
-      counter.set(self.shm["next-hop-macaddr-v4"], next_hop_macaddr_v4.u64)
-   end
 
    for _ = 1, link.nreadable(i6) do
       -- Decapsulate incoming IPv6 packets from the B4 interface and
