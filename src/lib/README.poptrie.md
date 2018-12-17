@@ -53,6 +53,8 @@ Creates and returns a new `Poptrie` object.
 
 * `direct_pointing` - *Optional*. Boolean that governs whether to use the
   *direct pointing* optimization. Default is `false`.
+* `s` - *Optional*. Bits to use for the *direct pointing* optimization.
+  Default is 18. Note that the direct map array will be 2×2ˢ bytes in size.
 * `leaves` - *Optional*. An array of leaves. When *leaves* is supplied *nodes*
    must be supplied as well.
 * `nodes` - *Optional*. An array of nodes. When *nodes* is supplied *leaves*

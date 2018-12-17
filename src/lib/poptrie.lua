@@ -53,8 +53,11 @@ function new (init)
       if init.direct_pointing ~= nil then
          self.direct_pointing = init.direct_pointing
       end
+      if init.s ~= nil then
+         self.s = init.s
+      end
       if self.direct_pointing then
-         self.directmap = array(Poptrie.base_t, 2^Poptrie.s)
+         self.directmap = array(Poptrie.base_t, 2^self.s)
       end
    end
    self.asm_lookup64 = poptrie_lookup.generate(self, 64)
@@ -218,7 +221,7 @@ function Poptrie:build_directmap (rib)
          self.directmap[index] = bor(value or 0, Poptrie.leaf_tag)
       end
    end
-   self:rib_map(build, Poptrie.s, rib)
+   self:rib_map(build, self.s, rib)
 end
 
 -- Compress RIB into Poptrie
@@ -283,7 +286,7 @@ function Poptrie:lookup (key)
    local N, L, D = self.nodes, self.leaves, self.directmap
    local index, offset = 0, 0
    if self.direct_pointing then
-      offset = Poptrie.s
+      offset = self.s
       index = D[extract(key, 0, offset)]
       if debug then print(bin(index), band(index, Poptrie.leaf_tag - 1)) end
       if band(index, Poptrie.leaf_tag) ~= 0 then

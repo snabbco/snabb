@@ -19,7 +19,6 @@ function generate (Poptrie, keysize)
    -- Assert assumptions about lib.poptrie
    assert(Poptrie.k == 6)
    if Poptrie.direct_pointing then
-      assert(Poptrie.s == 18)
       assert(Poptrie.leaf_tag == bit.lshift(1, 31))
    end
    assert(ffi.sizeof(Poptrie.leaf_t) == 2)
@@ -66,9 +65,10 @@ end
 -- lookup(leaf_t *leaves, node_t *nodes, key) -> leaf_t
 function lookup (Dst, Poptrie, keysize)
    if Poptrie.direct_pointing then
-      -- v = extract(key, 0, s=18)
-      -- v = band(key, lshift(1, s=18) - 1)
-      | mov v, 0x3FFFF
+      -- v = extract(key, 0, Poptrie.s)
+      local direct_mask = bit.lshift(1ULL, Poptrie.s) - 1
+      -- v = band(key, direct_mask)
+      | mov v, direct_mask
       | and v, key
       -- index = dmap[v]
       | mov index, dword [dmap+v*4]
