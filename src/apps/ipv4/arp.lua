@@ -21,6 +21,7 @@ local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
 local alarms = require("lib.yang.alarms")
+local counter = require("core.counter")
 local S = require("syscall")
 
 alarms.add_to_inventory(
@@ -132,6 +133,9 @@ local function random_locally_administered_unicast_mac_address()
 end
 
 ARP = {}
+ARP.shm = {
+   ["next-hop-macaddr-v4"] = {counter},
+}
 local arp_config_params = {
    -- Source MAC address will default to a random address.
    self_mac = { default=false },
@@ -191,6 +195,11 @@ function ARP:arp_resolved (ip, mac, provenance)
       resolve_alarm:clear()
    end
    self.next_mac = mac
+   if self.next_mac then
+      local buf = ffi.new('union { uint64_t u64; uint8_t bytes[6]; }')
+      buf.bytes = self.next_mac
+      counter.set(self.shm["next-hop-macaddr-v4"], buf.u64)
+   end
    if self.shared_next_mac_key then
       if provenance == 'remote' then
          -- If we are getting this information from a packet and not
