@@ -1,13 +1,11 @@
 module(..., package.seeall)
 local ffi = require("ffi")
-local C = ffi.C
-local lib = require("core.lib")
-local common = require("program.l2vpn.tunnels.common").tunnel
+local base = require("program.l2vpn.tunnels.base").tunnel
 local l2tpv3 = require("lib.protocol.keyed_ipv6_tunnel")
 
-tunnel = setmetatable({}, { __index = common })
+tunnel = setmetatable({}, { __index = base })
 
-local vc_params = {
+local params = {
    -- The spec for L2TPv3 over IPv6 recommends to set the session ID
    -- to 0xffffffff for the "static 1:1 mapping" scenario.
    local_session = { default = 0xffffffff },
@@ -17,26 +15,13 @@ local vc_params = {
 }
 
 function tunnel:new (config)
-   local o = { vcs = {} }
-   for vc_id, arg in pairs(config.vcs) do
-      local conf = lib.parse(arg, vc_params)
-      local vc = {
-         header_in =
-            l2tpv3:new({ session_id = conf.local_session,
-                         cookie = l2tpv3:new_cookie(conf.local_cookie) }),
-         header_out =
-            l2tpv3:new({ session_id = conf.remote_session,
-                         cookie = l2tpv3:new_cookie(conf.remote_cookie) }),
-         link_name = "vc_"..vc_id
-      }
-      vc.header_in_ptr = ffi.cast("uint8_t *", vc.header_in:header_ptr())
-      vc.header_out_ptr = ffi.cast("uint8_t *", vc.header_out:header_ptr())
-      table.insert(o.vcs, vc)
+   local function create_headers (_, config)
+      return l2tpv3:new({ session_id = config.local_session,
+                          cookie = l2tpv3:new_cookie(config.local_cookie) }),
+      l2tpv3:new({ session_id = config.remote_session,
+                   cookie = l2tpv3:new_cookie(config.remote_cookie) })
    end
-   o.header_size = l2tpv3:sizeof()
-   o.logger = lib.logger_new({ module = "L2TPv3" })
-   o.header_scratch = l2tpv3:new()
-   o.handle_unknown_header_fn = function(self, p)
+   local function unknown_header (self, p)
       if self.logger and self.logger:can_log() then
          local l2tpv3 = self.header_scratch:new_from_mem(p.data, p.length)
          self.logger:log(("L2TPv3 unknown session/cookie: 0x%08x/%s"):format(
@@ -44,7 +29,8 @@ function tunnel:new (config)
       end
    end
 
-   return setmetatable(o, { __index = tunnel })
+   return self:_new(config, "l2tpv3", l2tpv3, l2tpv3:sizeof(), params, create_headers,
+                    unknown_header)
 end
 
 function selftest ()
