@@ -237,7 +237,7 @@ function Fragmenter:process_ptb (pkt)
    dgram:parse_n(3)
    local _, ipv6, icmp = unpack(dgram:stack())
    local payload, length = dgram:payload()
-   if not icmp:type() == 2 then return false end
+   if icmp:type() ~= 2 then return false end
    local ptb = dgram:parse()
    counter.add(self.shm["ipv6-pmtud-ptb-received"])
 
