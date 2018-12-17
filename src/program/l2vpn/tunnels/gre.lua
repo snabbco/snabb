@@ -1,39 +1,29 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(..., package.seeall)
-local ffi = require("ffi")
-local C = ffi.C
-local lib = require("core.lib")
-local common = require("program.l2vpn.tunnels.common").tunnel
+local base = require("program.l2vpn.tunnels.base").tunnel
 local gre = require("lib.protocol.gre")
 
-tunnel = setmetatable({}, { __index = common })
+tunnel = setmetatable({}, { __index = base })
 
 function tunnel:new (config)
-   local o = { vcs = {} }
-   for vc_id, _ in pairs(config.vcs) do
+   local function create_headers (vc_id)
       local header = gre:new({ protocol = 0x6558,
                                checksum = false,
                                key = vc_id })
-      local vc = {
-         header_in = header,
-         header_out = header,
-         link_name = "vc_"..vc_id
-      }
-      vc.header_in_ptr = ffi.cast("uint8_t *", header:header_ptr())
-      vc.header_out_ptr = ffi.cast("uint8_t *", header:header_ptr())
-      table.insert(o.vcs, vc)
+      return header, header
    end
-   -- The base GRE header does not include the key field
-   o.header_size = gre:new({ key = 0}):sizeof()
-   o.logger = lib.logger_new({ module = "GRE" })
-   o.header_scratch = gre:new()
-   o.handle_unknown_header_fn = function(self, p)
+   unknown_header = function(self, p)
       if self.logger and self.logger:can_log() then
-         local gre = self.header_scratch:new_from_mem(p.data, p.length)
+         local gre = assert(self.header_scratch:new_from_mem(p.data, p.length))
          self.logger:log(("GRE unknown key: 0x%04x"):format(gre:key()))
       end
    end
 
-   return setmetatable(o, { __index = tunnel })
+   -- The base GRE header does not include the key field
+   local header_size = gre:new({ key = 0}):sizeof()
+   return self:_new(config, "gre", gre, header_size, {}, create_headers,
+                    unknown_header)
 end
 
 function selftest ()
@@ -48,6 +38,7 @@ function selftest ()
       dgram:push(gre:new({ protocol = 0x6558,
                            checksum = false,
                            key = key }))
+
       return setmetatable({ dgram = dgram }, { __index = SourceGRE })
    end
    function SourceGRE:pull ()
@@ -69,7 +60,7 @@ function selftest ()
       config.link(app_graph, "gre.vc_"..vc_id.." -> "..vc_id.."_sink.input")
       config.link(app_graph, vc_id.."_north.output -> gre.vc_"..vc_id)
    end
-   config.app(app_graph, "noise", SourceGRE, math.random(2^32-1))
+   config.app(app_graph, "noise", SourceGRE, 0xdead)
    config.link(app_graph, "noise.output -> join.noise")
 
    config.app(app_graph, "join", Join)
