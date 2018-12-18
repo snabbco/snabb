@@ -3,9 +3,18 @@
 #
 # This script runs the lwAFTR release benchmarks
 #
-# Set SNABB_LWAFTR_CPU0, SNABB_LWAFTR_CPU1 to pick CPUs for the lwAFTR
-# Set SNABB_LOADTEST_CPU0, SNABB_LOADTEST_CPU1 for two instance test
-# Set SNABB_PCI0 to SNABB_PCI7 when calling
+# You need to set the CPU's and PCI devices when calling the script
+# for the lwAFTR and the load tester. Make sure to select them keeping
+# in mind the NUMA nodes. Config options:
+#
+# LwAFTR
+# CPUs: $SNABB_LWAFTR_CPU0 (required), $SNABB_LWAFTR_CPU1,
+#       $SNABB_LWAFTR_CPU2, $SNABB_LWAFTR_CPU3
+# NICs: $PCI0 (required), $PCI2, $PCI4
+#
+# Loadtest:
+# CPUs: $SNABB_LOADTEST_CPU0, $SNABB_LOADTEST_CPU1
+# NICs: $PCI1 (required, CPU0), $PCI3 (CPU0), $PCI5 (CPU1), $PCI7 (CPIU1)
 
 if [ ! $SNABB_LWAFTR_CPU0 ]; then
     echo ">> SNABB_LWAFTR_CPU0 not set, defaulting to 0"
@@ -67,10 +76,19 @@ function run_benchmark {
     cpu=${6:-$SNABB_LWAFTR_CPU0}
 
     lwaftr_log=`mktemp -p $TMPDIR`
-    $SNABB lwaftr run --cpu $cpu \
-           --name lwaftr-release-benchmarks \
-           --conf $dataset/$config $lwaftr_args > $lwaftr_log &
-    lwaftr_pid=$!
+
+    # Only supply the CPU argument only if it's not already specified.
+    if [[ *"--cpu"* == "$lwaftr_args" ]]; then
+	$SNABB lwaftr run \
+               --name lwaftr-release-benchmarks \
+               --conf $dataset/$config $lwaftr_args > $lwaftr_log &
+	lwaftr_pid=$!
+    else
+	$SNABB lwaftr run --cpu $cpu \
+               --name lwaftr-release-benchmarks \
+               --conf $dataset/$config $lwaftr_args > $lwaftr_log &
+	lwaftr_pid=$!
+    fi
 
     # wait briefly to let lwaftr start up
     sleep 1
@@ -129,25 +147,27 @@ if [ ! $ON_A_STICK_ONLY ]; then
     run_benchmark "1 instance, 2 NIC interface" \
                   "lwaftr.conf" \
                   "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2" \
-                  "$FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
+                  "--cpu $SNABB_LOADTEST_CPU0 \
+		   $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
                    $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3"
 
     run_benchmark "1 instance, 2 NIC interfaces (from config)" \
                   "lwaftr2.conf" \
                   "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2" \
-                  "$FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
+                  "--cpu $SNABB_LOADTEST_CPU0 \
+		   $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
                    $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3"
 fi
 
 run_benchmark "1 instance, 1 NIC (on a stick)" \
               "lwaftr.conf" \
               "--on-a-stick $SNABB_PCI0" \
-              "$FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1"
+              "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1"
 
 run_benchmark "1 instance, 1 NIC (on-a-stick, from config file)" \
               "lwaftr3.conf" \
               "" \
-              "$FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1"
+              "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1"
 
 if [ ! $ONE_INSTANCE_ONLY ]; then
     run_benchmark "2 instances, 2 NICs (from config)" \
@@ -172,10 +192,21 @@ else
     run_benchmark "1 instance, 1 NIC, 2 queues" \
                   "lwaftr6.conf" \
                   "" \
-                  "$FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
+                  "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
                   "" \
                   "$SNABB_LWAFTR_CPU0,$SNABB_LWAFTR_CPU1"
 fi
 
+if [[ ! $SNABB_LWAFTR_CPU1 || ! $SNABB_LWAFTR_CPU2 || ! $SNABB_LWAFTR_CPU3 || $ON_A_STICK_ONLY ]]; then
+    echo ">> Not running test for 2 instances and 4 queues. Missing LWAFTR CPUs 0,1,2 and 3 and/or"
+    echo ">> not configured at least 4 NICs."
+else
+    run_benchmark "2 instances, 2 NIC, 4 queues" \
+                  "lwaftr7.conf" \
+                  "--cpu $SNABB_LWAFTR_CPU0,$SNABB_LWAFTR_CPU1,$SNABB_LWAFTR_CPU2,$SNABB_LWAFTR_CPU3" \
+                  "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
+		  "--cpu $SNABB_LOADTEST_CPU1 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI3"
+fi
+  
 # cleanup
 rm -r $TMPDIR
