@@ -2,6 +2,13 @@
 
 ## [2018.09.02]
 
+### Features
+
+* Add benchmarking test for 2 instances each with 2 queues (total of 4
+  queues).
+  
+    https://github.com/Igalia/snabb/pull/1206
+
 ### Bug fixes
 
 * Fixes compiling on GCC 8.1 relating to unsafe usage of `strncpy`.
