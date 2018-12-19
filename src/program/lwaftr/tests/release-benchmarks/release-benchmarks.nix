@@ -4,9 +4,9 @@ let dataset = stdenv.mkDerivation {
   name = "lwaftr-dataset";
 
   dataset = (fetchTarball {
-    url = https://people.igalia.com/atakikawa/lwaftr_benchmarking_dataset.tar.gz;
+    url = https://people.igalia.com/jtallon/lwaftr_benchmarking_dataset.tar.gz;
     # not supported in old NixOS
-    #sha256 = "48b4204e656d19aa9f2b4023104f2483e66df7523e28188181fb3d052445eaba";
+    #sha256 = "feb77cade87848f3f38f35c0807ac6c34c4550256a9fa99f0e1fca1063bc96fb";
   });
 
   snabb_pci0 = builtins.getEnv "SNABB_PCI0";
