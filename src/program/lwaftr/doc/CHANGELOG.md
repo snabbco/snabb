@@ -1,5 +1,37 @@
 # Change Log
 
+## [2018.09.02]
+
+### Features
+
+* Add benchmarking test for 2 instances each with 2 queues (total of 4
+  queues).
+  
+    https://github.com/Igalia/snabb/pull/1206
+
+### Bug fixes
+
+* Fixes compiling on GCC 8.1 relating to unsafe usage of `strncpy`.
+
+    https://github.com/Igalia/snabb/pull/1193
+
+* Fix bug where the next-hop counter reported an incorrect value. The
+  ARP and NDP apps should now report the next-hop mac address when
+  resolved.
+
+    https://github.com/Igalia/snabb/pull/1204
+
+* Fix bug in with ctables that caused a TABOV (table overflow) error.
+
+    https://github.com/Igalia/snabb/pull/1200
+
+* Fix a bug where the kernel could overwrite some of our memory
+  due to giving an incorrect size being given in `get_mempolicy`. This
+  could have caused a crash in certain situations. We're now
+  allocating a mask of the correct size.
+
+    https://github.com/Igalia/snabb/pull/1198
+
 ## [2018.09.01]
 
 ### Features
