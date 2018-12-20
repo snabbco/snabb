@@ -431,11 +431,11 @@ function parse_intf(config)
          state.nds[nd:name()] = { app = nd, intf = intf }
          connect_duplex(nd:socket('south'), socket_in)
 
-         fragmenter = App:new('frag_'..intf.nname..vid_suffix(vid),
+         fragmenter = App:new('frag_v6_'..intf.nname..vid_suffix(vid),
                               frag_ipv6,
                               { mtu = intf.mtu - 14, pmtud = true,
                                 pmtu_local_addresses = {} })
-         local reassembler = App:new('reass_'..intf.nname..vid_suffix(vid),
+         local reassembler = App:new('reass_v6_'..intf.nname..vid_suffix(vid),
                                      reass_ipv6,
                                      {})
          local nd_north = nd:socket('north')
@@ -465,11 +465,11 @@ function parse_intf(config)
          state.arps[arp:name()] = { app = arp, intf = intf }
          connect_duplex(arp:socket('south'), socket_in)
 
-         fragmenter = App:new('frag_'..intf.nname..vid_suffix(vid),
+         fragmenter = App:new('frag_v4_'..intf.nname..vid_suffix(vid),
                               frag_ipv4,
                               { mtu = intf.mtu - 14, pmtud = true,
                                 pmtu_local_addresses = {} })
-         local reassembler = App:new('reass_'..intf.nname..vid_suffix(vid),
+         local reassembler = App:new('reass_v4_'..intf.nname..vid_suffix(vid),
                                      reass_ipv4,
                                      {})
          local arp_north = arp:socket('north')
