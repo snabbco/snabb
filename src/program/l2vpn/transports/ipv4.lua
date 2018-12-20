@@ -81,6 +81,21 @@ function transport:link ()
    end
 end
 
+local function prepend(self, i, sout)
+   local proto_info = self._proto_infos[i]
+   local pin = assert(self.input[proto_info.link_name])
+   for _ = 1, link.nreadable(pin) do
+      local p = link.receive(pin)
+      local total_length = p.length + ipv4_header_size
+      local header = proto_info.combined_header
+      C.checksum_update_incremental_16(header.ipv4_ptr + csum_offset,
+                                       header.ipv4_ptr + length_offset,
+                                       total_length)
+      p = packet.prepend(p, header.ptr, header.length)
+      link.transmit(sout, p)
+   end
+end
+
 function transport:push ()
    local sin = self.input.south
    local sout = self.output.south
@@ -107,18 +122,16 @@ function transport:push ()
       packet.free(link.receive(discard))
    end
 
-   for i = 1, self._nprotos do
-      local proto_info = self._proto_infos[i]
-      local pin = assert(self.input[proto_info.link_name])
-      for _ = 1, link.nreadable(pin) do
-         local p = link.receive(pin)
-         local total_length = p.length + ipv4_header_size
-         local header = proto_info.combined_header
-         C.checksum_update_incremental_16(header.ipv4_ptr + csum_offset,
-                                          header.ipv4_ptr + length_offset,
-                                          total_length)
-         p = packet.prepend(p, header.ptr, header.length)
-         link.transmit(sout, p)
+   if self._nprotos >= 3 then
+      for i = 1, self._nprotos do
+         prepend(self, i, sout)
+      end
+   else
+      if self._nprotos >= 1 then
+         prepend(self, 1, sout)
+      end
+      if self._nprotos >= 2 then
+         prepend(self, 2, sout)
       end
    end
 end

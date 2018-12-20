@@ -71,6 +71,18 @@ function transport:link ()
    end
 end
 
+local function prepend (self, i, sout)
+   local proto_info = self._proto_infos[i]
+   local pin = assert(self.input[proto_info.link_name])
+   for _ = 1, link.nreadable(pin) do
+      local p = link.receive(pin)
+      proto_info.header:payload_length(p.length)
+      local header = proto_info.combined_header
+      p = packet.prepend(p, header.data, header.length)
+      link.transmit(sout, p)
+   end
+end
+
 function transport:push ()
    local sin = self.input.south
    local sout = self.output.south
@@ -92,15 +104,16 @@ function transport:push ()
       packet.free(link.receive(discard))
    end
 
-   for i = 1, self._nprotos do
-      local proto_info = self._proto_infos[i]
-      local pin = assert(self.input[proto_info.link_name])
-      for _ = 1, link.nreadable(pin) do
-         local p = link.receive(pin)
-         proto_info.header:payload_length(p.length)
-         local header = proto_info.combined_header
-         p = packet.prepend(p, header.data, header.length)
-         link.transmit(sout, p)
+   if self._nprotos >= 3 then
+      for i = 1, self._nprotos do
+         prepend(self, i, sout)
+      end
+   else
+      if self._nprotos >= 1 then
+         prepend(self, 1, sout)
+      end
+      if self._nprotos >= 2 then
+         prepend(self, 2, sout)
       end
    end
 end
