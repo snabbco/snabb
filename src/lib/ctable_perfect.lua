@@ -24,7 +24,7 @@ local function lookup_ptr_with_default (self, key)
 end
 
 local function update (self, key, value)
-   local entry = self:lookup_ptr(key)
+   local entry = self:lookup_ptr(ffi.cast("uint8_t *", key))
    entry.value = value
    return entry
 end
