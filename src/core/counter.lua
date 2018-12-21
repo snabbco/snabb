@@ -47,17 +47,21 @@ local private = {}
 local numbers = {} -- name -> number
 
 function create (name, initval)
-   if numbers[name] then return private[numbers[name]] end
+   if numbers[name] then
+      return ffi.cast("struct counter *", private[numbers[name]])
+   end
    local n = #public+1
    public[n] = shm.create(name, counter_t)
    private[n] = ffi.new(counter_t)
    numbers[name] = n
    if initval then set(private[n], initval) end
-   return private[n]
+   return ffi.cast("struct counter *", private[n])
 end
 
 function open (name)
-   if numbers[name] then return private[numbers[name]] end
+   if numbers[name] then
+      return ffi.cast("struct counter *", private[numbers[name]])
+   end
    local n = #public+1
    public[n] = shm.open(name, counter_t, 'readonly')
    private[n] = public[#public] -- use counter directly
