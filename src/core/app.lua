@@ -424,8 +424,10 @@ function compute_breathe_order ()
          end
       end
       for linkname,link in pairs(app.input) do
-         linknames[link] = appname..'.'..linkname
-         inputs[link] = app
+         if type(linkname) == "string" then
+            linknames[link] = appname..'.'..linkname
+            inputs[link] = app
+         end
       end
    end
    for link,app in pairs(inputs) do
