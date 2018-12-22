@@ -81,11 +81,11 @@ end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
-function with_restart (app, method)
+function with_restart (app, method, link, arg)
    local status, result
    if use_restart then
       -- Run fn in protected mode using pcall.
-      status, result = pcall(method, app)
+      status, result = pcall(method, app, link, arg)
 
       -- If pcall caught an error mark app as "dead" (record time and cause
       -- of death).
@@ -93,7 +93,7 @@ function with_restart (app, method)
          app.dead = { error = result, time = now() }
       end
    else
-      status, result = true, method(app)
+      status, result = true, method(app, link, arg)
    end
    return status, result
 end
@@ -305,14 +305,14 @@ function apply_config_actions (actions)
       local link = app.output[linkname]
       app.output[linkname] = nil
       remove_link_from_array(app.output, link)
-      if app.link then app:link() end
+      if app.link then app:link('unlink', 'output', linkname) end
    end
    function ops.unlink_input (appname, linkname)
       local app = app_table[appname]
       local link = app.input[linkname]
       app.input[linkname] = nil
       remove_link_from_array(app.input, link)
-      if app.link then app:link() end
+      if app.link then app:link('unlink', 'input', linkname) end
    end
    function ops.free_link (linkspec)
       link.free(link_table[linkspec], linkspec)
@@ -330,7 +330,7 @@ function apply_config_actions (actions)
              appname..": duplicate output link "..linkname)
       app.output[linkname] = link
       table.insert(app.output, link)
-      if app.link then app:link() end
+      if app.link then app:link('link', 'output', linkname, link) end
    end
    function ops.link_input (appname, linkname, linkspec)
       local app = app_table[appname]
@@ -339,7 +339,10 @@ function apply_config_actions (actions)
              appname..": duplicate input link "..linkname)
       app.input[linkname] = link
       table.insert(app.input, link)
-      if app.link then app:link() end
+      if app.link then
+         local method, arg = app:link('link', 'input', linkname, link)
+         app.push_link[linkname] = { method = method, arg = arg }
+      end
    end
    function ops.stop_app (name)
       local app = app_table[name]
@@ -358,6 +361,7 @@ function apply_config_actions (actions)
       app.appname = name
       app.output = {}
       app.input = {}
+      app.push_link = {}
       app_table[name] = app
       app.zone = zone
       if app.shm then
@@ -430,11 +434,17 @@ function compute_breathe_order ()
       for linkname,link in pairs(app.input) do
          if type(linkname) == "string" then
             linknames[link] = appname..'.'..linkname
-            inputs[link] = app
+            local method, arg = app['push_'..linkname] or app.push, nil
+            if app.push_link[linkname] then
+               method = app.push_link[linkname].method or method
+               arg = app.push_link[linkname].arg
+            end
+            inputs[link] = { app = app, method = method, arg = arg, link = link }
          end
       end
    end
-   for link,app in pairs(inputs) do
+   for link,spec in pairs(inputs) do
+      local app = spec.app
       successors[link] = {}
       if not app.pull then
          for _,succ in pairs(app.output) do
@@ -464,7 +474,7 @@ function compute_breathe_order ()
    local link_order = tsort(nodes, entry_nodes, successors)
    local i = 1
    for _,link in ipairs(link_order) do
-      if breathe_push_order[#breathe_push_order] ~= inputs[link] then
+      if breathe_push_order[#breathe_push_order] ~= inputs[link].app then
          table.insert(breathe_push_order, inputs[link])
       end
    end
@@ -539,10 +549,11 @@ function breathe ()
    end
    -- Exhale: push work out through the app network
    for i = 1, #breathe_push_order do
-      local app = breathe_push_order[i]
-      if app.push and not app.dead then
+      local spec = breathe_push_order[i]
+      local app = spec.app
+      if spec.method and not app.dead then
          zone(app.zone)
-         with_restart(app, app.push)
+         with_restart(app, spec.method, spec.link, spec.arg)
          zone()
       end
    end
