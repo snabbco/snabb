@@ -219,7 +219,9 @@ function shiftright (p, bytes)
 end
 
 -- Conveniently create a packet by copying some existing data.
-function from_pointer (ptr, len) return append(allocate(), ptr, len) end
+function from_pointer (ptr, len)
+   return append(allocate(), ffi.cast("uint8_t *", ptr), len)
+end
 function from_string (d)         return from_pointer(d, #d) end
 
 -- Free a packet that is no longer in use.
