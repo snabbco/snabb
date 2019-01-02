@@ -46,19 +46,17 @@ end
 
 -- pop a VLAN tag (4 byte of TPID and TCI) from a packet
 function pop_tag (pkt)
-   local payload = pkt.data + o_ethernet_ethertype
-   local length = pkt.length
-   pkt.length = length - 4
-   C.memmove(payload, payload + 4, length - o_ethernet_ethertype - 4)
+   C.memmove(pkt.data + 4, pkt.data, o_ethernet_ethertype)
+   return packet.shiftleft(pkt, 4)
 end
 
 -- push a VLAN tag onto a packet.  The tag is in network byte-order.
 function push_tag (pkt, tag)
+   local pkt = packet.shiftright(pkt, 4)
+   C.memmove(pkt.data, pkt.data + 4, o_ethernet_ethertype)
    local payload = pkt.data + o_ethernet_ethertype
-   local length = pkt.length
-   pkt.length = length + 4
-   C.memmove(payload + 4, payload, length - o_ethernet_ethertype)
    cast(uint32_ptr_t, payload)[0] = tag
+   return pkt
 end
 
 -- extract TCI (2 bytes) from packet, no check is performed to verify that the
@@ -102,8 +100,7 @@ function Tagger:push ()
    local tag = self.tag
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      push_tag(pkt, tag)
-      transmit(output, pkt)
+      transmit(output, push_tag(pkt, tag))
    end
 end
 
@@ -124,8 +121,7 @@ function Untagger:push ()
          -- Incorrect VLAN tag; drop.
          packet.free(pkt)
       else
-         pop_tag(pkt)
-         transmit(output, pkt)
+         transmit(output, pop_tag(pkt))
       end
    end
 end
@@ -165,8 +161,7 @@ function VlanMux:push ()
          -- dig out TCI field
          local tci = extract_tci(p)
          local vid = tci_to_vid(tci)
-         pop_tag(p)
-         self:transmit(to[vid], p)
+         self:transmit(to[vid], pop_tag(p))
       else -- untagged, send to native output
          self:transmit(to[0], p)
       end
@@ -179,8 +174,7 @@ function VlanMux:push ()
       local l_in = from.link
       while not empty(l_in) do
          local p = receive(l_in)
-         push_tag(p, build_tag(from.vid, tpid))
-         self:transmit(l_out, p)
+         self:transmit(l_out, push_tag(p, build_tag(from.vid, tpid)))
       end
       i = i + 1
    end
@@ -212,13 +206,14 @@ function test_tag_untag ()
       26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
       36 37
    ]], 82))
-   local payload = pkt.data + o_ethernet_ethertype
    local vid = 0
    for i=0,15 do
       for j=0,255 do
          local tag = build_tag(vid, tpids.dot1q)
-         push_tag(pkt, tag)
+         pkt = push_tag(pkt, tag)
+         local payload = pkt.data + o_ethernet_ethertype
          assert(cast(uint32_ptr_t, payload)[0] == tag)
+         pkt = pop_tag(pkt)
          vid = vid + 1
       end
    end
