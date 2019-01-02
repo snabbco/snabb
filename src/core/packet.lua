@@ -117,6 +117,16 @@ function rebalance_freelists ()
    end
 end
 
+-- Register struct freelist as an abstract SHM object type so that the group
+-- freelist can be recognized by shm.open_frame and described with tostring().
+shm.register(
+   'freelist',
+   {open = function (name) return shm.open(name, "struct freelist") end}
+)
+ffi.metatype("struct freelist", {__tostring = function (freelist)
+   return ("%d/%d"):format(tonumber(freelist.nfree), tonumber(freelist.max))
+end})
+
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
