@@ -82,8 +82,7 @@ function clone_upstream {
                git config user.name "Snabb Bot")
 }
 
-function dock_build { (cd src && scripts/dock.sh "(cd .. && make)"); }
-function build { git submodule update --init && dock_build; }
+function build { (cd src && scripts/dock.sh "(cd .. && make)"); }
 
 function log_status {
     if grep "ERROR" $(pull_request_log $1) >/dev/null 2>&1; then
