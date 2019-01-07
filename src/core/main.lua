@@ -8,7 +8,7 @@ package.path = ''
 
 local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
-local zone = require("jit.zone")
+local vmprofile = require("jit.vmprofile")
 local lib = require("core.lib")
 local shm = require("core.shm")
 local C   = ffi.C
@@ -41,7 +41,6 @@ _G.developer_debug = lib.getenv("SNABB_DEBUG") ~= nil
 debug_on_error = _G.developer_debug
 
 function main ()
-   zone("startup")
    require "lib.lua.strict"
    -- Warn on unsupported platforms
    if ffi.arch ~= 'x64' or ffi.os ~= 'Linux' then
@@ -55,6 +54,8 @@ function main ()
       if f == nil then
          error(("Failed to load $SNABB_PROGRAM_LUACODE: %q"):format(expr))
       else
+         engine.setvmprofile("program")
+         vmprofile.start()
          f()
       end
    else
@@ -64,9 +65,12 @@ function main ()
          print("unsupported program: "..program:gsub("_", "-"))
          usage(1)
       else
+         engine.setvmprofile("program")
+         vmprofile.start()
          require(modulename(program)).run(args)
       end
    end
+   vmprofile.stop()
 end
 
 -- Take the program name from the first argument, unless the first

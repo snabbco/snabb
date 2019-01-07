@@ -5,7 +5,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASFFI
 
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -755,11 +754,6 @@ static void cp_push_attributes(CPDecl *decl)
 {
   CType *ct = &decl->stack[decl->pos];
   if (ctype_isfunc(ct->info)) {  /* Ok to modify in-place. */
-#if LJ_TARGET_X86
-    if ((decl->fattr & CTFP_CCONV))
-      ct->info = (ct->info & (CTMASK_NUM|CTF_VARARG|CTMASK_CID)) +
-		 (decl->fattr & ~CTMASK_CID);
-#endif
   } else {
     if ((decl->attr & CTFP_ALIGNED) && !(decl->mode & CPARSE_MODE_FIELD))
       cp_push(decl, CTINFO(CT_ATTRIB, CTATTRIB(CTA_ALIGN)),
@@ -1075,32 +1069,6 @@ static void cp_decl_gccattribute(CPState *cp, CPDecl *decl)
 	  if (vsize) CTF_INSERT(decl->attr, VSIZEP, lj_fls(vsize));
 	}
 	break;
-#if LJ_TARGET_X86
-      case H_(5ad22db8,c689b848): case H_(439150fa,65ea78cb):  /* regparm */
-	CTF_INSERT(decl->fattr, REGPARM, cp_decl_sizeattr(cp));
-	decl->fattr |= CTFP_CCONV;
-	break;
-      case H_(18fc0b98,7ff4c074): case H_(4e62abed,0a747424):  /* cdecl */
-	CTF_INSERT(decl->fattr, CCONV, CTCC_CDECL);
-	decl->fattr |= CTFP_CCONV;
-	break;
-      case H_(72b2e41b,494c5a44): case H_(f2356d59,f25fc9bd):  /* thiscall */
-	CTF_INSERT(decl->fattr, CCONV, CTCC_THISCALL);
-	decl->fattr |= CTFP_CCONV;
-	break;
-      case H_(0d0ffc42,ab746f88): case H_(21c54ba1,7f0ca7e3):  /* fastcall */
-	CTF_INSERT(decl->fattr, CCONV, CTCC_FASTCALL);
-	decl->fattr |= CTFP_CCONV;
-	break;
-      case H_(ef76b040,9412e06a): case H_(de56697b,c750e6e1):  /* stdcall */
-	CTF_INSERT(decl->fattr, CCONV, CTCC_STDCALL);
-	decl->fattr |= CTFP_CCONV;
-	break;
-      case H_(ea78b622,f234bd8e): case H_(252ffb06,8d50f34b):  /* sseregparm */
-	decl->fattr |= CTF_SSEREGPARM;
-	decl->fattr |= CTFP_CCONV;
-	break;
-#endif
       default:  /* Skip all other attributes. */
 	goto skip_attr;
       }
@@ -1156,15 +1124,9 @@ static void cp_decl_attributes(CPState *cp, CPDecl *decl)
     case CTOK_ASM: cp_decl_asm(cp, decl); continue;
     case CTOK_DECLSPEC: cp_decl_msvcattribute(cp, decl); continue;
     case CTOK_CCDECL:
-#if LJ_TARGET_X86
-      CTF_INSERT(decl->fattr, CCONV, cp->ct->size);
-      decl->fattr |= CTFP_CCONV;
-#endif
       break;
     case CTOK_PTRSZ:
-#if LJ_64
       CTF_INSERT(decl->attr, MSIZEP, cp->ct->size);
-#endif
       break;
     default: return;
     }
@@ -1216,19 +1178,6 @@ static CTSize cp_field_align(CPState *cp, CType *ct, CTInfo info)
 {
   CTSize align = ctype_align(info);
   UNUSED(cp); UNUSED(ct);
-#if (LJ_TARGET_X86 && !LJ_ABI_WIN) || (LJ_TARGET_ARM && __APPLE__)
-  /* The SYSV i386 and iOS ABIs limit alignment of non-vector fields to 2^2. */
-  if (align > 2 && !(info & CTFP_ALIGNED)) {
-    if (ctype_isarray(info) && !(info & CTF_VECTOR)) {
-      do {
-	ct = ctype_rawchild(cp->cts, ct);
-	info = ct->info;
-      } while (ctype_isarray(info) && !(info & CTF_VECTOR));
-    }
-    if (ctype_isnum(info) || ctype_isenum(info))
-      align = 2;
-  }
-#endif
   return align;
 }
 
@@ -1286,11 +1235,7 @@ static void cp_struct_layout(CPState *cp, CTypeID sid, CTInfo sattr)
 	  ct->info = CTINFO(CT_BITFIELD,
 	    (info & (CTF_QUAL|CTF_UNSIGNED|CTF_BOOL)) +
 	    (csz << (CTSHIFT_BITCSZ-3)) + (bsz << CTSHIFT_BITBSZ));
-#if LJ_BE
-	  ct->info += ((csz - (bofs & (csz-1)) - bsz) << CTSHIFT_BITPOS);
-#else
 	  ct->info += ((bofs & (csz-1)) << CTSHIFT_BITPOS);
-#endif
 	  ct->size = ((bofs & ~(csz-1)) >> 3);  /* Store container offset. */
 	}
       }
@@ -1646,12 +1591,10 @@ static void cp_declarator(CPState *cp, CPDecl *decl)
       cp_decl_attributes(cp, decl);
       sz = CTSIZE_PTR;
       info = CTINFO(CT_PTR, CTALIGN_PTR);
-#if LJ_64
       if (ctype_msizeP(decl->attr) == 4) {
 	sz = 4;
 	info = CTINFO(CT_PTR, CTALIGN(2));
       }
-#endif
       info += (decl->attr & (CTF_QUAL|CTF_REF));
       decl->attr &= ~(CTF_QUAL|(CTMASK_MSIZEP<<CTSHIFT_MSIZEP));
       cp_push(decl, info, sz);
@@ -1885,4 +1828,3 @@ int lj_cparse(CPState *cp)
   return errcode;
 }
 
-#endif

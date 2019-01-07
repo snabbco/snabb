@@ -32,7 +32,6 @@
 #define SYMPREFIX_CF		"luaopen_%s"
 #define SYMPREFIX_BC		"luaJIT_BC_%s"
 
-#if LJ_TARGET_DLOPEN
 
 #include <dlfcn.h>
 
@@ -65,120 +64,6 @@ static const char *ll_bcsym(void *lib, const char *sym)
   return (const char *)dlsym(lib, sym);
 }
 
-#elif LJ_TARGET_WINDOWS
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-#ifndef GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
-#define GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS  4
-#define GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT  2
-BOOL WINAPI GetModuleHandleExA(DWORD, LPCSTR, HMODULE*);
-#endif
-
-#undef setprogdir
-
-static void setprogdir(lua_State *L)
-{
-  char buff[MAX_PATH + 1];
-  char *lb;
-  DWORD nsize = sizeof(buff);
-  DWORD n = GetModuleFileNameA(NULL, buff, nsize);
-  if (n == 0 || n == nsize || (lb = strrchr(buff, '\\')) == NULL) {
-    luaL_error(L, "unable to get ModuleFileName");
-  } else {
-    *lb = '\0';
-    luaL_gsub(L, lua_tostring(L, -1), LUA_EXECDIR, buff);
-    lua_remove(L, -2);  /* remove original string */
-  }
-}
-
-static void pusherror(lua_State *L)
-{
-  DWORD error = GetLastError();
-#if LJ_TARGET_XBOXONE
-  wchar_t wbuffer[128];
-  char buffer[128*2];
-  if (FormatMessageW(FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
-      NULL, error, 0, wbuffer, sizeof(wbuffer)/sizeof(wchar_t), NULL) &&
-      WideCharToMultiByte(CP_ACP, 0, wbuffer, 128, buffer, 128*2, NULL, NULL))
-#else
-  char buffer[128];
-  if (FormatMessageA(FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
-      NULL, error, 0, buffer, sizeof(buffer), NULL))
-#endif
-    lua_pushstring(L, buffer);
-  else
-    lua_pushfstring(L, "system error %d\n", error);
-}
-
-static void ll_unloadlib(void *lib)
-{
-  FreeLibrary((HINSTANCE)lib);
-}
-
-static void *ll_load(lua_State *L, const char *path, int gl)
-{
-  HINSTANCE lib = LoadLibraryExA(path, NULL, 0);
-  if (lib == NULL) pusherror(L);
-  UNUSED(gl);
-  return lib;
-}
-
-static lua_CFunction ll_sym(lua_State *L, void *lib, const char *sym)
-{
-  lua_CFunction f = (lua_CFunction)GetProcAddress((HINSTANCE)lib, sym);
-  if (f == NULL) pusherror(L);
-  return f;
-}
-
-static const char *ll_bcsym(void *lib, const char *sym)
-{
-  if (lib) {
-    return (const char *)GetProcAddress((HINSTANCE)lib, sym);
-  } else {
-    HINSTANCE h = GetModuleHandleA(NULL);
-    const char *p = (const char *)GetProcAddress(h, sym);
-    if (p == NULL && GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-					(const char *)ll_bcsym, &h))
-      p = (const char *)GetProcAddress(h, sym);
-    return p;
-  }
-}
-
-#else
-
-#undef PACKAGE_LIB_FAIL
-#define PACKAGE_LIB_FAIL	"absent"
-
-#define DLMSG	"dynamic libraries not enabled; no support for target OS"
-
-static void ll_unloadlib(void *lib)
-{
-  UNUSED(lib);
-}
-
-static void *ll_load(lua_State *L, const char *path, int gl)
-{
-  UNUSED(path); UNUSED(gl);
-  lua_pushliteral(L, DLMSG);
-  return NULL;
-}
-
-static lua_CFunction ll_sym(lua_State *L, void *lib, const char *sym)
-{
-  UNUSED(lib); UNUSED(sym);
-  lua_pushliteral(L, DLMSG);
-  return NULL;
-}
-
-static const char *ll_bcsym(void *lib, const char *sym)
-{
-  UNUSED(lib); UNUSED(sym);
-  return NULL;
-}
-
-#endif
 
 /* ------------------------------------------------------------------------ */
 
@@ -193,8 +78,7 @@ static void **ll_register(lua_State *L, const char *path)
     lua_pop(L, 1);
     plib = (void **)lua_newuserdata(L, sizeof(void *));
     *plib = NULL;
-    luaL_getmetatable(L, "_LOADLIB");
-    lua_setmetatable(L, -2);
+    luaL_setmetatable(L, "_LOADLIB");
     lua_pushfstring(L, "LOADLIB: %s", path);
     lua_pushvalue(L, -2);
     lua_settable(L, LUA_REGISTRYINDEX);
@@ -489,29 +373,19 @@ static void modinit(lua_State *L, const char *modname)
 static int lj_cf_package_module(lua_State *L)
 {
   const char *modname = luaL_checkstring(L, 1);
-  int loaded = lua_gettop(L) + 1;  /* index of _LOADED table */
-  lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
-  lua_getfield(L, loaded, modname);  /* get _LOADED[modname] */
-  if (!lua_istable(L, -1)) {  /* not found? */
-    lua_pop(L, 1);  /* remove previous result */
-    /* try global variable (and create one if it does not exist) */
-    if (luaL_findtable(L, LUA_GLOBALSINDEX, modname, 1) != NULL)
-      lj_err_callerv(L, LJ_ERR_BADMODN, modname);
-    lua_pushvalue(L, -1);
-    lua_setfield(L, loaded, modname);  /* _LOADED[modname] = new table */
-  }
-  /* check whether table already has a _NAME field */
+  int lastarg = (int)(L->top - L->base);
+  luaL_pushmodule(L, modname, 1);
   lua_getfield(L, -1, "_NAME");
-  if (!lua_isnil(L, -1)) {  /* is table an initialized module? */
+  if (!lua_isnil(L, -1)) {  /* Module already initialized? */
     lua_pop(L, 1);
-  } else {  /* no; initialize it */
+  } else {
     lua_pop(L, 1);
     modinit(L, modname);
   }
   lua_pushvalue(L, -1);
   setfenv(L);
-  dooptions(L, loaded - 1);
-  return 0;
+  dooptions(L, lastarg);
+  return LJ_52;
 }
 
 static int lj_cf_package_seeall(lua_State *L)
@@ -534,12 +408,7 @@ static int lj_cf_package_seeall(lua_State *L)
 static void setpath(lua_State *L, const char *fieldname, const char *envname,
 		    const char *def, int noenv)
 {
-#if LJ_TARGET_CONSOLE
-  const char *path = NULL;
-  UNUSED(envname);
-#else
   const char *path = getenv(envname);
-#endif
   if (path == NULL || noenv) {
     lua_pushstring(L, def);
   } else {
@@ -582,8 +451,7 @@ LUALIB_API int luaopen_package(lua_State *L)
   lj_lib_pushcf(L, lj_cf_package_unloadlib, 1);
   lua_setfield(L, -2, "__gc");
   luaL_register(L, LUA_LOADLIBNAME, package_lib);
-  lua_pushvalue(L, -1);
-  lua_replace(L, LUA_ENVIRONINDEX);
+  lua_copy(L, -1, LUA_ENVIRONINDEX);
   lua_createtable(L, sizeof(package_loaders)/sizeof(package_loaders[0])-1, 0);
   for (i = 0; package_loaders[i] != NULL; i++) {
     lj_lib_pushcf(L, package_loaders[i], 1);

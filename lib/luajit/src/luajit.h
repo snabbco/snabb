@@ -30,11 +30,11 @@
 
 #include "lua.h"
 
-#define LUAJIT_VERSION		"LuaJIT 2.1.0-beta2"
-#define LUAJIT_VERSION_NUM	20100  /* Version 2.1.0 = 02.01.00. */
-#define LUAJIT_VERSION_SYM	luaJIT_version_2_1_0_beta2
-#define LUAJIT_COPYRIGHT	"Copyright (C) 2005-2017 Mike Pall"
-#define LUAJIT_URL		"http://luajit.org/"
+#define LUAJIT_VERSION		"RaptorJIT 1.0.0"
+#define LUAJIT_VERSION_NUM	10000  /* Version 1.0.0 = 01.00.00. */
+#define LUAJIT_VERSION_SYM	luaJIT_version_1_0_0
+
+#define LUAJIT_URL		"http://github.com/raptorjit/raptorjit"
 
 /* Modes for luaJIT_setmode. */
 #define LUAJIT_MODE_MASK	0x00ff
@@ -64,14 +64,12 @@ enum {
 /* Control the JIT engine. */
 LUA_API int luaJIT_setmode(lua_State *L, int idx, int mode);
 
-/* Low-overhead profiling API. */
-typedef void (*luaJIT_profile_callback)(void *data, lua_State *L,
-					int samples, int vmstate);
-LUA_API void luaJIT_profile_start(lua_State *L, const char *mode,
-				  luaJIT_profile_callback cb, void *data);
-LUA_API void luaJIT_profile_stop(lua_State *L);
-LUA_API const char *luaJIT_profile_dumpstack(lua_State *L, const char *fmt,
-					     int depth, size_t *len);
+/* VM profiling API. */
+LUA_API int luaJIT_vmprofile_start(lua_State *L);
+LUA_API int luaJIT_vmprofile_open(lua_State *L, const char *str, int noselect, int nostart);
+LUA_API int luaJIT_vmprofile_select(lua_State *L, void *ud);
+LUA_API int luaJIT_vmprofile_close(lua_State *L, void *ud);
+LUA_API int luaJIT_vmprofile_stop(lua_State *L);
 
 /* Enforce (dynamic) linker error for version mismatches. Call from main. */
 LUA_API void LUAJIT_VERSION_SYM(void);
