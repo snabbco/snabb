@@ -58,8 +58,16 @@ config.link(c, "nic1p0.output -> sink.input0")
 config.link(c, "nic1p1.output -> sink.input1")
 config.link(c, "nic1p2.output -> sink.input2")
 
-engine.configure(c)
-engine.main({ duration = 1 })
+local retries = 10
+repeat
+   -- This test is flaky on my hardware, apparently because sometimes the first
+   -- so-many packets are not delivered. This works around that. - Max
+   engine.configure(config.new())
+   engine.configure(c)
+   engine.main({ duration = 1 })
+   retries = retries - 1
+until link.stats(engine.app_table.sink.input.input0).rxpackets > 0
+   or retries == 0
 
 assert(link.stats(engine.app_table.sink.input.input0).rxpackets == 51,
        "wrong number of packets received on pool 0")
