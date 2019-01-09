@@ -295,7 +295,7 @@ function Reassembler:handle_fragment(pkt)
    -- Limit the scope of max_data_offset
    do
       local max_data_offset = ether_ipv6_header_len + frag_start + frag_size
-      if max_data_offset > ffi.sizeof(reassembly.packet.data) then
+      if max_data_offset > packet.max_payload then
          -- Snabb packets have a maximum size of 10240 bytes.
          return self:reassembly_error(entry)
       end
