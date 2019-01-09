@@ -284,7 +284,7 @@ function Reassembler:handle_fragment(pkt)
       else
          reassembly.final_start = frag_start
       end
-   elseif bit.band(frag_size, 0x7) ~= 0 then
+   elseif frag_size % 8 ~= 0 then
       -- The size of all non-terminal fragments must be a multiple of 8.
       -- Here we should send "ICMP Parameter Problem, Code 0 to the
       -- source of the fragment, pointing to the Payload Length field of
