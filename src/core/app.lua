@@ -326,6 +326,8 @@ function apply_config_actions (actions)
    function ops.link_output (appname, linkname, linkspec)
       local app = app_table[appname]
       local link = assert(link_table[linkspec])
+      assert(not app.output[linkname],
+             appname..": duplicate output link "..linkname)
       app.output[linkname] = link
       table.insert(app.output, link)
       if app.link then app:link() end
@@ -333,6 +335,8 @@ function apply_config_actions (actions)
    function ops.link_input (appname, linkname, linkspec)
       local app = app_table[appname]
       local link = assert(link_table[linkspec])
+      assert(not app.input[linkname],
+             appname..": duplicate input link "..linkname)
       app.input[linkname] = link
       table.insert(app.input, link)
       if app.link then app:link() end
