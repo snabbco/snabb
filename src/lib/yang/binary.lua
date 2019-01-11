@@ -143,8 +143,8 @@ local function data_emitter(production)
       local member_keys = {}
       for k,_ in pairs(production.members) do table.insert(member_keys, k) end
       local function order_predicate (x, y)
-         if (type(x) == 'number' and type(y) == 'number')
-         or (type(x) == 'string' and type(y) == 'string') then
+         if (type(x) == 'number' and type(y) == 'number') or
+            (type(x) == 'string' and type(y) == 'string') then
             return x >= y
          else
             return type(y) == 'number'
