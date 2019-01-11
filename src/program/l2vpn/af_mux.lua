@@ -6,7 +6,7 @@ local ethernet = require("lib.protocol.ethernet")
 af_mux = {}
 
 function af_mux:alloc_l2 ()
-   local l2 = ffi.new("struct link *[256]", self.discard_link)
+   local l2 = ffi.new("struct link *[256]", self.discard)
    table.insert(self.l2_anchors, l2)
    return l2
 end
@@ -29,7 +29,7 @@ end
 
 function af_mux:new ()
    local o = setmetatable({}, { __index = af_mux })
-   o.discard_link = link.new("af_mux_discard")
+   o.discard = link.new("af_mux_discard")
    o.l2_anchors = {}
    o.default = o:alloc_l2()
    o.l1 = ffi.new("struct link **[256]", o.default)
@@ -37,45 +37,40 @@ function af_mux:new ()
    return o
 end
 
-function af_mux:link ()
-   for name, l in pairs(self.output) do
-      if type(name) == "string" and name ~= "south" then
-         if name == "ipv4" then
-            self:add(0x0800, l) -- IPv4
-            self:add(0x0806, l) -- ARP
-         elseif name == "ipv6" then
-            self:add(0x86dd, l)
-         else
-            error("Invalid address family "..name)
-         end
+function af_mux:link (mode, dir, name, l)
+   if mode == 'unlink' or name == "south" then return end
+   if dir == 'output' then
+      if name == "ipv4" then
+         self:add(0x0800, l) -- IPv4
+         self:add(0x0806, l) -- ARP
+      elseif name == "ipv6" then
+         self:add(0x86dd, l)
+      else
+         error("Invalid address family "..name)
       end
+   else
+      return self.push_to_south
    end
 end
 
-function af_mux:push ()
-   local isouth = self.input.south
-   for _ = 1, link.nreadable(isouth) do
-      local p = link.receive(isouth)
+function af_mux:push_to_south (lin)
+   local sout = self.output.south
+   for _ = 1, link.nreadable(lin) do
+      link.transmit(sout, link.receive(lin))
+   end
+end
+
+function af_mux:push (sin)
+   for _ = 1, link.nreadable(sin) do
+      local p = link.receive(sin)
       local ether = ffi.cast(self.ether._header.ptr_t, p.data)
       local hi, lo = split(lib.ntohs(ether.ether_type))
       link.transmit(self.l1[hi][lo], p)
-  end
+   end
 
-   for _ = 1, link.nreadable(self.discard_link) do
-      packet.free(link.receive(self.discard_link))
-   end
-   
-   local iv4, iv6 = self.input.ipv4, self.input.ipv6
-   local osouth = self.output.south
-   if iv4 then
-      for _ = 1, link.nreadable(iv4) do
-         link.transmit(osouth, link.receive(iv4))
-      end
-   end
-   if iv6 then
-      for _ = 1, link.nreadable(iv6) do
-         link.transmit(osouth, link.receive(iv6))
-      end
+   local discard = self.discard
+   for _ = 1, link.nreadable(discard) do
+      packet.free(link.receive(discard))
    end
 end
 

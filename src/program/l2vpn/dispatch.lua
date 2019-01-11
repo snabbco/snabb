@@ -81,50 +81,28 @@ function dispatch:new (args)
    return setmetatable(o, { __index = dispatch })
 end
 
-function dispatch:link ()
-   for name, l in pairs(self.output) do
-      if type(name) == "string" and name ~= "south" then
-         local key = assert(self.keys_by_name[name])
-         self.ctab:update(key, l)
-      end
+function dispatch:link (mode, dir, name, l)
+   if mode == 'unlink' or name == "south" then return end
+   if dir == 'output' then
+      local key = assert(self.keys_by_name[name])
+      self.ctab:update(key, l)
+   else
+      return self.push_to_south
    end
 end
 
-local function input (self, i, sout)
-   local name = self.links[i]
-
-   local lin = self.input[name]
-   for _ = 1, link.nreadable(lin) do
-      link.transmit(sout, link.receive(lin))
-   end
-end
-
-function dispatch:push()
-   local sin = self.input.south
-   local sout = self.output.south
-
+function dispatch:push(sin)
    for _ = 1, link.nreadable(sin) do
       local p = link.receive(sin)
       local key = ffi.cast(self.key_ptr_t, p.data + self.offset)
       local entry = self.ctab:lookup_ptr(ffi.cast("uint8_t *", key))
       link.transmit(entry.value, p)
    end
+end
 
-   local discard = self.discard
-   for _ = 1, link.nreadable(discard) do
-      packet.free(link.receive(discard))
-   end
-
-   if self.nlinks >= 3 then
-      for i = 1, self.nlinks do
-         input(self, i, sout)
-      end
-   else
-      if self.nlinks >= 1 then
-         input(self, 1, sout)
-      end
-      if self.nlinks >= 2 then
-         input(self, 2, sout)
-      end
+function dispatch:push_to_south (lin)
+   local sout = self.output.south
+   for _ = 1, link.nreadable(lin) do
+      link.transmit(sout, link.receive(lin))
    end
 end

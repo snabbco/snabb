@@ -55,8 +55,7 @@ function transport:new (arg)
       dgram:push(ethernet:new({ type = 0x0800 }))
       dgram:new(dgram:packet(), ethernet) -- Reset parse stack
 
-      local proto_info = { link_name = name,
-                           proto = proto,
+      local proto_info = { proto = proto,
                            combined_header = {
                               ptr = ffi.cast("uint8_t *", dgram:packet().data),
                               ipv4_ptr = ffi.cast("uint16_t *",
@@ -66,26 +65,26 @@ function transport:new (arg)
       table.insert(o._proto_infos, proto_info)
       o._proto_infos_by_name[name] = proto_info
    end
-   o._nprotos = #o._proto_infos
 
    return setmetatable(o, { __index = transport })
 end
 
-function transport:link ()
-   for name, l in pairs(self.output) do
-      if type(name) == "string" and name ~= "south" then
-         local proto_info = assert(self._proto_infos_by_name[name],
-                                   "Unconfigured link: "..name)
-         self._proto_links_out[proto_info.proto] = l
-      end
+function transport:link (mode, dir, name, l)
+   if mode == 'unlink' or name == "south" then return end
+   if dir == 'output' then
+      local proto_info = assert(self._proto_infos_by_name[name],
+                                "Unconfigured link: "..name)
+      self._proto_links_out[proto_info.proto] = l
+   else
+      return self.prepend, self._proto_infos_by_name[name]
    end
 end
 
-local function prepend(self, i, sout)
-   local proto_info = self._proto_infos[i]
-   local pin = assert(self.input[proto_info.link_name])
-   for _ = 1, link.nreadable(pin) do
-      local p = link.receive(pin)
+function transport:prepend (lin, proto_info)
+   local sout = self.output.south
+
+   for _ = 1, link.nreadable(lin) do
+      local p = link.receive(lin)
       local total_length = p.length + ipv4_header_size
       local header = proto_info.combined_header
       C.checksum_update_incremental_16(header.ipv4_ptr + csum_offset,
@@ -96,12 +95,8 @@ local function prepend(self, i, sout)
    end
 end
 
-function transport:push ()
-   local sin = self.input.south
-   local sout = self.output.south
-   local discard = self._discard_link
+function transport:push (sin)
    local links_out = self._proto_links_out
-
    for _ = 1, link.nreadable(sin) do
       local p = link.receive(sin)
       -- Precondition: incoming packets must have at least an Ethernet
@@ -118,21 +113,9 @@ function transport:push ()
       end
    end
 
+   local discard = self._discard_link
    for _ = 1, link.nreadable(discard) do
       packet.free(link.receive(discard))
-   end
-
-   if self._nprotos >= 3 then
-      for i = 1, self._nprotos do
-         prepend(self, i, sout)
-      end
-   else
-      if self._nprotos >= 1 then
-         prepend(self, 1, sout)
-      end
-      if self._nprotos >= 2 then
-         prepend(self, 2, sout)
-      end
    end
 end
 
