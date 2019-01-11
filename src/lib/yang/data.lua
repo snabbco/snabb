@@ -10,6 +10,7 @@ local ffi = require("ffi")
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 local regexp = require("lib.xsd_regexp")
+local lib = require("core.lib")
 
 function normalize_id(id)
    return id:gsub('[^%w_]', '_')
@@ -109,22 +110,28 @@ function typeof(name)
    return type_cache[name]
 end
 
--- If a "list" node has one key that is string-valued or representable as a Lua
--- number, we will represent instances of that node as normal Lua tables where
--- the key is the table key and the value does not contain the key.
+-- If a "list" node has a single key that is string-valued or representable as
+-- a Lua number, we will represent instances of that node as normal Lua tables
+-- where the key is the table key and the value does not contain the key.
 local function table_native_key(keys)
-   local function representable_as_native(pt)
-      if pt == 'string' then return true end
-      local dt = {'int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32'}
-      for _, t in ipairs(dt) do if pt == t then return true end end
+   local native_number_types =
+      lib.set('int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32')
+   local function representable_as_native(v)
+      return v.type == 'scalar' and
+             (v.argument_type.primitive_type == 'string' or
+              native_number_types[v.argument_type.primitive_type])
    end
    local native_key = nil
    for k,v in pairs(keys) do
-      if native_key ~= nil then return nil end
-      if v.type ~= 'scalar' then return nil end
-      if representable_as_native(v.argument_type.primitive_type) then
+      if native_key ~= nil then
+         -- Bail out if the list has multiple keys, native or otherwise.
+         return nil
+      elseif representable_as_native(v) then
+         -- Select the first native key, if any.
          native_key = k
-      else return nil end
+      else
+         return nil
+      end
    end
    return native_key
 end
