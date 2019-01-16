@@ -10,7 +10,6 @@ local timer     = require("core.timer")
 local shm       = require("core.shm")
 local histogram = require('core.histogram')
 local counter   = require("core.counter")
-local zone      = require("jit.zone")
 local jit       = require("jit")
 local S         = require("syscall")
 local ffi       = require("ffi")
@@ -31,6 +30,13 @@ local named_program_root = shm.root .. "/" .. "by-name"
 
 -- The currently claimed name (think false = nil but nil makes strict.lua unhappy).
 program_name = false
+
+-- Auditlog state
+auditlog_enabled = false
+function enable_auditlog ()
+   jit.auditlog(shm.path("audit.log"))
+   auditlog_enabled = true
+end
 
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
@@ -68,6 +74,28 @@ maxsleep = 100
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
 busywait = false
 
+-- Profiling with vmprofile --------------------------------
+
+-- Low-level FFI
+ffi.cdef[[
+int vmprofile_get_profile_size();
+void vmprofile_set_profile(void *counters);
+]]
+
+local vmprofile_t = ffi.new("uint8_t["..C.vmprofile_get_profile_size().."]")
+
+local vmprofiles = {}
+local function getvmprofile (name)
+   if vmprofiles[name] == nil then
+      vmprofiles[name] = shm.create("vmprofile/"..name, vmprofile_t)
+   end
+   return vmprofiles[name]
+end
+
+function setvmprofile (name)
+   C.vmprofile_set_profile(getvmprofile(name))
+end
+
 -- True when the engine is running the breathe loop.
 local running = false
 
@@ -83,6 +111,7 @@ end
 -- error app will be marked as dead and restarted eventually.
 function with_restart (app, method)
    local status, result
+   setvmprofile(app.zone)
    if use_restart then
       -- Run fn in protected mode using pcall.
       status, result = pcall(method, app)
@@ -95,6 +124,7 @@ function with_restart (app, method)
    else
       status, result = true, method(app)
    end
+   setvmprofile("engine")
    return status, result
 end
 
@@ -474,6 +504,14 @@ function main (options)
       done = lib.timeout(options.duration)
    end
 
+   -- Enable auditlog
+   if not auditlog_enabled then
+      enable_auditlog()
+   end
+
+   -- Setup vmprofile
+   setvmprofile("engine")
+
    local breathe = breathe
    if options.measure_latency or options.measure_latency == nil then
       local latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)
@@ -488,6 +526,9 @@ function main (options)
    until done and done()
    counter.commit()
    if not options.no_report then report(options.report) end
+
+   -- Switch to catch-all profile
+   setvmprofile("program")
 end
 
 local nextbreath
@@ -526,18 +567,14 @@ function breathe ()
    for i = 1, #breathe_pull_order do
       local app = breathe_pull_order[i]
       if app.pull and not app.dead then
-         zone(app.zone)
          with_restart(app, app.pull)
-         zone()
       end
    end
    -- Exhale: push work out through the app network
    for i = 1, #breathe_push_order do
       local app = breathe_push_order[i]
       if app.push and not app.dead then
-         zone(app.zone)
          with_restart(app, app.push)
-         zone()
       end
    end
    counter.add(breaths)
