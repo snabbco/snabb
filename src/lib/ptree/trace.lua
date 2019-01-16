@@ -3,6 +3,8 @@
 module(...,package.seeall)
 
 local lib = require('core.lib')
+local stream = require("lib.stream")
+local file = require("lib.stream.file")
 local json = require("lib.ptree.json")
 
 local Trace = {}
@@ -15,7 +17,11 @@ function new (conf)
    local conf = lib.parse(conf, trace_config_spec)
    local ret = setmetatable({}, {__index=Trace})
    ret.id = 0
-   ret.output = io.open(conf.file, conf.file_mode)
+   if stream.is_stream(conf.file) then
+      ret.output = conf.file
+   else
+      ret.output = file.open(conf.file, conf.file_mode)
+   end
    return ret
 end
 
@@ -47,7 +53,7 @@ function Trace:record(id, args)
    if not obj then return end
    obj.id = tostring(self.id)
    self.id = self.id + 1
-   json.write_json_object(self.output, obj)
+   json.write_json(self.output, obj)
    self.output:write('\n')
    self.output:flush()
 end
@@ -59,9 +65,7 @@ end
 
 function selftest ()
    print('selftest: lib.ptree.trace')
-   local S = require('syscall')
-
-   local tmp = os.tmpname()
+   local tmp = require('lib.stream.mem').tmpfile()
    local trace = new({file=tmp})
    trace:record("get-config",
                 {path="/", schema="foo", revision="bar"})
@@ -69,22 +73,16 @@ function selftest ()
                 {path="/", schema="foo", revision="bar", config="baz"})
    trace:record("unsupported-rpc",
                 {path="/", schema="foo", revision="bar", config="baz"})
-   trace:close()
 
-   local fd = S.open(tmp, 'rdonly')
-   local input = json.buffered_input(fd)
-   json.skip_whitespace(input)
-   local parsed = json.read_json_object(input)
+   tmp:seek('set', 0)
+   local parsed = json.read_json(tmp)
    assert(lib.equal(parsed, {id="0", verb="get", path="/",
                              schema="foo", revision="bar"}))
-   json.skip_whitespace(input)
-   parsed = json.read_json_object(input)
+   parsed = json.read_json(tmp)
    assert(lib.equal(parsed, {id="1", verb="set", path="/",
                              schema="foo", revision="bar", value="baz"}))
-   json.skip_whitespace(input)
-   assert(input:eof())
-   fd:close()
-   os.remove(tmp)
+   assert(json.read_json(tmp) == nil)
+   assert(tmp:read_char() == nil)
 
    print('selftest: ok')
 end

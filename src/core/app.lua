@@ -87,7 +87,7 @@ local vmprofile_t = ffi.new("uint8_t["..C.vmprofile_get_profile_size().."]")
 local vmprofiles = {}
 local function getvmprofile (name)
    if vmprofiles[name] == nil then
-      vmprofiles[name] = shm.create("vmprofile/"..name, vmprofile_t)
+      vmprofiles[name] = shm.create("vmprofile/"..name..".vmprofile", vmprofile_t)
    end
    return vmprofiles[name]
 end

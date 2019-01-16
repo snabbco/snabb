@@ -176,7 +176,7 @@ function wait_vm_up {
     local timeout_counter=0
     local timeout_max=50
     echo -n "Waiting for VM listening on telnet port $1 to get ready..."
-    while ( ! (run_telnet $1 "ping6 -c 1 0::0" | grep "1 received" \
+    while ( ! (run_telnet $1 "ping6 -c 1 0::0" 5 | grep "1 received" \
         >/dev/null) ); do
         # Time out eventually.
         if [ $timeout_counter -gt $timeout_max ]; then

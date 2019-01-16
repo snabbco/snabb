@@ -4,7 +4,7 @@ module(..., package.seeall)
 
 local schema = require("lib.yang.schema")
 local data = require("lib.yang.data")
-local util = require("lib.yang.util")
+local mem = require("lib.stream.mem")
 
 function prepare_callee(schema_name)
    local schema = schema.load_schema_by_name(schema_name)
@@ -22,10 +22,10 @@ function prepare_caller(schema_name)
    }
 end
 
-function prepare_calls(caller, calls)
-   local str = caller.print_input(calls, util.string_io_file())
-   local function parse_responses(str)
-      local responses = caller.parse_output(str)
+function prepare_calls(caller, calls, call_stream)
+   caller.print_input(calls, call_stream)
+   local function parse_responses(stream)
+      local responses = caller.parse_output(stream)
       assert(#responses == #calls)
       local stripped_responses = {}
       for i=1,#calls do
@@ -34,22 +34,25 @@ function prepare_calls(caller, calls)
       end
       return stripped_responses
    end
-   return str, parse_responses
+   return parse_responses
 end
 
 function prepare_call(caller, id, data)
-   local str, parse_responses = prepare_calls(caller, {{id=id, data=data}})
-   local function parse_response(str) return parse_responses(str)[1] end
-   return str, parse_response
+   local call_stream = mem.tmpfile()
+   local parse_responses = prepare_calls(caller, {{id=id, data=data}},
+                                         call_stream)
+   local function parse_response(stream) return parse_responses(stream)[1] end
+   call_stream:seek('set', 0)
+   return call_stream:read_all_chars(), parse_response
 end
 
-function handle_calls(callee, str, handle)
+function handle_calls(callee, call_stream, handle, response_stream)
    local responses = {}
-   for _,call in ipairs(callee.parse_input(str)) do
+   for _,call in ipairs(callee.parse_input(call_stream)) do
       table.insert(responses,
                    { id=call.id, data=handle(call.id, call.data) })
    end
-   return callee.print_output(responses, util.string_io_file())
+   callee.print_output(responses, response_stream)
 end
 
 function dispatch_handler(obj, prefix, trace)
@@ -73,9 +76,11 @@ function selftest()
    function handler:rpc_get_config(data)
       return { config='pong '..data.schema }
    end
-   local response_str = handle_calls(callee, call_str,
-                                     dispatch_handler(handler))
-   local response = parse_response(response_str)
+   local response_stream = mem.tmpfile()
+   handle_calls(callee, mem.open_input_string(call_str),
+                dispatch_handler(handler), response_stream)
+   response_stream:seek('set', 0)
+   local response = parse_response(response_stream)
    assert(response.config == 'pong foo')
    print('selftest: ok')
 end

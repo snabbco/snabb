@@ -213,7 +213,7 @@ end
 
 function comma_value(n) -- credit http://richard.warburton.it
    if type(n) == 'cdata' then
-      n = tonumber(n)
+      n = string.match(tostring(n), '^-?([0-9]+)U?LL$') or tonumber(n)
    end
    if n ~= n then return "NaN" end
    local left,num,right = string.match(n,'^([^%d]*%d)(%d*)(.-)$')
@@ -561,6 +561,17 @@ function set(...)
    local ret = {}
    for k, v in pairs({...}) do ret[v] = true end
    return ret
+end
+
+-- Check if 'name' is a kernel network interface.
+function is_iface (name)
+   local f = io.open('/proc/net/dev')
+   for line in f:lines() do
+      local iface = line:match("^%s*(%w+):")
+      if iface and iface == name then f:close() return true end
+   end
+   f:close()
+   return false
 end
 
 function selftest ()

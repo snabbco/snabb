@@ -23,7 +23,7 @@ local scheduling_opts = {
 local sched_apply = {}
 
 function sched_apply.cpu (cpu)
-   print(string.format('Binding data plane PID %s to CPU %s.',
+   print(string.format('Binding data-plane PID %s to CPU %s.',
                        tonumber(S.getpid()), cpu))
    numa.bind_to_cpu(cpu)
 end
