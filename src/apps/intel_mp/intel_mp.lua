@@ -1259,7 +1259,7 @@ end
 function Intel1g:set_vmdq_rx_pool ()
    -- long packets enabled, multicast promiscuous, broadcast accept, accept
    -- untagged pkts
-   self.r.VMOLR[self.poolnum]:set(bits { LPE=16, MPE=28, BAM=26, AUPE=14 })
+   self.r.VMOLR[self.poolnum]:set(bits { LPE=16, MPE=28, BAM=27, AUPE=24 })
    -- packet splitting none
    self.r.PSRTYPE[self.poolnum](0)
 end
