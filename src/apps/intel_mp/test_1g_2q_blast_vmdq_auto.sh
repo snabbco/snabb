@@ -5,9 +5,9 @@
 SNABB_SEND_BLAST=true SNABB_SEND_BLAST_RATE=1e9 ./testsend.snabb $SNABB_PCI_INTEL1G1 0 source2.pcap &
 BLAST=$!
 
-SNABB_RECV_SPINUP=2 SNABB_RECV_DURATION=5 ./testvmdqrecv.snabb $SNABB_PCI_INTEL1G0 "90:72:82:78:c9:7a" nil nil nil > results.0 &
+SNABB_RECV_SPINUP=2 SNABB_RECV_DURATION=5 ./testvmdqrecv.snabb $SNABB_PCI_INTEL1G0 "90:72:82:78:c9:7a" nil nil 0 > results.0 &
 PID1=$!
-SNABB_RECV_SPINUP=2 SNABB_RECV_DURATION=5 ./testvmdqrecv.snabb $SNABB_PCI_INTEL1G0 "12:34:56:78:9a:bc" nil nil nil > results.1
+SNABB_RECV_SPINUP=2 SNABB_RECV_DURATION=5 ./testvmdqrecv.snabb $SNABB_PCI_INTEL1G0 "12:34:56:78:9a:bc" nil nil 0 > results.1
 
 wait $PID1
 kill -9 $BLAST
