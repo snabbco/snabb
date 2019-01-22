@@ -418,6 +418,7 @@ breathe_push_order = {}
 -- app's push function to run multiple times in a breath.
 function compute_breathe_order ()
    breathe_pull_order, breathe_push_order = {}, {}
+   pull_order_n, push_order_n = 0, 0
    local pull_links, inputs, successors = {}, {}, {}
    local linknames, appnames = {}, {}
    local function cmp_apps(a, b) return appnames[a] < appnames[b] end
@@ -478,6 +479,8 @@ function compute_breathe_order ()
          table.insert(breathe_push_order, inputs[link])
       end
    end
+   pull_order_n = #breathe_pull_order
+   push_order_n = #breathe_push_order
 end
 
 -- Call this to "run snabb switch".
@@ -553,7 +556,7 @@ function breathe ()
          zone()
       end
       i = i+1
-      if i <= #breathe_pull_order then
+      if i <= pull_order_n then
          goto PULL_LOOP
       end
    end
@@ -569,7 +572,7 @@ function breathe ()
          zone()
       end
       i = i+1
-      if i <= #breathe_push_order then
+      if i <= push_order_n then
          goto PUSH_LOOP
       end
    end
