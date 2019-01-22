@@ -746,9 +746,9 @@ function parse_config (args)
       assert_vpls(intf.l3, "Uplink interface "..uplink
                      .." is L2 when L3 is expected")
       print("  Uplink is on "..uplink)
-      intf.used = true
-      assert(intf.l3[vpls.afi],
+      assert(intf.l3[vpls.afi].configured,
              "Address family "..vpls.afi.." not enabled on uplink")
+      intf.used = true
 
       local bridge_group = {
          config = vpls.bridge,
