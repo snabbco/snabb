@@ -497,11 +497,15 @@ function main (options)
    end
 
    monotonic_now = C.get_monotonic_time()
-   repeat
+   ::MAIN_LOOP::
+   do
       breathe()
       if not no_timers then timer.run() end
       if not busywait then pace_breathing() end
-   until done and done()
+      if  done and done() then goto DONE end
+      goto MAIN_LOOP
+   end
+   ::DONE::
    counter.commit()
    if not options.no_report then report(options.report) end
 end
@@ -539,22 +543,34 @@ function breathe ()
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
-   for i = 1, #breathe_pull_order do
+   local i = 1
+   ::PULL_LOOP::
+   do
       local app = breathe_pull_order[i]
       if app.pull and not app.dead then
          zone(app.zone)
          with_restart(app, app.pull)
          zone()
       end
+      i = i+1
+      if i <= #breathe_pull_order then
+         goto PULL_LOOP
+      end
    end
    -- Exhale: push work out through the app network
-   for i = 1, #breathe_push_order do
+   i = 1
+   ::PUSH_LOOP::
+   do
       local spec = breathe_push_order[i]
       local app = spec.app
       if spec.method and not app.dead then
          zone(app.zone)
          with_restart(app, spec.method, spec.link, spec.arg)
          zone()
+      end
+      i = i+1
+      if i <= #breathe_push_order then
+         goto PUSH_LOOP
       end
    end
    counter.add(breaths)
