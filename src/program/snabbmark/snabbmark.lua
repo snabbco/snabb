@@ -120,41 +120,33 @@ function sumf(a, ...) return a and a + sumf(...) or 0 end
 
 Source = {}
 
-function Source:new(size)
-   return setmetatable({}, {__index=Source})
+function Source:new (size)
+   size = size or 64
+   local p = packet.allocate()
+   p.length = size
+   return setmetatable({packet=p}, {__index=Source})
 end
 
-function Source:pull()
+function Source:pull ()
    for _, o in ipairs(self.output) do
       for i = 1, engine.pull_npackets do
-         local p = packet.allocate()
-         ffi.copy(p.data, self.to_mac_address, 6)
-         ffi.copy(p.data + 6, self.from_mac_address, 6)
-         p.length = self.size
-         link.transmit(o, p)
+         link.transmit(o, packet.clone(self.packet))
       end
    end
 end
 
-function Source:set_packet_addresses(from_mac_address, to_mac_address)
-   self.from_mac_address, self.to_mac_address = from_mac_address, to_mac_address
-   print(string.format("Sending from %02x:%02x:%02x:%02x:%02x:%02x to %02x:%02x:%02x:%02x:%02x:%02x",
-                       self.from_mac_address[0],
-                       self.from_mac_address[1],
-                       self.from_mac_address[2],
-                       self.from_mac_address[3],
-                       self.from_mac_address[4],
-                       self.from_mac_address[5],
-                       self.to_mac_address[0],
-                       self.to_mac_address[1],
-                       self.to_mac_address[2],
-                       self.to_mac_address[3],
-                       self.to_mac_address[4],
-                       self.to_mac_address[5]))
+function Source:set_packet_addresses (src_mac, dst_mac)
+   local p = self.packet
+   ffi.copy(p.data, dst_mac, 6)
+   ffi.copy(p.data + 6, src_mac, 6)
 end
 
-function Source:set_packet_size(size)
-   self.size = size
+function Source:set_packet_size (size)
+   self.packet.length = size
+end
+
+function Source:set_packet (packet)
+   self.packet = packet
 end
 
 function solarflare (npackets, packet_size, timeout)
@@ -206,9 +198,13 @@ function solarflare (npackets, packet_size, timeout)
 
    engine.configure(c)
 
-   engine.app_table.source:set_packet_addresses(engine.app_table[send_device.interface].mac_address,
-                                                engine.app_table[receive_device.interface].mac_address)
+   local src_mac = engine.app_table[send_device.interface].mac_address
+   local dst_mac = engine.app_table[receive_device.interface].mac_address
+   engine.app_table.source:set_packet_addresses(src_mac, dst_mac)
    engine.app_table.source:set_packet_size(packet_size)
+
+   print(("Sending from %s to %s"):format(ethernet:ntop(src_mac),
+                                          ethernet:ntop(dst_mac)))
 
    engine.Hz = false
 
@@ -296,11 +292,12 @@ receive_device.interface= "rx1GE"
 
    engine.configure(c)
 
-   --engine.app_table.source:set_packet_addresses(engine.app_table[send_device.interface].mac_address,
-   --                                             engine.app_table[receive_device.interface].mac_address)
-   engine.app_table.source:set_packet_addresses(ethernet:pton("02:00:00:00:00:01"),
-                                                ethernet:pton("02:00:00:00:00:02"))
+   local src_mac, dst_mac = "02:00:00:00:00:01", "02:00:00:00:00:02"
+   engine.app_table.source:set_packet_addresses(ethernet:pton(src_mac),
+                                                ethernet:pton(dst_mac))
    engine.app_table.source:set_packet_size(packet_size)
+
+   print(("Sending from %s to %s"):format(src_mac, dst_mac))
 
    engine.Hz = false
 
@@ -616,4 +613,23 @@ function checksum_bench ()
    benchmark_report(44, 14.4)
    benchmark_report(550, 2)
    benchmark_report(1516, 1)
+end
+
+function selftest ()
+   local function test_source ()
+      local source = Source:new()
+      local src_mac = ethernet:pton("02:00:00:00:00:01")
+      local dst_mac = ethernet:pton("02:00:00:00:00:01")
+      source:set_packet_addresses(src_mac, dst_mac)
+      source:set_packet_size(128)
+      local pkt = packet.from_string(lib.hexundump([[
+         02:00:00:00:00:01 02:00:00:00:00:02 08 00 45 00
+         3c fd fe 9e 7f 71 ec b1 d7 98 3a c0 08 00 45 00
+         00 2e 00 00 00 00 40 11 88 97 05 08 07 08 c8 14
+         1e 04 10 92 10 92 00 1a 6d a3 34 33 1f 69 40 6b
+         54 59 b6 14 2d 11 44 bf af d9 be aa
+      ]], 60))
+      source:set_packet(pkt)
+   end
+   test_source()
 end
