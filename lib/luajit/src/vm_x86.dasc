@@ -5309,9 +5309,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
    */
 
   case BC_FUNCF:
-    |.if JIT
-    |  hotcall RB
-    |.endif
   case BC_FUNCV:  /* NYI: compiled vararg functions. */
     | // Fall through. Assumes BC_IFUNCF/BC_IFUNCV follow and ins_AD is a no-op.
     break;
