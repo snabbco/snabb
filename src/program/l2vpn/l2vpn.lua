@@ -813,6 +813,8 @@ function parse_config (args)
          assert_vpls(intf, "AC interface "..ac.." does not exist")
          assert_vpls(not intf.l3, "AC interface "..ac
                         .." is L3 when L2 is expected")
+         assert_vpls(not intf.used, "AC interface "..ac.." already "
+                        .."assigned to another VPLS")
          table.insert(bridge_group.acs, intf)
          intf.used = true
          -- Note: if the AC is the native VLAN on a trunk, the actual packets
