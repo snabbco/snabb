@@ -860,22 +860,20 @@ function parse_config (args)
       end
    end
 
+   -- Create sinks for unused interfaces
    for name, intf in pairs(intfs) do
-      if not intf.used and not intf.subintfs then
-         -- Create sink for interfaces not used as uplink or AC
+      if intf.l2 and not intf.used and not intf.subintfs then
          local sink = App:new('sink_'..intf.nname,
                               Sink, {})
          connect_duplex(intf.l2, sink:socket('input'))
-      else
-         if intf.l3 then
-            for afi, state in pairs(intf.l3) do
-               if state.configured and not state.used then
-                  -- Create sink for a L3 interface not connected to
-                  -- a dispatcher
-                  local sink = App:new('sink_'..intf.nname..'_'..afi,
-                                       Sink, {})
-                  connect_duplex(state.socket_out, sink:socket('input'))
-               end
+      elseif intf.l3 then
+         for afi, state in pairs(intf.l3) do
+            if state.configured and not state.used then
+               -- Create sink for a L3 interface not connected to
+               -- a dispatcher
+               local sink = App:new('sink_'..intf.nname..'_'..afi,
+                                    Sink, {})
+               connect_duplex(state.socket_out, sink:socket('input'))
             end
          end
       end
