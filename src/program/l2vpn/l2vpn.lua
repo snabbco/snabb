@@ -796,11 +796,8 @@ function parse_config (args)
                         cc_socket = cc_socket })
 
       end
-      -- XXX remove conditional once frag for ipv4 is implemented
-      if intf.l3[vpls.afi].fragmenter then
-         table.insert(intf.l3[vpls.afi].fragmenter:arg().pmtu_local_addresses,
-                      vpls.address)
-      end
+      table.insert(intf.l3[vpls.afi].fragmenter:arg().pmtu_local_addresses,
+                   vpls.address)
 
       print("  Creating attachment circuits")
       for name, t in pairs(vpls.ac) do
