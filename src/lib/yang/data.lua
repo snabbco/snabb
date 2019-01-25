@@ -652,22 +652,39 @@ function data_parser_from_grammar(production)
    function top_parsers.struct(production)
       local struct_t = production.ctype and typeof(production.ctype)
       local members = visitn(production.members)
+      local keys = {}
+      for k,v in pairs(members) do table.insert(keys, k) end
       return function(stream)
          local P = parser_mod.Parser.new(stream)
          local ret = {}
-         for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
+         local expanded_members = {}
+         for _,k in ipairs(keys) do
+            if members[k].represents then
+               -- Choice fields don't include the name of the choice block in the data. They
+               -- need to be able to provide the parser for the leaves it represents.
+               local member_parser = members[k].stateful_parser()
+               for _, node in pairs(members[k].represents()) do
+                  -- Choice fields need to keep state around as they're called multiple times
+                  -- and need to do some validation to comply with spec.
+                  expanded_members[node] = member_parser
+               end
+            else
+               ret[normalize_id(k)] = members[k].init()
+               expanded_members[k] = members[k]
+            end
+         end
          while true do
             P:skip_whitespace()
             if P:is_eof() then break end
             local k = P:parse_identifier()
             if k == '' then P:error("Expected a keyword") end
-            local sub = assert(members[k], 'unrecognized parameter: '..k)
+            local sub = assert(expanded_members[k], 'unrecognized parameter: '..k)
             local id = normalize_id(k)
             ret[id] = sub.parse(P, ret[id], k)
          end
-         for k,sub in pairs(members) do
+         for k,sub in pairs(expanded_members) do
             local id = normalize_id(k)
-            ret[id] = sub.finish(ret[id])
+            ret[id] = sub.finish(ret[id], k)
          end
          if struct_t then return struct_t(ret) else return ret end
       end
@@ -1870,6 +1887,35 @@ function selftest()
       }
    ]])
    assert(success == false)
+
+   -- Test top-level choice.
+   local choice_schema = schema.load_schema([[module toplevel-choice-schema {
+      namespace "urn:ietf:params:xml:ns:yang:toplevel-choice-schema";
+      prefix "test";
+
+      choice test {
+        case this {
+          leaf foo { type string; }
+          leaf bar { type string; }
+        }
+        case that {
+          leaf baz { type uint32; }
+          leaf qux { type uint64; }
+        }
+      }
+   }]])
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
+      foo "hello";
+      bar "world";
+   ]])
+   assert(choice_data.foo == "hello")
+   assert(choice_data.bar == "world")
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
+      baz 1;
+   ]])
+   assert(choice_data.baz == 1)
 
    -- Test range / length restrictions.
    local range_length_schema = schema.load_schema([[module range-length-schema {
