@@ -494,6 +494,9 @@ function choice_parser(keyword, choices, members, default, mandatory)
       -- using different leaves from different case statements.
       local chosen
 
+      -- keep track of initialzed members
+      local inits = {}
+
       local function init() return {} end
       local function parse(P, out, k)
          if chosen and choice_map[k] ~= chosen then
@@ -501,12 +504,13 @@ function choice_parser(keyword, choices, members, default, mandatory)
          else
             chosen = choice_map[k]
          end
-         return members[chosen][k].parse(P, members[chosen][k].init(), k)
+         inits[k] = inits[k] or members[chosen][k].init()
+         return members[chosen][k].parse(P, inits[k], k)
       end
 
       -- This holds a copy of all the nodes so we know when we've hit the last one.
       local function finish(out, k)
-         if out ~= nil then return out end
+         if out ~= nil then return members[chosen][k].finish(out) end
          if mandatory and chosen == nil then error("missing choice value: "..keyword) end
          if default and default == choice_map[k] then
             return members[default][k].finish()
@@ -1888,7 +1892,7 @@ function selftest()
    ]])
    assert(success == false)
 
-   -- Test top-level choice.
+   -- Test top-level choice with list member.
    local choice_schema = schema.load_schema([[module toplevel-choice-schema {
       namespace "urn:ietf:params:xml:ns:yang:toplevel-choice-schema";
       prefix "test";
@@ -1900,7 +1904,7 @@ function selftest()
         }
         case that {
           leaf baz { type uint32; }
-          leaf qux { type uint64; }
+          list qu-x { key id; leaf id { type string; } leaf v { type string; } }
         }
       }
    }]])
@@ -1914,8 +1918,12 @@ function selftest()
    local choice_data = load_config_for_schema(choice_schema,
                                               mem.open_input_string [[
       baz 1;
+      qu-x { id "me"; v "hey"; }
+      qu-x { id "you"; v "hi"; }
    ]])
    assert(choice_data.baz == 1)
+   assert(choice_data.qu_x.me.v == "hey")
+   assert(choice_data.qu_x.you.v == "hi")
 
    -- Test range / length restrictions.
    local range_length_schema = schema.load_schema([[module range-length-schema {
