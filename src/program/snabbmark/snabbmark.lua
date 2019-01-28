@@ -2,13 +2,16 @@
 
 module(..., package.seeall)
 
+local basic_apps = require("apps.basic.basic_apps")
+local datagram = require("lib.protocol.datagram")
+local ethernet = require("lib.protocol.ethernet")
+local ffi = require("ffi")
+local ipv4 = require("lib.protocol.ipv4")
+local lib = require("core.lib")
+local pci = require("lib.hardware.pci")
+local udp = require("lib.protocol.udp")
 local usage = require("program.snabbmark.README_inc")
 
-local basic_apps = require("apps.basic.basic_apps")
-local pci           = require("lib.hardware.pci")
-local ethernet      = require("lib.protocol.ethernet")
-local lib = require("core.lib")
-local ffi = require("ffi")
 local C = ffi.C
 
 function run (args)
@@ -21,6 +24,8 @@ function run (args)
       solarflare(unpack(args))
    elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
       intel1g(unpack(args))
+   elseif command == 'rawsocket' and #args ~= 3 then
+      rawsocket(unpack(args))
    elseif command == 'esp' and #args >= 2 then
       esp(unpack(args))
    elseif command == 'hash' and #args <= 1 then
@@ -332,6 +337,161 @@ receive_device.interface= "rx1GE"
    end
 end
 
+local function get_macaddr (iface)
+   local fd = io.open("/sys/class/net/"..iface.."/address", "rt")
+   if not fd then return nil end
+   local ret = fd:read("*all")
+   ret = ret:match("[%x:]+")
+   fd:close()
+   return ret
+end
+
+local function w (...) io.stdout:write(...) end
+
+local function skip (...)
+   w(...) w("\n")
+   main.exit(engine.test_skipped_code)
+end
+
+local function stats (txpackets, rxpackets, runtime, packet_size)
+   local total = txpackets / 1e6
+   local mpps = txpackets / runtime / 1e6
+   local gbps = ((txpackets * packet_size * 8) / runtime) / (1024*1024*1024)
+   local loss = (txpackets - rxpackets) * 100 / txpackets
+   print()
+   print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, "..
+          "%.2f Gbit/s, %.2f %% packet loss)."):format(total, runtime, mpps,
+                                                       gbps, loss))
+end
+
+local function build_packet (args)
+   local ETHER_PROTO_IPV4 = 0x0800
+   local PROTO_UDP = 0x11
+
+   local size = args.size or 64
+   local src_mac = args.src_mac or "00:00:5E:00:00:01"
+   local dst_mac = args.dst_mac or "00:00:5E:00:00:02"
+
+   local dgram = datagram:new()
+
+   local eth_h = ethernet:new({dst = ethernet:pton(dst_mac),
+                               src = ethernet:pton(src_mac),
+                               type = ETHER_PROTO_IPV4})
+   local ip_h = ipv4:new({dst = ipv4:pton("192.0.2.254"),
+                          src = ipv4:pton("192.0.2.1"),
+                          protocol = PROTO_UDP,
+                          ttl = 64})
+   local udp_h = udp:new({src_port = math.random(65535),
+                          dst_port = math.random(65535)})
+
+   local total_length = size - 14
+   local length = total_length - 20
+
+   ip_h:total_length(total_length)
+   udp_h:length(length)
+
+   ip_h:checksum()
+
+   local payload_length = length - 8
+   local payload = ffi.new("uint8_t[?]", payload_length)
+   local count = 0
+   for i=0,payload_length-1 do
+      payload[i] = count
+      count = count + 1
+   end
+
+   dgram:push_raw(payload, payload_length)
+   dgram:push(udp_h)
+   dgram:push(ip_h)
+   dgram:push(eth_h)
+
+   return dgram:packet()
+end
+
+function rawsocket (npackets, packet_size, timeout)
+   local driver = require("apps.socket.raw").RawSocket
+   npackets = tonumber(npackets) or 10e3
+   packet_size = tonumber(packet_size) or 64
+   timeout = tonumber(timeout) or 1000
+
+   local ifname0 = lib.getenv("SNABB_IFNAME0") or lib.getenv("SNABB_PCI0")
+   if not ifname0 then
+      skip("SNABB_IFNAME0 not set.")
+   end
+   local ifname1 = lib.getenv("SNABB_IFNAME1") or lib.getenv("SNABB_PCI1")
+   if not ifname1 then
+      skip("SNABB_IFNAME1 not set.")
+   end
+
+   -- Topology:
+   -- Source -> Socket NIC#1 => Socket NIC#2 -> Sink
+
+   -- Initialize apps.
+   local c = config.new()
+
+   config.app(c, "source", Source)
+   config.app(c, "tee", basic_apps.Tee)
+   config.app(c, ifname0, driver, ifname0)
+   config.app(c, ifname1, driver, ifname1)
+   config.app(c, "sink", basic_apps.Sink)
+
+   -- Set links.
+   config.link(c, "source.tx -> tee.rx")
+   config.link(c, "tee.tx -> "..ifname0..".rx")
+   config.link(c, ifname1..".tx -> sink.input")
+
+   -- Set engine.
+   engine.configure(c)
+   engine.Hz = false
+
+   -- Adjust packet.
+   local src_mac = get_macaddr(ifname0) or "00:00:5E:00:00:01"
+   local dst_mac = get_macaddr(ifname1) or "00:00:5E:00:00:02"
+   local pkt = build_packet({src_mac = src_mac,
+                             dst_mac = dst_mac,
+                             size = packet_size})
+   engine.app_table.source:set_packet(pkt)
+
+   -- Print info.
+   w(("Packets: %d; "):format(npackets))
+   w(("Packet Size: %d; "):format(packet_size))
+   w(("Timeout: %d"):format(timeout))
+   print("")
+
+   w(("Sending through %s (%s); "):format(ifname0, src_mac))
+   w(("Receiving through %s (%s)"):format(ifname1, dst_mac))
+   print("")
+
+   -- Run.
+   local start = C.get_monotonic_time()
+   timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
+   local txpackets = 0
+   local n, n_max = 0, timeout and timeout * 100
+   while txpackets < npackets and n < n_max do
+      txpackets = link.stats(engine.app_table.source.output.tx).txpackets
+      engine.main({duration = 0.01, no_report = true})
+      n = n + 1
+   end
+   local finish = C.get_monotonic_time()
+   local runtime = finish - start
+   local rxpackets = link.stats(engine.app_table.sink.input.input).rxpackets
+   if rxpackets >= txpackets then
+      rxpackets = txpackets
+   end
+
+   -- Print report if any.
+   engine.report()
+
+   -- Print stats.
+   stats(txpackets, rxpackets, runtime, packet_size)
+
+   if txpackets < npackets then
+      print(("Packets lost. Rx: %d. Lost: %d"):format(txpackets, npackets - txpackets))
+      main.exit(1)
+   end
+end
+
+
 function esp (npackets, packet_size, mode, direction)
    local esp = require("lib.ipsec.esp")
    local ethernet = require("lib.protocol.ethernet")
@@ -567,18 +727,20 @@ end
 function selftest ()
    local function test_source ()
       local source = Source:new()
-      local src_mac = ethernet:pton("02:00:00:00:00:01")
-      local dst_mac = ethernet:pton("02:00:00:00:00:01")
+      local src_mac = ethernet:pton("00:00:5E:00:00:01")
+      local dst_mac = ethernet:pton("00:00:5E:00:00:02")
       source:set_packet_addresses(src_mac, dst_mac)
       source:set_packet_size(128)
-      local pkt = packet.from_string(lib.hexundump([[
-         02:00:00:00:00:01 02:00:00:00:00:02 08 00 45 00
-         3c fd fe 9e 7f 71 ec b1 d7 98 3a c0 08 00 45 00
-         00 2e 00 00 00 00 40 11 88 97 05 08 07 08 c8 14
-         1e 04 10 92 10 92 00 1a 6d a3 34 33 1f 69 40 6b
-         54 59 b6 14 2d 11 44 bf af d9 be aa
-      ]], 60))
+   end
+   local function test_set_packet ()
+      local source = Source:new()
+      local pkt = build_packet({size = 550,
+                                src_mac = "00:00:5E:00:00:01",
+                                dst_mac = "00:00:5E:00:00:02"})
       source:set_packet(pkt)
    end
+   print("selftest:")
    test_source()
+   test_set_packet()
+   print("ok")
 end
