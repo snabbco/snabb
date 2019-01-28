@@ -2,13 +2,16 @@
 
 module(..., package.seeall)
 
+local basic_apps = require("apps.basic.basic_apps")
+local datagram = require("lib.protocol.datagram")
+local ethernet = require("lib.protocol.ethernet")
+local ffi = require("ffi")
+local ipv4 = require("lib.protocol.ipv4")
+local lib = require("core.lib")
+local pci = require("lib.hardware.pci")
+local udp = require("lib.protocol.udp")
 local usage = require("program.snabbmark.README_inc")
 
-local basic_apps = require("apps.basic.basic_apps")
-local pci           = require("lib.hardware.pci")
-local ethernet      = require("lib.protocol.ethernet")
-local lib = require("core.lib")
-local ffi = require("ffi")
 local C = ffi.C
 
 function run (args)
@@ -21,6 +24,10 @@ function run (args)
       solarflare(unpack(args))
    elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
       intel1g(unpack(args))
+   elseif command == 'intel10g' and #args >= 2 and #args <= 3 then
+      intel10g(unpack(args))
+   elseif command == 'rawsocket' and #args ~= 3 then
+      rawsocket(unpack(args))
    elseif command == 'esp' and #args >= 2 then
       esp(unpack(args))
    elseif command == 'hash' and #args <= 1 then
@@ -118,41 +125,33 @@ function sumf(a, ...) return a and a + sumf(...) or 0 end
 
 Source = {}
 
-function Source:new(size)
-   return setmetatable({}, {__index=Source})
+function Source:new (size)
+   size = size or 64
+   local p = packet.allocate()
+   p.length = size
+   return setmetatable({packet=p}, {__index=Source})
 end
 
-function Source:pull()
+function Source:pull ()
    for _, o in ipairs(self.output) do
       for i = 1, engine.pull_npackets do
-         local p = packet.allocate()
-         ffi.copy(p.data, self.to_mac_address, 6)
-         ffi.copy(p.data + 6, self.from_mac_address, 6)
-         p.length = self.size
-         link.transmit(o, p)
+         link.transmit(o, packet.clone(self.packet))
       end
    end
 end
 
-function Source:set_packet_addresses(from_mac_address, to_mac_address)
-   self.from_mac_address, self.to_mac_address = from_mac_address, to_mac_address
-   print(string.format("Sending from %02x:%02x:%02x:%02x:%02x:%02x to %02x:%02x:%02x:%02x:%02x:%02x",
-                       self.from_mac_address[0],
-                       self.from_mac_address[1],
-                       self.from_mac_address[2],
-                       self.from_mac_address[3],
-                       self.from_mac_address[4],
-                       self.from_mac_address[5],
-                       self.to_mac_address[0],
-                       self.to_mac_address[1],
-                       self.to_mac_address[2],
-                       self.to_mac_address[3],
-                       self.to_mac_address[4],
-                       self.to_mac_address[5]))
+function Source:set_packet_addresses (src_mac, dst_mac)
+   local p = self.packet
+   ffi.copy(p.data, dst_mac, 6)
+   ffi.copy(p.data + 6, src_mac, 6)
 end
 
-function Source:set_packet_size(size)
-   self.size = size
+function Source:set_packet_size (size)
+   self.packet.length = size
+end
+
+function Source:set_packet (packet)
+   self.packet = packet
 end
 
 function solarflare (npackets, packet_size, timeout)
@@ -204,9 +203,13 @@ function solarflare (npackets, packet_size, timeout)
 
    engine.configure(c)
 
-   engine.app_table.source:set_packet_addresses(engine.app_table[send_device.interface].mac_address,
-                                                engine.app_table[receive_device.interface].mac_address)
+   local src_mac = engine.app_table[send_device.interface].mac_address
+   local dst_mac = engine.app_table[receive_device.interface].mac_address
+   engine.app_table.source:set_packet_addresses(src_mac, dst_mac)
    engine.app_table.source:set_packet_size(packet_size)
+
+   print(("Sending from %s to %s"):format(ethernet:ntop(src_mac),
+                                          ethernet:ntop(dst_mac)))
 
    engine.Hz = false
 
@@ -294,11 +297,12 @@ receive_device.interface= "rx1GE"
 
    engine.configure(c)
 
-   --engine.app_table.source:set_packet_addresses(engine.app_table[send_device.interface].mac_address,
-   --                                             engine.app_table[receive_device.interface].mac_address)
-   engine.app_table.source:set_packet_addresses(ethernet:pton("02:00:00:00:00:01"),
-                                                ethernet:pton("02:00:00:00:00:02"))
+   local src_mac, dst_mac = "02:00:00:00:00:01", "02:00:00:00:00:02"
+   engine.app_table.source:set_packet_addresses(ethernet:pton(src_mac),
+                                                ethernet:pton(dst_mac))
    engine.app_table.source:set_packet_size(packet_size)
+
+   print(("Sending from %s to %s"):format(src_mac, dst_mac))
 
    engine.Hz = false
 
@@ -334,6 +338,256 @@ receive_device.interface= "rx1GE"
       main.exit(1)
    end
 end
+
+local function get_macaddr (iface)
+   local fd = io.open("/sys/class/net/"..iface.."/address", "rt")
+   if not fd then return nil end
+   local ret = fd:read("*all")
+   ret = ret:match("[%x:]+")
+   fd:close()
+   return ret
+end
+
+local function w (...) io.stdout:write(...) end
+
+local function skip (...)
+   w(...) w("\n")
+   main.exit(engine.test_skipped_code)
+end
+
+local function stats (txpackets, rxpackets, runtime, packet_size)
+   local total = txpackets / 1e6
+   local mpps = txpackets / runtime / 1e6
+   local gbps = ((txpackets * packet_size * 8) / runtime) / (1024*1024*1024)
+   local loss = (txpackets - rxpackets) * 100 / txpackets
+   print()
+   print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, "..
+          "%.2f Gbit/s, %.2f %% packet loss)."):format(total, runtime, mpps,
+                                                       gbps, loss))
+end
+
+local function build_packet (args)
+   local ETHER_PROTO_IPV4 = 0x0800
+   local PROTO_UDP = 0x11
+
+   local size = args.size or 64
+   local src_mac = args.src_mac or "00:00:5E:00:00:01"
+   local dst_mac = args.dst_mac or "00:00:5E:00:00:02"
+
+   local dgram = datagram:new()
+
+   local eth_h = ethernet:new({dst = ethernet:pton(dst_mac),
+                               src = ethernet:pton(src_mac),
+                               type = ETHER_PROTO_IPV4})
+   local ip_h = ipv4:new({dst = ipv4:pton("192.0.2.254"),
+                          src = ipv4:pton("192.0.2.1"),
+                          protocol = PROTO_UDP,
+                          ttl = 64})
+   local udp_h = udp:new({src_port = math.random(65535),
+                          dst_port = math.random(65535)})
+
+   local total_length = size - 14
+   local length = total_length - 20
+
+   ip_h:total_length(total_length)
+   udp_h:length(length)
+
+   ip_h:checksum()
+
+   local payload_length = length - 8
+   local payload = ffi.new("uint8_t[?]", payload_length)
+   local count = 0
+   for i=0,payload_length-1 do
+      payload[i] = count
+      count = count + 1
+   end
+
+   dgram:push_raw(payload, payload_length)
+   dgram:push(udp_h)
+   dgram:push(ip_h)
+   dgram:push(eth_h)
+
+   return dgram:packet()
+end
+
+function intel10g (npackets, packet_size, timeout)
+   local function load_driver ()
+      return require("apps.intel_mp.intel_mp").Intel
+   end
+   local function device_info (pciaddr)
+      pciaddr = assert(tostring(pciaddr), "Invalid pciaddr: "..pciaddr)
+      local device = pciaddr and pci.device_info(pciaddr)
+      if not (device or device.driver == 'apps.intel_mp.intel_mp') then
+         skip("SNABB_PCI[0|1] not set, or not suitable Intel 10G.")
+      end
+      return device
+   end
+
+   local pciaddr0 = lib.getenv("SNABB_PCI0")
+   if not pciaddr0 then
+      skip("SNABB_PCI0 not set")
+   end
+   local pciaddr1 = lib.getenv("SNABB_PCI1")
+   if not pciaddr1 then
+      skip("SNABB_PCI1 not set")
+   end
+   local status, Intel10gNic = pcall(load_driver)
+   if not status then
+      skip("Could not find driver: "..Intel10gNic)
+   end
+
+   npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
+   packet_size = tonumber(packet_size) or error("Invalid packet size: " .. packet_size)
+   timeout = tonumber(timeout) or 1000
+
+   local nic0 = device_info(pciaddr0)
+   local nic1 = device_info(pciaddr1)
+
+   nic0.interface = "nic0"
+   nic1.interface = "nic1"
+
+   w(("Sending through %s (%s); "):format(nic0.interface, nic0.pciaddress))
+   w(("Receiving through %s (%s)"):format(nic1.interface, nic1.pciaddress))
+   print("")
+
+   -- Topology:
+   -- Source -> Intel10g NIC#1 => Intel10g NIC#2 -> Sink
+
+   -- Initialize apps.
+   local c = config.new()
+   config.app(c, "source", Source)
+   config.app(c, "tee", basic_apps.Tee)
+   config.app(c, "sink", basic_apps.Sink)
+   config.app(c, nic0.interface, Intel10gNic, {
+      pciaddr = pciaddr0,
+   })
+   config.app(c, nic1.interface, Intel10gNic, {
+      pciaddr = pciaddr1,
+   })
+   config.app(c, "sink", basic_apps.Sink)
+
+   -- Set links.
+   config.link(c, "source.tx -> tee.rx")
+   config.link(c, "tee.tx -> "..nic0.interface.."."..nic0.rx)
+   config.link(c, nic1.interface.."."..nic1.tx.." -> sink.rx")
+
+   -- Set engine.
+   engine.configure(c)
+   engine.Hz = false
+
+   -- Adjust packet.
+   local pkt = build_packet({size = packet_size})
+   engine.app_table.source:set_packet(pkt)
+
+   local start = C.get_monotonic_time()
+   local txpackets = 0
+   local n, n_max = 0, timeout and timeout * 100
+   while txpackets < npackets and n < n_max do
+      engine.main({duration = 0.01, no_report = true})
+      txpackets = link.stats(engine.app_table[nic0.interface].input[nic0.rx]).rxpackets
+      n = n + 1
+   end
+   local rxpackets = link.stats(engine.app_table.sink.input.rx).rxpackets
+   local finish = C.get_monotonic_time()
+   local runtime = finish - start
+   if rxpackets >= txpackets then
+      rxpackets = txpackets
+   end
+
+   engine.report()
+
+   -- Print stats.
+   stats(txpackets, rxpackets, runtime, packet_size)
+
+   if txpackets < npackets then
+      print("Packets lost. Test failed!")
+      main.exit(1)
+   end
+end
+
+function rawsocket (npackets, packet_size, timeout)
+   local driver = require("apps.socket.raw").RawSocket
+   npackets = tonumber(npackets) or 10e3
+   packet_size = tonumber(packet_size) or 64
+   timeout = tonumber(timeout) or 1000
+
+   local ifname0 = lib.getenv("SNABB_IFNAME0") or lib.getenv("SNABB_PCI0")
+   if not ifname0 then
+      skip("SNABB_IFNAME0 not set.")
+   end
+   local ifname1 = lib.getenv("SNABB_IFNAME1") or lib.getenv("SNABB_PCI1")
+   if not ifname1 then
+      skip("SNABB_IFNAME1 not set.")
+   end
+
+   -- Topology:
+   -- Source -> Socket NIC#1 => Socket NIC#2 -> Sink
+
+   -- Initialize apps.
+   local c = config.new()
+
+   config.app(c, "source", Source)
+   config.app(c, "tee", basic_apps.Tee)
+   config.app(c, ifname0, driver, ifname0)
+   config.app(c, ifname1, driver, ifname1)
+   config.app(c, "sink", basic_apps.Sink)
+
+   -- Set links.
+   config.link(c, "source.tx -> tee.rx")
+   config.link(c, "tee.tx -> "..ifname0..".rx")
+   config.link(c, ifname1..".tx -> sink.input")
+
+   -- Set engine.
+   engine.configure(c)
+   engine.Hz = false
+
+   -- Adjust packet.
+   local src_mac = get_macaddr(ifname0) or "00:00:5E:00:00:01"
+   local dst_mac = get_macaddr(ifname1) or "00:00:5E:00:00:02"
+   local pkt = build_packet({src_mac = src_mac,
+                             dst_mac = dst_mac,
+                             size = packet_size})
+   engine.app_table.source:set_packet(pkt)
+
+   -- Print info.
+   w(("Packets: %d; "):format(npackets))
+   w(("Packet Size: %d; "):format(packet_size))
+   w(("Timeout: %d"):format(timeout))
+   print("")
+
+   w(("Sending through %s (%s); "):format(ifname0, src_mac))
+   w(("Receiving through %s (%s)"):format(ifname1, dst_mac))
+   print("")
+
+   -- Run.
+   local start = C.get_monotonic_time()
+   timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
+   local txpackets = 0
+   local n, n_max = 0, timeout and timeout * 100
+   while txpackets < npackets and n < n_max do
+      txpackets = link.stats(engine.app_table.source.output.tx).txpackets
+      engine.main({duration = 0.01, no_report = true})
+      n = n + 1
+   end
+   local finish = C.get_monotonic_time()
+   local runtime = finish - start
+   local rxpackets = link.stats(engine.app_table.sink.input.input).rxpackets
+   if rxpackets >= txpackets then
+      rxpackets = txpackets
+   end
+
+   -- Print report if any.
+   engine.report()
+
+   -- Print stats.
+   stats(txpackets, rxpackets, runtime, packet_size)
+
+   if txpackets < npackets then
+      print(("Packets lost. Rx: %d. Lost: %d"):format(txpackets, npackets - txpackets))
+      main.exit(1)
+   end
+end
+
 
 function esp (npackets, packet_size, mode, direction)
    local esp = require("lib.ipsec.esp")
@@ -565,4 +819,25 @@ function ctable ()
                 'streaming lookup, stride='..stride)
       stride = stride * 2
    until stride > 256
+end
+
+function selftest ()
+   local function test_source ()
+      local source = Source:new()
+      local src_mac = ethernet:pton("00:00:5E:00:00:01")
+      local dst_mac = ethernet:pton("00:00:5E:00:00:02")
+      source:set_packet_addresses(src_mac, dst_mac)
+      source:set_packet_size(128)
+   end
+   local function test_set_packet ()
+      local source = Source:new()
+      local pkt = build_packet({size = 550,
+                                src_mac = "00:00:5E:00:00:01",
+                                dst_mac = "00:00:5E:00:00:02"})
+      source:set_packet(pkt)
+   end
+   print("selftest:")
+   test_source()
+   test_set_packet()
+   print("ok")
 end
