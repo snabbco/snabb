@@ -24,6 +24,8 @@ function run (args)
       solarflare(unpack(args))
    elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
       intel1g(unpack(args))
+   elseif command == 'intel10g' and #args >= 2 and #args <= 3 then
+      intel10g(unpack(args))
    elseif command == 'rawsocket' and #args ~= 3 then
       rawsocket(unpack(args))
    elseif command == 'esp' and #args >= 2 then
@@ -406,6 +408,101 @@ local function build_packet (args)
    dgram:push(eth_h)
 
    return dgram:packet()
+end
+
+function intel10g (npackets, packet_size, timeout)
+   local function load_driver ()
+      return require("apps.intel_mp.intel_mp").Intel
+   end
+   local function device_info (pciaddr)
+      pciaddr = assert(tostring(pciaddr), "Invalid pciaddr: "..pciaddr)
+      local device = pciaddr and pci.device_info(pciaddr)
+      if not (device or device.driver == 'apps.intel_mp.intel_mp') then
+         skip("SNABB_PCI[0|1] not set, or not suitable Intel 10G.")
+      end
+      return device
+   end
+
+   local pciaddr0 = lib.getenv("SNABB_PCI0")
+   if not pciaddr0 then
+      skip("SNABB_PCI0 not set")
+   end
+   local pciaddr1 = lib.getenv("SNABB_PCI1")
+   if not pciaddr1 then
+      skip("SNABB_PCI1 not set")
+   end
+   local status, Intel10gNic = pcall(load_driver)
+   if not status then
+      skip("Could not find driver: "..Intel10gNic)
+   end
+
+   npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
+   packet_size = tonumber(packet_size) or error("Invalid packet size: " .. packet_size)
+   timeout = tonumber(timeout) or 1000
+
+   local nic0 = device_info(pciaddr0)
+   local nic1 = device_info(pciaddr1)
+
+   nic0.interface = "nic0"
+   nic1.interface = "nic1"
+
+   w(("Sending through %s (%s); "):format(nic0.interface, nic0.pciaddress))
+   w(("Receiving through %s (%s)"):format(nic1.interface, nic1.pciaddress))
+   print("")
+
+   -- Topology:
+   -- Source -> Intel10g NIC#1 => Intel10g NIC#2 -> Sink
+
+   -- Initialize apps.
+   local c = config.new()
+   config.app(c, "source", Source)
+   config.app(c, "tee", basic_apps.Tee)
+   config.app(c, "sink", basic_apps.Sink)
+   config.app(c, nic0.interface, Intel10gNic, {
+      pciaddr = pciaddr0,
+   })
+   config.app(c, nic1.interface, Intel10gNic, {
+      pciaddr = pciaddr1,
+   })
+   config.app(c, "sink", basic_apps.Sink)
+
+   -- Set links.
+   config.link(c, "source.tx -> tee.rx")
+   config.link(c, "tee.tx -> "..nic0.interface.."."..nic0.rx)
+   config.link(c, nic1.interface.."."..nic1.tx.." -> sink.rx")
+
+   -- Set engine.
+   engine.configure(c)
+   engine.Hz = false
+
+   -- Adjust packet.
+   local pkt = build_packet({size = packet_size})
+   engine.app_table.source:set_packet(pkt)
+
+   local start = C.get_monotonic_time()
+   local txpackets = 0
+   local n, n_max = 0, timeout and timeout * 100
+   while txpackets < npackets and n < n_max do
+      engine.main({duration = 0.01, no_report = true})
+      txpackets = link.stats(engine.app_table[nic0.interface].input[nic0.rx]).rxpackets
+      n = n + 1
+   end
+   local rxpackets = link.stats(engine.app_table.sink.input.rx).rxpackets
+   local finish = C.get_monotonic_time()
+   local runtime = finish - start
+   if rxpackets >= txpackets then
+      rxpackets = txpackets
+   end
+
+   engine.report()
+
+   -- Print stats.
+   stats(txpackets, rxpackets, runtime, packet_size)
+
+   if txpackets < npackets then
+      print("Packets lost. Test failed!")
+      main.exit(1)
+   end
 end
 
 function rawsocket (npackets, packet_size, timeout)
