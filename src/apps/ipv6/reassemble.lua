@@ -87,7 +87,10 @@ local fragment_header_ptr_t = ffi.typeof('$*', fragment_header_t)
 -- Precondition: packet already has IPv6 ethertype.
 local function ipv6_packet_has_valid_length(h, len)
    if len < ether_ipv6_header_len then return false end
-   return ntohs(h.ipv6.payload_length) == len - ether_ipv6_header_len
+   -- The minimum Ethernet frame size is 60 bytes (without FCS).  Those
+   -- frames may contain padding bytes.
+   local payload_length = ntohs(h.ipv6.payload_length)
+   return payload_length <= 60 or payload_length == len - ether_ipv6_header_len
 end
 
 local function swap(array, i, j)
