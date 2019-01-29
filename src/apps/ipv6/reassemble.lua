@@ -87,7 +87,10 @@ local fragment_header_ptr_t = ffi.typeof('$*', fragment_header_t)
 -- Precondition: packet already has IPv6 ethertype.
 local function ipv6_packet_has_valid_length(h, len)
    if len < ether_ipv6_header_len then return false end
-   return ntohs(h.ipv6.payload_length) == len - ether_ipv6_header_len
+   -- The minimum Ethernet frame size is 60 bytes (without FCS).  Those
+   -- frames may contain padding bytes.
+   local payload_length = ntohs(h.ipv6.payload_length)
+   return payload_length <= 60 or payload_length == len - ether_ipv6_header_len
 end
 
 local function swap(array, i, j)
@@ -284,7 +287,7 @@ function Reassembler:handle_fragment(pkt)
       else
          reassembly.final_start = frag_start
       end
-   elseif bit.band(frag_size, 0x7) ~= 0 then
+   elseif frag_size % 8 ~= 0 then
       -- The size of all non-terminal fragments must be a multiple of 8.
       -- Here we should send "ICMP Parameter Problem, Code 0 to the
       -- source of the fragment, pointing to the Payload Length field of
@@ -295,7 +298,7 @@ function Reassembler:handle_fragment(pkt)
    -- Limit the scope of max_data_offset
    do
       local max_data_offset = ether_ipv6_header_len + frag_start + frag_size
-      if max_data_offset > ffi.sizeof(reassembly.packet.data) then
+      if max_data_offset > packet.max_payload then
          -- Snabb packets have a maximum size of 10240 bytes.
          return self:reassembly_error(entry)
       end
