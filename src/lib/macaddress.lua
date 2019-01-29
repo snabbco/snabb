@@ -31,6 +31,11 @@ function mac_mt:new (m)
    end
    return macobj
 end
+function mac_mt:from_bytes(b)
+	local macobj = mac_t()
+	ffi.copy(macobj.bytes, b, 6)
+	return macobj
+end
 
 function mac_mt:__tostring ()
    return string.format('%02X:%02X:%02X:%02X:%02X:%02X',
