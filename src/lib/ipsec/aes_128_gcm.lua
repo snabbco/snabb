@@ -77,13 +77,25 @@ local function aes_128_block (block, key)
    ASM.aesni_encrypt_single_block(gcm_data, block)
 end
 
-local aes_128_gcm = {}
+-- Encrypt a single 128-bit block with the basic AES256 block cipher.
+local function aes_256_block (block, key)
+   local gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
+   ASM.aes_keyexp_256_enc_avx(key, gcm_data)
+   ASM.aesni_encrypt_256_single_block(gcm_data, block)
+end
 
-function aes_128_gcm:new (spi, key, salt)
+local aes_gcm = {}
+
+function aes_gcm:new (spi, key, keylen, salt)
    assert(spi, "Need SPI.")
    local o = {}
-   o.key = ffi.new("uint8_t[16]")
-   ffi.copy(o.key, lib.hexundump(key, 16, "Need 16 bytes of key material."), 16)
+   if keylen == 128 then
+      o.key = ffi.new("uint8_t[16]")
+      ffi.copy(o.key, lib.hexundump(key, 16, "Need 16 bytes of key material."), 16)
+   elseif keylen == 256 then
+      o.key = ffi.new("uint8_t[32]")
+      ffi.copy(o.key, lib.hexundump(key, 32, "Need 32 bytes of key material."), 32)
+   else error("NYI") end
    o.IV_SIZE = 8
    o.iv = iv:new(lib.hexundump(salt, 4, "Need 4 bytes of salt."))
    -- “Implementations MUST support a full-length 16-octet ICV”
@@ -92,35 +104,54 @@ function aes_128_gcm:new (spi, key, salt)
    o.AAD_SIZE = 12
    o.aad = aad:new(spi)
    -- Compute subkey (H)
-   o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 16)
-   aes_128_block(o.hash_subkey, o.key)
+   local hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 16)
    o.gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
-   ASM.aes_keyexp_128_enc_avx(o.key, o.gcm_data)
-   ASM.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
-   return setmetatable(o, {__index=aes_128_gcm})
+   if keylen == 128 then
+      aes_128_block(hash_subkey, o.key)
+      ASM.aes_keyexp_128_enc_avx(o.key, o.gcm_data)
+      o.gcm_enc = ASM.aesni_gcm_enc_avx_gen4
+      o.gcm_dec = ASM.aesni_gcm_dec_avx_gen4
+   elseif keylen == 256 then
+      aes_256_block(hash_subkey, o.key)
+      ASM.aes_keyexp_256_enc_avx(o.key, o.gcm_data)
+      o.gcm_enc = ASM.aesni_gcm_enc_256_avx_gen4
+      o.gcm_dec = ASM.aesni_gcm_dec_256_avx_gen4
+   end
+   ASM.aesni_gcm_precomp_avx_gen4(o.gcm_data, hash_subkey)
+   return setmetatable(o, {__index=aes_gcm})
 end
 
-function aes_128_gcm:encrypt (out_ptr, iv, seq_low, seq_high, payload, length, auth_dest)
+function aes_gcm:encrypt (out_ptr, iv, seq_low, seq_high, payload, length, auth_dest)
    self.iv:iv(iv)
    self.aad:seq_no(seq_low, seq_high)
-   ASM.aesni_gcm_enc_avx_gen4(self.gcm_data,
-                              out_ptr,
-                              payload, length,
-                              u8_ptr(self.iv:header_ptr()),
-                              u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
-                              auth_dest or self.auth_buf, self.AUTH_SIZE)
+   self.gcm_enc(self.gcm_data,
+                out_ptr,
+                payload, length,
+                u8_ptr(self.iv:header_ptr()),
+                u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
+                auth_dest or self.auth_buf, self.AUTH_SIZE)
 end
 
-function aes_128_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length)
+function aes_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length)
    self.iv:iv(iv)
    self.aad:seq_no(seq_low, seq_high)
-   ASM.aesni_gcm_dec_avx_gen4(self.gcm_data,
-                              out_ptr,
-                              ciphertext, length,
-                              u8_ptr(self.iv:header_ptr()),
-                              u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
-                              self.auth_buf, self.AUTH_SIZE)
+   self.gcm_dec(self.gcm_data,
+                out_ptr,
+                ciphertext, length,
+                u8_ptr(self.iv:header_ptr()),
+                u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
+                self.auth_buf, self.AUTH_SIZE)
    return ASM.auth16_equal(self.auth_buf, ciphertext + length) == 0
+end
+
+local aes_128_gcm = {}
+function aes_128_gcm:new (spi, key, salt)
+   return aes_gcm:new(spi, key, 128, salt)
+end
+
+local aes_256_gcm = {}
+function aes_256_gcm:new (spi, key, salt)
+   return aes_gcm:new(spi, key, 256, salt)
 end
 
 
@@ -233,10 +264,59 @@ function selftest ()
                             "84b7d7b98f0ca8b6acda6894bc619069"..
                             "ef9cbc28fe1b56a7c4e0d58c86cd2bc0",
                     plain = "0800c6cd020007006162636465666768"..
-                            "696a6b6c6d6e6f707172737401020201" } }
+                            "696a6b6c6d6e6f707172737401020201" },
+                  { key   = "abbccddef00112233445566778899aab"..
+                            "abbccddef00112233445566778899aab",
+                    keylen = 256,
+                    salt  = "73616c74",
+                    spi   = 0x17405e67,
+                    seq   = 0x156f3126dd0db99bULL,
+                    iv    = "616e640169766563",
+                    ctag  = "f2d69ecdbd5a0d5b8d5ef38bad4da58d"..
+                            "1f278fde98ef67549d524a3018d9a57f"..
+                            "f4d3a31ce673119e451626c2415771e3"..
+                            "b7eebca614c89b35",
+                    plain = "45080028732c00004006e9f90a010612"..
+                            "0a01038f06b88023dd6bafbecb712602"..
+                            "50101f646d540001" },
+                  { key   = "abbccddef00112233445566778899aab"..
+                            "abbccddef00112233445566778899aab",
+                    keylen = 256,
+                    salt  = "73616c74",
+                    spi   = 0x17405e67,
+                    seq   = 0x156f3126dd0db99bULL,
+                    iv    = "616e640169766563",
+                    ctag  = "d4b7ed86a1777f2ea13d6973d324c69e"..
+                            "7b43f826fb56831226508bebd2dceb18"..
+                            "d0a6df10e5487df074113e14c641024e"..
+                            "3e6773d91a62ee429b043a10e3efe6b0"..
+                            "12a49363412364f8c0cac587f249e56b"..
+                            "11e24f30e44ccc76",
+                    plain = "636973636f0172756c65730174686501"..
+                            "6e6574776501646566696e6501746865"..
+                            "746563686e6f6c6f6769657301746861"..
+                            "7477696c6c01646566696e65746f6d6f"..
+                            "72726f7701020201" },
+                  { key   = "6c6567616c697a656d6172696a75616e"..
+                            "61616e64646f69746265666f72656961",
+                    keylen = 256,
+                    salt  = "7475726e",
+                    spi   = 0x796b6963,
+                    seq   = 0xffffffffffffffffULL,
+                    iv    = "333021696765746d",
+                    ctag  = "f97ab2aa356d8edce17644ac8c78e25d"..
+                            "d24dedbb29ebf1b64a274b39b49c3a86"..
+                            "4cd3d78ca4ae68a32b42458fb57dbe82"..
+                            "1dcc63b9d0937ba2945f669368661a32"..
+                            "9fb4c053",
+                    plain = "45000030da3a00008001df3bc0a80005"..
+                            "c0a800010800c6cd0200070061626364"..
+                            "65666768696a6b6c6d6e6f7071727374"..
+                            "01020201" },
+   }
    for i, t in ipairs(test) do
       print("Test vector:", i)
-      local gcm = aes_128_gcm:new(t.spi, t.key, t.salt)
+      local gcm = aes_gcm:new(t.spi, t.key, t.keylen or 128, t.salt)
       local iv = lib.hexundump(t.iv, gcm.IV_SIZE)
       local seq = ffi.new(seq_no_t)
       seq.no = t.seq
@@ -267,28 +347,26 @@ function selftest ()
    end
    local profile = (has_pmu_counters and pmu.profile) or function (f) f() end
    local length = 1000 * 1000 * 100 -- 100MB
-   local gcm = aes_128_gcm:new(0x0, "00000000000000000000000000000000", "00000000")
-   local p = ffi.new("uint8_t[?]", length + gcm.AUTH_SIZE)
-   local start = C.get_monotonic_time()
-   profile(function ()
-         ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,
-                                    p, p, length,
-                                    u8_ptr(gcm.iv:header_ptr()),
-                                    p, 0, -- No AAD
-                                    p + length, gcm.AUTH_SIZE)
-   end)
-   local finish = C.get_monotonic_time()
-   print("Encrypted", length, "bytes in", finish-start, "seconds")
-   local start = C.get_monotonic_time()
-   profile(function ()
-         ASM.aesni_gcm_dec_avx_gen4(gcm.gcm_data,
-                                    p, p, length,
-                                    u8_ptr(gcm.iv:header_ptr()),
-                                    p, 0, -- No AAD
-                                    p + length, gcm.AUTH_SIZE)
-   end)
-   local finish = C.get_monotonic_time()
-   print("Decrypted", length, "bytes in", finish-start, "seconds")
+   local k = "00000000000000000000000000000000"..
+             "00000000000000000000000000000000"
+   for _, keylen in ipairs{128, 256} do
+      print("AES", keylen)
+      local gcm = aes_gcm:new(0x0, k, keylen, "00000000")
+      local p = ffi.new("uint8_t[?]", length + gcm.AUTH_SIZE)
+      local start = C.get_monotonic_time()
+      profile(function ()
+            gcm:encrypt(p, u8_ptr(gcm.iv:header_ptr()), 0, 0,
+                        p, length, p + length)
+      end)
+      local finish = C.get_monotonic_time()
+      print("Encrypted", length, "bytes in", finish-start, "seconds")
+      local start = C.get_monotonic_time()
+      profile(function ()
+            gcm:decrypt(p, 0, 0, u8_ptr(gcm.iv:header_ptr()), p, length)
+      end)
+      local finish = C.get_monotonic_time()
+      print("Decrypted", length, "bytes in", finish-start, "seconds")
+   end
    -- Test aes_128_block with vectors from
    -- http://www.inconteam.com/software-development/41-encryption/55-aes-test-vectors 
    local test_key = ffi.new("uint8_t[16]")
@@ -307,6 +385,29 @@ function selftest ()
       ffi.copy(should, lib.hexundump(b[2], 16), 16)
       aes_128_block(block, test_key)
       assert(C.memcmp(should, block, 16) == 0)
+   end
+   -- Test aes_256_block with test vectors from
+   -- https://csrc.nist.gov/CSRC/media/Projects/Cryptographic-Standards-and-Guidelines/documents/aes-development/rijndael-vals.zip
+   local key = ffi.new("uint8_t[32]")
+   local pt = ffi.new("uint8_t[16]")
+   local should = ffi.new("uint8_t[16]")
+   local test_blocks = {
+      "E35A6DCB19B201A01EBCFA8AA22B5759",
+      "5075C2405B76F22F553488CAE47CE90B",
+      "49DF95D844A0145A7DE01C91793302D3",
+      "E7396D778E940B8418A86120E5F421FE",
+      "05F535C36FCEDE4657BE37F4087DB1EF",
+      "D0C1DDDD10DA777C68AB36AF51F2C204",
+      "1C55FB811B5C6464C4E5DE1535A75514",
+      "52917F3AE957D5230D3A2AF57C7B5A71"
+   }
+   for i, b in ipairs(test_blocks) do
+      print("Block I=", i, b)
+      key[0] = bit.rshift(0x100, i)
+      ffi.fill(pt, ffi.sizeof(pt))
+      ffi.copy(should, lib.hexundump(b, 16), 16)
+      aes_256_block(pt, key)
+      assert(C.memcmp(should, pt, 16) == 0)
    end
 end
 
