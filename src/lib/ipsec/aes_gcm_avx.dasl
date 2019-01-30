@@ -4,6 +4,7 @@
 -- https://github.com/lukego/intel-ipsec/blob/master/code/avx2/gcm_avx_gen4.asm
 -- https://github.com/lukego/intel-ipsec/blob/master/code/gcm_defines.asm
 -- https://github.com/lukego/intel-ipsec/blob/master/code/aes_keyexp_128.asm
+-- https://github.com/lukego/intel-ipsec/blob/master/code/aes_keyexp_256.asm
 
 local dasm = require("dasm")
 local ffi = require("ffi")
@@ -186,8 +187,8 @@ local function ghash_8_encrypt_8_parallel(Dst, t, ctr, loop_idx, operation, nrou
   end
 
   almost_encrypt_8(Dst, 1, ctr, t[1], operation, loop_idx, nrounds, function(round)
-    -- Guess: this has nothing to do with the round really, its just to splice
-    -- in parallel work (eight iterations, operating on shifted_key_8-1).
+    -- This has nothing to do with the round per se, its just splicing in
+    -- parallel ghash work (eight iterations, operating on shifted_key_8-1).
     local start = nrounds - 6
     local i = round - start -- 0-7
     if round >= start then
@@ -231,7 +232,7 @@ end
 
 local function ghash_last_8(Dst, t)
   for i = 1, 8 do
-    | vmovdqa xmm(t[5]), [arg1 + 16*(23-i)] -- XXX ?
+    | vmovdqa xmm(t[5]), [arg1 + 16*(23-i)]
     | vpshufd xmm(t[2]), xmm(i), 0x4e
     | vpshufd xmm(t[3]), xmm(t[5]), 0x4e
     | vpxor xmm(t[2]), xmm(t[2]), xmm(i)
@@ -458,7 +459,7 @@ local function keyexp2_round (Dst, round)
   | vpxor xmm4, xmm4, xmm2
 end
 
-local function keyexp(Dst)
+local function keyexp128(Dst)
   | vmovdqu xmm1, [arg1]
   | vmovdqa [arg2], xmm1
   | vpxor xmm3, xmm3, xmm3
@@ -507,24 +508,24 @@ local function generator(Dst)
   || precompute(Dst)
   |.align 16
   |->aes_keyexp_128_enc_avx:
-  || keyexp(Dst)
+  || keyexp128(Dst)
   |.align 16
   |->aes_keyexp_256_enc_avx:
   || keyexp256(Dst)
   |.align 16
-  |->aesni_gcm_enc_avx_gen4:
+  |->aesni_gcm_enc_128_avx_gen4:
   || gcm_enc_dec(Dst, "enc", 0, 9)
   |.align 16
   |->aesni_gcm_enc_256_avx_gen4:
   || gcm_enc_dec(Dst, "enc", 8, 13)
   |.align 16
-  |->aesni_gcm_dec_avx_gen4:
+  |->aesni_gcm_dec_128_avx_gen4:
   || gcm_enc_dec(Dst, "dec", 16, 9)
   |.align 16
   |->aesni_gcm_dec_256_avx_gen4:
   || gcm_enc_dec(Dst, "dec", 24, 13)
   |.align 16
-  |->aesni_encrypt_single_block:
+  |->aesni_encrypt_128_single_block:
   | vmovdqu xmm0, [arg2]
   || encrypt_single_block(Dst, 0, 9)
   | vmovdqu [arg2], xmm0
@@ -563,14 +564,14 @@ local mcode, size = Dst:build()
 local entry = dasm.globals(globals, globalnames)
 local fn_t = ffi.typeof("void(*)(gcm_data*, uint8_t*, const uint8_t*, uint64_t, uint8_t*, const uint8_t*, uint64_t, uint8_t*, uint64_t)")
 return setmetatable({
-  aes_keyexp_128_enc_avx = ffi.cast("void(*)(uint8_t*, gcm_data*)", entry.aes_keyexp_128_enc_avx),
-  aes_keyexp_256_enc_avx = ffi.cast("void(*)(uint8_t*, gcm_data*)", entry.aes_keyexp_256_enc_avx),
-  aesni_gcm_precomp_avx_gen4 = ffi.cast("void(*)(gcm_data*, uint8_t*)", entry.aesni_gcm_precomp_avx_gen4),
-  aesni_gcm_enc_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_enc_avx_gen4),
+  aes_keyexp_128_enc_avx = ffi.cast("void(*)(const uint8_t*, gcm_data*)", entry.aes_keyexp_128_enc_avx),
+  aes_keyexp_256_enc_avx = ffi.cast("void(*)(const uint8_t*, gcm_data*)", entry.aes_keyexp_256_enc_avx),
+  aesni_gcm_precomp_avx_gen4 = ffi.cast("void(*)(gcm_data*, const uint8_t*)", entry.aesni_gcm_precomp_avx_gen4),
+  aesni_gcm_enc_128_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_enc_128_avx_gen4),
   aesni_gcm_enc_256_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_enc_256_avx_gen4),
-  aesni_gcm_dec_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_dec_avx_gen4),
+  aesni_gcm_dec_128_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_dec_128_avx_gen4),
   aesni_gcm_dec_256_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_dec_256_avx_gen4),
-  aesni_encrypt_single_block = ffi.cast("void(*)(gcm_data*, uint8_t*)", entry.aesni_encrypt_single_block),
+  aesni_encrypt_128_single_block = ffi.cast("void(*)(gcm_data*, uint8_t*)", entry.aesni_encrypt_128_single_block),
   aesni_encrypt_256_single_block = ffi.cast("void(*)(gcm_data*, uint8_t*)", entry.aesni_encrypt_256_single_block),
   auth16_equal = ffi.cast("uint64_t(*)(uint8_t[16], uint8_t[16])", entry.auth16_equal)
 }, {_anchor = mcode})

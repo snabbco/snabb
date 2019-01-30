@@ -2,10 +2,10 @@
 
 module(...,package.seeall)
 
--- Implementation of IPsec ESP using AES-GCM with 128-bit keys, 16 byte ICV and
+-- Implementation of IPsec ESP using AES-GCM with 16 byte ICV and
 -- “Extended Sequence Numbers” (see RFC 4303 and RFC 4106). Provides
--- address-family independent encapsulation/decapsulation routines for “tunnel
--- mode” and “transport mode” routines for IPv6.
+-- address-family independent encapsulation/decapsulation routines for
+-- “tunnel mode” and “transport mode” routines for IPv6.
 --
 -- Notes:
 --
@@ -24,7 +24,7 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local esp = require("lib.protocol.esp")
 local esp_tail = require("lib.protocol.esp_tail")
-local aes_128_gcm = require("lib.ipsec.aes_128_gcm")
+local aes_gcm = require("lib.ipsec.aes_gcm")
 local seq_no_t = require("lib.ipsec.seq_no_t")
 local lib = require("core.lib")
 local ffi = require("ffi")
@@ -58,11 +58,15 @@ local function padding (a, l) return bit.band(-l, a-1) end
 --   https://github.com/YangModels/yang/blob/master/experimental/ietf-extracted-YANG-modules/ietf-ipsec@2018-01-08.yang
 
 function esp_new (conf)
-   assert(conf.aead == "aes-gcm-16-icv", "Only supports aes-gcm-16-icv")
+   local aead
+   if     conf.aead == "aes-gcm-16-icv"     then aead = aes_gcm.aes_128_gcm
+   elseif conf.aead == "aes-256-gcm-16-icv" then aead = aes_gcm.aes_256_gcm
+   else error("Unsupported AEAD: "..conf.aead) end
+
    assert(conf.spi, "Need SPI.")
 
    local o = {
-      cipher = aes_128_gcm:new(conf.spi, conf.key, conf.salt),
+      cipher = aead:new(conf.spi, conf.key, conf.salt),
       spi = conf.spi,
       seq = ffi.new(seq_no_t),
       pad_to = 4 -- minimal padding

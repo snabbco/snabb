@@ -4,7 +4,7 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
-local ASM = require("lib.ipsec.aes_128_gcm_avx")
+local ASM = require("lib.ipsec.aes_gcm_avx")
 local header = require("lib.protocol.header")
 local lib = require("core.lib")
 local ntohl, htonl = lib.ntohl, lib.htonl
@@ -70,31 +70,15 @@ end
 
 local function u8_ptr (ptr) return ffi.cast("uint8_t *", ptr) end
 
--- Encrypt a single 128-bit block with the basic AES block cipher.
-local function aes_128_block (block, key)
-   local gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
-   ASM.aes_keyexp_128_enc_avx(key, gcm_data)
-   ASM.aesni_encrypt_single_block(gcm_data, block)
-end
-
--- Encrypt a single 128-bit block with the basic AES256 block cipher.
-local function aes_256_block (block, key)
-   local gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
-   ASM.aes_keyexp_256_enc_avx(key, gcm_data)
-   ASM.aesni_encrypt_256_single_block(gcm_data, block)
-end
-
 local aes_gcm = {}
 
 function aes_gcm:new (spi, key, keylen, salt)
    assert(spi, "Need SPI.")
    local o = {}
    if keylen == 128 then
-      o.key = ffi.new("uint8_t[16]")
-      ffi.copy(o.key, lib.hexundump(key, 16, "Need 16 bytes of key material."), 16)
+      key = lib.hexundump(key, 16, "Need 16 bytes of key material.")
    elseif keylen == 256 then
-      o.key = ffi.new("uint8_t[32]")
-      ffi.copy(o.key, lib.hexundump(key, 32, "Need 32 bytes of key material."), 32)
+      key = lib.hexundump(key, 32, "Need 32 bytes of key material.")
    else error("NYI") end
    o.IV_SIZE = 8
    o.iv = iv:new(lib.hexundump(salt, 4, "Need 4 bytes of salt."))
@@ -104,16 +88,16 @@ function aes_gcm:new (spi, key, keylen, salt)
    o.AAD_SIZE = 12
    o.aad = aad:new(spi)
    -- Compute subkey (H)
-   local hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 16)
+   local hash_subkey = ffi.new("uint8_t[16]")
    o.gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
    if keylen == 128 then
-      aes_128_block(hash_subkey, o.key)
-      ASM.aes_keyexp_128_enc_avx(o.key, o.gcm_data)
-      o.gcm_enc = ASM.aesni_gcm_enc_avx_gen4
-      o.gcm_dec = ASM.aesni_gcm_dec_avx_gen4
+      ASM.aes_keyexp_128_enc_avx(key, o.gcm_data)
+      ASM.aesni_encrypt_128_single_block(o.gcm_data, hash_subkey)
+      o.gcm_enc = ASM.aesni_gcm_enc_128_avx_gen4
+      o.gcm_dec = ASM.aesni_gcm_dec_128_avx_gen4
    elseif keylen == 256 then
-      aes_256_block(hash_subkey, o.key)
-      ASM.aes_keyexp_256_enc_avx(o.key, o.gcm_data)
+      ASM.aes_keyexp_256_enc_avx(key, o.gcm_data)
+      ASM.aesni_encrypt_256_single_block(o.gcm_data, hash_subkey)
       o.gcm_enc = ASM.aesni_gcm_enc_256_avx_gen4
       o.gcm_dec = ASM.aesni_gcm_dec_256_avx_gen4
    end
@@ -144,12 +128,12 @@ function aes_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length)
    return ASM.auth16_equal(self.auth_buf, ciphertext + length) == 0
 end
 
-local aes_128_gcm = {}
+aes_128_gcm = {}
 function aes_128_gcm:new (spi, key, salt)
    return aes_gcm:new(spi, key, 128, salt)
 end
 
-local aes_256_gcm = {}
+aes_256_gcm = {}
 function aes_256_gcm:new (spi, key, salt)
    return aes_gcm:new(spi, key, 256, salt)
 end
@@ -383,7 +367,9 @@ function selftest ()
       print("Block:", b[1], b[2])
       ffi.copy(block, lib.hexundump(b[1], 16), 16)
       ffi.copy(should, lib.hexundump(b[2], 16), 16)
-      aes_128_block(block, test_key)
+      local gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
+      ASM.aes_keyexp_128_enc_avx(test_key, gcm_data)
+      ASM.aesni_encrypt_128_single_block(gcm_data, block)
       assert(C.memcmp(should, block, 16) == 0)
    end
    -- Test aes_256_block with test vectors from
@@ -406,11 +392,9 @@ function selftest ()
       key[0] = bit.rshift(0x100, i)
       ffi.fill(pt, ffi.sizeof(pt))
       ffi.copy(should, lib.hexundump(b, 16), 16)
-      aes_256_block(pt, key)
+      local gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
+      ASM.aes_keyexp_256_enc_avx(key, gcm_data)
+      ASM.aesni_encrypt_256_single_block(gcm_data, pt)
       assert(C.memcmp(should, pt, 16) == 0)
    end
 end
-
-
-aes_128_gcm.selftest = selftest
-return aes_128_gcm

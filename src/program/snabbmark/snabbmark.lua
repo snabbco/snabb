@@ -345,7 +345,8 @@ receive_device.interface= "rx1GE"
    end
 end
 
-function esp (npackets, packet_size, mode, direction)
+function esp (npackets, packet_size, mode, direction, aead)
+   aead = aead or "aes-gcm-16-icv"
    local esp = require("lib.ipsec.esp")
    local ethernet = require("lib.protocol.ethernet")
    local ipv6 = require("lib.protocol.ipv6")
@@ -366,8 +367,9 @@ function esp (npackets, packet_size, mode, direction)
    end
    local plain = d:packet()
    local conf = { spi = 0x0,
-                  aead = "aes-gcm-16-icv",
-                  key = "00112233445566778899AABBCCDDEEFF",
+                  aead = aead,
+                  key = "00112233445566778899AABBCCDDEEFF"..
+                        "00112233445566778899AABBCCDDEEFF",
                   salt = "00112233"}
    local enc, dec = esp.encrypt:new(conf), esp.decrypt:new(conf)
    local encap, decap
