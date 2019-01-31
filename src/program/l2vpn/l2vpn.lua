@@ -1073,12 +1073,12 @@ function run (parameters)
          -- Reconfigure ND/ARP apps with proper MAC addresses from the
          -- interfaces to which they are attached
          for name, nd in pairs(state.nds) do
-            nd.app:arg().local_mac =
-               macaddress:new(counter.read(nd.intf.stats.macaddr)).bytes
+            local mac = macaddress:new(counter.read(nd.intf.stats.macaddr))
+            nd.app:arg().local_mac = ethernet:pton(ethernet:ntop(mac.bytes))
          end
          for name, arp in pairs(state.arps) do
-            arp.app:arg().self_mac =
-               macaddress:new(counter.read(arp.intf.stats.macaddr)).bytes
+            local mac = macaddress:new(counter.read(arp.intf.stats.macaddr))
+            arp.app:arg().self_mac = ethernet:pton(ethernet:ntop(mac.bytes))
          end
          engine.configure(create_app_graph())
          jit.flush()
