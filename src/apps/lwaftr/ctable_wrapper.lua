@@ -13,7 +13,7 @@ local HASH_MAX = 0xFFFFFFFF
 -- This is only called when the table is 'full'.
 -- Notably, it cannot be called on an empty table,
 -- so there is no risk of an infinite loop.
-local function evict_random_entry(ctab)
+local function evict_random_entry(ctab, cleanup_fn)
    local random_hash = math.random(0, HASH_MAX - 1)
    local index = floor(random_hash*ctab.scale + 0.5)
    local entries = ctab.entries
@@ -25,15 +25,17 @@ local function evict_random_entry(ctab)
       end
    end
    local ptr = ctab.entries + index
+   if cleanup_fn then cleanup_fn(ptr) end
    ctab:remove_ptr(ptr)
 end
 
 -- Behave exactly like insertion, except if the table is full: if it
 -- is, then evict a random entry instead of resizing.
-local function add_with_random_eviction(self, key, value, updates_allowed)
+local function add_with_random_eviction(self, key, value, updates_allowed,
+                                        cleanup_fn)
    local did_evict = false
    if self.occupancy + 1 > self.occupancy_hi then
-      evict_random_entry(self)
+      evict_random_entry(self, cleanup_fn)
       did_evict = true
    end
    return ctable.CTable.add(self, key, value, updates_allowed), did_evict

@@ -24,6 +24,8 @@ local link       = require("core.link")
 local ipsum      = require("lib.checksum").ipsum
 local ctable     = require('lib.ctable')
 local ctablew    = require('apps.lwaftr.ctable_wrapper')
+local token_bucket = require('lib.token_bucket')
+local tsc        = require('lib.tsc')
 local alarms     = require('lib.yang.alarms')
 local S          = require('syscall')
 
@@ -85,7 +87,10 @@ local fragment_header_ptr_t = ffi.typeof('$*', fragment_header_t)
 -- Precondition: packet already has IPv6 ethertype.
 local function ipv6_packet_has_valid_length(h, len)
    if len < ether_ipv6_header_len then return false end
-   return ntohs(h.ipv6.payload_length) == len - ether_ipv6_header_len
+   -- The minimum Ethernet frame size is 60 bytes (without FCS).  Those
+   -- frames may contain padding bytes.
+   local payload_length = ntohs(h.ipv6.payload_length)
+   return payload_length <= 60 or payload_length == len - ether_ipv6_header_len
 end
 
 local function swap(array, i, j)
@@ -132,6 +137,8 @@ local reassembler_config_params = {
    max_concurrent_reassemblies = { default=20000 },
    -- Maximum number of fragments to reassemble.
    max_fragments_per_reassembly = { default=40 },
+   -- Maximum number of seconds to keep a partially reassembled packet
+   reassembly_timeout = { default = 60 },
 }
 
 function Reassembler:new(conf)
@@ -153,7 +160,8 @@ function Reassembler:new(conf)
             uint16_t final_start;
             uint16_t reassembly_base;
             uint32_t running_length; // bytes copied so far
-            struct packet packet;
+            uint64_t tstamp; // creation time in TSC ticks
+            struct packet *packet;
          } __attribute((packed))]],
          o.max_fragments_per_reassembly,
          o.max_fragments_per_reassembly),
@@ -164,6 +172,16 @@ function Reassembler:new(conf)
    o.scratch_fragment_key = params.key_type()
    o.scratch_reassembly = params.value_type()
    o.next_counter_update = -1
+
+   local scan_time = o.reassembly_timeout / 2
+   local scan_chunks = 100
+   o.scan_tb = token_bucket.new({ rate = math.ceil(o.ctab.size / scan_time),
+                                  burst_size = o.ctab.size / scan_chunks})
+   o.tsc = tsc.new()
+   o.ticks_per_timeout = o.tsc:tps() * o.reassembly_timeout
+   o.scan_cursor = 0
+   o.scan_tstamp = o.tsc:stamp()
+   o.scan_interval = o.tsc:tps() * scan_time / scan_chunks + 0ULL
 
    alarms.add_to_inventory(
       {alarm_type_id='incoming-ipv6-fragments'},
@@ -188,13 +206,14 @@ function Reassembler:record_eviction()
    counter.add(self.shm["drop-ipv6-frag-random-evicted"])
 end
 
-function Reassembler:reassembly_success(entry, pkt)
-   self.ctab:remove_ptr(entry)
+function Reassembler:reassembly_success(entry)
    counter.add(self.shm["in-ipv6-frag-reassembled"])
-   link.transmit(self.output.output, pkt)
+   link.transmit(self.output.output, entry.value.packet)
+   self.ctab:remove_ptr(entry)
 end
 
 function Reassembler:reassembly_error(entry, icmp_error)
+   packet.free(entry.value.packet)
    self.ctab:remove_ptr(entry)
    counter.add(self.shm["drop-ipv6-frag-invalid-reassembly"])
    if icmp_error then -- This is an ICMP packet
@@ -202,9 +221,15 @@ function Reassembler:reassembly_error(entry, icmp_error)
    end
 end
 
-function Reassembler:lookup_reassembly(src_ip, dst_ip, fragment_id)
+local function cleanup_evicted_entry (entry)
+   packet.free(entry.value.packet)
+end
+
+function Reassembler:lookup_reassembly(h, fragment)
+   local fragment_id = ntohl(fragment.id)
    local key = self.scratch_fragment_key
-   key.src_addr, key.dst_addr, key.fragment_id = src_ip, dst_ip, fragment_id
+   key.src_addr, key.dst_addr, key.fragment_id =
+      h.ipv6.src_ip, h.ipv6.dst_ip, fragment_id
 
    local entry = self.ctab:lookup_ptr(key)
    if entry then return entry end
@@ -213,32 +238,30 @@ function Reassembler:lookup_reassembly(src_ip, dst_ip, fragment_id)
    ffi.fill(reassembly, ffi.sizeof(reassembly))
    reassembly.reassembly_base = ether_ipv6_header_len
    reassembly.running_length = ether_ipv6_header_len
-   -- Fragment 0 will fill in the contents of this data.
-   packet.length = ether_ipv6_header_len
+   reassembly.tstamp = self.tsc:stamp()
+   reassembly.packet = packet.allocate()
+   packet.append(reassembly.packet, ffi.cast("uint8_t *", h),
+                 ether_ipv6_header_len)
 
    local did_evict = false
-   entry, did_evict = self.ctab:add(key, reassembly, false)
+   entry, did_evict = self.ctab:add(key, reassembly, false,
+                                    cleanup_evicted_entry)
    if did_evict then self:record_eviction() end
    return entry
 end
 
-function Reassembler:handle_fragment(h)
+function Reassembler:handle_fragment(pkt)
+   local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
    local fragment = ffi.cast(fragment_header_ptr_t, h.ipv6.payload)
+   -- Note: keep the number of local variables to a minimum when
+   -- calling lookup_reassembly to avoid "register coalescing too
+   -- complex" trace aborts in ctable.
+   local entry = self:lookup_reassembly(h, fragment)
+   local reassembly = entry.value
    local fragment_offset_and_flags = ntohs(fragment.fragment_offset_and_flags)
    local frag_start = bit.band(fragment_offset_and_flags, fragment_offset_mask)
    local frag_size = ntohs(h.ipv6.payload_length) - fragment_header_len
 
-   local entry = self:lookup_reassembly(h.ipv6.src_ip, h.ipv6.dst_ip,
-                                        ntohl(fragment.id))
-   local reassembly = entry.value
-
-   -- Header comes from unfragmentable part of packet 0.
-   if frag_start == 0 then
-      local header = ffi.cast(ether_ipv6_header_ptr_t, reassembly.packet.data)
-      ffi.copy(header, h, ether_ipv6_header_len)
-      header.ipv6.next_header = fragment.next_header
-      -- Payload length will be overwritten at end.
-   end
    local fcount = reassembly.fragment_count
    if fcount + 1 > self.max_fragments_per_reassembly then
       -- Too many fragments to reassembly this packet; fail.
@@ -246,8 +269,8 @@ function Reassembler:handle_fragment(h)
    end
    reassembly.fragment_starts[fcount] = frag_start
    reassembly.fragment_ends[fcount] = frag_start + frag_size
-   if reassembly.fragment_starts[fcount] <
-      reassembly.fragment_starts[fcount - 1] then
+   if (fcount > 0 and reassembly.fragment_starts[fcount] <
+       reassembly.fragment_starts[fcount - 1]) then
       sort_array(reassembly.fragment_starts, fcount)
       sort_array(reassembly.fragment_ends, fcount)
    end
@@ -267,16 +290,19 @@ function Reassembler:handle_fragment(h)
       return self:reassembly_error(entry)
    end
 
-   local max_data_offset = ether_ipv6_header_len + frag_start + frag_size
-   if max_data_offset > ffi.sizeof(reassembly.packet.data) then
-      -- Snabb packets have a maximum size of 10240 bytes.
-      return self:reassembly_error(entry)
+   -- Limit the scope of max_data_offset
+   do
+      local max_data_offset = ether_ipv6_header_len + frag_start + frag_size
+      if max_data_offset > packet.max_payload then
+         -- Snabb packets have a maximum size of 10240 bytes.
+         return self:reassembly_error(entry)
+      end
+      ffi.copy(reassembly.packet.data + reassembly.reassembly_base + frag_start,
+               fragment.payload, frag_size)
+      reassembly.packet.length = math.max(reassembly.packet.length,
+                                          max_data_offset)
+      reassembly.running_length = reassembly.running_length + frag_size
    end
-   ffi.copy(reassembly.packet.data + reassembly.reassembly_base + frag_start,
-            fragment.payload, frag_size)
-   reassembly.packet.length = math.max(reassembly.packet.length,
-                                       max_data_offset)
-   reassembly.running_length = reassembly.running_length + frag_size
 
    if reassembly.final_start == 0 then
       -- Still reassembling.
@@ -287,17 +313,44 @@ function Reassembler:handle_fragment(h)
    elseif not verify_valid_offsets(reassembly) then
       return self:reassembly_error(entry)
    else
-      local out = packet.clone(reassembly.packet)
-      local header = ffi.cast(ether_ipv6_header_ptr_t, out.data)
-      header.ipv6.payload_length = htons(out.length - ether_ipv6_header_len)
-      return self:reassembly_success(entry, out)
+      -- Limit the scope of header
+      do
+         local header = ffi.cast(ether_ipv6_header_ptr_t, reassembly.packet.data)
+         header.ipv6.payload_length = htons(reassembly.packet.length - ether_ipv6_header_len)
+         header.ipv6.next_header = fragment.next_header
+      end
+      return self:reassembly_success(entry)
    end
+end
+
+function Reassembler:expire (now)
+   local cursor = self.scan_cursor
+   for i = 1, self.scan_tb:take_burst() do
+      local entry
+      cursor, entry = self.ctab:next_entry(cursor, cursor + 1)
+      if entry then
+         if now - entry.value.tstamp > self.ticks_per_timeout then
+            self:reassembly_error(entry)
+         else
+            cursor = cursor + 1
+         end
+      end
+   end
+   self.scan_cursor = cursor
+   self.scan_tstamp = now
 end
 
 function Reassembler:push ()
    local input, output = self.input.input, self.output.output
 
    self.incoming_ipv6_fragments_alarm:check()
+
+   do
+      local now = self.tsc:stamp()
+      if now - self.scan_tstamp > self.scan_interval then
+         self:expire(now)
+      end
+   end
 
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
@@ -314,13 +367,18 @@ function Reassembler:push ()
       elseif h.ipv6.next_header == fragment_proto then
          -- A fragment; try to reassemble.
          counter.add(self.shm["in-ipv6-frag-needs-reassembly"])
-         self:handle_fragment(h)
-         packet.free(pkt)
+         link.transmit(input, pkt)
       else
          -- Not fragmented; forward it on.
          counter.add(self.shm["in-ipv6-frag-reassembly-unneeded"])
          link.transmit(output, pkt)
       end
+   end
+
+   for _ = 1, link.nreadable(input) do
+      local pkt = link.receive(input)
+      self:handle_fragment(pkt)
+      packet.free(pkt)
    end
 
    if self.next_counter_update < engine.now() then
