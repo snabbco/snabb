@@ -1,10 +1,10 @@
--- Test suite for the Mellanox ConnectX-4 driver.
+-- Test suite for the Mellanox ConnectX driver.
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
-local connectx4 = require("apps.mellanox.connectx4")
+local connectx = require("apps.mellanox.connectx")
 local counter = require("core.counter")
 local lib = require("core.lib")
 
@@ -27,7 +27,7 @@ local lib = require("core.lib")
 -- 
 -- Hardware queue count will be macs*vlans*rss on each interface.
 function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburst, macs, vlans, rss)
-   print("selftest: connectx4_test switch")
+   print("selftest: connectx_test switch")
    assert(rss == 1, "rss not yet handled")
    assert(ncores == 1, "multicore not yet handled")
    -- Create queue definitions
@@ -39,14 +39,14 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       end
    end
    -- Instantiate app network
-   local nic0 = connectx4.ConnectX4:new({pciaddress=pci0, queues=queues, macvlan=true})
-   local nic1 = connectx4.ConnectX4:new({pciaddress=pci1, queues=queues, macvlan=true})
+   local nic0 = connectx.ConnectX:new({pciaddress=pci0, queues=queues, macvlan=true})
+   local nic1 = connectx.ConnectX:new({pciaddress=pci1, queues=queues, macvlan=true})
    local io0 = {}               -- io apps on nic0
    local io1 = {}               -- io apps on nic1
    print(("creating %d queues per device..."):format(#queues))
    for _, queue in ipairs(queues) do
       local function ioapp (pci, queue)
-         local a = connectx4.IO:new({pciaddress=pci, queue=queue.id})
+         local a = connectx.IO:new({pciaddress=pci, queue=queue.id})
          a.input  = { input  = link.new(("input-%s-%s" ):format(pci, queue.id)) }
          a.output = { output = link.new(("output-%s-%s"):format(pci, queue.id)) }
          return a
