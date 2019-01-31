@@ -1,10 +1,10 @@
--- Device driver for the Mellanox ConnectX-4 Ethernet controller family.
+-- Device driver for the Mellanox ConnectX-4+ Ethernet controller family.
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
--- This is a device driver for Mellanox ConnectX-4 and ConnectX-4 LX
--- ethernet cards. This driver is completely stand-alone and does not
--- depend on any other software such as Mellanox OFED library or the
--- Linux mlx5 driver.
+-- This is a device driver for Mellanox ConnectX family ethernet
+-- cards. This driver is completely stand-alone and does not depend on
+-- any other software such as Mellanox OFED library or the Linux mlx5
+-- driver.
 --
 -- Thanks are due to Mellanox and Deutsche Telekom for making it
 -- possible to develop this driver based on publicly available
