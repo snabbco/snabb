@@ -500,15 +500,11 @@ function main (options)
    end
 
    monotonic_now = C.get_monotonic_time()
-   ::MAIN_LOOP::
-   do
+   repeat
       breathe()
       if not no_timers then timer.run() end
       if not busywait then pace_breathing() end
-      if  done and done() then goto DONE end
-      goto MAIN_LOOP
-   end
-   ::DONE::
+   until done and done()
    counter.commit()
    if not options.no_report then report(options.report) end
 end
