@@ -411,6 +411,7 @@ end
 
 breathe_pull_order = {}
 breathe_push_order = {}
+pull_order_n, push_order_n = 0, 0
 
 -- Sort the links in the app graph, and arrange to run push() on the
 -- apps on the receiving ends of those links.  This will run app:push()
