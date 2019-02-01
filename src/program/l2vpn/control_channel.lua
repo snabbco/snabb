@@ -154,6 +154,7 @@ control_channel = {
       enable = { default = false },
       heartbeat = { default = 10 },
       dead_factor = { default = 3 },
+      send_repeat = { default = 3 },
       -- Name of the associated pseudowire. Used for
       --   pwName
       --   cpwVcName
@@ -447,8 +448,10 @@ function control_channel:new (conf)
       -- Set up control-channel processing
       o._cc.timer_xmit = timer.new(conf.vc_id.." control-channel xmit",
                                    function (t)
-                                      link.transmit(o.output.south,
-                                                    packet.clone(dgram:packet()))
+                                      for _ = 1, conf.send_repeat do
+                                         link.transmit(o.output.south,
+                                                       packet.clone(dgram:packet()))
+                                      end
                                    end,
                                    1e9 * conf.heartbeat, 'repeating')
       o._cc.timer_hb = timer.new(conf.vc_id.." control-channel heartbeat",
