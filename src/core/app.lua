@@ -545,6 +545,7 @@ function breathe ()
    local i = 1
    ::PULL_LOOP::
    do
+      if i > pull_order_n then goto PULL_EXIT end
       local app = breathe_pull_order[i]
       if app.pull and not app.dead then
          zone(app.zone)
@@ -552,14 +553,14 @@ function breathe ()
          zone()
       end
       i = i+1
-      if i <= pull_order_n then
-         goto PULL_LOOP
-      end
+      goto PULL_LOOP
    end
+   ::PULL_EXIT::
    -- Exhale: push work out through the app network
    i = 1
    ::PUSH_LOOP::
    do
+      if i > push_order_n then goto PUSH_EXIT end
       local spec = breathe_push_order[i]
       local app = spec.app
       if spec.method and not app.dead then
@@ -568,10 +569,9 @@ function breathe ()
          zone()
       end
       i = i+1
-      if i <= push_order_n then
-         goto PUSH_LOOP
-      end
+      goto PUSH_LOOP
    end
+   ::PUSH_EXIT::
    counter.add(breaths)
    -- Commit counters and rebalance freelists at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then
