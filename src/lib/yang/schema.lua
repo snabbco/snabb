@@ -736,6 +736,28 @@ function resolve(schema, features)
          elseif node.id == 'identityref' then
             node.bases = resolve_bases(node.bases, env)
             node.default_prefix = schema.id
+         elseif node.id == 'enumeration' then
+            local values = {}
+            local max_value = -2147483648
+            for i, enum in ipairs(node.enums) do
+               assert(not node.enums[enum.name],
+                      'duplicate name in enumeration: '..enum.name)
+               node.enums[enum.name] = enum
+               if enum.value then
+                  assert(not values[enum.value],
+                         'duplicate value in enumeration: '..enum.value)
+                  values[enum.value] = true
+                  max_value = math.max(enum.value, max_value)
+               elseif i == 1 then
+                  max_value = 0
+                  enum.value = max_value
+               elseif max_value < 2147483647 then
+                  max_value = max_value + 1
+                  enum.value = max_value
+               else
+                  error('explicit value required in enum: '..enum.name)
+               end
+            end
          end
          node.primitive_type = node.id
       end
