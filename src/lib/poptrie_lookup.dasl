@@ -68,19 +68,14 @@ function lookup (Dst, Poptrie, keysize)
       -- v = extract(key, 0, Poptrie.s)
       local direct_mask = bit.lshift(1ULL, Poptrie.s) - 1
       -- v = band(key, direct_mask)
-      | mov v, direct_mask
-      | and v, key
+      | mov v, key
+      | and v, direct_mask
       -- index = dmap[v]
       | mov index, dword [dmap+v*4]
-      -- eax = band(index, leaf_tag)
-      | mov eax, 0x80000000
-      | and eax, index
-      -- is leaf_tag set?
-      | cmp eax, 0
-      | je >1 -- leaf_tag not set, index is a node
-      -- eax = leaf_tag - 1 (tag inverted)
-      | mov eax, 0x7FFFFFFF
-      | and eax, index
+      -- eax = band(index, leaf_tag - 1) (tag inverted)
+      | mov eax, index
+      | btr eax, 31 -- is leaf_tag set?
+      | jnc >1 -- leaf_tag not set, index is a node
       | ret
       -- node, offset = nodes[index], s
       |1:
@@ -90,9 +85,9 @@ function lookup (Dst, Poptrie, keysize)
       | mov offset, 18
    else
       -- index, node, offset = 0, nodes[index], 0
-      | mov index, 0
+      | xor index, index
       | lea node, [nodes+0] -- nodes[0]
-      | mov offset, 0
+      | xor offset, offset
    end
    -- while band(vec, lshift(1ULL, v)) ~= 0
    |2:
@@ -107,15 +102,8 @@ function lookup (Dst, Poptrie, keysize)
    else error("NYI") end
    -- vec = nodes[index].vector
    | mov vec, qword [node+8]
-   -- rax = lshift(1ULL, v)
-   | mov rax, 1
-   | mov rcx, v
-   | shl rax, cl
-   -- rax = band(vec, rax)
-   | and rax, vec
-   -- is bit v set in vec?
-   | cmp rax, 0
-   | je >3 -- reached leaf, exit loop
+   | bt vec, v -- is bit v set in vec?
+   | jnc >3 -- reached leaf, exit loop
    -- rax = lshift(2ULL, v) - 1
    | mov rax, 2
    | mov rcx, v
@@ -126,8 +114,8 @@ function lookup (Dst, Poptrie, keysize)
    | popcnt rax, rax
    -- index = base + bc - 1
    | mov index, dword [node+20] -- nodes[index].base1
-   | add index, eax
    | sub index, 1
+   | add index, eax
    -- node = nodes[index]
    | imul index, 24 -- multiply by node size
    | lea node, [nodes+index]
@@ -151,8 +139,6 @@ function lookup (Dst, Poptrie, keysize)
    -- return leaves[base + bc - 1]
    | mov index, dword [node+16] -- nodes[index].base0
    | add index, eax
-   | sub index, 1
-   -- assumption: at most ax is set at this point because popcnt(qword) < byte
-   | mov ax, word [leaves+index*2] -- leaves[index]
+   | movzx eax, word [leaves+index*2-2] -- leaves[index]
    | ret
 end
