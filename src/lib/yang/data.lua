@@ -1284,6 +1284,13 @@ function selftest()
 
       container fruit-bowl {
          leaf description { type string; }
+         leaf material {
+            type enumeration {
+               enum wood;
+               enum glass;
+               enum plastic;
+            }
+         }
          list contents { uses fruit; key name; }
       }
       leaf addr {
@@ -1295,6 +1302,7 @@ function selftest()
    local data = load_config_for_schema(test_schema, [[
      fruit-bowl {
        description 'ohai';
+       material glass;
        contents { name foo; score 7; }
        contents { name bar; score 8; }
        contents { name baz; score 9; tree-grown true; }
@@ -1303,6 +1311,7 @@ function selftest()
    ]])
    for i =1,2 do
       assert(data.fruit_bowl.description == 'ohai')
+      assert(data.fruit_bowl.material == 'glass', data.material)
       local contents = data.fruit_bowl.contents
       assert(contents.foo.score == 7)
       assert(contents.foo.tree_grown == nil)
