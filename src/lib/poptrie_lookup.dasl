@@ -74,7 +74,8 @@ function lookup (Dst, Poptrie, keysize)
       | mov index, dword [dmap+v*4]
       -- eax = band(index, leaf_tag - 1) (tag inverted)
       | mov eax, index
-      | btr eax, 31 -- is leaf_tag set?
+      -- is leaf_tag set? (unsets bit)
+      | btr eax, 31
       | jnc >1 -- leaf_tag not set, index is a node
       | ret
       -- node, offset = nodes[index], s
@@ -102,7 +103,8 @@ function lookup (Dst, Poptrie, keysize)
    else error("NYI") end
    -- vec = nodes[index].vector
    | mov vec, qword [node+8]
-   | bt vec, v -- is bit v set in vec?
+   -- is bit v set in vec?
+   | bt vec, v
    | jnc >3 -- reached leaf, exit loop
    -- rax = lshift(2ULL, v) - 1
    | mov rax, 2
