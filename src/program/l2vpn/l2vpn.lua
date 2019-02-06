@@ -158,10 +158,7 @@ local params = {
       required = true,
       keysof = {
          description = { default = '' },
-         vc_id = { required = true },
          mtu = { required = true },
-         afi = { required = true },
-         address = { required = true },
          uplink = { required = true },
          bridge = {
             config = {
@@ -185,7 +182,10 @@ local params = {
          pw = {
             required = true,
             keysof = {
-               address = { required = true },
+               afi = { required = true },
+               local_address = { required = true },
+               remote_address = { required = true },
+               vc_id = { required = true },
                tunnel = {
                   config = tunnel_params
                },
@@ -716,8 +716,7 @@ function parse_config (args)
                         tunnel:socket('south'))
       end
 
-      return tunnel:socket(('vc_%d'):format(vc_id)),
-      tunnel:socket(('vc_%d'):format(vc_id + 0x8000))
+      return tunnel:socket(('vc_%d'):format(vc_id)), tunnel:socket(('vc_%d'):format(vc_id + 0x8000))
    end
 
    local bridge_groups = {}
@@ -728,15 +727,7 @@ function parse_config (args)
 
       print("Creating VPLS instance "..vpls_name
             .." ("..(vpls.description or "<no description>")..")")
-      print("  VC ID: "..vpls.vc_id)
       print("  MTU: "..vpls.mtu)
-
-      local af = af_classes[vpls.afi]
-      assert(af, "Invalid address family identifier"..vpls.afi)
-      assert(af:pton(vpls.address),
-             "Invalid "..vpls.afi.." address "..vpls.address)
-      print("  Address family: "..vpls.afi)
-      print("  Address: "..vpls.address)
 
       local uplink = vpls.uplink
       assert(type(uplink) == "string",
@@ -746,8 +737,6 @@ function parse_config (args)
       assert_vpls(intf.l3, "Uplink interface "..uplink
                      .." is L2 when L3 is expected")
       print("  Uplink is on "..uplink)
-      assert(intf.l3[vpls.afi].configured,
-             "Address family "..vpls.afi.." not enabled on uplink")
       intf.used = true
 
       local bridge_group = {
@@ -759,19 +748,29 @@ function parse_config (args)
              "Invalid bridge type: "..bridge_group.config.type)
       bridge_groups[vpls_name] = bridge_group
 
+      local local_addresses = { ipv4 = {}, ipv6 = {} }
       print("  Creating pseudowires")
       for name, pw in pairs(vpls.pw) do
          print("    "..name)
-         assert(af:pton(pw.address),
-                "Invalid "..vpls.afi.." address "..pw.address)
-         print("      Address: "..pw.address)
+         local af = af_classes[pw.afi]
+         assert(af, "Invalid address family identifier"..pw.afi)
+         assert(intf.l3[pw.afi].configured,
+                "Address family "..pw.afi.." not enabled on uplink")
+         assert(af:pton(pw.local_address),
+                "Invalid local "..pw.afi.." address "..pw.local_address)
+         assert(af:pton(pw.remote_address),
+                "Invalid remote "..pw.afi.." address "..pw.remote_address)
+         print("      AFI: "..pw.afi)
+         print("      Local address: "..pw.local_address)
+         print("      Remote address: "..pw.remote_address)
+         print("      VC ID: "..pw.vc_id)
          local tunnel_config = pw.tunnel or vpls.tunnel
          print("      Encapsulation: "..tunnel_config.type)
 
          local socket, cc_socket =
-            add_pw(vpls.afi, intf, uplink, af:pton(vpls.address),
-                   af:pton(pw.address),
-                   vpls.vc_id, tunnel_config)
+            add_pw(pw.afi, intf, uplink, af:pton(pw.local_address),
+                   af:pton(pw.remote_address),
+                   pw.vc_id, tunnel_config)
          local cc_app
          if cc_socket then
             local cc_config = pw.cc or vpls.cc or {}
@@ -784,9 +783,9 @@ function parse_config (args)
                                 name = vpls_name..'_'..name,
                                 description = vpls.description,
                                 mtu = vpls.mtu,
-                                vc_id = vpls.vc_id,
-                                afi = vpls.afi,
-                                peer_addr = pw.address })
+                                vc_id = pw.vc_id,
+                                afi = pw.afi,
+                                peer_addr = pw.remote_address })
             connect_duplex(cc_socket, cc_app:socket('south'))
          end
          table.insert(bridge_group.pws,
@@ -795,9 +794,12 @@ function parse_config (args)
                         cc_app = cc_app,
                         cc_socket = cc_socket })
 
+         if not local_addresses[pw.afi][pw.local_address] then
+            table.insert(intf.l3[pw.afi].fragmenter:arg().pmtu_local_addresses,
+                         pw.local_address)
+            local_addresses[pw.afi][pw.local_address] = true
+         end
       end
-      table.insert(intf.l3[vpls.afi].fragmenter:arg().pmtu_local_addresses,
-                   vpls.address)
 
       print("  Creating attachment circuits")
       for name, t in pairs(vpls.ac) do
