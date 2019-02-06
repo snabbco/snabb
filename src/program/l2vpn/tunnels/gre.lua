@@ -13,16 +13,24 @@ function tunnel:new (config)
                                key = vc_id })
       return header, header
    end
-   unknown_header = function(self, p)
+   unknown_header = function(self, p, ancillary_data)
       if self.logger and self.logger:can_log() then
          local gre = assert(self.header_scratch:new_from_mem(p.data, p.length))
-         self.logger:log(("GRE unknown key: 0x%04x"):format(gre:key()))
+         local src, dst = ancillary_data.remote_addr, ancillary_data.local_addr
+         local key = gre:key()
+         if key >= 0x8000 then
+            self.logger:log(("%s => %s : control-channel packet for unknown "
+                             .."VC ID %d"):format(src, dst, key - 0x8000))
+         else
+            self.logger:log(("%s => %s : data packet for unknown "
+                             .."VC ID %d"):format(src, dst, key))
+         end
       end
    end
 
    -- The base GRE header does not include the key field
    local header_size = gre:new({ key = 0}):sizeof()
-   return self:_new(config, "gre", gre, header_size, {}, create_headers,
+   return self:_new(config, "GRE", gre, header_size, {}, create_headers,
                     unknown_header)
 end
 

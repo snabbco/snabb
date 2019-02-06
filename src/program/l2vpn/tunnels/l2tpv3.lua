@@ -21,15 +21,16 @@ function tunnel:new (config)
       l2tpv3:new({ session_id = config.remote_session,
                    cookie = l2tpv3:new_cookie(config.remote_cookie) })
    end
-   local function unknown_header (self, p)
+   local function unknown_header (self, p, ancillary_data)
       if self.logger and self.logger:can_log() then
          local l2tpv3 = self.header_scratch:new_from_mem(p.data, p.length)
-         self.logger:log(("L2TPv3 unknown session/cookie: 0x%08x/%s"):format(
+         self.logger:log(("%s -> %s : unknown session/cookie: 0x%08x/%s"):format(
+               ancillary_data.remote_addr, ancillary_data.local_addr,
                l2tpv3:session_id(), l2tpv3:cookie()))
       end
    end
 
-   return self:_new(config, "l2tpv3", l2tpv3, l2tpv3:sizeof(), params, create_headers,
+   return self:_new(config, "L2TPv3", l2tpv3, l2tpv3:sizeof(), params, create_headers,
                     unknown_header)
 end
 

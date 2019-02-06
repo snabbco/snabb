@@ -710,7 +710,10 @@ function parse_config (args)
                           { vcs =
                                tunnel_info.mk_vc_config_fn(vc_id,
                                                            vc_id + 0x8000,
-                                                           tunnel_config.config) })
+                                                           tunnel_config.config),
+                            ancillary_data = {
+                               remote_addr = af:ntop(remote_addr),
+                               local_addr = af:ntop(local_addr) } })
          sd_entry.protomux:arg().links[type] = { proto = tunnel_info.proto }
          connect_duplex(sd_entry.protomux:socket(type),
                         tunnel:socket('south'))

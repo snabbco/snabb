@@ -7,7 +7,12 @@ local ctable = require("lib.ctable_perfect")
 tunnel = {
    config = {
       vcs = { default = {} },
-      logger = { default = nil },
+      ancillary_data = {
+         config = {
+            local_addr = { required = true },
+            remote_addr = { required = true }
+         }
+      }
    }
 }
 
@@ -37,6 +42,8 @@ function tunnel:_new (config, name, class, size, params,
       o.keys[name] = key
       o.headers[name] = header_out
    end
+
+   o.ancillary_data = config.ancillary_data
 
    o.discard = link.new(name.."_discard")
    local default_value = self.value_t()
@@ -87,7 +94,7 @@ function tunnel:push (sin)
    local discard = self.discard
    for _ = 1, link.nreadable(discard) do
       local p = link.receive(discard)
-      self:handle_unknown_header_fn(p)
+      self:handle_unknown_header_fn(p, self.ancillary_data)
       packet.free(p)
    end
 end
