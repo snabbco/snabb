@@ -176,7 +176,7 @@ local params = {
          ac = {
             required = true,
             keysof = {
-               name = { required = true }
+               interface = { required = true }
             }
          },
          pw = {
@@ -610,6 +610,10 @@ function parse_config (args)
    local tunnel_infos = {
       l2tpv3 = {
          class = require("program.l2vpn.tunnels.l2tpv3").tunnel,
+         params = {
+            local_cookie = { required = true },
+            remote_cookie = { required = true }
+         },
          proto = 115,
          mk_vc_config_fn = function (vc_id, cc_vc_id, tunnel_config)
             return {
@@ -628,6 +632,7 @@ function parse_config (args)
       },
       gre = {
          class = require("program.l2vpn.tunnels.gre").tunnel,
+         params = {},
          proto = 47,
          mk_vc_config_fn = function (vc_id, cc_vc_id, tunnel_config)
             return {
@@ -705,12 +710,13 @@ function parse_config (args)
 
       local tunnel = sd_entry.tunnels[type]
       if not tunnel then
+         local config = lib.parse(tunnel_config.config, tunnel_info.params)
          tunnel = App:new(type.."_"..sd_entry.index,
                           tunnel_info.class,
                           { vcs =
                                tunnel_info.mk_vc_config_fn(vc_id,
                                                            vc_id + 0x8000,
-                                                           tunnel_config.config),
+                                                           config),
                             ancillary_data = {
                                remote_addr = af:ntop(remote_addr),
                                local_addr = af:ntop(local_addr) } })
@@ -806,7 +812,7 @@ function parse_config (args)
 
       print("  Creating attachment circuits")
       for name, t in pairs(vpls.ac) do
-         local ac = t.name
+         local ac = t.interface
          print("    "..name)
          assert(type(ac) == "string",
                 "AC interface specifier must be a string")
