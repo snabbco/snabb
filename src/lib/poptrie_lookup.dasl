@@ -14,11 +14,19 @@ local dasm = require("dasm")
 -- Table keeping machine code alive to the GC.
 local anchor = {}
 
+-- leaf_t poptrie_lookup
+-- (leaf_t *leaves, node_t *nodes, uint8_t *key, base_t *directmap)
+-- NB: this type is hardcoded here to avoid filling up the ctype table
+local prototype = ffi.typeof(
+   "uint16_t (*) (void *, void *, uint8_t *, void *)"
+)
+
 -- Assemble a lookup routine
 function generate (Poptrie, keysize)
    -- Assert assumptions about lib.poptrie
    assert(Poptrie.k == 6)
    if Poptrie.direct_pointing then
+      assert(Poptrie.s <= 32)
       assert(Poptrie.leaf_tag == bit.lshift(1, 31))
    end
    assert(ffi.sizeof(Poptrie.leaf_t) == 2)
@@ -41,14 +49,6 @@ function generate (Poptrie, keysize)
       dasm.dump(mcode, size)
    end
 
-   local prototype
-   if keysize <= 64 then
-      prototype = ffi.typeof(
-         "$ (*) ($ *, $ *, uint64_t, $ *)",
-         Poptrie.leaf_t, Poptrie.leaf_t, Poptrie.node_t, Poptrie.base_t
-      )
-   else error("NYI") end
-
    return ffi.cast(prototype, mcode)
 end
 
@@ -60,6 +60,7 @@ end
 |.define node,    r8  -- pointer into node array 
 |.define offset,  r9  -- offset into key
 |.define v,       r10 -- k or s bits extracted from key
+|.define v_dw,    r10d -- (v as dword)
 |.define vec,     r11 -- 64-bit vector or leafvec
 
 -- lookup(leaf_t *leaves, node_t *nodes, key) -> leaf_t
@@ -68,7 +69,7 @@ function lookup (Dst, Poptrie, keysize)
       -- v = extract(key, 0, Poptrie.s)
       local direct_mask = bit.lshift(1ULL, Poptrie.s) - 1
       -- v = band(key, direct_mask)
-      | mov v, key
+      | mov v_dw, dword [key]
       | and v, direct_mask
       -- index = dmap[v]
       | mov index, dword [dmap+v*4]
@@ -93,19 +94,31 @@ function lookup (Dst, Poptrie, keysize)
    -- while band(vec, lshift(1ULL, v)) ~= 0
    |2:
    -- v = extract(key, offset, k=6)
-   if keysize <= 64 then
-      -- v = rshift(key, offset)
-      | mov v, key
-      | mov rcx, offset
+   | mov rcx, offset
+   -- v = rshift(key, offset)
+   if keysize == 32 then
+      | mov v_dw, dword [key]
       | shr v, cl
-      -- v = band(v, lshift(1, k=6) - 1)
-      | and v, 0x3F
+   elseif keysize == 64 then
+      | mov v, [key]
+      | shr v, cl
+   elseif keysize == 128 then
+      | mov v, [key]
+      | mov vec, [key+8]
+      | cmp rcx, 63
+      | jng >3
+      | sub rcx, 64
+      | mov v, vec
+      | 3:
+      | shrd v, vec, cl
    else error("NYI") end
+   -- v = band(v, lshift(1, k=6) - 1)
+   | and v, 0x3F
    -- vec = nodes[index].vector
    | mov vec, qword [node+8]
    -- is bit v set in vec?
    | bt vec, v
-   | jnc >3 -- reached leaf, exit loop
+   | jnc >4 -- reached leaf, exit loop
    -- rax = lshift(2ULL, v) - 1
    | mov rax, 2
    | mov rcx, v
@@ -125,7 +138,7 @@ function lookup (Dst, Poptrie, keysize)
    | add offset, 6
    | jmp <2 -- loop
    -- end while
-   |3:
+   |4:
    -- rax = lshift(2ULL, v) - 1
    | mov rax, 2
    | mov rcx, v

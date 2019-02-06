@@ -60,7 +60,13 @@ function new (init)
          self.directmap = array(Poptrie.base_t, 2^self.s)
       end
    end
-   self.asm_lookup64 = poptrie_lookup.generate(self, 64)
+   for _, keysize in ipairs{ 32, 64, 128 } do
+      self["asm_lookup"..keysize] = poptrie_lookup.generate(self, keysize)
+      self["lookup"..keysize] = function (self, key)
+         local lookup = self["asm_lookup"..keysize]
+         return lookup(self.leaves, self.nodes, key, self.directmap)
+      end
+   end
    return self
 end
 
@@ -78,13 +84,18 @@ function Poptrie:grow_leaves ()
    self.leaves = new_leaves
 end
 
--- XXX - Generalize for key=uint8_t[?]
-local function extract (key, offset, length)
-   return band(rshift(key+0ULL, offset), lshift(1, length) - 1)
+-- Extract bits at offset
+-- key=uint8_t[?]
+function extract (key, offset, length)
+   assert(length <= 32); assert(offset < 128)
+   local byte_offset = math.min(math.floor(offset/8), 12)
+   local bit_offset = offset - byte_offset*8
+   local dword = ffi.cast("uint32_t*", key + byte_offset)[0]
+   return band(rshift(dword, bit_offset), lshift(1, length) - 1)
 end
 
 -- Add key/value pair to RIB (intermediary binary trie)
--- key=uint64_t, length=uint16_t, value=uint16_t
+-- key=uint8_t[?], length=uint16_t, value=uint16_t
 function Poptrie:add (key, length, value)
    assert(value)
    local function add (node, offset)
@@ -317,10 +328,6 @@ function Poptrie:lookup (key)
    return L[base + bc - 1]
 end
 
-function Poptrie:lookup64 (key)
-   return self.asm_lookup64(self.leaves, self.nodes, key, self.directmap)
-end
-
 function Poptrie:fib_info ()
    for i=0, self.node_base-1 do
       print("node:", i)
@@ -335,47 +342,77 @@ function Poptrie:fib_info ()
 end
 
 function selftest ()
-   -- To test direct pointing: Poptrie.direct_pointing = true
+   local function s (...)
+      local pf = ffi.new("uint8_t[16]")
+      for i, b in ipairs{...} do pf[i-1] = b end
+      return pf
+   end
+   local function rs ()
+      local bs = {}
+      for i = 1, 16 do bs[i] = math.random(256) - 1 end
+      return s(unpack(bs))
+   end
+   -- To test direct pointing: direct_pointing = true
    local t = new{}
    -- Tets building empty RIB
    t:build()
    -- Test RIB
-   t:add(0x00, 8, 1) -- 00000000
-   t:add(0x0F, 8, 2) -- 00001111
-   t:add(0x07, 4, 3) --     0111
-   t:add(0xFF, 8, 4) -- 11111111
-   t:add(0xFF, 5, 5) --    11111
-   local v, n = t:rib_lookup(0x0, 1)
+   t:add(s(0x00), 8, 1) -- 00000000
+   t:add(s(0x0F), 8, 2) -- 00001111
+   t:add(s(0x07), 4, 3) --     0111
+   t:add(s(0xFF), 8, 4) -- 11111111
+   t:add(s(0xFF), 5, 5) --    11111
+   -- 111111111111111111111111111111111111111111111111111111111111111111110000
+   t:add(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F), 72, 6)
+   local v, n = t:rib_lookup(s(0x0), 1)
    assert(not v and n.left and not n.right)
-   local v, n = t:rib_lookup(0x00, 8)
+   local v, n = t:rib_lookup(s(0x00), 8)
    assert(v == 1 and not n)
-   local v, n = t:rib_lookup(0x07, 3)
+   local v, n = t:rib_lookup(s(0x07), 3)
    assert(not v and (n.left and n.right))
-   local v, n = t:rib_lookup(0x0, 1, n)
+   local v, n = t:rib_lookup(s(0x0), 1, n)
    assert(v == 3 and not n)
-   local v, n = t:rib_lookup(0xFF, 5)
+   local v, n = t:rib_lookup(s(0xFF), 5)
    assert(v == 5 and (not n.left) and n.right)
-   local v, n = t:rib_lookup(0x0F, 3, n)
+   local v, n = t:rib_lookup(s(0x0F), 3, n)
    assert(v == 4 and not n)
-   local v, n = t:rib_lookup(0x3F, 8)
+   local v, n = t:rib_lookup(s(0x3F), 8)
    assert(v == 5 and not n)
+   local v, n = t:rib_lookup(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F), 72)
+   assert(v == 6 and not n)
    -- Test FIB
    t:build()
    if debug then t:fib_info() end
-   assert(t:lookup(0x00) == 1) -- 00000000
-   assert(t:lookup(0x03) == 0) -- 00000011
-   assert(t:lookup(0x07) == 3) -- 00000111
-   assert(t:lookup(0x0F) == 2) -- 00001111
-   assert(t:lookup(0x1F) == 5) -- 00011111
-   assert(t:lookup(0x3F) == 5) -- 00111111
-   assert(t:lookup(0xFF) == 4) -- 11111111
-   assert(t:lookup64(0x00) == 1)
-   assert(t:lookup64(0x03) == 0)
-   assert(t:lookup64(0x07) == 3)
-   assert(t:lookup64(0x0F) == 2)
-   assert(t:lookup64(0x1F) == 5)
-   assert(t:lookup64(0x3F) == 5)
-   assert(t:lookup64(0xFF) == 4)
+   assert(t:lookup(s(0x00)) == 1) -- 00000000
+   assert(t:lookup(s(0x03)) == 0) -- 00000011
+   assert(t:lookup(s(0x07)) == 3) -- 00000111
+   assert(t:lookup(s(0x0F)) == 2) -- 00001111
+   assert(t:lookup(s(0x1F)) == 5) -- 00011111
+   assert(t:lookup(s(0x3F)) == 5) -- 00111111
+   assert(t:lookup(s(0xFF)) == 4) -- 11111111
+   assert(t:lookup(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F)) == 6)
+   assert(t:lookup32(s(0x00)) == 1)
+   assert(t:lookup32(s(0x03)) == 0)
+   assert(t:lookup32(s(0x07)) == 3)
+   assert(t:lookup32(s(0x0F)) == 2)
+   assert(t:lookup32(s(0x1F)) == 5)
+   assert(t:lookup32(s(0x3F)) == 5)
+   assert(t:lookup32(s(0xFF)) == 4)
+   assert(t:lookup64(s(0x00)) == 1)
+   assert(t:lookup64(s(0x03)) == 0)
+   assert(t:lookup64(s(0x07)) == 3)
+   assert(t:lookup64(s(0x0F)) == 2)
+   assert(t:lookup64(s(0x1F)) == 5)
+   assert(t:lookup64(s(0x3F)) == 5)
+   assert(t:lookup64(s(0xFF)) == 4)
+   assert(t:lookup128(s(0x00)) == 1)
+   assert(t:lookup128(s(0x03)) == 0)
+   assert(t:lookup128(s(0x07)) == 3)
+   assert(t:lookup128(s(0x0F)) == 2)
+   assert(t:lookup128(s(0x1F)) == 5)
+   assert(t:lookup128(s(0x3F)) == 5)
+   assert(t:lookup128(s(0xFF)) == 4)
+   assert(t:lookup128(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F)) == 6)
 
    -- Random testing
    local function reproduce (cases)
@@ -383,16 +420,27 @@ function selftest ()
       print("repoducing...")
       local t = new{}
       for entry, case in ipairs(cases) do
-         print("key:", entry, bin(case[1]))
-         print("prefix:", entry, bin(case[1], case[2]))
+         local a, l = unpack(case)
+         if l <= 64 then
+            print("key:", entry, bin(ffi.cast("uint64_t*", a)[0]))
+            print("prefix:", entry, bin(ffi.cast("uint64_t*", a)[0], l))
+         else
+            print("key:", entry, bin(ffi.cast("uint64_t*", a)[0]))
+            print("    ", "   ", bin(ffi.cast("uint64_t*", a)[1]))
+            print("prefix:", entry, bin(ffi.cast("uint64_t*", a)[0], 64))
+            print("    ", "   ", bin(ffi.cast("uint64_t*", a)[1], l-64))
+         end
          t:add(case[1], case[2], entry)
       end
       t:build()
       t:fib_info()
       for _, case in ipairs(cases) do
-         print("rib:", t:rib_lookup(case[1]))
-         print("fib:", t:lookup(case[1]))
-         print("64:",  t:lookup64(case[1]))
+         local a, l = unpack(case)
+         print("rib:", t:rib_lookup(a))
+         print("fib:", t:lookup(a))
+         if l <= 32 then print("32:",  t:lookup32(a))
+         elseif l <= 64 then print("64:",  t:lookup64(a))
+         else print("128:",  t:lookup128(a)) end
       end
    end
    local function r_assert (condition, cases)
@@ -403,7 +451,7 @@ function selftest ()
    end
    local lib = require("core.lib")
    local seed = lib.getenv("SNABB_RANDOM_SEED") or 0
-   for keysize = 1, 64 do
+   for keysize = 1, 128 do
       print("keysize:", keysize)
       -- ramp up the geometry below to crank up test coverage
       for entries = 1, 3 do
@@ -413,7 +461,7 @@ function selftest ()
             local t = new{}
             local k = {}
             for entry = 1, entries do
-               local a, l = math.random(2^keysize - 1), math.random(keysize)
+               local a, l = rs(), math.random(keysize)
                cases[entry] = {a, l}
                t:add(a, l, entry)
                k[entry] = a
@@ -426,7 +474,10 @@ function selftest ()
             t:build()
             for entry, a in ipairs(k) do
                r_assert(t:lookup(a) == v[entry], cases)
-               r_assert(t:lookup64(a) == v[entry], cases)
+               local l = cases[entry][2]
+               if l <= 32 then r_assert(t:lookup32(a) == v[entry], cases)
+               elseif l <= 64 then r_assert(t:lookup64(a) == v[entry], cases)
+               else r_assert(t:lookup128(a) == v[entry], cases) end
             end
          end
       end
@@ -453,9 +504,9 @@ function selftest ()
       local t = new{direct_pointing=false}
       local k = {}
       local numentries = 10000
-      local keysize = 64
+      local keysize = 32
       for entry = 1, numentries do
-         local a, l = math.random(2^keysize - 1), math.random(keysize)
+         local a, l = rs(), math.random(keysize)
          t:add(a, l, entry)
          k[entry] = a
       end
@@ -465,21 +516,31 @@ function selftest ()
       local function lookup (iter)
          for i=1,iter do t:lookup(k[i%#k+1]) end
       end
+      local function lookup32 (iter)
+         for i=1,iter do t:lookup32(k[i%#k+1]) end
+      end
       local function lookup64 (iter)
          for i=1,iter do t:lookup64(k[i%#k+1]) end
+      end
+      local function lookup128 (iter)
+         for i=1,iter do t:lookup128(k[i%#k+1]) end
       end
       print("PMU analysis (numentries="..numentries..", keysize="..keysize..")")
       pmu.setup()
       time("build", build)
       measure("lookup", lookup, 1e5)
-      measure("lookup64", lookup64, 1e7)
+      if keysize <= 32 then measure("lookup32", lookup32, 1e7) end
+      if keysize <= 64 then measure("lookup64", lookup64, 1e7) end
+      if keysize <= 128 then measure("lookup128", lookup128, 1e7) end
       do local rib = t.rib
          t = new{direct_pointing=true}
          t.rib = rib
       end
       time("build(direct_pointing)", build)
       measure("lookup(direct_pointing)", lookup, 1e5)
-      measure("lookup64(direct_pointing)", lookup64, 1e7)
+      if keysize <= 32 then measure("lookup32(direct_pointing)", lookup32, 1e7) end
+      if keysize <= 64 then measure("lookup64(direct_pointing)", lookup64, 1e7) end
+      if keysize <= 128 then measure("lookup128(direct_pointing)", lookup128, 1e7) end
    else
       print("No PMU available.")
    end
