@@ -40,21 +40,22 @@ Ethernet frame to that device.
 
 The service is implemented by connecting the set of _provider edge_
 devices (PE) that host the attachment circuits by tunnels which
-transport the Ethernet frames within IPv6 packets using an appropriate
-encapsulation mechanism called the _tunneling protocol_.  Each such
-tunnel is called a _pseudowire_ (PW) and contains exactly two
-endpoints.  Conceptually, each PE implements its own learning bridge
-to which all local attachment circuits and pseudowires are connected.
-The bridge maintains MAC tables for all of those ports.  In general,
-the resulting topology contains loops and a mechanism is needed that
-prevents packets from entering any such loop, such as the _spanning
-tree protocol_ (SPT).  This implementation uses a full mesh of PWs
-together with _split horizon_ forwarding to avoid loops without the
-need for SPT.  In this model, each PE maintains a PW to every other PE
-(this is the full mesh) with the rule that a frame received on any PW
-is never forwarded to any other PW (this is the split-horizon rule).
-The trade-off with respect to SPT is that the number of PWs in the
-system scales quadratically with the number of PE devices.
+transport the Ethernet frames within IP packets (IPv4 or IPv6) using
+an appropriate encapsulation mechanism called the _tunneling
+protocol_.  Each such tunnel is called a _pseudowire_ (PW) and
+contains exactly two endpoints.  Conceptually, each PE implements its
+own learning bridge to which all local attachment circuits and
+pseudowires are connected.  The bridge maintains MAC tables for all of
+those ports.  In general, the resulting topology contains loops and a
+mechanism is needed that prevents packets from entering any such loop,
+such as the _spanning tree protocol_ (SPT).  This implementation uses
+a full mesh of PWs together with _split horizon_ forwarding to avoid
+loops without the need for SPT.  In this model, each PE maintains a PW
+to every other PE (this is the full mesh) with the rule that a frame
+received on any PW is never forwarded to any other PW (this is the
+split-horizon rule).  The trade-off with respect to SPT is that the
+number of PWs in the system scales quadratically with the number of PE
+devices.
 
 The following figure illustrates the model with a setup that contains
 four PEs, six ACs and six PWs.
@@ -197,54 +198,51 @@ elements
    * An upstream interface, which is connected to the ISPs network and
      transports the traffic of all PWs
 
-Each VPLS instance is uniquely identified by the IPv6 address shared
-by all its local PW endpoints.  Ethernet frames entering the VPNTP
-through an AC are switched to one of the PWs by the bridge of the
-respective VPLS instance according to the rules laid out above.  The
-PW encapsulates the frame in an IPv6 packet, where the source IPv6
-address is the local VPLS identifier and the destination address is
-the identifier of the VPLS instance on the remote PE, which is part of
-the static PW configuration.  The IPv6 header is responsible for
-delivering the packet to the appropriate egress PE, while an
-additional header specific to the tunnel protocol is used to identify
-the payload as an Ethernet frame.
+Ethernet frames entering the VPNTP through an AC are switched to
+another AC or one of the PWs according to the bridge's forwarding
+table.  A PW encapsulates the Ethernet frame in an IP packet and
+transmits it to the remote PE device.
+
+IP frames arriving on a PW from a remote PE are decapsulated and the
+resulting Ethernet frame is switched to an AC by the bridge.
+
+A PW is uniquely identified by the tuple (address family, source
+address, destination address, VC ID). The address family is either
+IPv4 or IPv6 and the addresses must be valid within that family.  The
+VC ID is used to distinguish PWs between the same pair of addresses.
+
+Apart from the IP header used to transport the Ethernet frames across
+the network, a PW also uses a particular "upper layer" protocol header
+called the _tunnel protocol_ to identify the payload and carry
+additional information relevant for the tunnel, for example the VC ID.
 
 The tunnel protocol is a property of a PW (and, consequently, each end
 of a PW must be configured to use the same protocol).  However, it is
-possible to mix PWs with different tunnel protocols in the same VPLS.
-The supported tunnel protocols are listed in the next section.
+possible to mix PWs with different tunnel protocols and/or address
+families in the same VPLS.  The supported tunnel protocols are listed
+in the next section.
 
-The final packet, containing the IPv6 header, tunnel header and
-original Ethernet frame is injected into the provider's network
-through the uplink interface.
+The entire architecture is shown in the following figure.  For
+simplicity, the distinction between IPv4 and IPv6 is not shown here.
+In the implementation, there exist separate data paths with identical
+functionality for both address families.
 
-Each PW is uniquely identified by the source and destination addresses
-of its IPv6 header.  When an IPv6 packet enters the VPNTP through the
-uplink, those addresses are used to forward the packet to the
-appropriate pseudowire module by a component called the _dispatcher_.
-The PW module strips the IPv6 header from the packet, performs any
-protocol-specific processing (apart from stripping the tunnel header
-itself, for example verifying the checksum of a GRE header) and hands
-the original Ethernet frame to the bridge module for forwarding to the
-appropriate AC.
+In the case depicted below, all VPLS instances are configured to share
+the same uplink, but there is no restriction in this respect,
+i.e. each VPLS or groups of VPLS could use different uplinks.  The box
+labelled `ND` is a module that provides neighbor discovery to
+determine the MAC address of the adjacent router in the outbound
+direction and let the adjacent router discover the local MAC address
+when sending packets in the inbound direction.  The ND module is the
+feature that identifies the uplink as a "L3-port", while the ACs are
+L2-ports without the need for neighbor discovery.
 
-The entire architecture is shown in the following figure.  In this
-case, all VPLS instances are configured to share the same uplink, but
-there is no restriction in this respect, i.e. each VPLS or groups of
-VPLS could use different uplinks.  The box labelled `ND` is a module
-that provides IPv6 neighbor discovery to determine the MAC address of
-the adjacent router in the outbound direction and let the adjacent
-router discover the local MAC address when sending packets in the
-inbound direction.  The ND module is the feature that identifies the
-uplink as a "L3-port", while the ACs are L2-ports without the need for
-neighbor discovery.
-
-The box labelled `Frag` is a collections of apps that performs IPv6
+The box labelled `Frag` is a collections of apps that performs IP
 fragmentation and reassembly for packets destined to any of the
 pseudowires connected to the dispatcher. Initially, the path MTU
 (PMTU) for all outgoing packets is equal to the MTU of the uplink
 port, but the fragmenter implements standard PMTU discovery (PMTUD):
-ff any of the packets experiences an MTU bottleneck (i.e. a link along
+if any of the packets experiences an MTU bottleneck (i.e. a link along
 the path to the destination whose MTU is smaller than that of the
 uplink port), the corresponding device will generate an appropriate
 ICMP _Packet-Too-Big_ (PTB) message, which will be processed by the
@@ -254,39 +252,47 @@ instead of the uplink's MTU.  The cached PMTUD is discarded after 10
 minutes to allow the system to discover an increase of the PMTU,
 e.g. after a routing change.
 
+The box labelled _dispatcher_ contains a collection of apps which
+de-multiplex the traffic coming in from the uplink based on the pair
+of source and destination address, tunnel protocol and VC ID in order
+to pass the Ethernet frame carried in the payload to the proper VPLS
+instance.  In the reverse direction, the dispatcher adds the
+appropriate tunnel and transport headers and passes the packet on for
+transmission on the uplink.
+
     DIAGRAM: VPN-TP
     
-    ------------------------------------------ Decapsulation ---------------------------------------->
-    <----------------------------------------- Encapsulation -----------------------------------------
-                                                            +=-------------------------------+
-                                                            |  VPLS                          |
-                                                            |                                |
-                                                            |     +-------+    +---------+   |
-                                                      +---------->+ PW    +<-->+         |   |
-                                                      |     :     +-------+    |         +<-------> AC
-                                                      |     |         .        | Bridge  |   :  .
-                                                      |     |         .        |         |   |  .
-                                                      |     |     +-------+    |         +<-------> AC
-                                                      |+--------->+ PW    +<-->+         |   |
-                                                      ||    |     +-------+    +---------+   |
-                                    +------------+    ||    +=-------------------------------+
+    ------------------------------------------ Decapsulation --------------------------->
+    <----------------------------------------- Encapsulation ----------------------------
+                                                            +=------------------+
+                                                            |  VPLS             |
+                                                            |                   |
+                                                        PW  |     +---------+   |
+                                                      +---------->+         |   |
+                                                      |     :     |         +<-------> AC
+                                                      |     |     | Bridge  |   :  .
+                                                      |     |     |         |   |  .
+                                                      | PW  |     |         +<-------> AC
+                                                      |+--------->+         |   |
+                                                      ||    |     +---------+   |
+                                    +------------+    ||    +=------------------+
                                     |            +<---+|              .
                 +----+   +------+   |            +<----+              .
     Uplink <--->+ ND +<->+ Frag +<->+ dispatcher |                    .
                 +----+   +------+   |            +<----+              .
                                     |            +<---+|              .
-                                    +------------+    ||    +=-------------------------------+
-                                                      ||    |     +-------+    +---------+   |
-                                                      |+--------->+ PW    +<-->+         |   |
-                                                      |     :     +-------+    |         +<-------> AC
-                                                      |     |         .        | Bridge  |   :  .
-                                                      |     |         .        |         |   |  .
-                                                      |     |     +-------+    |         +<-------> AC
-                                                      +---------->+ PW    +<-->|         |   |
-                                                            |     +-------+    +---------+   |
-                                                            |                                |
-                                                            |  VPLS                          |
-                                                            +=-------------------------------+
+                                    +------------+    ||    +=------------------+
+                                                      ||    |     +---------+   |
+                                                      |+--------->+         |   |
+                                                      | PW  :     |         +<-------> AC
+                                                      |     |     | Bridge  |   :  .
+                                                      |     |     |         |   |  .
+                                                      |     |     |         +<-------> AC
+                                                      +---------->+         |   |
+                                                        PW  |     +---------+   |
+                                                            |                   |
+                                                            |  VPLS             |
+                                                            +=------------------+
 
 Any of the ACs or uplinks can be implemented either as physical
 interfaces or as VLAN-mode sub-interfaces of a physical interface
@@ -321,9 +327,9 @@ multiplexer and its trunk port connects to the interface.
 
     DIAGRAM: UPLINK-VLAN-TRUNK
     
-                                +----+ uplink +------------+
-                          +---->+ ND +<------>+ dispatcher +<----
-                   VID 100|     +----+        +------------+
+                                +----+    +------+    +------------+
+                          +---->+ ND +<-->+ Frag +<-->+ dispatcher +<--
+                   VID 100|     +----+    +------+    +------------+
                           V
                        +--+--+
                 trunk  | VLAN|
@@ -331,9 +337,9 @@ multiplexer and its trunk port connects to the interface.
                        |     |
                        +--+--+
                           ^
-                   VID 200|     +----+ uplink +------------+
-                          +---->+ ND +<------>+ dispatcher +<---
-                                +----+        +------------+
+                   VID 200|     +----+    +------+    +------------+
+                          +---->+ ND +<-->+ Frag +<-->+ dispatcher +<--
+                                +----+    +------+    +------------+
 
 It is possible to let all ACs and uplinks share the same physical
 port, providing a "VPNTP-on-a-stick" configuration.
@@ -345,26 +351,18 @@ The following tunneling protocols are supported.
 #### GRE
 
 The GRE protocol version 0 is supported according to RFCs 1701, 2784
-and 2890 with the restriction that only the `checksum` and `key`
-extensions are available.  The 2-byte protocol identifier carried in
-every GRE header is set to the value `0x6558` assigned to "Transparent
-Ethernet Bridging" (see the [IEEE Ethertype
+and 2890 with the restriction that only the `key` extensions is
+available, which is set to the _VC ID_ assigned to the PW.  The 2-byte
+protocol identifier carried in every GRE header is set to the value
+`0x6558` assigned to "Transparent Ethernet Bridging" (see the [IEEE
+Ethertype
 assignments](http://standards-oui.ieee.org/ethertype/eth.txt))
-
-If the `key` extension is enabled, the 32-bit value is set to the _VC
-label_ assigned to the VPLS to which the PW belongs (TODO: discuss VC
-label).
-
-If the `checksum` extension is enabled, the checksum over the GRE
-header and original Ethernet frame is included in the tunnel header
-for integrity checking at the tunnel egress.  Note: this will impact
-performance (TODO: add estimate of overhead).
 
 #### <a name="tunnel_keyed_ipv6">Keyed IPv6 Tunnel</a>
 
 The keyed IPv6 tunnel is a stripped down version of the L2TPv3
 protocol as specified by the Internet Draft
-[`draft-ietf-l2tpext-keyed-ipv6-tunnel`](https://tools.ietf.org/html/draft-ietf-l2tpext-keyed-ipv6-tunnel)
+[`RFC8159`](https://tools.ietf.org/html/rfc8159).
 
 The protocol is only defined for transport over IPv6 and does not make
 use of the regular L2TPv3 control channel.  The header contains only
@@ -377,12 +375,8 @@ two fields:
 Since the pseudowire associated with a tunnel is already uniquely
 identified by the IPv6 addresses of the endpoints, the session ID is
 not actually needed to assign a packet to a particular VPLS instance.
-The draft recommends setting the session ID to the value `0xffffffff`.
-It can still be set to an arbitrary value (except for `0x0`, which is
-reserved for the control channel in the generic L2TPv3 protocol) to
-inter-operate with implementations that do make use of the value.  The
-session ID is unidirectional, i.e. each endpoint may chose a value
-independently.
+The draft recommends setting the session ID to the value `0xffffffff`,
+which is enforced by this implementation.
 
 The cookie is used to protect against spoofing and brute-force blind
 insertion attacks.  Each endpoint is configured with a _remote
@@ -399,8 +393,8 @@ information about the payload (like the protocol field of GRE).
 
 #### <a name="control-channel">Pseudowire Control-Channel</a>
 
-The pseudowire module (`program.l2vpn.pseudowire`) implements an
-in-band _control channel_ (CC), which provides two types of services:
+Each pseudowire implements an optional in-band _control channel_ (CC),
+which provides two types of services:
 
    1. Parameter advertisement. One end of the PW can advertise local
    parameters to its peer, either for informational purposes or to
@@ -436,8 +430,15 @@ data-plane breaks, the control-channel is disrupted as well and the
 failure is detected automatically.
 
 A protocol-dependent mechanism must be used to differentiate control
-traffic from data traffic.  This implementation reserves the value
-`0xFFFFFFFE` for the GRE `key` and L2TPv3 session ID for this purpose.
+traffic from data traffic.  For GRE, the VC ID used for the control
+channel is derived from the VC ID of the PW by adding the value
+0x8000.  This convention also restricts the range of VC IDs available
+for PWs to 0x0000 - 0x7FFF.
+
+For L2TPv3, the VC ID is not configurable (the PW identitiy is
+determined by the sourde and destination IPv6 addrresses alone).  It
+uses the session ID `0xFFFFFFFF` for the PW and `0xFFFFFFFE` for the
+control channel.
 
 The following items are supported by the control-channel.
 
@@ -453,8 +454,6 @@ The following items are supported by the control-channel.
      unsigned 16-bit number in the TLV.
 
    * `if_description`: Interface description (TODO)
-
-   * `vc_id`:
 
 The dead-peer detection proceeds as follows.  The local endpoint
 records the heartbeat interval advertised by the remote end over the
@@ -543,15 +542,13 @@ form.
 <vpls_name> = {
   description = <description>,
   mtu = <mtu>,
-  vc_id = <vc_id>,
   uplink = <uplink_interface>,
   bridge = <bridge_config>,
   ac = {
-    <ac_1> = <ac_interface>,
-    <ac_2> = <ac_interface>,
+    <ac_1> = { interface = <ac_interface> },
+    <ac_2> = { interface = <ac_interface> },
     ...
   },
-  address = <VPLS_address>,
   tunnel = <tunnel_config>,
   cc = <cc_config>,
   pw = {
@@ -587,10 +584,6 @@ The keys define the properties of the VPLS instance.
      [VLAN-mode](#ac-modes), the size of the service-delimiting tag (4
      bytes) is subtracted from the MTU of the sub-interface before it
      is compared to the VPLS MTU.
-
-   *  `vc_id`
-
-      (TODO)
 
    * `uplink`
 
@@ -665,9 +658,9 @@ The keys define the properties of the VPLS instance.
      configuration, for example
      ```
      ac = {
-       AC_1 = "TenGigE0/0",
-       AC_2 = "TenGigE0/1.100",
-       AC_3 = "TenGigE0/1.200"
+       AC_1 = { interface = "TenGigE0/0" },
+       AC_2 = { interface = "TenGigE0/1.100" },
+       AC_3 = { interface = "TenGigE0/1.200" },
      }
      ```
  
@@ -680,11 +673,6 @@ The keys define the properties of the VPLS instance.
      [interface abstraction](#interface-abstraction) section for
      details).
 
-   * `address`
-
-     the IPv6 address that uniquely identifies the VPLS instance.  It
-     is used as endpoint for all attached pseudowires.
-
    * `tunnel`
 
      a table that specifies the default tunnel configuration for all
@@ -695,7 +683,7 @@ The keys define the properties of the VPLS instance.
      ```
      <tunnel_config> = {
        type = "gre" | "l2tpv3",
-       -- Type-specific configuration
+       config = { -- Type-specific configuration }
      }
      ```
 
@@ -705,63 +693,26 @@ The keys define the properties of the VPLS instance.
 
       * GRE
 
-        ```
-        {
-          type = "gre",
-          key = <key>,            -- optional
-          checksum = true | false -- optional
-        }
-        ```
-
-        The optional key `key` is a 32-bit value (for example `key =
-        0x12345678`) that will be placed in the GRE key header field
-        for packets transmitted on the pseudowire.  Packets arriving
-        on the pseudowire are expected to contain the same key,
-        otherwise they are discarded and an error message is
-        logged. Hence, both sides of the pseudowire must be configured
-        with the same key (or none).
-
-        The value of `0xFFFFFFFE` is reserved for the control channel.
-        Note that while the control channel always uses a key, it is
-        permitted to configure the tunnel itself without a key.
-
-        If `checksum = true`, outgoing GRE packets will contain a
-        checksum that covers the encapsulated Ethernet frame.  When a
-        pseudowire receives a packet that contains a checksum, it is
-        always validated, irrespective of the setting of the
-        `checksum` configuration key.  If validation fails, the packet
-        is dropped and an error is logged.
+        No specific configuration required or allowed.
 
       * L2TPv3
 
         ```
         {
           type = "l2tpv3",
-          local_session = <local_session>,   -- optional
-          remote_session = <remote_session>, -- optional
-          local_cookie = <local_cookie>,
-          remote_cookie = <remote_cookie>,
+          config = {
+            local_cookie = <local_cookie>,
+            remote_cookie = <remote_cookie>
+          }
         }
         ```
 
-        The optional `local_session` and `remote_session` keys specify
-        32-bit numbers that can be used as session identifiers.  As
-        [discussed above](#tunnel_keyed_ipv6), they are only needed to
-        ensure interoperability in certain cases.  If omitted, they
-        will default to the value `0xFFFFFFFF`.  The value
-        `<remote_session>` is placed in outgoing packets, while the
-        the session ID of incoming packets is compared to
-        `<local_session>`.  If the values don't match, the packet is
-        discarded and an error is logged.  Hence, the pseudowire
-        endpoints must be configured with one's local session ID
-        identical to that of the other's remote session ID.
-
         The mandatory `<local_cookie>` and `<remote_cookie>` keys must
         specify 64-bit numbers for the purpose [explained
-        above](#tunnel_keyed_ipv6).  Like the session ID, the cookies
-        are unidirectional, i.e. one's local cookie must be equal to
-        the other's remote cookie.  The value must consist of a
-        sequence of 8 bytes, e.g. a Lua string of length 8 like
+        above](#tunnel_keyed_ipv6).  The cookies are unidirectional,
+        i.e. one's local cookie must be equal to the other's remote
+        cookie.  The value must consist of a sequence of 8 bytes,
+        e.g. a Lua string of length 8 like
         `'\x00\x11\x22\x33\x44\x55\x66\x77'`.
 
    * `cc`
@@ -805,16 +756,26 @@ The keys define the properties of the VPLS instance.
      configuration is a Lua table of the form
      ```
      <pw_config> = {
-       address = <remote_address>,
+       afi = "ipv4" | "ipv6",
+       local_address = <local_address>,
+       remote_address = <remote_address>,
+       vc_id = <vc_id>,
        tunnel = <tunnel_config>, -- optional
        cc = <cc_config>          -- optional
      }
      ```
 
-     The mandatory key `address` specifies the IPv6 address of the
-     remote end of the pseudowire.  The `tunnel` and `cc` keys specify
-     the configurations of the tunnel and control-channel of the
-     pseudowire, respectively, as described above.
+     The mandatory key `afi` selects the address family.  The
+     mandatory keys `local_address` and `remote_address` specify the
+     local and remote endpoint addresses within that address family.
+     The `tunnel` and `cc` keys specify the configurations of the
+     tunnel and control-channel of the pseudowire, respectively, as
+     described above.
+
+     The mandatory key `vc_id` specifies the VC ID to use for this PW.
+     The tuple (`local_address`, `remote_address`, `vc_id`) must be
+     unique.  For tunnel protocols which do not support VC IDs (like
+     L2TPv3), the `vc_id` must be set to 0.
 
      The tunnel configuration is mandatory for a pseudowire, either
      through the default at the VPLS top-level configuration or the
@@ -897,22 +858,27 @@ return {
       description = "Endpoint A of a point-to-point L2 VPN",
       uplink = "TenGigE0/1",
       mtu = 1514,
-      vc_id = 1,
       ac = {
-        ac_A = "TenGigE0/0",
+        ac_A = { interface = "TenGigE0/0" },
       },
-      address = "2001:db8:0:1:0:0:0:1",
       tunnel = {
         type = 'l2tpv3',
-        local_cookie  = '\x00\x11\x22\x33\x44\x55\x66\x77',
-        remote_cookie = '\x77\x66\x55\x44\x33\x33\x11\x00'
+        config = {
+          local_cookie  = '\x00\x11\x22\x33\x44\x55\x66\x77',
+          remote_cookie = '\x77\x66\x55\x44\x33\x33\x11\x00'
+        }
       },
       cc = {
         heartbeat = 2,
         dead_factor = 4
       },
       pw = {
-         pw_B = { address = "2001:db8:0:1:0:0:0:2" },
+        pw_B = {
+          afi = "ipv6",
+          local_address = "2001:db8:0:1:0:0:0:1",
+          remote_address = "2001:db8:0:1:0:0:0:2",
+          vc_id = 0
+        },
       }
     }
   }
@@ -960,21 +926,27 @@ return {
       mtu = 1514,
       vc_id = 1,
       ac = {
-        ac_B = "TenGigE0/0"
-        }
+        ac_B = { interface = "TenGigE0/0" }
       },
       address = "2001:db8:0:1:0:0:0:2",
       tunnel = {
         type = 'l2tpv3',
-        local_cookie  = '\x77\x66\x55\x44\x33\x33\x11\x00',
-        remote_cookie = '\x00\x11\x22\x33\x44\x55\x66\x77'
+        config = {
+          local_cookie  = '\x77\x66\x55\x44\x33\x33\x11\x00',
+          remote_cookie = '\x00\x11\x22\x33\x44\x55\x66\x77'
+        }
       },
       cc = {
         heartbeat = 2,
         dead_factor = 4
       },
       pw = {
-         pw_A = { address = "2001:db8:0:1:0:0:0:1" },
+        pw_A = {
+          afi = "ipv6",
+          local_address = "2001:db8:0:1:0:0:0:2",
+          remot_address = "2001:db8:0:1:0:0:0:1".
+          vc_id = 0
+        },
       }
     }
   }
@@ -1019,9 +991,14 @@ configured by a Lua table of the following form
       ipv6 = {
         address = <address>,
         next_hop = <next_hop>,
-        [ neighbor_mac = <neighbor_mac>,
-          [ neighbor_nd = true | false, ] ]
-      }
+        [ next_hop_mac = <next_hop_mac>, ]
+      },
+      ipv4 = {
+        address = <address>,
+        next_hop = <next_hop>,
+        [ next_hop_mac = <next_hop_mac>, ]
+      },
+
     }, ]
   [ trunk = {
       enable = true | false,
@@ -1035,8 +1012,12 @@ configured by a Lua table of the following form
               ipv6 = {
                 address = <address>,
                 next_hop = <next_hop>,
-                [ neighbor_mac = <neighbor_mac>,
-                  [ neighbor_nd = true | false, ] ]
+                [ next_hop_mac = <next_hop_mac>, ]
+              },
+              ipv4 = {
+                address = <address>,
+                next_hop = <next_hop>,
+                [ next_hop_mac = <next_hop_mac>, ]
               }
             } ]
          },
@@ -1142,7 +1123,7 @@ one would use a configuration like the following (see the complete
 vpls = {
   vpls1 = {
     ac = {
-      ac1 = "TenGigE0/0",
+      ac1 = { interface = "TenGigE0/0" },
     },
     .
     .
@@ -1236,7 +1217,8 @@ its behavior at the Ethernet layer (L2) consisting of the items
 mtu = <mtu>,
 [ trunk = {
     enable = true | false,
-    encapsulation = "dot1q" | "dot1ad" | <number>, ]
+    encapsulation = "dot1q" | "dot1ad" | <number>,
+  }, ]
 [ mirror = {
     [ rx = true | false | <rx_name>, ]
     [ tx = true | false | <tx_name>, ]
@@ -1396,51 +1378,41 @@ configurations called `afs`:
     ipv6 = {
       address = <address>,
       next_hop = <next_hop>,
-      [ neighbor_mac = <neighbor_mac>,
-        [ neighbor_nd = true | false, ] ]
+      [ next_hop_mac = <next_hop_mac>, ]
+    },
+    ipv4 = {
+      address = <address>,
+      next_hop = <next_hop>,
+      [ next_hop_mac = <next_hop_mac>, ]
     }
   }
 }
 ```
 
-The `afs` table is intended to contain separate sections for each
-supported address family.  Currently, only IPv6 is supported in a
-restricted manner where only a single address/prefix is allowed per
-interface.
+The `afs` table can contain configurations of either or both address
+families.  Both are restricted to a single address per interface.
 
 Like on a conventional system, the main configuration option is the
-assignment of a subnet and an address within this subnet.  The
-`<address>` item must be a string that specifies a complete IPv6
-address in any of the valid notations.  A netmask of `/64` is implied
-and currently cannot be changed.  For example,
-
-```
-afs = {
-  ipv6 = {
-    address = "2001:db8::1"
-  }
-}
-```
-
-would set the IPv6-subnet to `2001:db8::/64` and the address of the
-interface to `2001:db8::1` at the same time.
+assignment of a an address to the interface.  Currently, the notion of
+a subnet mask is not supported, see below.
 
 The presence of any L3 interface implies that the system also provides
 
    * Some kind of routing functionality which determines
      the address of a directly attached system to which a given
      packet must be handed off, a.k.a. _next-hop_
-   * An address-resolution process that finds the MAC address
-     of the interface for the next-hop, a.k.a. _neighbor discovery_
-     (ND) in the context of IPv6.  This process must also support
-     address resolution in the other direction, when the adjacent
-     system tries to discover the MAC address associated with the
-     local address
+
+   * An address-resolution process that finds the MAC address of the
+     interface for the next-hop, a.k.a. _neighbor discovery_ (provided
+     by ICMPv6 and ARP for IPv6 and IPv4, respectively).  This process
+     must also support address resolution in the other direction, when
+     the adjacent system tries to discover the MAC address associated
+     with the local address
 
 Currently, the Snabb architecture has no concept of routing at all,
 let alone any kind of dynamic routing.  Within the `l2vpn`
 application, only the "uplinks" need to be L3-interfaces, because they
-transport payload encapsulated in IPv6 between the device and the ISP
+transport payload encapsulated in IP between the device and the ISP
 network.  Attachment circuits are, by definition, L2-ports.
 
 Because the `l2vpn` application essentially monopolizes all interfaces
@@ -1452,16 +1424,18 @@ like neighbor discovery have no meaning to the system and need to be
 dropped) and are fed directly into the network of applications that
 processes them.
 
-The IPv6 packets that are generated by the `l2vpn` application itself
-by encapsulating Ethernet frames from attachment circuits are directed
-to a specific L3-port via the VPLS configuration to which the
+The IP packets that are generated by the `l2vpn` application itself by
+encapsulating Ethernet frames from attachment circuits are directed to
+a specific L3-port via the VPLS configuration to which the
 corresponding pseudowire belongs (via the `uplink` item in the [VPLS
 configuration](#vpls-instance-config)).  This can be viewed as a kind
 of policy-based routing decision.  Each L3-port is associated with a
 static next-hop which is essentially a interface-specific
 default-route.  This is the purpose of the `<next_hop>` configuration
-item, which must be a complete IPv6 address that belongs to the same
-subnet as the `<address>`.
+item, which must be a complete IP address. This is the only address
+for which outbound neighbor discovery needs to be performed and it is
+simply assumed that it is "on-net", i.e. directly reachable.  This is
+why a subnet mask is not required.
 
 The difference to a L2-port is the insertion of a _neighbor discovery_
 module (ND) between the interface driver and the Snabb application
@@ -1469,84 +1443,34 @@ that attaches to the port.  The ND module performs the following
 functions
 
    * For packets coming from the driver
+
      * Handle packets which are part of the ND protocol
        (i.e. address resolution)
-     * Pass all other packets to the application or drop
-       them if the type field in the Ethernet header doesn't have
-       the proper value for the L3 protocol (e.g. `0x86dd` for IPv6)
+
+     * Pass all other packets to the application or drop them if the
+       type field in the Ethernet header doesn't have the proper value
+       for the L3 protocol (e.g. `0x86dd` for IPv6 and `0x0800 for
+       IPv4)
+
    * For packets coming from the application (they are expected
      to already contain an Ethernet header)
+
      * Set the type field in the Ethernet header to the proper
        value for the L3 protocol
+
      * Fill in the MAC address of the physical interface as
        source address in the Ethernet header
+
      * If the next-hop address has been resolved by ND,
        fill in the discovered MAC address as destination
        address in the Ethernet header
+
      * If ND for the next-hop has not completed, drop
        the packet
 
-For IPv6, one of three ND modules is selected based on the
-configuration.
-
-#### Full ND
-
-In this mode, dynamic ND is performed in both directions: the system
-performs address-resolution for the `<next_hop>` address and it
-responds to address-resolution requests for its own address
-`<address>`.  The `<address>` and `<next_hop>` are the only required
-configuration items
-
-```
-afs = {
-  ipv6 = {
-    address = <address>,
-    next_hop = <next_hop>
-  }
-}
-```
-
-This mode is implemented by the `apps.ipv6.nd_light` Snabb
-application.
-
-#### Partial ND
-
-In this mode, the system uses a static mapping of the `<next_hop>`
-address to its MAC address but it still responds to address-resolution
-requests from adjacent systems.  The configuration must include the
-`<neighbor_mac>` item and set the `<neighbor_nd>` item to `true`
-
-```
-afs = {
-  ipv6 = {
-    address = <address>,
-    next_hop = <next_hop>,
-    neighbor_mac = <neighbor_mac>,
-    neighbor_nd = true
-  }
-}
-```
-This mode is implemented by the `apps.ipv6.ns_responder` Snabb
-application.
-
-#### Static ND
-
-In this mode, the system uses a static mapping for the `<next_hop>`
-and does not respond to ND requests either, i.e. it requires that the
-adjacent system uses a static ND entry for `<address>` as well:
-
-```
-afs = {
-  ipv6 = {
-    address = <address>,
-    next_hop = <next_hop>,
-    neighbor_mac = <neighbor_mac>,
-    neighbor_nd = false
-  }
-}
-```
-This mode is implemented by the `apps.ipv6.nd_static` Snabb
-application.
+If the MAC address for `next_hop` is set via the `next_hop_mac`
+configuration option, neighbor discovery need not be performed for
+outgoing packets.
 
 ### <a name="sub-interfaces">Sub-Interfaces</a>
 
@@ -1584,8 +1508,12 @@ trunk = {
           ipv6 = {
             address = <address>,
             next_hop = <next_hop>,
-            [ neighbor_mac = <neighbor_mac>,
-              [ neighbor_nd = true | false, ] ]
+            [ next_hop_mac = <next_hop_mac> ]
+          },
+          ipv4 = {
+            address = <address>,
+            next_hop = <next_hop>,
+            [ next_hop_mac = <next_hop_mac> ]
           }
         } ]
      },
@@ -1798,20 +1726,19 @@ most Cisco devices and are almost but not quite identical to their
 As has already been discussed, only static routing is supported on the
 uplink interface by configuring the next-hop address used for all
 outgoing packets.  This address must be resolvable to a MAC address
-through regular IPv6 neighbor discovery by the adjacent router.  There
+through regular IP neighbor discovery by the adjacent router.  There
 currently is no concept of a routing table in the Snabb architecture,
 but this mechanism is essentially equivalent to a static default
 route.
 
-For the tunnels to work, all local IPv6 endpoint addresses need to be
+For the tunnels to work, all local IP endpoint addresses need to be
 reachable by the remote sides of the pseudowires.  How this is
 achieved is outside the scope of the Snabb system.  There are
 basically two methods.
 
-   * The adjacent router configures static routes for each IPv6
-     address that terminates a VPLS and re-distributes the routes
-     within the routing domains in which the remote endpoints are
-     located.
+   * The adjacent router configures static routes for each IP address
+     that terminates a VPLS and re-distributes the routes within the
+     routing domains in which the remote endpoints are located.
 
    * The host running the VPNTP announces the local endpoint addresses
      with the next-hop address of the local uplink interface address
