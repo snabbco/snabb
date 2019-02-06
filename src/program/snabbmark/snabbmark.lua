@@ -28,6 +28,8 @@ function run (args)
       intel10g(unpack(args))
    elseif command == 'rawsocket' and #args ~= 3 then
       rawsocket(unpack(args))
+   elseif command == 'xdpsocket' and #args ~= 3 then
+      xdpsocket(unpack(args))
    elseif command == 'esp' and #args >= 2 then
       esp(unpack(args))
    elseif command == 'hash' and #args <= 1 then
@@ -587,6 +589,14 @@ end
 
 function rawsocket (npackets, packet_size, timeout)
    local driver = require("apps.socket.raw").RawSocket
+   npackets = tonumber(npackets) or 10e3
+   packet_size = tonumber(packet_size) or 64
+   timeout = tonumber(timeout) or 1000
+   socket(driver, npackets, packet_size, timeout)
+end
+
+function xdpsocket (npackets, packet_size, timeout)
+   local driver = require("apps.socket.xdp.xdp").XDPSocket
    npackets = tonumber(npackets) or 10e3
    packet_size = tonumber(packet_size) or 64
    timeout = tonumber(timeout) or 1000
