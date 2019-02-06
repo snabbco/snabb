@@ -507,12 +507,7 @@ function intel10g (npackets, packet_size, timeout)
    end
 end
 
-function rawsocket (npackets, packet_size, timeout)
-   local driver = require("apps.socket.raw").RawSocket
-   npackets = tonumber(npackets) or 10e3
-   packet_size = tonumber(packet_size) or 64
-   timeout = tonumber(timeout) or 1000
-
+local function socket (driver, npackets, packet_size, timeout)
    local ifname0 = lib.getenv("SNABB_IFNAME0") or lib.getenv("SNABB_PCI0")
    if not ifname0 then
       skip("SNABB_IFNAME0 not set.")
@@ -590,6 +585,13 @@ function rawsocket (npackets, packet_size, timeout)
    end
 end
 
+function rawsocket (npackets, packet_size, timeout)
+   local driver = require("apps.socket.raw").RawSocket
+   npackets = tonumber(npackets) or 10e3
+   packet_size = tonumber(packet_size) or 64
+   timeout = tonumber(timeout) or 1000
+   socket(driver, npackets, packet_size, timeout)
+end
 
 function esp (npackets, packet_size, mode, direction)
    local esp = require("lib.ipsec.esp")
