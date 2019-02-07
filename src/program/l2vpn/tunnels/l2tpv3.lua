@@ -94,9 +94,13 @@ function selftest ()
               { session = math.random(2^32-1),
                 cookie = random_cookie() })
    config.link(app_graph, "noise.output -> join.noise")
-
    config.app(app_graph, "join", Join)
-   config.app(app_graph, "l2tpv3", tunnel, { vcs = vcs })
+   config.app(app_graph, "l2tpv3", tunnel,
+              { vcs = vcs,
+                ancillary_data = {
+                   local_addr = "::",
+                   remote_addr = "::"
+                } })
    config.app(app_graph, "l2tpv3_rev", tunnel, { vcs = vcs_rev })
    config.app(app_graph, "sink_rev", Sink)
 
