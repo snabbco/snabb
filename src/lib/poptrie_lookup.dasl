@@ -58,7 +58,7 @@ end
 |.define dmap,    rcx -- pointer to directmap
 |.define index,   r8d -- index into node array
 |.define node,    r8  -- pointer into node array 
-|.define offset,  r9  -- offset into key
+|.define offset,  r9d -- offset into key
 |.define v,       r10 -- k or s bits extracted from key
 |.define v_dw,    r10d -- (v as dword)
 |.define vec,     r11 -- 64-bit vector or leafvec
@@ -94,7 +94,7 @@ function lookup (Dst, Poptrie, keysize)
    -- while band(vec, lshift(1ULL, v)) ~= 0
    |2:
    -- v = extract(key, offset, k=6)
-   | mov rcx, offset
+   | mov ecx, offset
    -- v = rshift(key, offset)
    if keysize == 32 then
       | mov v_dw, dword [key]
@@ -105,23 +105,20 @@ function lookup (Dst, Poptrie, keysize)
    elseif keysize == 128 then
       | mov v, [key]
       | mov vec, [key+8]
-      | cmp rcx, 63
-      | jng >3
-      | sub rcx, 64
-      | mov v, vec
-      | 3:
+      | test cl, 64
+      | cmovnz v, vec
       | shrd v, vec, cl
    else error("NYI") end
    -- v = band(v, lshift(1, k=6) - 1)
-   | and v, 0x3F
+   | and v_dw, 0x3F
    -- vec = nodes[index].vector
    | mov vec, qword [node+8]
    -- is bit v set in vec?
    | bt vec, v
    | jnc >4 -- reached leaf, exit loop
    -- rax = lshift(2ULL, v) - 1
-   | mov rax, 2
-   | mov rcx, v
+   | mov eax, 2
+   | mov ecx, v_dw
    | shl rax, cl
    | sub rax, 1
    -- rax = popcnt(band(vec, rax))
@@ -140,8 +137,8 @@ function lookup (Dst, Poptrie, keysize)
    -- end while
    |4:
    -- rax = lshift(2ULL, v) - 1
-   | mov rax, 2
-   | mov rcx, v
+   | mov eax, 2
+   | mov ecx, v_dw
    | shl rax, cl
    | sub rax, 1
    if Poptrie.leaf_compression then
