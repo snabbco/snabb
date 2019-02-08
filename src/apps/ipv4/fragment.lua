@@ -79,7 +79,6 @@ Fragmenter = {}
 Fragmenter.shm = {
    ["out-ipv4-frag"]      = {counter},
    ["out-ipv4-frag-not"]  = {counter},
-   ["out-ipv6-frag-not"]  = {counter},
    ["ipv4-pmtud-ptb-received"] = {counter},
    ["ipv4-pmtud-ptb-valid"] = {counter},
    ["ipv4-pmtud-ptb-invalid-csum"] = {counter},
