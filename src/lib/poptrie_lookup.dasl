@@ -84,7 +84,7 @@ function lookup (Dst, Poptrie, keysize)
       | imul index, 24 -- multiply by node size
       | lea node, [nodes+index]
       -- offset = s
-      | mov offset, 18
+      | mov offset, Poptrie.s
    else
       -- index, node, offset = 0, nodes[index], 0
       | xor index, index
