@@ -505,10 +505,10 @@ function selftest ()
       local k = {}
       local numentries = 10000
       local keysize = 32
-      for entry = 1, numentries do
+      for entry = 0, numentries - 1 do
          local a, l = rs(), math.random(keysize)
          t:add(a, l, entry)
-         k[entry] = a
+         k[entry % 100 + 1] = a
       end
       local function build ()
          t:build()
