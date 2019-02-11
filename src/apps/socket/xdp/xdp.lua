@@ -65,18 +65,15 @@ function XDPSocket:can_transmit()
 end
 
 function XDPSocket:transmit (p)
-   return self.dev.transmit(self.dev.context, p.data, p.length + 1)
+   self.dev.transmit(self.dev.context, p.data, p.length + 1)
 end
 
 function XDPSocket:push ()
    local rx = self.input and self.input.rx
    if not rx then return end
-   while not link.empty(rx) do
-		if not self:can_transmit() then break end
+   while not link.empty(rx) and self:can_transmit() do
       local p = link.receive(rx)
-		if p.length > 0 then
-			self:transmit(p)
-		end
+		self:transmit(p)
 		packet.free(p)
    end
 end
