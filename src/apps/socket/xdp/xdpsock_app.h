@@ -67,12 +67,12 @@ typedef struct xdpsock_options_t {
 } xdpsock_options_t;
 
 typedef struct xdpsock_context_t {
-	struct xdpsock *xsks[4];  // MAX_SOCKS.
-	int num_socks;
-	int nfds_in, nfds_out;
-	struct pollfd *fds_in;
-	struct pollfd *fds_out;
-	const xdpsock_options_t *opts;
+    struct xdpsock *xsks[4];  // MAX_SOCKS.
+    int num_socks;
+    int nfds_in, nfds_out;
+    struct pollfd *fds_in;
+    struct pollfd *fds_out;
+    const xdpsock_options_t *opts;
 } __attribute__((packed)) xdpsock_context_t;
 
 /* Public. */

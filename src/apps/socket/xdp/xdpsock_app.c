@@ -592,7 +592,7 @@ static xdpsock_context_t* init_xdpsock_context(const xdpsock_options_t *opts, in
 
 bool can_receive(const xdpsock_context_t *ctx)
 {
-	const unsigned int timeout = 1000;
+    const unsigned int timeout = 1000;
 
     return poll(ctx->fds_in, ctx->nfds_in, timeout) > 0;
 }
@@ -607,17 +607,17 @@ size_t receive_packet(const xdpsock_context_t *ctx, char *data)
     rcvd = xq_deq(&xsk->rx, descs, BATCH_SIZE);
     if (!rcvd) {
         return 0;
-	}
+    }
 
-	char *buffer = xq_get_data(xsk, descs[0].addr);
-	size_t len = descs[0].len;
-	memcpy(data, buffer, len);
+    char *buffer = xq_get_data(xsk, descs[0].addr);
+    size_t len = descs[0].len;
+    memcpy(data, buffer, len);
 
     xsk->rx_npkts += rcvd;
 
     umem_fill_to_kernel_ex(&xsk->umem->fq, descs, rcvd);
 
-	return len;
+    return len;
 }
 
 void transmit_packets(const xdpsock_context_t *ctx, const char *pkt_data, size_t len, size_t batch_size)
