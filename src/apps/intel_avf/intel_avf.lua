@@ -185,6 +185,20 @@ local virtchnl_version_t = ffi.typeof([[
 ]])
 local virtchnl_version_ptr_t = ffi.typeof('$*', virtchnl_version_t)
 
+local virtchnl_irq_map_info_t = ffi.typeof([[
+   struct {
+      uint16_t num_vectors;
+
+      uint16_t vsi_id;
+      uint16_t vector_id;
+      uint16_t rxq_map;
+      uint16_t txq_map;
+      uint16_t rxitr_idx;
+      uint16_t txitr_idx;
+   } __attribute__((packed))
+]])
+local virtchnl_irq_map_info_ptr_t = ffi.typeof('$*', virtchnl_irq_map_info_t)
+
 function Intel_avf:init_tx_q()
    self.txdesc = ffi.cast(txdesc_ptr_t,
    memory.dma_alloc(ffi.sizeof(txdesc_t) * self.ring_buffer_size))
@@ -363,7 +377,7 @@ function Intel_avf:push ()
       self.tx_desc_free = self.tx_desc_free - 1
    end
    C.full_memory_barrier()
-   self.r.tx_tail(band(self.tx_next-1, self.ring_buffer_size - 1))
+   self.r.tx_tail(band(self.tx_next, self.ring_buffer_size - 1))
    -- self:mbox_sr_stats()
 end
 
@@ -431,7 +445,7 @@ function Intel_avf:mbox_setup()
       -- VIRTCHNL_OP_CONFIG_TX_QUEUE = 4,
       -- VIRTCHNL_OP_CONFIG_RX_QUEUE = 5,
       VIRTCHNL_OP_CONFIG_VSI_QUEUES = 6,
-      -- VIRTCHNL_OP_CONFIG_IRQ_MAP = 7,
+      VIRTCHNL_OP_CONFIG_IRQ_MAP = 7,
       VIRTCHNL_OP_ENABLE_QUEUES = 8,
       VIRTCHNL_OP_DISABLE_QUEUES = 9,
       -- VIRTCHNL_OP_ADD_ETH_ADDR = 10,
@@ -643,9 +657,30 @@ function Intel_avf:new(conf)
    self:mbox_sr_caps()
    self:init_tx_q()
    self:init_rx_q()
+
+   self:init_irq()
+   self:mbox_sr_irq()
+
    self:mbox_sr_q()
    self:mbox_sr_enable_q()
    return self
+end
+
+function Intel_avf:init_irq()
+   local intv = bit.lshift(20, 5)
+   local v = bit.bor(bits({ ENABLE = 0, CLEARPBA = 1, ITR0 = 3, ITR1 = 4}), intv)
+
+   self.r.VFINT_DYN_CTL0(v)
+   self.r.VFINT_DYN_CTLN[0](v)
+end
+
+function Intel_avf:mbox_sr_irq()
+   local tt = self:mbox_send_buf(virtchnl_irq_map_info_ptr_t)
+   tt.num_vectors = 1
+   tt.vsi_id = self.vsi_id
+   tt.vector_id = 0
+   tt.rxq_map = 1
+   self:mbox_sr("VIRTCHNL_OP_CONFIG_IRQ_MAP", ffi.sizeof(virtchnl_irq_map_info_t) + 12)
 end
 
 function Intel_avf:mbox_sr_add_mac()

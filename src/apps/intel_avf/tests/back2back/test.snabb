@@ -1,0 +1,47 @@
+#!../../../../snabb snsh
+local vf0 = os.getenv("SNABB_AVF_VF0")
+local vf1 = os.getenv("SNABB_AVF_VF1")
+
+assert(vf0 ~= nil, "SNABB_AVF_VF0 is nil")
+assert(vf1 ~= nil, "SNABB_AVF_VF0 is nil")
+
+local basic = require("apps.basic.basic_apps")
+local intel_avf = require("apps.intel_avf.intel_avf")
+local match = require("apps.test.match")
+local npackets = require("apps.test.npackets")
+local synth = require("apps.test.synth")
+local counter = require("core.counter")
+
+local c = config.new()
+local src="02:00:00:00:00:00"
+local dst="02:00:00:00:00:01"
+config.app(c, "synth", synth.Synth, {
+       sizes = {64,128,192,256,384,512,1024},
+       src=src,
+       dst=dst
+} )
+config.app(c, "tee", basic.Tee)
+config.app(c, "match", match.Match)
+
+-- 1001 is an important test case, descriptors are written back in sets of 4
+-- 1001, exercises the interrupt driven write back
+config.app(c, "npackets", npackets.Npackets, { npackets = 1001 })
+config.app(c, "nic0", intel_avf.Intel_avf, { pciaddr = vf0 })
+config.app(c, "nic1", intel_avf.Intel_avf, { pciaddr = vf1 })
+
+config.link(c, "synth.output -> npackets.input")
+config.link(c, "npackets.output -> tee.input")
+config.link(c, "tee.output1 -> nic0.input")
+config.link(c, "nic1.output -> match.rx")
+config.link(c, "tee.output2 -> match.comparator")
+
+engine.configure(c)
+engine.main({ duration = 0.01 })
+engine.main({duration = 3})
+
+function rx(l1, l2)
+   return counter.read(engine.link_table[l1 .. " -> " .. l2].stats.rxpackets)
+end
+assert(rx("tee.output1", "nic0.input") ==
+	rx("nic1.output", "match.rx"), "packets sent != packets recv")
+main.exit(0)
