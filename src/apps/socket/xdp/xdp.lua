@@ -59,10 +59,10 @@ function XDPSocket:can_receive ()
 end
 
 function XDPSocket:receive ()
-	local p = self.tx_packets[0]
+   local p = self.tx_packets[0]
    local rcvd = self.dev.receive(self.dev.context, cast("void*", p))
    if rcvd == 0 then return end
-	return rcvd
+   return rcvd
 end
 
 function XDPSocket:receive_packets ()
@@ -75,7 +75,7 @@ function XDPSocket:pull ()
    local tx = self.output and self.output.tx
    if not tx then return end
    local limit = engine.pull_npackets
-	while limit > 0 do
+   while limit > 0 do
       local rcvd = self:receive_packets()
       if not rcvd then break end
       for i=0,rcvd-1 do
@@ -83,7 +83,7 @@ function XDPSocket:pull ()
          link.transmit(tx, packet.clone(self.tx_packets[i]))
       end
       limit = limit - rcvd
-	end
+   end
 end
 
 function XDPSocket:can_transmit()
@@ -216,7 +216,7 @@ function selftest ()
       01 64 30 39 04 00 00 20 00 00 00 00 00 00 00 00
       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
       00 00
-	]=], 66))
+   ]=], 66))
 
    test_app_and_links(pkt, if_name0)
    test_send(pkt, if_name0)
