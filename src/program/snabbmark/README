@@ -37,6 +37,47 @@ Usage:
     Example usage with 10 million packets, packet size 128 bytes:
     sudo SNABB_PCI0="0000:02:00.0"  SNABB_PCI1="0000:03:00.0" ./snabb snabbmark intel1g 10e6 128
 
+  snabbmark intel10g <npackets> <packet-size> [<timeout>]
+    Send the given number of packets through a Intel 82599 NIC. The test
+    assumes that the two Intel NICs are connected back-to-back.
+
+    The optional <timeout> parameter can be used to specify a timeout in
+    seconds. If supplied the benchmark run for no longer than <timeout>
+    seconds.
+
+    Uses SNABB_PCI0 and SNABB_PCI1.
+
+    Example usage with 10 million packets, packet size 128 bytes:
+    sudo SNABB_PCI0="0000:02:00.0"  SNABB_PCI1="0000:03:00.0" ./snabb snabbmark intel10g 10e6 128
+
+  snabbmark rawsocket <npackets> <packet-size> [<timeout>]
+    Send the given number of packets through an OS managed network interface
+    using a raw socket. The test assumes that the two Intel NICs are connected
+    back-to-back.
+
+    The optional <timeout> parameter can be used to specify a timeout in
+    seconds. If supplied the benchmark run for no longer than <timeout>
+    seconds.
+
+    Uses SNABB_IFNAME0 and SNABB_IFNAME1.
+
+    Example usage with 10 million packets, packet size 128 bytes:
+    sudo SNABB_IFNAME0=ens2f0  SNABB_IFNAME1=ens3f0 ./snabb snabbmark rawsocket 10e6 128
+
+  snabbmark xdpsocket <npackets> <packet-size> [<timeout>]
+    Send the given number of packets through an OS managed network interface
+    using a XDP socket. The test assumes that the two Intel NICs are connected
+    back-to-back.
+
+    The optional <timeout> parameter can be used to specify a timeout in
+    seconds. If supplied the benchmark run for no longer than <timeout>
+    seconds.
+
+    Uses SNABB_IFNAME0 and SNABB_IFNAME1.
+
+    Example usage with 10 million packets, packet size 128 bytes:
+    sudo SNABB_IFNAME0=ens2f0  SNABB_IFNAME1=ens3f0 ./snabb snabbmark xdpsocket 10e6 128
+
   snabbmark esp <npackets> <packet-size> [<mode>] [<direction>] [<profile>]
     Benchmark ESP encapsulating or decapsulatiing <npackets> of
     <packet-size>. <mode> can be either "transport" (default) or "tunnel",
