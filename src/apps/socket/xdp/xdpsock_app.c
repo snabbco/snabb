@@ -43,6 +43,7 @@
         }                                                  \
     } while (0)
 
+#define PACKET_PAYLOAD_SIZE 10240 // Snabb's packet payload size.
 
 #include <assert.h>
 #include <errno.h>
@@ -83,6 +84,11 @@
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
+struct packet {
+    uint16_t length;
+    unsigned char data[PACKET_PAYLOAD_SIZE];
+};
+
 /* Private. */
 static inline u32 umem_nb_free(struct xdp_umem_uqueue *q, u32 nb);
 static inline u32 xq_nb_free(struct xdp_uqueue *q, u32 ndescs);
@@ -93,12 +99,12 @@ static inline int umem_fill_to_kernel(struct xdp_umem_uqueue *fq, u64 *d, size_t
 static inline size_t umem_complete_from_kernel(struct xdp_umem_uqueue *cq, u64 *d, size_t nb);
 static inline void *xq_get_data(struct xdpsock *xsk, u64 addr);
 static inline int xq_enq(struct xdp_uqueue *uq, const struct xdp_desc *descs, unsigned int ndescs);
-static inline int xq_enq_transmit(struct xdp_uqueue *uq, unsigned int id, unsigned int ndescs, size_t len);
+static inline int xq_enq_transmit(struct xdp_uqueue *uq, unsigned int id, unsigned int ndescs, size_t lengths[]);
 static inline int xq_deq(struct xdp_uqueue *uq, struct xdp_desc *descs, int ndescs);
 static struct xdp_umem *xdp_umem_configure(int sfd);
 static struct xdpsock *xsk_configure(const xdpsock_options_t *opts, struct xdp_umem *umem);
 static void kick_tx(int fd);
-static inline void complete_transmit(struct xdpsock *xsk);
+static inline void complete_transmit(struct xdpsock *xsk, size_t batch_size);
 static xdpsock_context_t* init_xdpsock_context(const xdpsock_options_t *opts, int xsks_map);
 
 static inline u32 umem_nb_free(struct xdp_umem_uqueue *q, u32 nb)
@@ -239,7 +245,7 @@ static inline int xq_enq(struct xdp_uqueue *uq, const struct xdp_desc *descs, un
 }
 
 static inline int xq_enq_transmit(struct xdp_uqueue *uq,
-                 unsigned int id, unsigned int ndescs, size_t len)
+                 unsigned int id, unsigned int ndescs, size_t lengths[])
 {
     struct xdp_desc *r = uq->ring;
     unsigned int i;
@@ -251,7 +257,7 @@ static inline int xq_enq_transmit(struct xdp_uqueue *uq,
         u32 idx = uq->cached_prod++ & uq->mask;
 
         r[idx].addr = (id + i) << FRAME_SHIFT;
-        r[idx].len = len - 1;
+        r[idx].len = lengths[i] - 1;
     }
 
     u_smp_wmb();
@@ -446,9 +452,9 @@ static void kick_tx(int fd)
     lassert(0);
 }
 
-static inline void complete_transmit(struct xdpsock *xsk)
+static inline void complete_transmit(struct xdpsock *xsk, size_t batch_size)
 {
-    u64 descs[BATCH_SIZE];
+    u64 descs[batch_size];
     unsigned int rcvd;
 
     if (!xsk->outstanding_tx)
@@ -456,7 +462,7 @@ static inline void complete_transmit(struct xdpsock *xsk)
 
     kick_tx(xsk->sfd);
 
-    rcvd = umem_complete_from_kernel(&xsk->umem->cq, descs, BATCH_SIZE);
+    rcvd = umem_complete_from_kernel(&xsk->umem->cq, descs, batch_size);
     if (rcvd > 0) {
         xsk->outstanding_tx -= rcvd;
         xsk->tx_npkts += rcvd;
@@ -597,80 +603,68 @@ bool can_receive(const xdpsock_context_t *ctx)
     return poll(ctx->fds_in, ctx->nfds_in, timeout) > 0;
 }
 
-size_t receive_packet(const xdpsock_context_t *ctx, char *data)
+size_t receive_packets(const xdpsock_context_t *ctx, void** packets, size_t batch_size)
 {
-    struct xdp_desc descs[BATCH_SIZE];
+    struct xdp_desc descs[batch_size];
     unsigned int rcvd, i;
 
     struct xdpsock *xsk = ctx->xsks[0];
 
-    rcvd = xq_deq(&xsk->rx, descs, BATCH_SIZE);
+    rcvd = xq_deq(&xsk->rx, descs, batch_size);
     if (!rcvd) {
         return 0;
     }
 
-    char *buffer = xq_get_data(xsk, descs[0].addr);
-    size_t len = descs[0].len;
-    memcpy(data, buffer, len);
+    struct packet** pkts = (struct packet**) packets;
+    for (i = 0; i < rcvd; i++) {
+        char *buffer = xq_get_data(xsk, descs[i].addr);
+        size_t len = descs[i].len;
+        memcpy(pkts[i]->data, buffer, len);
+        pkts[i]->length = len;
+    }
 
     xsk->rx_npkts += rcvd;
 
     umem_fill_to_kernel_ex(&xsk->umem->fq, descs, rcvd);
 
-    return len;
+    return rcvd;
 }
 
-void transmit_packets(const xdpsock_context_t *ctx, const char *pkt_data, size_t len, size_t batch_size)
+size_t receive_packet(const xdpsock_context_t *ctx, void* packet)
+{
+    struct packet* pkts[1];
+    pkts[0] = (struct packet*) packet;
+    return receive_packets(ctx, (void**) pkts, 1);
+}
+
+void transmit_packets(const xdpsock_context_t *ctx, void** packets, size_t batch_size)
 {
     unsigned int idx = 0;
 
     struct xdpsock *xsk = ctx->xsks[0];
+    size_t lengths[batch_size];
 
+    struct packet** pkts = (struct packet**) packets;
     if (xq_nb_free(&xsk->tx, batch_size) >= batch_size) {
-        for (int i = idx*FRAME_SIZE; i < (idx + batch_size)*FRAME_SIZE; i += FRAME_SIZE) {
-            memcpy(&xsk->umem->frames[i], pkt_data, len);
+        for (int i = idx*FRAME_SIZE, j = 0; i < (idx + batch_size)*FRAME_SIZE; i += FRAME_SIZE, j++) {
+            memcpy(&xsk->umem->frames[i], pkts[j]->data, pkts[j]->length);
+            lengths[j] = pkts[j]->length;
         }
-        lassert(xq_enq_transmit(&xsk->tx, idx, batch_size, len) == 0);
+        lassert(xq_enq_transmit(&xsk->tx, idx, batch_size, lengths) == 0);
 
         xsk->outstanding_tx += batch_size;
         idx += batch_size;
         idx %= NUM_FRAMES;
     }
 
-    complete_transmit(xsk);
+    complete_transmit(xsk, batch_size);
 }
 
-void transmit_packet(const xdpsock_context_t *ctx, const char *pkt_data, size_t len)
+void transmit_packet(const xdpsock_context_t *ctx, void* packet)
 {   
-    transmit_packets(ctx, pkt_data, len, 1);
-}
-
-void transmit(const xdpsock_context_t *ctx, const char *pkt_data, size_t len)
-{
-    int timeout, nfds = 1;
-    struct pollfd fds[nfds + 1];
-    unsigned int idx = 0;
-
-    struct xdpsock *xsk = ctx->xsks[0];
-
-    for (int i = 0; i < NUM_FRAMES * FRAME_SIZE; i += FRAME_SIZE)
-        memcpy(&xsk->umem->frames[i], pkt_data, len);
-
-    if (ctx->opts->opt_poll) {
-        if (!can_transmit(ctx)) {
-            return;
-        }
-    }
-
-    if (xq_nb_free(&xsk->tx, BATCH_SIZE) >= BATCH_SIZE) {
-        lassert(xq_enq_transmit(&xsk->tx, idx, BATCH_SIZE, len) == 0);
-
-        xsk->outstanding_tx += BATCH_SIZE;
-        idx += BATCH_SIZE;
-        idx %= NUM_FRAMES;
-    }
-
-    complete_transmit(xsk);
+    struct packet* pkts[1];
+    pkts[0] = (struct packet*) packet;
+    transmit_packets(ctx, (void**) pkts, 1);
 }
 
 bool can_transmit(const xdpsock_context_t *ctx)

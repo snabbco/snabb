@@ -9,29 +9,48 @@ local lwdebug = require("apps.lwaftr.lwdebug")
 local ffi = require("ffi")
 local C = ffi.C
 
+local cast = ffi.cast
+
 require("apps.socket.xdp.xdpsock_app_h")
 
 XDPSocket = {}
 XDPSocket.__index = XDPSocket
 
-function XDPSocket:new (ifname)
-   assert(ifname)
+local BATCH_SIZE = 16
 
-   local ret = C.init_xdp(ifname) 
+function XDPSocket:new (conf)
+   if type(conf) == 'string' then
+      conf = {
+         ifname = assert(conf),
+         batch_size = BATCH_SIZE,
+      }
+   end
+   assert(type(conf) == 'table')
+
+   local ret = C.init_xdp(conf.ifname)
    if not ret then
-      print("Error initializing XDP Socket in "..ifname)
+      print("Error initializing XDP Socket in "..conf.ifname)
       os.exit(1)
    end
 
+   local batch_size = conf.batch_size or BATCH_SIZE
    local o = {
+      batch_size = batch_size,
+      rx_packets = ffi.new("struct packet*[?]", batch_size),
+      tx_packets = ffi.new("struct packet*[?]", batch_size),
       dev = {
          context = ret,
          can_receive = C.can_receive,
          can_transmit = C.can_transmit,
          receive = C.receive_packet,
+         receive_packets = C.receive_packets,
          transmit = C.transmit_packet,
+         transmit_packets = C.transmit_packets,
       }
    }
+   for i=0,batch_size-1 do
+      o.tx_packets[i] = packet.allocate()
+   end
    return setmetatable(o, {__index = XDPSocket})
 end
 
@@ -40,11 +59,16 @@ function XDPSocket:can_receive ()
 end
 
 function XDPSocket:receive ()
-	local p = packet.allocate()
-   local sz = self.dev.receive(self.dev.context, p.data)
-   if sz == 0 then return end
-   p.length = sz
-	return p
+	local p = self.tx_packets[0]
+   local rcvd = self.dev.receive(self.dev.context, cast("void*", p))
+   if rcvd == 0 then return end
+	return rcvd
+end
+
+function XDPSocket:receive_packets ()
+   local rcvd = self.dev.receive_packets(self.dev.context, cast("void**", self.tx_packets), self.batch_size)
+   if rcvd == 0 then return end
+   return tonumber(rcvd)
 end
 
 function XDPSocket:pull ()
@@ -52,11 +76,13 @@ function XDPSocket:pull ()
    if not tx then return end
    local limit = engine.pull_npackets
 	while limit > 0 do
-      local pkt = self:receive()
-      if not pkt then break end
-      -- lwdebug.print_pkt(pkt)
-      link.transmit(tx, pkt)
-      limit = limit - 1
+      local rcvd = self:receive_packets()
+      if not rcvd then break end
+      for i=0,rcvd-1 do
+         -- lwdebug.print_pkt(self.tx_packets[i])
+         link.transmit(tx, packet.clone(self.tx_packets[i]))
+      end
+      limit = limit - rcvd
 	end
 end
 
@@ -65,17 +91,40 @@ function XDPSocket:can_transmit()
 end
 
 function XDPSocket:transmit (p)
-   self.dev.transmit(self.dev.context, p.data, p.length + 1)
+   self.dev.transmit(self.dev.context, cast("void*", p))
+end
+
+function XDPSocket:transmit_packets (packets, nmemb)
+   self.dev.transmit_packets(self.dev.context, cast("void**", packets), nmemb)
 end
 
 function XDPSocket:push ()
+   local packets = self.rx_packets
+   local nmemb = 0
+   local function receive (l)
+      packets[nmemb] = link.receive(l)
+      nmemb = nmemb + 1
+   end
+   local function free ()
+      for i=0,nmemb-1 do
+         packet.free(packets[i])
+      end
+      nmemb = 0
+   end
+   local function transmit ()
+      self:transmit_packets(packets, nmemb)
+   end
    local rx = self.input and self.input.rx
    if not rx then return end
    while not link.empty(rx) and self:can_transmit() do
-      local p = link.receive(rx)
-		self:transmit(p)
-		packet.free(p)
+      receive(rx)
+      if nmemb == self.batch_size then
+         transmit()
+         free()
+      end
    end
+   transmit()
+   free()
 end
 
 function selftest ()

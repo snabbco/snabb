@@ -76,9 +76,10 @@ typedef struct xdpsock_context_t {
 } __attribute__((packed)) xdpsock_context_t;
 
 /* Public. */
-
 xdpsock_context_t* init_xdp(const char *if_name);
-size_t receive_packet(const xdpsock_context_t *ctx, char *data);
-void transmit_packet(const xdpsock_context_t *ctx, const char *pkt_data, size_t len);
-bool can_transmit(const xdpsock_context_t *ctx);
 bool can_receive(const xdpsock_context_t *ctx);
+bool can_transmit(const xdpsock_context_t *ctx);
+size_t receive_packet(const xdpsock_context_t *ctx, void* packet);
+size_t receive_packets(const xdpsock_context_t *ctx, void** packets, size_t batch_size);
+void transmit_packet(const xdpsock_context_t *ctx, void* packet);
+void transmit_packets(const xdpsock_context_t *ctx, void** packets, size_t batch_size);
