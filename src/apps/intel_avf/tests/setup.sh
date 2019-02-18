@@ -33,5 +33,6 @@ function setup(){
 
 SNABB_AVF_VF0=$(setup $SNABB_AVF_PF0 02:00:00:00:00:00)
 SNABB_AVF_VF1=$(setup $SNABB_AVF_PF1 02:00:00:00:00:01)
+sleep 3
 echo export SNABB_AVF_VF0=$SNABB_AVF_VF0
 echo export SNABB_AVF_VF1=$SNABB_AVF_VF1

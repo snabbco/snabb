@@ -5,6 +5,10 @@ local vf1 = os.getenv("SNABB_AVF_VF1")
 assert(vf0 ~= nil, "SNABB_AVF_VF0 is nil")
 assert(vf1 ~= nil, "SNABB_AVF_VF0 is nil")
 
+-- 1001 is an important test case, descriptors are written back in sets of 4
+-- 1001, exercises the interrupt driven write back
+local packet_count = 1001
+
 local basic = require("apps.basic.basic_apps")
 local intel_avf = require("apps.intel_avf.intel_avf")
 local match = require("apps.test.match")
@@ -23,9 +27,7 @@ config.app(c, "synth", synth.Synth, {
 config.app(c, "tee", basic.Tee)
 config.app(c, "match", match.Match)
 
--- 1001 is an important test case, descriptors are written back in sets of 4
--- 1001, exercises the interrupt driven write back
-config.app(c, "npackets", npackets.Npackets, { npackets = 1001 })
+config.app(c, "npackets", npackets.Npackets, { npackets = packet_count })
 config.app(c, "nic0", intel_avf.Intel_avf, { pciaddr = vf0 })
 config.app(c, "nic1", intel_avf.Intel_avf, { pciaddr = vf1 })
 
@@ -36,12 +38,43 @@ config.link(c, "nic1.output -> match.rx")
 config.link(c, "tee.output2 -> match.comparator")
 
 engine.configure(c)
-engine.main({ duration = 0.01 })
-engine.main({duration = 3})
+engine.main({ duration = 0.01, report = false })
+engine.main({duration = 3, report = false})
 
 function rx(l1, l2)
    return counter.read(engine.link_table[l1 .. " -> " .. l2].stats.rxpackets)
 end
 assert(rx("tee.output1", "nic0.input") ==
 	rx("nic1.output", "match.rx"), "packets sent != packets recv")
+
+
+local n0 = engine.app_table['nic0']
+local n1 = engine.app_table['nic1']
+n0:mbox_sr_stats()
+n1:mbox_sr_stats()
+
+assert(counter.read(n0.shm.tx_unicast) == counter.read(n1.shm.rx_unicast), "mbox_sr_stats counters dont match")
+assert(counter.read(n0.shm.tx_unicast) == packet_count, "mbox_sr_stats.tx_unicast != packet_count")
+
+local c = config.new()
+config.app(c, "synth", synth.Synth, {
+       sizes = {64,128,192,256,384,512,1024},
+       src=src,
+       dst=dst
+} )
+config.app(c, "nic0", intel_avf.Intel_avf, { pciaddr = vf0 })
+config.app(c, "nic1", intel_avf.Intel_avf, { pciaddr = vf1 })
+config.app(c, "sink", basic.Sink)
+config.link(c, "synth.output -> nic0.input")
+config.link(c, "nic1.output -> sink.input")
+engine.configure(c)
+
+while true do
+	local v = rx("synth.output", "nic0.input")
+	if v > 100 * 1000 * 1000 then
+		break
+	end
+	engine.main({ duration = 1, no_report = true })
+end
+
 main.exit(0)
