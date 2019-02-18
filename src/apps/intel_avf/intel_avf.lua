@@ -349,12 +349,10 @@ function Intel_avf:reclaim_txdesc ()
    local COMPLETE = 15
 
    while band(self.txdesc[ self:ringnext(self.tx_cand) ].cmd_type_offset_bsz, COMPLETE) == COMPLETE
-         and self.tx_desc_free < self.ring_buffer_size do
+         and self.tx_desc_free < self.ring_buffer_size - 1 do
       local c = self.tx_cand
-      if self.txqueue[c] ~= nil then
-         packet.free(self.txqueue[c])
-         self.txqueue[c] = nil
-      end
+      packet.free(self.txqueue[c])
+      self.txqueue[c] = nil
       self.tx_cand = self:ringnext(self.tx_cand)
       self.tx_desc_free = self.tx_desc_free + 1
    end
@@ -378,7 +376,6 @@ function Intel_avf:push ()
    end
    C.full_memory_barrier()
    self.r.tx_tail(band(self.tx_next, self.ring_buffer_size - 1))
-   -- self:mbox_sr_stats()
 end
 
 function Intel_avf:pull()
@@ -406,7 +403,7 @@ end
 function Intel_avf:mbox_setup()
    local dlen = 4096
    self.mbox = {
-      q_len = 64,
+      q_len = 16,
       -- FIXME find reference
       q_alignment = 64,
       datalen = dlen,
@@ -577,7 +574,7 @@ function Intel_avf:mbox_recv()
    assert(bit.band(self.mbox.rxq[idx].flags0, bits({ ERR = 2 })) == 0)
 
    local msg_status = ffi.cast(virtchnl_msg_ptr_t, self.mbox.rxq + idx)[0].status
-   assert(msg_status == 0, "failure in PF")
+   assert(msg_status == 0, "failure in PF" .. tonumber(msg_status))
    local opcode = ffi.cast(virtchnl_msg_ptr_t, self.mbox.rxq + idx)[0].opcode
 
    local bflag = bits({ ExternalBuf = 4 })
@@ -591,7 +588,12 @@ function Intel_avf:mbox_recv()
    self.mbox.rxq[idx].flags0 = 0
    self.mbox.rxq[idx].flags1 = bits({LARGE_BUFFER = 1, BUFFER=4, NO_INTERRUPTS=5})
    ffi.fill(self.mbox.rxq_buffers[idx], self.mbox.datalen)
+   self.mbox.rxq[idx].data_addr_high =
+         tophysical(self.mbox.rxq_buffers[idx]) / 2^32
+   self.mbox.rxq[idx].data_addr_low =
+         tophysical(self.mbox.rxq_buffers[idx]) % 2^32
 
+   C.full_memory_barrier()
    self.r.VF_ARQT( idx )
    if opcode == self.mbox.opcodes['VIRTCHNL_OP_EVENT'] then
       return self:mbox_recv()
@@ -663,6 +665,7 @@ function Intel_avf:new(conf)
 
    self:mbox_sr_q()
    self:mbox_sr_enable_q()
+   self:mbox_sr_stats()
    return self
 end
 
@@ -693,35 +696,24 @@ function Intel_avf:mbox_sr_add_mac()
 end
 
 function Intel_avf:mbox_sr_stats()
-   if self.throttle() == false then
-      return
-   end
-   if self.stats_pos == 0 then
-      local tt = self:mbox_send_buf(queue_select_ptr_t)
-      tt.vsi_id = self.vsi_id
-      local opcode = self.mbox.opcodes['VIRTCHNL_OP_GET_STATS']
-      self:mbox_send_p1(opcode, ffi.sizeof(queue_select_t))
-      self.stats_pos = 1
-   elseif self.stats_pos == 1 then
-      self:mbox_send_p2()
-      self.stats_pos = 2
-   elseif self.stats_pos == 2 then
-      local stats = ffi.cast(eth_stats_ptr_t, self:mbox_recv())
-      local set = counter.set
-      set(self.shm.rx_bytes,     stats.rx_bytes)
-      set(self.shm.rx_unicast,   stats.rx_unicast)
-      set(self.shm.rx_multicast, stats.rx_multicast)
-      set(self.shm.rx_broadcast, stats.rx_broadcast)
-      set(self.shm.rx_discards,  stats.rx_discards)
-      set(self.shm.rx_unknown_protocol,   stats.rx_unknown_protocol)
+   local tt = self:mbox_send_buf(queue_select_ptr_t)
+   tt.vsi_id = self.vsi_id
 
-      set(self.shm.tx_bytes,     stats.tx_bytes)
-      set(self.shm.tx_unicast,   stats.tx_unicast)
-      set(self.shm.tx_multicast, stats.tx_multicast)
-      set(self.shm.tx_broadcast, stats.tx_broadcast)
-      set(self.shm.tx_discards,  stats.tx_discards)
-      set(self.shm.tx_errors,    stats.tx_errors)
-      self.stats_pos = 0
-   end
+   local stats = ffi.cast(eth_stats_ptr_t, self:mbox_sr('VIRTCHNL_OP_GET_STATS', ffi.sizeof(queue_select_t)))
+   local set = counter.set
+
+   set(self.shm.rx_bytes,     stats.rx_bytes)
+   set(self.shm.rx_unicast,   stats.rx_unicast)
+   set(self.shm.rx_multicast, stats.rx_multicast)
+   set(self.shm.rx_broadcast, stats.rx_broadcast)
+   set(self.shm.rx_discards,  stats.rx_discards)
+   set(self.shm.rx_unknown_protocol,   stats.rx_unknown_protocol)
+
+   set(self.shm.tx_bytes,     stats.tx_bytes)
+   set(self.shm.tx_unicast,   stats.tx_unicast)
+   set(self.shm.tx_multicast, stats.tx_multicast)
+   set(self.shm.tx_broadcast, stats.tx_broadcast)
+   set(self.shm.tx_discards,  stats.tx_discards)
+   set(self.shm.tx_errors,    stats.tx_errors)
 end
 
