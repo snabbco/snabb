@@ -322,8 +322,6 @@ function Intel_avf:mbox_sr_q()
 
    self:mbox_sr('VIRTCHNL_OP_CONFIG_VSI_QUEUES', ffi.sizeof(virtchnl_q_pair_t) + 64)
 
-   -- FIXME why do we sleep?
-   C.usleep(1000*1000)
    self.r.rx_tail = self.r.QRX_TAIL[self.qno]
    self.r.tx_tail = self.r.QTX_TAIL[self.qno]
    self.rx_tail = 0
@@ -472,12 +470,6 @@ function Intel_avf:mbox_sr(opcode, datalen)
 end
 
 function Intel_avf:mbox_send(opcode, datalen)
-   self:mbox_send_p1(opcode, datalen)
-   self:mbox_send_p2(opcode, datalen)
-end
--- Splitting mbox_send into 2 parts so that each can be called on a
--- different breath reducing the per breath latency
-function Intel_avf:mbox_send_p1(opcode, datalen)
    local idx = self.mbox.next_send_idx
    self.mbox.tmp_idx = idx
    self.mbox.next_send_idx = ( idx + 1 ) % self.mbox.q_len
@@ -498,12 +490,6 @@ function Intel_avf:mbox_send_p1(opcode, datalen)
    self.mbox.txq[idx].data_addr_low = tophysical(self.mbox.send_buf) % 2^32
 
    self.r.VF_ATQT(self.mbox.next_send_idx)
-   return
-end
-function Intel_avf:mbox_send_p2()
-   -- Wait for the mailbox to process the send
-   -- FIXME Wait with timeout ?
-   -- FIXME assert on timeout ?
 
    local idx = self.mbox.tmp_idx
    self.mbox.tmp_idx = nil
