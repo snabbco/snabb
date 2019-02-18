@@ -359,7 +359,7 @@ function value_parser(typ)
    end
    validate = range_validator(typ.range, validate)
    validate = length_validator(typ.length, validate)
-   validate = pattern_validator(typ.pattern, validate)
+   validate = pattern_validator(typ.patterns, validate)
    validate = bit_validator(typ.bit, validate)
    validate = enum_validator(enums(typ), validate)
    validate = identityref_validator(typ.bases, typ.default_prefix, validate)
