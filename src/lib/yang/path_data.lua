@@ -70,8 +70,8 @@ function resolver(grammar, path_string)
       end
    end
    local function compute_table_getter(grammar, key, getter)
-      if grammar.string_key then
-         return table_getter(key[normalize_id(grammar.string_key)], getter)
+      if grammar.native_key then
+         return table_getter(key[normalize_id(grammar.native_key)], getter)
       elseif grammar.key_ctype and grammar.value_ctype then
          return ctable_getter(key, getter)
       elseif grammar.key_ctype then
@@ -219,8 +219,8 @@ local function setter_for_grammar(grammar, path)
       end
    elseif grammar.type == 'table' then
       local key = prepare_table_lookup(grammar.keys, grammar.key_ctype, query)
-      if grammar.string_key then
-         key = key[data.normalize_id(grammar.string_key)]
+      if grammar.native_key then
+         key = key[data.normalize_id(grammar.native_key)]
          return function(config, subconfig)
             local tab = getter(config)
             assert(tab[key] ~= nil)
@@ -307,7 +307,7 @@ local function adder_for_grammar(grammar, path)
             end
             return config
          end
-      elseif grammar.string_key or grammar.key_ctype then
+      elseif grammar.native_key or grammar.key_ctype then
          -- cltable or string-keyed table.
          local pairs = grammar.key_ctype and cltable.pairs or pairs
          return function(config, subconfig)
@@ -382,8 +382,8 @@ local function remover_for_grammar(grammar, path)
       end
    elseif grammar.type == 'table' then
       local key = prepare_table_lookup(grammar.keys, grammar.key_ctype, query)
-      if grammar.string_key then
-         key = key[data.normalize_id(grammar.string_key)]
+      if grammar.native_key then
+         key = key[data.normalize_id(grammar.native_key)]
          return function(config)
             local tab = getter(config)
             assert(tab[key] ~= nil)
