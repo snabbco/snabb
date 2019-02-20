@@ -1,0 +1,2 @@
+(import ./default.nix {}).raptorjit
+

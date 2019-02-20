@@ -508,6 +508,10 @@ Returns a pointer to the mapped object.
 
 Create an alias (symbolic link) for an object.
 
+— Function **shm.path** *name*
+
+Returns the fully-qualified path for an object called *name*.
+
 — Function **shm.exists** *name*
 
 Returns a true value if shared object by *name* exists.
@@ -669,6 +673,15 @@ Clears the buckets of *histogram*.
 
 Returns a closure that wraps *thunk*, measuring and recording the difference
 between calls to *now* before and after *thunk* into *histogram*.
+
+— Method **histogram:summarize* *prev*
+
+Returns the approximate minimum, average, and maximum values recorded in
+*histogram*.
+
+If *prev* is given, it should be a snapshot of a previous version of the
+histogram. In that case, this method returns the approximate minimum, average
+and maximum values for the difference between *histogram* and *prev*.
 
 
 ## Lib (core.lib)
