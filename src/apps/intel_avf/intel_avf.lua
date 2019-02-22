@@ -294,6 +294,7 @@ function Intel_avf:mbox_setup_txq()
    self.r.VF_ATQH(0)
    self.r.VF_ATQT(0)
    self.mbox.next_send_idx = 0
+   C.full_memory_barrier()
 
    -- set length and enable the queue
    self.r.VF_ATQLEN(bits({ ENABLE = 31 }) + self.mbox.q_len)
@@ -471,7 +472,6 @@ end
 
 function Intel_avf:mbox_send(opcode, datalen)
    local idx = self.mbox.next_send_idx
-   self.mbox.tmp_idx = idx
    self.mbox.next_send_idx = ( idx + 1 ) % self.mbox.q_len
 
    self.mbox.txq[idx].flags0 = 0
@@ -482,23 +482,28 @@ function Intel_avf:mbox_send(opcode, datalen)
       self.mbox.txq[idx].flags0 =
          bit.bor(self.mbox.txq[idx].flags0, bits({ LARGE_BUFFER = 1 }))
    end
-   self.mbox.txq[idx].flags1
-      = bits({ INDIRECT_BUFFER = 2, BUFFER = 4, NO_INTERRUPTS = 5 })
+   if datalen > 0 then
+      self.mbox.txq[idx].flags1
+         = bits({ INDIRECT_BUFFER = 2, BUFFER = 4, NO_INTERRUPTS = 5 })
+      self.mbox.txq[idx].data_addr_high = tophysical(self.mbox.send_buf) / 2^32
+      self.mbox.txq[idx].data_addr_low = tophysical(self.mbox.send_buf) % 2^32
+   else
+      self.mbox.txq[idx].flags1 = bits({ NO_INTERRUPTS = 5 })
+   end
    self.mbox.txq[idx].datalen = datalen
    self.mbox.txq[idx].cookie_high = opcode
-   self.mbox.txq[idx].data_addr_high = tophysical(self.mbox.send_buf) / 2^32
-   self.mbox.txq[idx].data_addr_low = tophysical(self.mbox.send_buf) % 2^32
+
+   C.full_memory_barrier()
 
    self.r.VF_ATQT(self.mbox.next_send_idx)
 
-   local idx = self.mbox.tmp_idx
-   self.mbox.tmp_idx = nil
    lib.waitfor(function()
       return self.r.VF_ATQT() == self.mbox.next_send_idx
    end)
    lib.waitfor(function()
       -- 1 == bits({ DescriptorDone = 0 })
       -- 2 == bits({ Complete = 1 })
+
       return band(self.mbox.txq[idx].flags0, 1) == 1 and
          band(self.mbox.txq[idx].flags0, 2) == 2
    end)
@@ -639,7 +644,18 @@ function Intel_avf:new(conf)
    pci.set_bus_master(self.pciaddress, true)
    pci.disable_bus_master_cleanup(self.pciaddress)
 
+   -- wait for the nic to be ready, setup the mailbox and then reset it
+   -- that way it doesn't matter what state you where given the card
    self:wait_for_vfgen_rstat()
+   self:mbox_setup()
+   self:stop()
+
+   -- FIXME
+   -- I haven't worked out why the sleep is required but without it
+   -- self_mbox_set_version hangs indefinitely
+   C.sleep(1)
+
+   -- setup the nic for real
    self:mbox_setup()
    self:mbox_sr_version()
    self:mbox_sr_caps()
@@ -653,6 +669,13 @@ function Intel_avf:new(conf)
    self:mbox_sr_enable_q()
    self:mbox_sr_stats()
    return self
+end
+
+function Intel_avf:stop()
+   self:mbox_send(self.mbox.opcodes['VIRTCHNL_OP_RESET_VF'], 0)
+   self.r.VF_ARQLEN(0)
+   self.r.VF_ATQLEN(0)
+   self:wait_for_vfgen_rstat()
 end
 
 function Intel_avf:init_irq()

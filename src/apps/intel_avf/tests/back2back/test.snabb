@@ -1,9 +1,9 @@
 #!../../../../snabb snsh
-local vf0 = os.getenv("SNABB_AVF_VF0")
-local vf1 = os.getenv("SNABB_AVF_VF1")
+local vf0 = os.getenv("SNABB_AVF_PF0_VF0")
+local vf1 = os.getenv("SNABB_AVF_PF1_VF0")
 
-assert(vf0 ~= nil, "SNABB_AVF_VF0 is nil")
-assert(vf1 ~= nil, "SNABB_AVF_VF0 is nil")
+assert(vf0 ~= nil, "SNABB_AVF_PF0_VF0 is nil")
+assert(vf1 ~= nil, "SNABB_AVF_PF1_VF0 is nil")
 
 -- 1001 is an important test case, descriptors are written back in sets of 4
 -- 1001, exercises the interrupt driven write back
@@ -18,7 +18,7 @@ local counter = require("core.counter")
 
 local c = config.new()
 local src="02:00:00:00:00:00"
-local dst="02:00:00:00:00:01"
+local dst="02:00:00:00:00:10"
 config.app(c, "synth", synth.Synth, {
        sizes = {64,128,192,256,384,512,1024},
        src=src,
@@ -44,17 +44,23 @@ engine.main({duration = 3, report = false})
 function rx(l1, l2)
    return counter.read(engine.link_table[l1 .. " -> " .. l2].stats.rxpackets)
 end
-assert(rx("tee.output1", "nic0.input") ==
-	rx("nic1.output", "match.rx"), "packets sent != packets recv")
+function assert_eq(a,b,msg)
+	local an = tonumber(a)
+	local bn = tonumber(b)
+	assert(an == bn, msg .. " " .. an .. " ~= " .. bn)
+end
 
+local s = rx("tee.output1", "nic0.input")
+local r = rx("nic1.output", "match.rx")
+assert_eq(s, r, "packets_sr_1")
 
 local n0 = engine.app_table['nic0']
 local n1 = engine.app_table['nic1']
 n0:mbox_sr_stats()
 n1:mbox_sr_stats()
 
-assert(counter.read(n0.shm.tx_unicast) == counter.read(n1.shm.rx_unicast), "mbox_sr_stats counters dont match")
-assert(counter.read(n0.shm.tx_unicast) == packet_count, "mbox_sr_stats.tx_unicast != packet_count")
+assert_eq(counter.read(n0.shm.tx_unicast), counter.read(n1.shm.rx_unicast), "mxbox_sr_stats_1")
+assert_eq(counter.read(n0.shm.tx_unicast), packet_count, "mbox_sr_stats_2")
 
 local c = config.new()
 config.app(c, "synth", synth.Synth, {
@@ -76,5 +82,5 @@ while true do
 	end
 	engine.main({ duration = 1, no_report = true })
 end
-
+engine.stop()
 main.exit(0)

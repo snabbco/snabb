@@ -40,3 +40,5 @@ echo 2 > /sys/bus/pci/devices/0000\:03\:00.1/sriov_numvfs
 ip link set up dev enp3s0f1
 ip link set enp3s0f1 vf 0 mac 02:00:00:00:00:01
 ip link set enp3s0f1 vf 0 vlan 10
+
+A more complete example can be found in apps/intel_avf/tests/setup.sh
