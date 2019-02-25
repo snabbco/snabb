@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 // See https://tools.ietf.org/html/rfc4303#page-38
 
 #include <stdbool.h>

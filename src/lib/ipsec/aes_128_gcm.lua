@@ -1,4 +1,7 @@
-module(..., package.seeall)
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(...,package.seeall)
+
 local ffi = require("ffi")
 local C = ffi.C
 local ASM = require("lib.ipsec.aes_128_gcm_avx")
@@ -78,6 +81,7 @@ local aes_128_gcm = {}
 
 function aes_128_gcm:new (spi, key, salt)
    assert(spi, "Need SPI.")
+   -- We only support 128-bit keys.
    assert(key and #key == 32, "Need 16 bytes of key material.")
    assert(salt and #salt == 8, "Need 4 bytes of salt.")
    local o = {}
@@ -85,7 +89,8 @@ function aes_128_gcm:new (spi, key, salt)
    ffi.copy(o.key, lib.hexundump(key, 16), 16)
    o.IV_SIZE = 8
    o.iv = iv:new(lib.hexundump(salt, 4))
-   o.AUTH_SIZE = 12
+   -- “Implementations MUST support a full-length 16-octet ICV”
+   o.AUTH_SIZE = 16
    o.auth_buf = ffi.new("uint8_t[?]", o.AUTH_SIZE)
    o.AAD_SIZE = 12
    o.aad = aad:new(spi)
@@ -118,7 +123,7 @@ function aes_128_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length
                               u8_ptr(self.iv:header_ptr()),
                               u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
                               self.auth_buf, self.AUTH_SIZE)
-   return ASM.auth12_equal(self.auth_buf, ciphertext + length) == 0
+   return ASM.auth16_equal(self.auth_buf, ciphertext + length) == 0
 end
 
 
@@ -256,23 +261,35 @@ function selftest ()
              "Authentication failed.")
    end
    -- Microbenchmarks.
+   local pmu = require("lib.pmu")
+   local has_pmu_counters, err = pmu.is_available()
+   if not has_pmu_counters then
+      io.stderr:write('No PMU available: '..err..'\n')
+   else
+      pmu.setup()
+   end
+   local profile = (has_pmu_counters and pmu.profile) or function (f) f() end
    local length = 1000 * 1000 * 100 -- 100MB
    local gcm = aes_128_gcm:new(0x0, "00000000000000000000000000000000", "00000000")
    local p = ffi.new("uint8_t[?]", length + gcm.AUTH_SIZE)
    local start = C.get_monotonic_time()
-   ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,
-                              p, p, length,
-                              u8_ptr(gcm.iv:header_ptr()),
-                              p, 0, -- No AAD
-                              p + length, gcm.AUTH_SIZE)
+   profile(function ()
+         ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,
+                                    p, p, length,
+                                    u8_ptr(gcm.iv:header_ptr()),
+                                    p, 0, -- No AAD
+                                    p + length, gcm.AUTH_SIZE)
+   end)
    local finish = C.get_monotonic_time()
    print("Encrypted", length, "bytes in", finish-start, "seconds")
    local start = C.get_monotonic_time()
-   ASM.aesni_gcm_dec_avx_gen4(gcm.gcm_data,
-                              p, p, length,
-                              u8_ptr(gcm.iv:header_ptr()),
-                              p, 0, -- No AAD
-                              p + length, gcm.AUTH_SIZE)
+   profile(function ()
+         ASM.aesni_gcm_dec_avx_gen4(gcm.gcm_data,
+                                    p, p, length,
+                                    u8_ptr(gcm.iv:header_ptr()),
+                                    p, 0, -- No AAD
+                                    p + length, gcm.AUTH_SIZE)
+   end)
    local finish = C.get_monotonic_time()
    print("Decrypted", length, "bytes in", finish-start, "seconds")
    -- Test aes_128_block with vectors from

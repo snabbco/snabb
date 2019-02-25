@@ -45,6 +45,10 @@ Usage:
     Optionally, a LuaJIT profiler option string can be supplied as <profile>,
     which will cause the benchmark run to be profiled accordingly.
 
+    Note: transport mode may generally score better because it has to
+    encapsulate 40 bytes less per packet because of the enclosed IPv6 header
+    in tunnel mode, and this micro-benchmark measures end-to-end throughput.
+
   snabbmark hash [<key-size>]
     Benchmark hash functions used for internal data structures.
 
