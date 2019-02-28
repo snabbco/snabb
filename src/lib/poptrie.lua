@@ -87,8 +87,9 @@ end
 -- Extract bits at offset
 -- key=uint8_t[?]
 function extract (key, offset, length)
-   assert(length <= 32); assert(offset < 128)
-   local byte_offset = math.min(math.floor(offset/8), 12)
+   assert(offset >= 0 and length > 0 and length <= 32)
+   assert(offset <= ffi.sizeof(key) * 8)
+   local byte_offset = math.min(math.floor(offset / 8), ffi.sizeof(key) - 4)
    local bit_offset = offset - byte_offset*8
    local dword = ffi.cast("uint32_t*", key + byte_offset)[0]
    return band(rshift(dword, bit_offset), lshift(1, length) - 1)
