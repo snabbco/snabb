@@ -276,7 +276,7 @@ PQMPRC      0x10038 +0x100*0..7     RCR Per Queue Multicast Packets Received
    singleton = [[
 EEMNGCTL  0x01010 -            RW Manageability EEPROM-Mode Control Register
 EEC       0x00010 -            RW EEPROM-Mode Control Register
-FACTPS	  0x05B30 -            Function Active and Power State to MNG
+FACTPS	  0x05B30 -            RO Function Active and Power State to MNG
 ]]
 }
 
