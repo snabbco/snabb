@@ -199,6 +199,23 @@ local virtchnl_irq_map_info_t = ffi.typeof([[
 ]])
 local virtchnl_irq_map_info_ptr_t = ffi.typeof('$*', virtchnl_irq_map_info_t)
 
+local mbox_q_t = ffi.typeof([[
+      struct {
+         uint8_t flags0;
+         uint8_t flags1;
+         uint16_t opcode;
+         uint16_t datalen;
+         uint16_t return_value;
+         uint32_t cookie_high;
+         uint32_t cookie_low;
+         uint32_t param0;
+         uint32_t param1;
+         uint32_t data_addr_high;
+         uint32_t data_addr_low;
+      } __attribute__((packed))
+]])
+local mbox_q_ptr_t = ffi.typeof('$*', mbox_q_t)
+
 function Intel_avf:init_tx_q()
    self.txdesc = ffi.cast(txdesc_ptr_t,
    memory.dma_alloc(ffi.sizeof(txdesc_t) * self.ring_buffer_size))
@@ -240,11 +257,16 @@ function Intel_avf:supported_hardware()
    assert(devices[device] == true, "unsupported nic version: " .. device)
 end
 
-function Intel_avf:mbox_setup_rxq()
+function Intel_avf:mbox_allocate_rxq()
+   -- new() allocates everything then resets the nic.
+   -- Only allocate space the first time around
+   if self.mbox.rxq ~= nil then
+      return
+   end
    self.mbox.rxq =
       memory.dma_alloc(self.mbox.q_byte_len, self.mbox.q_alignment)
    ffi.fill(self.mbox.rxq, self.mbox.q_byte_len)
-   self.mbox.rxq = ffi.cast(ffi.typeof("$*", self.mbox.q_t), self.mbox.rxq)
+   self.mbox.rxq = ffi.cast(mbox_q_ptr_t, self.mbox.rxq)
 
    for i=0,self.mbox.q_len-1 do
       local ptr = ffi.cast("uint8_t *", memory.dma_alloc(self.mbox.datalen))
@@ -263,6 +285,9 @@ function Intel_avf:mbox_setup_rxq()
       self.mbox.rxq[i].flags1 =
          bits({LARGE_BUFFER = 1, BUFFER=4, NO_INTERRUPTS=5})
    end
+end
+function Intel_avf:mbox_setup_rxq()
+   self:mbox_allocate_rxq()
    self.r.VF_ARQBAL(tophysical(self.mbox.rxq) % 2^32)
    self.r.VF_ARQBAH(tophysical(self.mbox.rxq) / 2^32)
    self.r.VF_ARQH(0)
@@ -273,10 +298,13 @@ function Intel_avf:mbox_setup_rxq()
    self.r.VF_ARQLEN(bits({ ENABLE = 31 }) + self.mbox.q_len)
 end
 
-function Intel_avf:mbox_setup_txq()
+function Intel_avf:mbox_allocate_txq()
+   if self.mbox.txq ~= nil then
+      return
+   end
    self.mbox.txq = memory.dma_alloc(self.mbox.q_byte_len, self.mbox.q_alignment)
    ffi.fill(self.mbox.txq, self.mbox.q_byte_len)
-   self.mbox.txq = ffi.cast(ffi.typeof("$*", self.mbox.q_t), self.mbox.txq )
+   self.mbox.txq = ffi.cast(mbox_q_ptr_t, self.mbox.txq)
 
    for i=0,self.mbox.q_len-1 do
       local ptr = ffi.cast("uint8_t *", memory.dma_alloc(4096))
@@ -289,6 +317,9 @@ function Intel_avf:mbox_setup_txq()
       self.mbox.txq[i].data_addr_low =
       tophysical(self.mbox.txq_buffers[i]) % 2^32
    end
+end
+function Intel_avf:mbox_setup_txq()
+   self:mbox_allocate_txq()
    self.r.VF_ATQBAL(tophysical(self.mbox.txq) % 2^32)
    self.r.VF_ATQBAH(tophysical(self.mbox.txq) / 2^32)
    self.r.VF_ATQH(0)
@@ -403,62 +434,47 @@ function Intel_avf:mbox_setup()
    local dlen = 4096
    self.mbox = {
       q_len = 16,
+      -- q_len * sizeo(mbox_q_t)
+      q_byte_len = 16 * ffi.sizeof(mbox_q_t),
       -- FIXME find reference
       q_alignment = 64,
       datalen = dlen,
       txq_buffers = {},
       rxq_buffers = {},
-      send_buf = memory.dma_alloc(dlen)
-   }
-   self.mbox.q_t = ffi.typeof([[
-      struct {
-         uint8_t flags0;
-         uint8_t flags1;
-         uint16_t opcode;
-         uint16_t datalen;
-         uint16_t return_value;
-         uint32_t cookie_high;
-         uint32_t cookie_low;
-         uint32_t param0;
-         uint32_t param1;
-         uint32_t data_addr_high;
-         uint32_t data_addr_low;
-      } __attribute__((packed))
-   ]])
-   self.mbox.q_byte_len = self.mbox.q_len * ffi.sizeof(self.mbox.q_t)
-
-   self.mbox.hwopcodes = {
-      SEND_TO_PF     = 0x0801,
-      RECV_FROM_PF   = 0x0802,
-      SHUTDOWN_QUEUE = 0x0803
-   }
-   self.mbox.opcodes = {
-      VIRTCHNL_OP_UNKNOWN = 0,
-      VIRTCHNL_OP_VERSION = 1,
-      VIRTCHNL_OP_RESET_VF = 2,
-      VIRTCHNL_OP_GET_VF_RESOURCES = 3,
-      -- 4/5 unsupported by CentOS 7 PF
-      -- VIRTCHNL_OP_CONFIG_TX_QUEUE = 4,
-      -- VIRTCHNL_OP_CONFIG_RX_QUEUE = 5,
-      VIRTCHNL_OP_CONFIG_VSI_QUEUES = 6,
-      VIRTCHNL_OP_CONFIG_IRQ_MAP = 7,
-      VIRTCHNL_OP_ENABLE_QUEUES = 8,
-      VIRTCHNL_OP_DISABLE_QUEUES = 9,
-      -- VIRTCHNL_OP_ADD_ETH_ADDR = 10,
-      -- VIRTCHNL_OP_DEL_ETH_ADDR = 11,
-      -- VIRTCHNL_OP_ADD_VLAN = 12,
-      -- VIRTCHNL_OP_DEL_VLAN = 13,
-      -- VIRTCHNL_OP_CONFIG_PROMISCUOUS_MODE = 14,
-      VIRTCHNL_OP_GET_STATS = 15,
-      -- VIRTCHNL_OP_RSVD = 16,
-      VIRTCHNL_OP_EVENT = 17,
-      -- VIRTCHNL_OP_IWARP = 20,
-      -- VIRTCHNL_OP_CONFIG_IWARP_IRQ_MAP = 21,
-      -- VIRTCHNL_OP_RELEASE_IWARP_IRQ_MAP = 22,
-      -- VIRTCHNL_OP_CONFIG_RSS_KEY = 23,
-      -- VIRTCHNL_OP_CONFIG_RSS_LUT = 24,
-      -- VIRTCHNL_OP_GET_RSS_HENA_CAPS = 25,
-      -- VIRTCHNL_OP_SET_RSS_HENA = 26
+      send_buf = memory.dma_alloc(dlen),
+      hwopcodes = {
+         SEND_TO_PF     = 0x0801,
+         RECV_FROM_PF   = 0x0802,
+         SHUTDOWN_QUEUE = 0x0803
+      },
+      opcodes = {
+         VIRTCHNL_OP_UNKNOWN = 0,
+         VIRTCHNL_OP_VERSION = 1,
+         VIRTCHNL_OP_RESET_VF = 2,
+         VIRTCHNL_OP_GET_VF_RESOURCES = 3,
+         -- 4/5 unsupported by CentOS 7 PF
+         -- VIRTCHNL_OP_CONFIG_TX_QUEUE = 4,
+         -- VIRTCHNL_OP_CONFIG_RX_QUEUE = 5,
+         VIRTCHNL_OP_CONFIG_VSI_QUEUES = 6,
+         VIRTCHNL_OP_CONFIG_IRQ_MAP = 7,
+         VIRTCHNL_OP_ENABLE_QUEUES = 8,
+         VIRTCHNL_OP_DISABLE_QUEUES = 9,
+         -- VIRTCHNL_OP_ADD_ETH_ADDR = 10,
+         -- VIRTCHNL_OP_DEL_ETH_ADDR = 11,
+         -- VIRTCHNL_OP_ADD_VLAN = 12,
+         -- VIRTCHNL_OP_DEL_VLAN = 13,
+         -- VIRTCHNL_OP_CONFIG_PROMISCUOUS_MODE = 14,
+         VIRTCHNL_OP_GET_STATS = 15,
+         -- VIRTCHNL_OP_RSVD = 16,
+         VIRTCHNL_OP_EVENT = 17,
+         -- VIRTCHNL_OP_IWARP = 20,
+         -- VIRTCHNL_OP_CONFIG_IWARP_IRQ_MAP = 21,
+         -- VIRTCHNL_OP_RELEASE_IWARP_IRQ_MAP = 22,
+         -- VIRTCHNL_OP_CONFIG_RSS_KEY = 23,
+         -- VIRTCHNL_OP_CONFIG_RSS_LUT = 24,
+         -- VIRTCHNL_OP_GET_RSS_HENA_CAPS = 25,
+         -- VIRTCHNL_OP_SET_RSS_HENA = 26
+      }
    }
    self:mbox_setup_rxq()
    self:mbox_setup_txq()
