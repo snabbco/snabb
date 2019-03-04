@@ -60,13 +60,9 @@ function new (init)
          self.directmap = array(Poptrie.base_t, 2^self.s)
       end
    end
-   for _, keysize in ipairs{ 32, 64, 128 } do
-      self["asm_lookup"..keysize] = poptrie_lookup.generate(self, keysize)
-      self["lookup"..keysize] = function (self, key)
-         local lookup = self["asm_lookup"..keysize]
-         return lookup(self.leaves, self.nodes, key, self.directmap)
-      end
-   end
+   self.asm_lookup32 = poptrie_lookup.generate(self, 32)
+   self.asm_lookup64 = poptrie_lookup.generate(self, 64)
+   self.asm_lookup128 = poptrie_lookup.generate(self, 128)
    return self
 end
 
@@ -327,6 +323,16 @@ function Poptrie:lookup (key)
    end
    if debug then print(base + bc - 1) end
    return L[base + bc - 1]
+end
+
+function Poptrie:lookup32 (key)
+   return self.asm_lookup32(self.leaves, self.nodes, key, self.directmap)
+end
+function Poptrie:lookup64 (key)
+   return self.asm_lookup64(self.leaves, self.nodes, key, self.directmap)
+end
+function Poptrie:lookup64 (key)
+   return self.asm_lookup64(self.leaves, self.nodes, key, self.directmap)
 end
 
 function Poptrie:fib_info ()
