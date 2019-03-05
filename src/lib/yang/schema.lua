@@ -446,7 +446,7 @@ local function init_refine(node, loc, argument, children)
 end
 local function init_revision(node, loc, argument, children)
    -- TODO: parse date
-   node.value = require_argument(loc, argument)
+   node.date = require_argument(loc, argument)
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
 end
@@ -771,6 +771,13 @@ function resolve(schema, features)
             node[prop] = shallow_copy(node[prop])
             for k,v in pairs(node[prop]) do node[prop][k] = visit(v, env) end
          end
+         local last_revision = nil
+         for _,revision in ipairs(node.revisions) do
+            if last_revision == nil or last_revision < revision.date then
+               last_revision = revision.date
+            end
+         end
+         node.last_revision = last_revision
       end
       if node.kind == 'rpc' then
          if node.input then node.input = visit(node.input, env) end
@@ -1094,12 +1101,13 @@ function selftest()
    assert(schema.contact == "John Smith fake@person.tld")
    assert(schema.organization == "Fruit Inc.")
    assert(schema.description == "Module to test YANG schema lib")
+   assert(schema.last_revision == "2016-05-28")
 
    -- Check all revisions are accounted for.
    assert(schema.revisions[1].description == "Revision 1")
-   assert(schema.revisions[1].value == "2016-05-27")
+   assert(schema.revisions[1].date == "2016-05-27")
    assert(schema.revisions[2].description == "Revision 2")
-   assert(schema.revisions[2].value == "2016-05-28")
+   assert(schema.revisions[2].date == "2016-05-28")
 
    -- Check that the feature statements are in the exports interface
    -- but not the schema itself.
