@@ -78,8 +78,9 @@ function check_affinity_for_pci_addresses (addrs)
          print('Warning: No NUMA memory affinity.')
          print('Pass --cpu to bind to a CPU and its NUMA node.')
       end
-   elseif policy.mode ~= S.c.MPOL_MODE['bind'] then
-      print("Warning: NUMA memory policy already in effect, but it's not --membind.")
+   elseif (policy.mode ~= S.c.MPOL_MODE['bind'] and
+           policy.mode ~= S.c.MPOL_MODE['preferred']) then
+      print("Warning: NUMA memory policy already in effect, but it's not --membind or --preferred.")
    else
       local node = S.getcpu().node
       local node_for_pci = choose_numa_node_for_pci_addresses(addrs)
