@@ -301,7 +301,7 @@ end
 function data_compiler_from_schema(schema, is_config)
    local grammar = data.data_grammar_from_schema(schema, is_config)
    return data_compiler_from_grammar(data_emitter(grammar),
-                                     schema.id, schema.revision_date)
+                                     schema.id, schema.last_revision)
 end
 
 function config_compiler_from_schema(schema)
