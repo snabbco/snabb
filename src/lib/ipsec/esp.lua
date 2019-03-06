@@ -22,6 +22,7 @@ local header = require("lib.protocol.header")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
+local ipv4 = require("lib.protocol.ipv4")
 local esp = require("lib.protocol.esp")
 local esp_tail = require("lib.protocol.esp_tail")
 local aes_128_gcm = require("lib.ipsec.aes_128_gcm")
@@ -32,7 +33,7 @@ local C = ffi.C
 local logger = lib.logger_new({ rate = 32, module = 'esp' })
 local band = bit.band
 
-local htons, htonl, ntohl = lib.htons, lib.htonl, lib.ntohl
+local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
 
 require("lib.ipsec.track_seq_no_h")
 local window_t = ffi.typeof("uint8_t[?]")
@@ -40,6 +41,7 @@ local window_t = ffi.typeof("uint8_t[?]")
 PROTOCOL = 50 -- https://tools.ietf.org/html/rfc4303#section-2
 
 local ipv6_ptr_t = ffi.typeof("$ *", ipv6:ctype())
+local ipv4_ptr_t = ffi.typeof("$ *", ipv4:ctype())
 local function ipv6_fl (ip) return bit.lshift(ntohl(ip.v_tc_fl), 12) end
 
 local esp_header_ptr_t = ffi.typeof("$ *", esp:ctype())
@@ -51,6 +53,12 @@ local ESP_SIZE = esp:sizeof()
 local ESP_TAIL_SIZE = esp_tail:sizeof()
 
 local TRANSPORT6_PAYLOAD_OFFSET = ETHERNET_SIZE + IPV6_SIZE
+
+-- Offsets in units of uint16_t
+local IPV4_CSUM_OFFSET = ffi.offsetof(ipv4:ctype(), 'checksum')/2
+local IPV4_LENGTH_OFFSET = ffi.offsetof(ipv4:ctype(), 'total_length')/2
+-- Covers TTL (unchanged) and protocol
+local IPV4_TTL_OFFSET = ffi.offsetof(ipv4:ctype(), 'ttl')/2
 
 -- NB: `a' must be a power of two
 local function padding (a, l) return bit.band(-l, a-1) end
@@ -144,6 +152,42 @@ function encrypt:encapsulate_transport6 (p)
    return p
 end
 
+function encrypt:encapsulate_transport4 (p)
+   local ip = ffi.cast(ipv4_ptr_t, p.data + ETHERNET_SIZE)
+   local ihl = bit.band(bit.rshift(ntohs(ip.ihl_v_tos), 8), 0x0f)
+   local ip_header_length = ihl*4
+   local transport_payload_offset = ETHERNET_SIZE + ip_header_length
+
+   if p.length < transport_payload_offset then return nil end
+
+   local payload = p.data + transport_payload_offset
+   local payload_length = p.length - transport_payload_offset
+   local pad_length = self:padding(payload_length)
+   local overhead = self.ESP_OVERHEAD + pad_length
+   p = packet.resize(p, p.length + overhead)
+
+   local tail = payload + payload_length + pad_length
+   self:encode_esp_trailer(tail, ip.protocol, pad_length)
+
+   local ctext_length = payload_length + pad_length + ESP_TAIL_SIZE
+   self:encrypt_payload(payload, ctext_length)
+
+   local ctext = payload + ESP_SIZE + self.cipher.IV_SIZE
+   C.memmove(ctext, payload, ctext_length + self.cipher.AUTH_SIZE)
+
+   self:encode_esp_header(payload)
+
+   local ptr = ffi.cast("uint16_t *", ip)
+   C.checksum_update_incremental_16(ptr + IPV4_CSUM_OFFSET,
+                                    ptr + IPV4_LENGTH_OFFSET,
+                                    ip_header_length + payload_length + overhead)
+   C.checksum_update_incremental_16(ptr + IPV4_CSUM_OFFSET,
+                                    ptr + IPV4_TTL_OFFSET,
+                                    bit.bor(bit.lshift(ip.ttl, 8), PROTOCOL))
+
+   return p
+end
+
 -- Encapsulation in tunnel mode is performed as follows:
 -- (In tunnel mode, the input packet must be an IP frame already stripped of
 -- its Ethernet header.)
@@ -199,7 +243,7 @@ function decrypt:new (conf)
    return setmetatable(o, {__index=decrypt})
 end
 
-function decrypt:decrypt_payload (ptr, length, ip)
+function decrypt:decrypt_payload (ptr, length, ip, audit_fn)
    -- NB: bounds check is performed by caller
    local esp_header = ffi.cast(esp_header_ptr_t, ptr)
    local iv_start = ptr + ESP_SIZE
@@ -226,7 +270,7 @@ function decrypt:decrypt_payload (ptr, length, ip)
    end
 
    if error then
-      self:audit(error, ntohl(esp_header.spi), seq_low, ip)
+      audit_fn(self, error, ntohl(esp_header.spi), seq_low, ip)
       return nil
    end
 
@@ -257,7 +301,7 @@ function decrypt:decapsulate_transport6 (p)
    local payload_length = p.length - TRANSPORT6_PAYLOAD_OFFSET
 
    local ptext_start, ptext_length, next_header =
-      self:decrypt_payload(payload, payload_length, ip)
+      self:decrypt_payload(payload, payload_length, ip, self.audit_v6)
 
    if not ptext_start then return nil end
 
@@ -266,6 +310,36 @@ function decrypt:decapsulate_transport6 (p)
 
    C.memmove(payload, ptext_start, ptext_length)
    p = packet.resize(p, TRANSPORT6_PAYLOAD_OFFSET + ptext_length)
+
+   return p
+end
+
+function decrypt:decapsulate_transport4 (p)
+   local ip = ffi.cast(ipv4_ptr_t, p.data + ETHERNET_SIZE)
+   local ihl = bit.band(bit.rshift(ntohs(ip.ihl_v_tos), 8), 0x0f)
+   local ip_header_length = ihl*4
+   local transport_payload_offset = ETHERNET_SIZE + ip_header_length
+
+   if p.length - transport_payload_offset < self.MIN_SIZE then return nil end
+
+   local payload = p.data + transport_payload_offset
+   local payload_length = p.length - transport_payload_offset
+
+   local ptext_start, ptext_length, protocol =
+      self:decrypt_payload(payload, payload_length, ip, self.audit_v4)
+
+   if not ptext_start then return nil end
+
+   local ptr = ffi.cast("uint16_t *", ip)
+   C.checksum_update_incremental_16(ptr + IPV4_CSUM_OFFSET,
+                                    ptr + IPV4_LENGTH_OFFSET,
+                                    ip_header_length + ptext_length)
+   C.checksum_update_incremental_16(ptr + IPV4_CSUM_OFFSET,
+                                    ptr + IPV4_TTL_OFFSET,
+                                    bit.bor(bit.lshift(ip.ttl, 8), protocol))
+
+   C.memmove(payload, ptext_start, ptext_length)
+   p = packet.resize(p, transport_payload_offset + ptext_length)
 
    return p
 end
@@ -292,7 +366,7 @@ function decrypt:decapsulate_tunnel (p)
    return p, next_header
 end
 
-function decrypt:audit (reason, spi, seq, ip)
+function decrypt:audit_v6 (reason, spi, seq, ip)
    if not self.auditing then return end
    -- The information RFC4303 says we SHOULD log:
    logger:log(("Rejected packet (spi=%d, seq=%d, "
@@ -302,6 +376,18 @@ function decrypt:audit (reason, spi, seq, ip)
                  ip and ipv6:ntop(ip.src_ip) or "unknown",
                  ip and ipv6:ntop(ip.dst_ip) or "unknown",
                  ip and ipv6_fl(ip) or 0,
+                 reason))
+end
+
+function decrypt:audit_v4 (reason, spi, seq, ip)
+   if not self.auditing then return end
+   -- The information RFC4303 says we SHOULD log:
+   logger:log(("Rejected packet (spi=%d, seq=%d, "
+                  .."src_ip=%s, dst_ip=%s, "
+                  .."reason=%q)")
+         :format(spi, seq,
+                 ip and ipv4:ntop(ip.src_ip) or "unknown",
+                 ip and ipv4:ntop(ip.dst_ip) or "unknown",
                  reason))
 end
 
