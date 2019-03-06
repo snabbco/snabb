@@ -319,7 +319,7 @@ end
 local function src_dst_pair (af, src, dst)
    local function maybe_convert(addr)
       if type(addr) == "string" then
-         return af:pton(addr)
+         return assert(af:pton(addr))
       else
          return addr
       end
@@ -721,8 +721,10 @@ function parse_config (args)
          local socket
          if assoc then
             print("      IPsec enabled, encryption algorithm "..assoc.aead)
-            local ipsec = App:new('ipsec_'..index,
-                                  require("apps.ipsec.esp").Transport6_IKE,
+            local esp_module = afi == "ipv4" and "Transport4_IKE" or
+               "Transport6_IKE"
+            local ipsec = App:new('ipsec_'..afi.."_"..index,
+                                  require("apps.ipsec.esp")[esp_module],
                                   assoc)
             connect_duplex(dispatch:socket('sd_'..index),
                            ipsec:socket('encapsulated'))
@@ -771,7 +773,6 @@ function parse_config (args)
    local ipsec_assocs = {}
    for _, config in pairs(main_config.ipsec) do
       local af = check_af(config.afi)
-      assert(config.afi == "ipv6", "IPsec for IPv4 no yet supported")
       local sd_pair = src_dst_pair(af, config.remote_address, config.local_address)
       assert(not ipsec_assocs[sd_pair],
              ("Multiple definitions for IPsec association %s<->%s"):format(
