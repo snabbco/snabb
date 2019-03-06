@@ -12,10 +12,11 @@ local ipsec_shm = require("lib.ipsec.shm")
 local counter = require("core.counter")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
+local ipv4 = require("lib.protocol.ipv4")
 local siphash = require("lib.hash.siphash")
 require("lib.ipsec.shm_h")
 
-Transport6 = {
+Transport = {
    config = {
       spi = {required=true},
       aead = {default="aes-gcm-16-icv"},
@@ -34,7 +35,7 @@ Transport6 = {
    }
 }
 
-function Transport6:new (conf)
+function Transport:new (conf)
    local self = {}
    assert(conf.transmit_salt ~= conf.receive_salt,
           "Refusing to operate with transmit_salt == receive_salt")
@@ -52,10 +53,10 @@ function Transport6:new (conf)
       resync_threshold = conf.resync_threshold,
       resync_attempts = conf.resync_attempts,
       auditing = conf.auditing}
-   return setmetatable(self, {__index = Transport6})
+   return setmetatable(self, {__index = Transport})
 end
 
-function Transport6:push ()
+function Transport:push ()
    if self.ike_check and self.ike_check() then
       self:maybe_update_keys()
    end
@@ -64,14 +65,34 @@ function Transport6:push ()
    local input = self.input.decapsulated
    local output = self.output.encapsulated
    if self.encrypt then
-      for _=1,link.nreadable(input) do
-         local p = link.receive(input)
-         local p_enc = self.encrypt:encapsulate_transport6(p)
-         if p_enc then
-            link.transmit(output, p_enc)
-         else
-            packet.free(p)
-            counter.add(self.shm.txerrors)
+      -- Parametrization of the call to encapsulate_transport() per
+      -- address family would introduce a variability that will
+      -- ultimately lead to the formation of a side trace at that
+      -- point when traffic of both kinds is present, which will
+      -- favour the address family for which the loop happens to get
+      -- compiled first.  We work around this by duplicating the code
+      -- with calls to fixed functions.
+      if self.afi == "ipv4" then
+         for _=1,link.nreadable(input) do
+            local p = link.receive(input)
+            local p_enc = self.encrypt:encapsulate_transport4(p)
+            if p_enc then
+               link.transmit(output, p_enc)
+            else
+               packet.free(p)
+               counter.add(self.shm.txerrors)
+            end
+         end
+      else
+         for _=1,link.nreadable(input) do
+            local p = link.receive(input)
+            local p_enc = self.encrypt:encapsulate_transport6(p)
+            if p_enc then
+               link.transmit(output, p_enc)
+            else
+               packet.free(p)
+               counter.add(self.shm.txerrors)
+            end
          end
       end
    else
@@ -85,14 +106,27 @@ function Transport6:push ()
    local input = self.input.encapsulated
    local output = self.output.decapsulated
    if self.decrypt then
-      for _=1,link.nreadable(input) do
-         local p = link.receive(input)
-         local p_dec = self.decrypt:decapsulate_transport6(p)
-         if p_dec then
-            link.transmit(output, p_dec)
-         else
-            packet.free(p)
-            counter.add(self.shm.rxerrors)
+      if self.afi == "ipv4" then
+         for _=1,link.nreadable(input) do
+            local p = link.receive(input)
+            local p_dec = self.decrypt:decapsulate_transport4(p)
+            if p_dec then
+               link.transmit(output, p_dec)
+            else
+               packet.free(p)
+               counter.add(self.shm.rxerrors)
+            end
+         end
+      else
+         for _=1,link.nreadable(input) do
+            local p = link.receive(input)
+            local p_dec = self.decrypt:decapsulate_transport6(p)
+            if p_dec then
+               link.transmit(output, p_dec)
+            else
+               packet.free(p)
+               counter.add(self.shm.rxerrors)
+            end
          end
       end
    else
@@ -103,7 +137,33 @@ function Transport6:push ()
    end
 end
 
-Transport6_IKE = setmetatable(
+local ip_config = {
+   v6 = {
+      afi = "ipv6",
+      afi_class = ipv6,
+      hash_buf = ffi.new[[
+         struct {
+            uint8_t remote[16];
+            uint8_t local[16];
+         } __attribute__ ((__packed__))
+      ]]
+   },
+   v4 = {
+      afi = "ipv4",
+      afi_class = ipv4,
+      hash_buf = ffi.new[[
+         struct {
+            uint8_t remote[4];
+            uint8_t local[4];
+         } __attribute__ ((__packed__))
+      ]]
+   }
+}
+
+Transport6 = setmetatable(ip_config.v6, {__index = Transport})
+Transport4 = setmetatable(ip_config.v4, {__index = Transport})
+
+Transport_IKE = setmetatable(
    {
       config = {
          aead = {default="aes-gcm-16-icv"},
@@ -114,35 +174,29 @@ Transport6_IKE = setmetatable(
          resync_attempts = {},
          auditing = {}
       },
-   }, { __index = Transport6 })
+   }, { __index = Transport })
 
-function Transport6_IKE:new (conf)
-   local self = {
-      ike_check = lib.throttle(conf.ike_check_interval),
-      conf = conf,
-      -- Cache of current SAs
-      sas = { ['in'] = { spi = 0 }, out = { spi = 0 } }
-   }
+function Transport_IKE:new (conf)
+   local self = setmetatable(
+      {
+         ike_check = lib.throttle(conf.ike_check_interval),
+         conf = conf,
+         -- Cache of current SAs
+         sas = { ['in'] = { spi = 0 }, out = { spi = 0 } }
+      }, {__index = self})
 
    -- The hash over the source/destination addresses is used as a
    -- rendez-vous point with the Strongswan IKE daemon in the "ipsec"
    -- subdirectory of SNABB_SHM_ROOT.  The daemon calculates the same
    -- hash over the source and destination traffic-selectors.
-   local buf = ffi.new[[
-      union {
-         struct {
-            uint8_t remote[16];
-            uint8_t local[16];
-         } addrs;
-         uint8_t blob[32];
-      }]]
-   buf.addrs.remote = ipv6:pton(conf.remote_address)
-   buf.addrs['local'] = ipv6:pton(conf.local_address)
+   self.hash_buf.remote = self.afi_class:pton(conf.remote_address)
+   self.hash_buf['local'] = self.afi_class:pton(conf.local_address)
    -- Static key used by the Strongswan Charon IKE daemon
    local key = ffi.new("uint8_t[16]", 0, 1, 2, 3, 4, 5, 6, 7,
                        8, 9, 10, 11, 12, 13, 14, 15)
-   local hash_fn = siphash.make_hash({ size = 32, standard = true, key = key })
-   local hash = hash_fn(buf)
+   local hash_fn = siphash.make_hash({ size = ffi.sizeof(self.hash_buf),
+                                       standard = true, key = key })
+   local hash = hash_fn(self.hash_buf)
    local path = "/ipsec/"..bit.tohex(hash)
    -- It is crucial that we don't pick up the keys used by a previous
    -- invocation, since that would break the aes-gcm cipher (re-use of
@@ -152,10 +206,10 @@ function Transport6_IKE:new (conf)
                                     { ['in'] = { ipsec_shm },
                                        out = {ipsec_shm } })
 
-   return setmetatable(self, {__index = Transport6_IKE})
+   return self
 end
 
-function Transport6_IKE:maybe_update_key (dir, update_fn)
+function Transport_IKE:maybe_update_key (dir, update_fn)
    local cache = self.sas[dir]
    local sa = self.sa_frame[dir]
    if sa.spi == 0 then
@@ -204,10 +258,13 @@ local function update_key_out (self, spi, key, salt)
    end
 end
 
-function Transport6_IKE:maybe_update_keys ()
+function Transport_IKE:maybe_update_keys ()
    self:maybe_update_key('in', update_key_in)
    self:maybe_update_key('out', update_key_out)
 end
+
+Transport6_IKE = setmetatable(ip_config.v6, {__index = Transport_IKE})
+Transport4_IKE = setmetatable(ip_config.v4, {__index = Transport_IKE})
 
 Tunnel6 = {
    config = {
