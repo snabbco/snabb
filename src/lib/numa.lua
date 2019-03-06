@@ -141,6 +141,39 @@ function check_affinity_for_pci_addresses (addrs)
    end
 end
 
+local irqbalanced_checked = false
+local function assert_irqbalanced_disabled (warn)
+   if irqbalanced_checked then return end
+   irqbalanced_checked = true
+   for path in os.getenv('PATH'):split(':') do
+      if S.stat(path..'/irqbalance') then
+         if S.stat('/etc/default/irqbalance') then
+            for line in io.lines('/etc/default/irqbalance') do
+               if line:match('^ENABLED=0') then return end
+            end
+         end
+         warn('Irqbalanced detected; this will hurt performance!  %s',
+              'Consider uninstalling via "sudo apt-get remove irqbalance" and rebooting.')
+      end
+   end
+end
+
+local function check_cpu_performance_tuning (cpu, strict)
+   local warn = warn
+   if strict then warn = die end
+   assert_irqbalanced_disabled(warn)
+   local path = '/sys/devices/system/cpu/cpu'..cpu..'/cpufreq/scaling_governor'
+   local gov = assert(io.open(path)):read()
+   if not gov:match('performance') then
+      warn('Expected performance scaling governor for CPU %s, but got "%s"',
+           cpu, gov)
+   end
+
+   if not isolated_cpus()[cpu] then
+      warn('Expected dedicated core, but CPU %s is not in isolcpus set', cpu)
+   end
+end
+
 function unbind_cpu ()
    local cpu_set = S.sched_getaffinity()
    cpu_set:zero()
@@ -169,13 +202,7 @@ function bind_to_cpu (cpu, skip_perf_checks)
 
    bind_to_numa_node (cpu_and_node.node)
 
-   if not skip_perf_checks then
-      local ok, err = pcall(check_cpu_performance_tuning, bound_cpu)
-      if not ok then
-         warn("Error checking performance tuning on CPU %s: %s",
-              bound_cpu, tostring(err))
-      end
-   end
+   if not skip_perf_checks then check_cpu_performance_tuning(bound_cpu) end
 end
 
 function unbind_numa_node ()
@@ -208,21 +235,6 @@ end
 function prevent_preemption(priority)
    assert(S.sched_setscheduler(0, "fifo", priority or 1),
       'Failed to enable real-time scheduling.  Try running as root.')
-end
-
-function check_cpu_performance_tuning (cpu, strict)
-   local warn = warn
-   if strict then warn = die end
-   local path = '/sys/devices/system/cpu/cpu'..cpu..'/cpufreq/scaling_governor'
-   local gov = assert(io.open(path)):read()
-   if not gov:match('performance') then
-      warn('Expected performance scaling governor for CPU %s, but got "%s"',
-           cpu, gov)
-   end
-
-   if not isolated_cpus()[cpu] then
-      warn('Expected dedicated core, but CPU %s is not in isolcpus set', cpu)
-   end
 end
 
 function selftest ()
