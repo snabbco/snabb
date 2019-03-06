@@ -153,7 +153,7 @@ local function assert_irqbalanced_disabled (warn)
             end
          end
          warn('Irqbalanced detected; this will hurt performance!  %s',
-              'Consider uninstalling via "sudo apt-get uninstall irqbalance" and rebooting.')
+              'Consider uninstalling via "sudo apt-get remove irqbalance" and rebooting.')
       end
    end
 end
