@@ -86,8 +86,7 @@ function tunnel:push (sin)
    for _ = 1, link.nreadable(sin) do
       local p = link.receive(sin)
       assert(p.length > 0)
-      local key = ffi.cast(self.key_ptr_t, p.data)
-      local entry = self.ctab:lookup_ptr(ffi.cast("uint8_t *", key))
+      local entry = self.ctab:lookup_ptr(ffi.cast("uint8_t *", p.data))
       link.transmit(entry.value.link, packet.shiftleft(p, entry.value.shift))
    end
 
