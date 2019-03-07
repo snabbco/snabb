@@ -1046,7 +1046,6 @@ end
 local long_opts = {
    duration = "D",
    reconfig = "r",
-   logfile = "l",
    debug = "d",
    jit = "j",
    help = "h",
@@ -1064,10 +1063,6 @@ function run (parameters)
       else
          usage()
       end
-   end
-   function opt.l (arg)
-      local logfh = assert(io.open(arg, "a"))
-      lib.logger_default.fh = logfh
    end
    function opt.h (arg) usage() end
    function opt.d (arg) _G.developer_debug = true end

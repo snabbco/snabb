@@ -3,6 +3,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
+local logger = require("lib.logger")
 local cc_proto = require("program.l2vpn.cc_proto")
 local ipc_mib = require("lib.ipc.shmem.mib")
 local datagram = require("lib.protocol.datagram")
@@ -186,7 +187,7 @@ control_channel = {
 
 function control_channel:new (conf)
    local o = {
-      _logger = lib.logger_new({
+      _logger = logger.new({
             module =
                ("Pseudowire %s: Peer: %s"):format(conf.name, conf.peer_addr)
       }),

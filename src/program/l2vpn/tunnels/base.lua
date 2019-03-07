@@ -3,6 +3,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local lib = require("core.lib")
 local ctable = require("lib.ctable_perfect")
+local logger = require("lib.logger")
 
 tunnel = {
    config = {
@@ -54,7 +55,7 @@ function tunnel:_new (config, name, class, size, params,
          keys = keys_list,
          default_value = default_value })
 
-   o.logger = lib.logger_new({ module = name })
+   o.logger = logger.new({ module = name })
    o.header_scratch = class:new()
    o.handle_unknown_header_fn = unknown_header_fn
 
