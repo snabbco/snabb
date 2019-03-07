@@ -30,7 +30,7 @@ local seq_no_t = require("lib.ipsec.seq_no_t")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
-local logger = lib.logger_new({ rate = 32, module = 'esp' })
+local logger = require("lib.logger").new({ rate = 32, module = 'esp' })
 local band = bit.band
 
 local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
