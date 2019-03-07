@@ -8,9 +8,9 @@ Required arguments:
 
 Optional arguments:
        -n NAME, --name NAME     Record NAME as the identifier of this
-                                network function instance  NAME can then
-                                be passed to "snabb config" to query or
-                                modify the current state or
+                                network function instance.  NAME can
+                                then be passed to "snabb config" to
+                                query or modify the current state or
                                 configuration of the network function at
                                 run-time.  NAME must be unique among
                                 running Snabb programs.
