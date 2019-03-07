@@ -720,7 +720,7 @@ function parse_config (args)
          local assoc = ipsec_assocs[sd_pair]
          local socket
          if assoc then
-            print("      IPsec enabled, encryption algorithm "..assoc.aead)
+            print("      IPsec: "..assoc.aead)
             local esp_module = afi == "ipv4" and "Transport4_IKE" or
                "Transport6_IKE"
             local ipsec = App:new('ipsec_'..afi.."_"..index,
@@ -730,7 +730,7 @@ function parse_config (args)
                            ipsec:socket('encapsulated'))
             socket = ipsec:socket('decapsulated')
          else
-            print("      IPsec disabled")
+            print("      IPsec: disabled")
             socket = dispatch:socket('sd_'..index)
          end
 
