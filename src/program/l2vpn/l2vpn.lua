@@ -1158,7 +1158,6 @@ function run (parameters)
             arp.app:arg().self_mac = ethernet:pton(ethernet:ntop(mac.bytes))
          end
          engine.configure(create_app_graph())
-         jit.flush()
       end
       mtime = stat.mtime
       engine.main(engine_opts)
