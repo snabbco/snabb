@@ -13,6 +13,7 @@ local main      = require("core.main")
 local S         = require("syscall")
 local B4Gen     = require("program.packetblaster.lwaftr.lib").B4Gen
 local InetGen   = require("program.packetblaster.lwaftr.lib").InetGen
+local Interleave = require("program.packetblaster.lwaftr.lib").Interleave
 local Tap       = require("apps.tap.tap").Tap
 local vlan      = require("apps.vlan.vlan")
 local arp       = require("apps.ipv4.arp")
@@ -256,10 +257,11 @@ function run (args)
          
          -- Split based on ethertype.
          config.app(c, "mux", V4V6.V4V6, {})
-         v4_input, v4_output = finish_v4('mux.v4', 'mux.v4')
-         v6_input, v6_output = finish_v6('mux.v6', 'mux.v6')
+         config.app(c, "join", Interleave, {})
+         v4_input, v4_output = finish_v4('join.v4', 'mux.v4')
+         v6_input, v6_output = finish_v6('join.v6', 'mux.v6')
          config.link(c, output .. " -> mux.input")
-         config.link(c, "mux.output -> " .. input)
+         config.link(c, "join.output -> " .. input)
       end
    end
 

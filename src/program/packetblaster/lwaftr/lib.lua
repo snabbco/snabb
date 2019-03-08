@@ -149,6 +149,7 @@ function B4Gen:new(conf)
    lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, 1) -- Traffic class
    ipv6_hdr.next_header = PROTO_IPV4_ENCAPSULATION
    ipv6_hdr.hop_limit = DEFAULT_TTL
+   ipv6_hdr.src_ip = b4_ipv6
    ipv6_hdr.dst_ip = aftr_ipv6
 
    ipv4_hdr.src_ip = b4_ipv4
@@ -471,6 +472,25 @@ function InetGen:pull ()
          self.softwire_idx = 0
          ipv4_hdr.dst_ip = self.b4_ipv4
          udp_hdr.dst_port = htons(self.b4_port)
+      end
+   end
+end
+
+Interleave = {}
+
+function Interleave:new()
+   return setmetatable({}, {__index=Interleave})
+end
+
+function Interleave:push ()
+   local continue = true
+   while continue do
+      continue = false
+      for _, inport in ipairs(self.input) do
+         if not link.empty(inport) then
+            transmit(self.output.output, receive(inport))
+            continue = true
+         end
       end
    end
 end
