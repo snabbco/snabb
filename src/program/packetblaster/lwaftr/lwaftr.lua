@@ -36,7 +36,13 @@ local long_opts = {
    size         = "S",    -- frame size list (defaults to IMIX)
    src_mac      = "s",    -- source ethernet address
    dst_mac      = "d",    -- destination ethernet address
+   src_mac4     = 1,      -- source ethernet address for IPv4 traffic
+   dst_mac4     = 1,      -- destination ethernet address for IPv4 traffic
+   src_mac6     = 1,      -- source ethernet address for IPv6 traffic
+   dst_mac6     = 1,      -- destination ethernet address for IPv6 traffic
    vlan         = "v",    -- VLAN id
+   vlan4        = 1,      -- VLAN id for IPv4 traffic
+   vlan6        = 1,      -- VLAN id for IPv6 traffic
    b4           = "b",    -- B4 start IPv6_address,IPv4_address,port
    aftr         = "a",    -- fix AFTR public IPv6_address
    ipv4         = "I",    -- fix public IPv4 address
@@ -80,12 +86,16 @@ function run (args)
    end
 
    local v4_src_mac = "00:00:00:00:00:00"
+   function opt.src_mac4 (arg) v4_src_mac = arg end
    local v6_src_mac = "00:00:00:00:00:00"
-   function opt.s (arg) v4_src_mac, v6_src_mac = arg, arg end
+   function opt.src_mac6 (arg) v6_src_mac = arg end
+   function opt.s (arg) opt.src_mac4(arg); opt.src_mac6(arg) end
 
    local v4_dst_mac = "00:00:00:00:00:00"
+   function opt.dst_mac4 (arg) v4_dst_mac = arg end
    local v6_dst_mac = "00:00:00:00:00:00"
-   function opt.d (arg) v4_dst_mac, v6_dst_mac = arg, arg end
+   function opt.dst_mac6 (arg) v6_dst_mac = arg end
+   function opt.d (arg) opt.dst_mac4(arg); opt.dst_mac6(arg) end
 
    local b4_ipv6, b4_ipv4, b4_port = "2001:db8::", "10.0.0.0", 1024
    function opt.b (arg) 
@@ -149,11 +159,15 @@ function run (args)
    function opt.v6 () v4 = false end
    opt["6"] = opt.v6
 
-   local v4_vlan, v6_vlan = nil, nil
-   function opt.v (arg) 
-      v4_vlan = assert(tonumber(arg), "duration is not a number!")
-      v6_vlan = v4_vlan
+   local v4_vlan
+   function opt.vlan4 (arg) 
+      v4_vlan = assert(tonumber(arg), "vlan is not a number!")
    end
+   local v6_vlan
+   function opt.vlan6 (arg) 
+      v6_vlan = assert(tonumber(arg), "vlan is not a number!")
+   end
+   function opt.v (arg) opt.vlan4(arg); opt.vlan6(arg) end
 
    local pcap_file, single_pass = nil, false
    function opt.o (arg) 
@@ -218,8 +232,8 @@ function run (args)
       local next_ip = nil -- Assume we have a static dst mac.
       config.app(c, "ndp", ndp.NDP,
                  { self_ip = tester_ip,
-                   self_mac = ethernet:pton(v4_src_mac),
-                   next_mac = ethernet:pton(v4_dst_mac),
+                   self_mac = ethernet:pton(v6_src_mac),
+                   next_mac = ethernet:pton(v6_dst_mac),
                    next_ip = next_ip })
       config.link(c, output .. ' -> ndp.south')
       config.link(c, 'ndp.south -> ' .. input)

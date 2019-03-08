@@ -220,7 +220,7 @@ function B4Gen:pull ()
          rx_packets = rx_packets + 1
          local payload = cast(payload_ptr_type, pkt.data + rx_payload_offset)
          if payload.magic == MAGIC then
-            if self.last_rx_packet_number > 0 then
+            if self.last_rx_packet_number and self.last_rx_packet_number > 0 then
                lost_packets = lost_packets + payload.number - self.last_rx_packet_number - 1
             end
             self.last_rx_packet_number = payload.number
@@ -296,7 +296,7 @@ function B4Gen:pull ()
          self.softwire_idx = 0
          ipv6_hdr.src_ip = self.b4_ipv6
          ipv4_hdr.src_ip = self.b4_ipv4
-         ipv4_hdr.src_port = htons(self.b4_port)
+         udp_hdr.src_port = htons(self.b4_port)
       end
    end
 end
@@ -400,7 +400,7 @@ function InetGen:pull ()
          rx_packets = rx_packets + 1
          local payload = cast(payload_ptr_type, pkt.data + rx_payload_offset)
          if payload.magic == MAGIC then
-            if self.last_rx_packet_number > 0 then
+            if self.last_rx_packet_number and self.last_rx_packet_number > 0 then
                lost_packets = lost_packets + payload.number - self.last_rx_packet_number - 1
             end
             self.last_rx_packet_number = payload.number
@@ -470,7 +470,7 @@ function InetGen:pull ()
          -- Reset to initial softwire.
          self.softwire_idx = 0
          ipv4_hdr.dst_ip = self.b4_ipv4
-         ipv4_hdr.dst_port = htons(self.b4_port)
+         udp_hdr.dst_port = htons(self.b4_port)
       end
    end
 end
