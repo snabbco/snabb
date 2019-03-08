@@ -160,11 +160,11 @@ function run (args)
    opt["6"] = opt.v6
 
    local v4_vlan
-   function opt.vlan4 (arg) 
+   function opt.vlan4 (arg)
       v4_vlan = assert(tonumber(arg), "vlan is not a number!")
    end
    local v6_vlan
-   function opt.vlan6 (arg) 
+   function opt.vlan6 (arg)
       v6_vlan = assert(tonumber(arg), "vlan is not a number!")
    end
    function opt.v (arg) opt.vlan4(arg); opt.vlan6(arg) end
