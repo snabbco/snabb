@@ -99,6 +99,7 @@ local fragmenter_config_params = {
    pmtud = { default=false },
    pmtu_timeout = { default = 600 },
    pmtu_local_addresses = { default = {} },
+   use_alarms = { default = true }
 }
 
 deterministic_first_fragment_id = false
@@ -158,21 +159,23 @@ function Fragmenter:new(conf)
       o.ipv6_hdr = ipv6_hdr:new({})
    end
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='outgoing-ipv6-fragments'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Outgoing IPv6 fragments over N fragments/s',
+   if o.use_alarms then
+      alarms.add_to_inventory {
+         [{alarm_type_id='outgoing-ipv6-fragments'}] = {
+            resource=tostring(S.getpid()),
+            has_clear=true,
+            description='Outgoing IPv6 fragments over N fragments/s',
+         }
       }
-   }
-   local outgoing_fragments_alarm = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='outgoing-ipv6-fragments'}] = {
-         perceived_severity='warning',
-         alarm_text='More than 10,000 outgoing IPv6 fragments per second',
+      local outgoing_fragments_alarm = alarms.declare_alarm {
+         [{resource=tostring(S.getpid()),alarm_type_id='outgoing-ipv6-fragments'}] = {
+            perceived_severity='warning',
+            alarm_text='More than 10,000 outgoing IPv6 fragments per second',
+         }
       }
-   }
-   o.outgoing_ipv6_fragments_alarm = CounterAlarm.new(outgoing_fragments_alarm,
-      1, 1e4, o, "out-ipv6-frag")
+      o.outgoing_ipv6_fragments_alarm = CounterAlarm.new(outgoing_fragments_alarm,
+         1, 1e4, o, "out-ipv6-frag")
+   end
 
    return setmetatable(o, {__index=Fragmenter})
 end
@@ -291,7 +294,9 @@ function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
    local south, north = self.input.south, self.output.north
 
-   self.outgoing_ipv6_fragments_alarm:check()
+   if self.use_alarms then
+      self.outgoing_ipv6_fragments_alarm:check()
+   end
 
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)

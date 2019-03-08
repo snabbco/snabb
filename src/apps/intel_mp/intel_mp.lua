@@ -301,7 +301,8 @@ Intel = {
       linkup_wait_recheck = {default=0.1},
       wait_for_link = {default=false},
       master_stats = {default=true},
-      run_stats = {default=false}
+      run_stats = {default=false},
+      use_alarms = {default=true}
    },
 }
 Intel1g = setmetatable({}, {__index = Intel })
@@ -343,7 +344,8 @@ function Intel:new (conf)
       -- processes
       shm_root = "/intel-mp/" .. pci.canonical(conf.pciaddr) .. "/",
       -- only used for main process, affects max pool number
-      vmdq_queuing_mode = conf.vmdq_queuing_mode
+      vmdq_queuing_mode = conf.vmdq_queuing_mode,
+      use_alarms = conf.use_alarms
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -417,37 +419,39 @@ function Intel:new (conf)
       self.sync_timer = lib.throttle(0.01)
    end
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='ingress-bandwith'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Ingress bandwith exceeds N Gbps',
+   if conf.use_alarms then
+      alarms.add_to_inventory {
+         [{alarm_type_id='ingress-bandwith'}] = {
+            resource=tostring(S.getpid()),
+            has_clear=true,
+            description='Ingress bandwith exceeds N Gbps',
+         }
       }
-   }
-   local ingress_bandwith = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='ingress-bandwith'}] = {
-         perceived_severity='major',
-         alarm_text='Ingress bandwith exceeds 1e9 bytes/s which can cause packet drops.'
+      local ingress_bandwith = alarms.declare_alarm {
+         [{resource=tostring(S.getpid()),alarm_type_id='ingress-bandwith'}] = {
+            perceived_severity='major',
+            alarm_text='Ingress bandwith exceeds 1e9 bytes/s which can cause packet drops.'
+         }
       }
-   }
-   self.ingress_bandwith_alarm = CallbackAlarm.new(ingress_bandwith,
-      1, 1e9, function() return self:rxbytes() end)
+      self.ingress_bandwith_alarm = CallbackAlarm.new(ingress_bandwith,
+         1, 1e9, function() return self:rxbytes() end)
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='ingress-packet-rate'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Ingress packet-rate exceeds N Gbps',
+      alarms.add_to_inventory {
+         [{alarm_type_id='ingress-packet-rate'}] = {
+            resource=tostring(S.getpid()),
+            has_clear=true,
+            description='Ingress packet-rate exceeds N Gbps',
+         }
       }
-   }
-   local ingress_packet_rate = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='ingress-packet-rate'}] = {
-         perceived_severity='major',
-         alarm_text='Ingress packet-rate exceeds 2MPPS which can cause packet drops.'
+      local ingress_packet_rate = alarms.declare_alarm {
+         [{resource=tostring(S.getpid()),alarm_type_id='ingress-packet-rate'}] = {
+            perceived_severity='major',
+            alarm_text='Ingress packet-rate exceeds 2MPPS which can cause packet drops.'
+         }
       }
-   }
-   self.ingress_packet_rate_alarm = CallbackAlarm.new(ingress_packet_rate,
-      1, 2e6, function() return self:rxpackets() end)
+      self.ingress_packet_rate_alarm = CallbackAlarm.new(ingress_packet_rate,
+         1, 2e6, function() return self:rxpackets() end)
+   end
 
    return self
 end
@@ -631,8 +635,10 @@ function Intel:push ()
    local li = self.input.input
    if li == nil then return end
 
-   self.ingress_packet_rate_alarm:check()
-   self.ingress_bandwith_alarm:check()
+   if self.use_alarms then
+      self.ingress_packet_rate_alarm:check()
+      self.ingress_bandwith_alarm:check()
+   end
 
    while not empty(li) and self:can_transmit() do
       local p = receive(li)
