@@ -212,6 +212,12 @@ function usage ()
    main.exit(0)
 end
 
+local function merge (a, b)
+   for k, v in pairs(b) do
+      a[k] = v
+   end
+end
+
 local state
 local function clear_state ()
    state =  {
@@ -287,6 +293,8 @@ end
 --     This function is called after the driver has been created
 --     and receives the driver object as input.  It returns the
 --     path to the shm frame where the driver stores its stats counters.
+--   config ()
+--     return a table with driver-specific configuration
 local driver_helpers = {
    ['apps.intel_mp.intel_mp.Intel'] = {
       link_names = function ()
@@ -294,6 +302,9 @@ local driver_helpers = {
       end,
       stats_path = function (intf)
          return 'pci/'..intf.pci_address
+      end,
+      config = function ()
+         return { use_alarms = false }
       end
    },
    ['apps.tap.tap.Tap'] = {
@@ -302,7 +313,8 @@ local driver_helpers = {
       end,
       stats_path = function (intf)
          return 'apps/'..intf.app:name()
-      end
+      end,
+      config = function () return {} end
    },
 }
 
@@ -349,12 +361,14 @@ function parse_intf(config)
 
    -- NIC driver
    local drv_c = config.driver
+   local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
    if type(drv_c.config) == "table" then
       if (drv_c.config.pciaddr) then
          print("  PCI address: "..drv_c.config.pciaddr)
 	 intf.pci_address = drv_c.config.pciaddr
       end
       drv_c.config.mtu = config.mtu
+      merge(drv_c.config, driver_helper.config())
       if drv_c.extra_config then
          -- If present, extra_config must be a table, whose elements
          -- are merged with the regular config.  This feature allows
@@ -369,7 +383,6 @@ function parse_intf(config)
    end
    intf.app = App:new('intf_'..intf.nname,
                       require(drv_c.path)[drv_c.name], drv_c.config)
-   local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
    assert(driver_helper,
           "Unsupported driver (missing driver helper)"
              ..drv_c.path.."."..drv_c.name)
@@ -459,10 +472,11 @@ function parse_intf(config)
          fragmenter = App:new('frag_v6_'..intf.nname..vid_suffix(vid),
                               frag_ipv6,
                               { mtu = intf.mtu - 14, pmtud = true,
-                                pmtu_local_addresses = {} })
+                                pmtu_local_addresses = {},
+                                use_alarms = false })
          local reassembler = App:new('reass_v6_'..intf.nname..vid_suffix(vid),
                                      reass_ipv6,
-                                     {})
+                                     { use_alarms = false })
          local nd_north = nd:socket('north')
          connect(nd_north, fragmenter:socket('south'))
          connect(fragmenter:socket('output'), nd_north)
@@ -493,10 +507,11 @@ function parse_intf(config)
          fragmenter = App:new('frag_v4_'..intf.nname..vid_suffix(vid),
                               frag_ipv4,
                               { mtu = intf.mtu - 14, pmtud = true,
-                                pmtu_local_addresses = {} })
+                                pmtu_local_addresses = {},
+                                use_alarms = false })
          local reassembler = App:new('reass_v4_'..intf.nname..vid_suffix(vid),
                                      reass_ipv4,
-                                     {})
+                                     { use_alarms = false })
          local arp_north = arp:socket('north')
          connect(arp_north, fragmenter:socket('south'))
          connect(fragmenter:socket('output'), arp_north)
