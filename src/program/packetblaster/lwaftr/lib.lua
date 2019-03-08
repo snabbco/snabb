@@ -30,6 +30,7 @@ struct {
 ]]
 local ether_header_ptr_type = ffi.typeof("$*", ether_header_t)
 local ether_header_size = ffi.sizeof(ether_header_t)
+local ether_min_frame_size = 64
 
 -- The ethernet CRC field is not included in the packet as seen by
 -- Snabb, but it is part of the frame and therefore a contributor to the
@@ -119,6 +120,7 @@ B4Gen = {
       b4_ipv4 = {required=true},
       b4_port = {required=true},
       public_ipv4 = {required=true},
+      frame_overhead = {default=0}
    }
 }
 
@@ -167,14 +169,12 @@ function B4Gen:new(conf)
    payload.magic = MAGIC
    payload.number = 0
 
-   local minimum_size = ether_crc_size + ether_header_size +
-      ipv4_header_size + udp_header_size + payload_size
    -- The sizes are frame sizes, including the 4-byte ethernet CRC
    -- that we don't see in Snabb.
    local sizes = {}
    for _,size in ipairs(conf.sizes) do
-      assert(size >= minimum_size)
-      table.insert(sizes, size - ether_crc_size)
+      assert(size >= ether_min_frame_size)
+      table.insert(sizes, size - ether_crc_size - conf.frame_overhead)
    end
 
    local o = {
@@ -200,7 +200,11 @@ function B4Gen:new(conf)
    return setmetatable(o, {__index=B4Gen})
 end
 
+function B4Gen:done() return self.stopping end
+
 function B4Gen:pull ()
+
+   if self.stopping then return end
 
    local output = self.output.output
    local input = self.input.input
@@ -208,10 +212,6 @@ function B4Gen:pull ()
    local rx_bytes = self.rx_bytes
    local lost_packets = self.lost_packets
    local rx_payload_offset = self.rx_payload_offset
-
-   if self.stop_on_next_breath then
-      main.exit(0)
-   end
 
    -- Count and trash incoming packets.
    for _=1,link.nreadable(input) do
@@ -289,7 +289,7 @@ function B4Gen:pull ()
          if self.single_pass then
             printf("generated %d packets for each of %d softwires",
                    #self.sizes, self.softwire_count)
-            self.stop_on_next_breath = true
+            self.stopping = true
             break
          end
 
@@ -310,7 +310,8 @@ InetGen = {
       public_ipv4 = {required=true},
       b4_port = {required=true},
       count = {},
-      single_pass = {}
+      single_pass = {},
+      frame_overhead = {default=0}
    }
 }
 
@@ -349,14 +350,12 @@ function InetGen:new(conf)
    payload.magic = MAGIC
    payload.number = 0
 
-   local minimum_size = ether_crc_size + ether_header_size +
-      ipv4_header_size + udp_header_size + payload_size
    -- The sizes are frame sizes, including the 4-byte ethernet CRC
    -- that we don't see in Snabb.
    local sizes = {}
    for _,size in ipairs(conf.sizes) do
-      assert(size >= minimum_size)
-      table.insert(sizes, size - ether_crc_size)
+      assert(size >= ether_min_frame_size)
+      table.insert(sizes, size - ether_crc_size - conf.frame_overhead)
    end
 
    local o = {
@@ -380,7 +379,11 @@ function InetGen:new(conf)
    return setmetatable(o, {__index=InetGen})
 end
 
+function InetGen:done() return self.stopping end
+
 function InetGen:pull ()
+
+   if self.stopping then return end
 
    local output = self.output.output
    local input = self.input.input
@@ -388,10 +391,6 @@ function InetGen:pull ()
    local rx_bytes = self.rx_bytes
    local lost_packets = self.lost_packets
    local rx_payload_offset = self.rx_payload_offset
-
-   if self.stop_on_next_breath then
-      main.exit(0)
-   end
 
    -- Count and trash incoming packets.
    for _=1,link.nreadable(input) do
@@ -464,7 +463,7 @@ function InetGen:pull ()
          if self.single_pass then
             printf("generated %d packets for each of %d softwires",
                    #self.sizes, self.softwire_count)
-            self.stop_on_next_breath = true
+            self.stopping = true
             break
          end
 

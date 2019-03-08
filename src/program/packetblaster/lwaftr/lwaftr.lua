@@ -175,6 +175,7 @@ function run (args)
       pcap_file = arg
       target = pcap_file
       single_pass = true
+      rate = 1/0
    end
 
    args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:t:i:k:", long_opts)
@@ -346,7 +347,8 @@ function run (args)
       local rate = v6 and rate/2 or rate
       config.app(c, "inetgen", InetGen, {
          sizes = sizes, rate = rate, count = count, single_pass = single_pass,
-         b4_ipv4 = b4_ipv4, b4_port = b4_port, public_ipv4 = public_ipv4 })
+         b4_ipv4 = b4_ipv4, b4_port = b4_port, public_ipv4 = public_ipv4,
+         frame_overhead = v4_vlan and 4 or 0})
       if v6_output then
          config.link(c, v6_output .. " -> inetgen.input")
       end
@@ -363,7 +365,8 @@ function run (args)
       config.app(c, "b4gen", B4Gen, {
          sizes = sizes, rate = rate, count = count, single_pass = single_pass,
          b4_ipv6 = b4_ipv6, aftr_ipv6 = aftr_ipv6,
-         b4_ipv4 = b4_ipv4, b4_port = b4_port, public_ipv4 = public_ipv4 })
+         b4_ipv4 = b4_ipv4, b4_port = b4_port, public_ipv4 = public_ipv4,
+         frame_overhead = v6_vlan and 4 or 0})
       if v4_output then
          config.link(c, v4_output .. " -> b4gen.input")
       end
@@ -383,6 +386,17 @@ function run (args)
       timer.activate(t)
    end
 
-   if duration then engine.main({duration=duration})
-   else             engine.main() end
+   local done
+   if duration then
+      done = lib.timeout(duration)
+   else
+      local b4gen = engine.app_table.b4gen
+      local inetgen = engine.app_table.inetgen
+      print (b4gen, inetgen)
+      function done()
+         return ((not b4gen) or b4gen:done()) and ((not inetgen) or inetgen:done())
+      end
+   end
+
+   engine.main({done=done})
 end
