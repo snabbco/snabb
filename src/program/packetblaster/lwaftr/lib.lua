@@ -100,7 +100,7 @@ end
 
 local function inc_ipv4(ipv4)
    ipv4 = cast("uint32_t*", ipv4)
-   ipv4[0] = ipv4[0] + 1
+   ipv4[0] = htonl(ntohl(ipv4[0]) + 1)
 end
 
 local function printf(fmt, ...)
