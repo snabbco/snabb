@@ -124,6 +124,7 @@ end
 
 Lwaftrgen = {
    config = {
+      mode = {required=true},
       sizes = {required=true},
       dst_mac = {required=true},
       src_mac = {required=true},
@@ -133,8 +134,6 @@ Lwaftrgen = {
       b4_ipv4 = {},
       public_ipv4 = {},
       aftr_ipv6 = {},
-      ipv6_only = {},
-      ipv4_only = {},
       b4_port = {},
       protocol = {},
       count = {},
@@ -225,15 +224,7 @@ function Lwaftrgen:new(conf)
 
    local ipv6_ipv4_udp_hdr, ipv6_payload
 
-   local total_packet_count = 0
-   for _,size in ipairs(conf.sizes) do
-      -- count for IPv4 and IPv6 packets (40 bytes IPv6 encap header)
-      if conf.ipv4_only or conf.ipv6_only then 
-         total_packet_count = total_packet_count + 1
-      else
-         total_packet_count = total_packet_count + 2
-      end
-   end
+   local total_packet_count = #conf.sizes
 
    ipv6_ipv4_hdr.protocol = 17  -- UDP(17)
    ipv6_ipv4_udp_hdr = cast(udp_header_ptr_type, ipv6_pkt.data + udp_offset + ipv6_header_size)
@@ -242,6 +233,10 @@ function Lwaftrgen:new(conf)
    ipv6_payload = cast(payload_ptr_type, ipv6_pkt.data + udp_offset + ipv6_header_size + udp_header_size)
    ipv6_payload.magic = MAGIC
    ipv6_payload.number = 0
+
+   local v4 = conf.mode == 'from-internet'
+   local v6 = conf.mode == 'from-b4'
+   assert(v4 ~= v6)
 
    local o = {
       b4_ipv6 = b4_ipv6,
@@ -262,8 +257,8 @@ function Lwaftrgen:new(conf)
       ipv6_ipv4_hdr = ipv6_ipv4_hdr,
       ipv4_udp_hdr = ipv4_udp_hdr,
       ipv6_ipv4_udp_hdr = ipv6_ipv4_udp_hdr,
-      ipv4_only = conf.ipv4_only,
-      ipv6_only = conf.ipv6_only,
+      v4 = v4,
+      v6 = v6,
       vlan = vlan,
       udp_offset = udp_offset,
       protocol = conf.protocol,
@@ -386,7 +381,7 @@ function Lwaftrgen:pull ()
          local packet_len = size - ethernet_crc_size
          local ipv4_len =  packet_len - ethernet_total_size
          local udp_len = ipv4_len - ipv4_header_size
-         if not self.ipv6_only then
+         if self.v4 then
             ipv4_hdr.total_length = C.htons(ipv4_len)
             ipv4_udp_hdr.len = C.htons(udp_len)
             self.ipv4_pkt.length = packet_len
@@ -400,7 +395,7 @@ function Lwaftrgen:pull ()
             transmit(output, ipv4_pkt)
          end
 
-         if not self.ipv4_only then
+         if self.v6 then
             -- Expectation from callers is to make packets that are SIZE
             -- bytes big, *plus* the IPv6 header.
             ipv6_hdr.payload_length = C.htons(ipv4_len)

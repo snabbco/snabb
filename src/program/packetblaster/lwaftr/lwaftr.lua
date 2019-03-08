@@ -6,10 +6,17 @@ local engine    = require("core.app")
 local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
+local ethernet  = require("lib.protocol.ethernet")
+local ipv4      = require("lib.protocol.ipv4")
+local ipv6      = require("lib.protocol.ipv6")
 local main      = require("core.main")
 local S         = require("syscall")
 local Lwaftrgen = require("program.packetblaster.lwaftr.lib").Lwaftrgen
 local Tap       = require("apps.tap.tap").Tap
+local vlan      = require("apps.vlan.vlan")
+local arp       = require("apps.ipv4.arp")
+local ndp       = require("apps.lwaftr.ndp")
+local V4V6      = require("apps.lwaftr.V4V6")
 local raw       = require("apps.socket.raw")
 local pcap      = require("apps.pcap.pcap")
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
@@ -71,11 +78,13 @@ function run (args)
       end
    end
 
-   local src_mac = "00:00:00:00:00:00"
-   function opt.s (arg) src_mac = arg end
+   local v4_src_mac = "00:00:00:00:00:00"
+   local v6_src_mac = "00:00:00:00:00:00"
+   function opt.s (arg) v4_src_mac, v6_src_mac = arg, arg end
 
-   local dst_mac = "00:00:00:00:00:00"
-   function opt.d (arg) dst_mac = arg end
+   local v4_dst_mac = "00:00:00:00:00:00"
+   local v6_dst_mac = "00:00:00:00:00:00"
+   function opt.d (arg) v4_dst_mac, v6_dst_mac = arg, arg end
 
    local b4_ipv6, b4_ipv4, b4_port = "2001:db8::", "10.0.0.0", 1024
    function opt.b (arg) 
@@ -131,17 +140,18 @@ function run (args)
       target = sock_interface
    end
 
-   local ipv4_only = false
-   function opt.v4 () ipv4_only = true end
+   local v4, v6 = true, true
+
+   function opt.v4 () v6 = false end
    opt["4"] = opt.v4
 
-   local ipv6_only = false
-   function opt.v6 () ipv6_only = true end
+   function opt.v6 () v4 = false end
    opt["6"] = opt.v6
 
-   local vlan = nil
+   local v4_vlan, v6_vlan = nil, nil
    function opt.v (arg) 
-      vlan = assert(tonumber(arg), "duration is not a number!")
+      v4_vlan = assert(tonumber(arg), "duration is not a number!")
+      v6_vlan = v4_vlan
    end
 
    local pcap_file, single_pass
@@ -154,7 +164,7 @@ function run (args)
    args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:t:i:k:", long_opts)
 
    for _,s in ipairs(sizes) do
-      if s < 18 + (vlan and 4 or 0) + 20 + 8 then
+      if s < 18 + (v4_vlan and v6_vlan and 4 or 0) + 20 + 8 then
          error("Minimum frame size is 46 bytes (18 ethernet+CRC, 20 IPv4, and 8 UDP)")
       end
    end
@@ -167,68 +177,182 @@ function run (args)
    print(string.format("packetblaster lwaftr: Sending %d clients at %.3f MPPS to %s", count, rate, target))
    print()
 
-   if not ipv4_only then
+   if not (v4 or v6) then
+      -- Assume that -4 -6 means both instead of neither.
+      v4, v6 = true, true
+   end
+
+   local v4_input, v4_output, v6_input, v6_output
+
+   local function finish_vlan(input, output, vlan)
+      if not vlan then return input, output end
+
+      -- Add and remove the common vlan tag.
+      config.app(c, "untag", vlan.Untagger, {tag=vlan})
+      config.app(c, "tag", vlan.Tagger, {tag=vlan})
+      config.link(c, "tag.output -> " .. input)
+      config.link(c, input .. " -> untag.input")
+      return 'tag.input', 'untag.output'
+   end
+
+   local function finish_v4(input, output)
+      assert(v4)
+      -- Stamp output with the MAC and make an ARP responder.
+      local tester_ip = ipv4:pton('1.2.3.4')
+      local next_ip = nil -- Assume we have a static dst mac.
+      config.app(c, "arp", arp.ARP,
+                 { self_ip = tester_ip,
+                   self_mac = ethernet:pton(v4_src_mac),
+                   next_mac = ethernet:pton(v4_dst_mac),
+                   next_ip = next_ip })
+      config.link(c, output .. ' -> arp.south')
+      config.link(c, 'arp.south -> ' .. input)
+      return 'arp.north', 'arp.north'
+   end
+
+   local function finish_v6(input, output)
+      assert(v6)
+      -- Stamp output with the MAC and make an NDP responder.
+      local tester_ip = ipv6:pton('2001:DB8::1')
+      local next_ip = nil -- Assume we have a static dst mac.
+      config.app(c, "ndp", ndp.NDP,
+                 { self_ip = tester_ip,
+                   self_mac = ethernet:pton(v4_src_mac),
+                   next_mac = ethernet:pton(v4_dst_mac),
+                   next_ip = next_ip })
+      config.link(c, output .. ' -> ndp.south')
+      config.link(c, 'ndp.south -> ' .. input)
+      return 'ndp.north', 'ndp.north'
+   end
+
+   local function split(input, output)
+      assert(v4 and v6)
+      if v4_vlan ~= v6_vlan then
+         -- Split based on vlan.
+         config.app(c, "vmux", vlan.VlanMux, {})
+         config.link(c, output .. ' -> vmux.trunk')
+         config.link(c, 'vmux.trunk -> ' .. input)
+         local v4_link = v4_vlan and 'vmux.vlan'..v4_vlan or 'vmux.native'
+         v4_input, v4_output = finish_v4(v4_link, v4_link)
+         local v6_link = v6_vlan and 'vmux.vlan'..v6_vlan or 'vmux.native'
+         v6_input, v6_output = finish_v6(v6_link, v6_link)
+      else
+         input, output = finish_vlan(input, output, v4_vlan)
+         
+         -- Split based on ethertype.
+         config.app(c, "mux", V4V6.V4V6, {})
+         v4_input, v4_output = finish_v4('mux.v4', 'mux.v4')
+         v6_input, v6_output = finish_v6('mux.v6', 'mux.v6')
+         config.link(c, output .. " -> mux.input")
+         config.link(c, "mux.output -> " .. input)
+      end
+   end
+
+   local function maybe_split(input, output)
+      if v4 and v6 then
+         split(input, output)
+      elseif v4 then
+         input, output = finish_vlan(input, output, v4_vlan)
+         v4_input, v4_output = finish_v4(input, output)
+      else
+         input, output = finish_vlan(input, output, v6_vlan)
+         v6_input, v6_output = finish_v6(input, output)
+      end
+   end
+
+   if tap_interface then
+      if dir_exists(("/sys/devices/virtual/net/%s"):format(tap_interface)) then
+         config.app(c, "tap", Tap, tap_interface)
+      else
+         print(string.format("tap interface %s doesn't exist", tap_interface))
+         main.exit(1)
+      end
+      maybe_split("tap.input", "tap.output")
+   elseif pciaddr then
+      local device_info = pci.device_info(pciaddr)
+      if v4_vlan then
+         print(string.format("IPv4 vlan set to %d", v4_vlan))
+      end
+      if v6_vlan then
+         print(string.format("IPv6 vlan set to %d", v6_vlan))
+      end
+      if not device_info then
+         fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))
+      end
+      if v4 and v6 then
+         if v4_vlan == v6_vlan and v4_src_mac == v6_src_mac then
+            config.app(c, "nic", require(device_info.driver).driver,
+                       {pciaddr = pciaddr, vmdq = true, macaddr = v4_src_mac,
+                        mtu = 9500, vlan = v4_vlan})
+            maybe_split("nic."..device_info.rx, "nic."..device_info.tx)
+         else
+            config.app(c, "v4nic", require(device_info.driver).driver,
+                       {pciaddr = pciaddr, vmdq = true, macaddr = v4_src_mac,
+                        mtu = 9500, vlan = v4_vlan})
+            v4_input, v4_output = finish_v4("v4nic."..device_info.rx,
+                                            "v4nic."..device_info.tx)
+            config.app(c, "v6nic", require(device_info.driver).driver,
+                       {pciaddr = pciaddr, vmdq = true, macaddr = v6_src_mac,
+                        mtu = 9500, vlan = v6_vlan})
+            v6_input, v6_output = finish_v6("v6nic."..device_info.rx,
+                                            "v6nic."..device_info.tx)
+         end
+      elseif v4 then
+         config.app(c, "nic", require(device_info.driver).driver,
+                    {pciaddr = pciaddr, vmdq = true, macaddr = v4_src_mac,
+                     mtu = 9500, vlan = v4_vlan})
+         v4_input, v4_output = finish_v4("nic."..device_info.rx,
+                                         "nic."..device_info.tx)
+      else
+         config.app(c, "nic", require(device_info.driver).driver,
+                    {pciaddr = pciaddr, vmdq = true, macaddr = v6_src_mac,
+                     mtu = 9500, vlan = v6_vlan})
+         v6_input, v6_output = finish_v6("nic."..device_info.rx,
+                                         "nic."..device_info.tx)
+      end
+   elseif int_interface then
+      config.app(c, "int", raw.RawSocket, int_interface)
+      maybe_split("int.rx", "int.tx")
+   elseif sock_interface then
+      config.app(c, "virtio", VhostUser, { socket_path=sock_interface } )
+      maybe_split("virtio.rx", "virtio.tx")
+   else
+      config.app(c, "pcap", pcap.PcapWriter, pcap_file)
+      maybe_split("pcap.input", "pcap.output")
+   end
+
+   if v4 then
+      print()
+      print(string.format("IPv4: %s:12345 > %s:%d", public_ipv4, b4_ipv4, b4_port))
+      print("      destination IPv4 and Port adjusted per client")
+      print("IPv4 frame sizes: " .. table.concat(sizes,","))
+      local rate = v6 and rate/2 or rate
+      config.app(c, "v4generator", Lwaftrgen, { 
+         mode = 'from-internet',
+         sizes = sizes, count = count, aftr_ipv6 = aftr_ipv6, rate = rate,
+         src_mac = v4_src_mac, dst_mac = v4_dst_mac, vlan = v4_vlan,
+         b4_ipv6 = b4_ipv6, b4_ipv4 = b4_ipv4, b4_port = b4_port,
+         public_ipv4 = public_ipv4, single_pass = single_pass })
+      config.link(c, v4_output .. " -> v4generator.input")
+      config.link(c, "v4generator.output -> " .. v4_input)
+   end
+   if v6 then
+      print()
       print(string.format("IPv6: %s > %s: %s:%d > %s:12345", b4_ipv6, aftr_ipv6, b4_ipv4, b4_port, public_ipv4))
       print("      source IPv6 and source IPv4/Port adjusted per client")
       local sizes_ipv6 = {}
       for i,size in ipairs(sizes) do sizes_ipv6[i] = size + 40 end
       print("IPv6 frame sizes: " .. table.concat(sizes_ipv6,","))
+      local rate = v4 and rate/2 or rate
+      config.app(c, "v6generator", Lwaftrgen, { 
+         mode = 'from-b4',
+         sizes = sizes, count = count, aftr_ipv6 = aftr_ipv6, rate = rate,
+         src_mac = v6_src_mac, dst_mac = v6_dst_mac, vlan = v6_vlan,
+         b4_ipv6 = b4_ipv6, b4_ipv4 = b4_ipv4, b4_port = b4_port,
+         public_ipv4 = public_ipv4, single_pass = single_pass })
+      config.link(c, v6_output .. " -> v6generator.input")
+      config.link(c, "v6generator.output -> " .. v6_input)
    end
-
-   if not ipv6_only then
-      print()
-      print(string.format("IPv4: %s:12345 > %s:%d", public_ipv4, b4_ipv4, b4_port))
-      print("      destination IPv4 and Port adjusted per client")
-      print("IPv4 frame sizes: " .. table.concat(sizes,","))
-   end
-
-   if ipv4_only and ipv6_only then
-      print("Remove options v4only and v6only to generate both")
-      main.exit(1)
-   end
-
-   config.app(c, "generator", Lwaftrgen, { 
-      sizes = sizes, count = count, aftr_ipv6 = aftr_ipv6, rate = rate,
-      src_mac = src_mac, dst_mac = dst_mac, vlan = vlan,
-      b4_ipv6 = b4_ipv6, b4_ipv4 = b4_ipv4, b4_port = b4_port,
-      public_ipv4 = public_ipv4, single_pass = single_pass,
-      ipv4_only = ipv4_only, ipv6_only = ipv6_only })
-
-   local input, output
-
-   if tap_interface then
-      if dir_exists(("/sys/devices/virtual/net/%s"):format(tap_interface)) then
-         config.app(c, "tap", Tap, tap_interface)
-         input, output = "tap.input", "tap.output"
-      else
-         print(string.format("tap interface %s doesn't exist", tap_interface))
-         main.exit(1)
-      end
-   elseif pciaddr then
-      local device_info = pci.device_info(pciaddr)
-      if vlan then
-         print(string.format("vlan set to %d", vlan))
-      end
-      if device_info then
-         config.app(c, "nic", require(device_info.driver).driver,
-         {pciaddr = pciaddr, vmdq = true, macaddr = src_mac, mtu = 9500})
-         input, output = "nic."..device_info.rx, "nic."..device_info.tx
-      else
-         fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))
-      end
-   elseif int_interface then
-      config.app(c, "int", raw.RawSocket, int_interface)
-      input, output = "int.rx", "int.tx"
-   elseif sock_interface then
-      config.app(c, "virtio", VhostUser, { socket_path=sock_interface } )
-      input, output = "virtio.rx", "virtio.tx"
-   else
-      config.app(c, "pcap", pcap.PcapWriter, pcap_file)
-      input, output = "pcap.input", "pcap.output"
-   end
-
-   config.link(c, output .. " -> generator.input")
-   config.link(c, "generator.output -> " .. input)
 
    engine.busywait = true
    engine.configure(c)
