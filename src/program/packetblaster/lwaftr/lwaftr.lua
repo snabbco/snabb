@@ -11,7 +11,8 @@ local ipv4      = require("lib.protocol.ipv4")
 local ipv6      = require("lib.protocol.ipv6")
 local main      = require("core.main")
 local S         = require("syscall")
-local Lwaftrgen = require("program.packetblaster.lwaftr.lib").Lwaftrgen
+local B4Gen     = require("program.packetblaster.lwaftr.lib").B4Gen
+local InetGen   = require("program.packetblaster.lwaftr.lib").InetGen
 local Tap       = require("apps.tap.tap").Tap
 local vlan      = require("apps.vlan.vlan")
 local arp       = require("apps.ipv4.arp")
@@ -154,7 +155,7 @@ function run (args)
       v6_vlan = v4_vlan
    end
 
-   local pcap_file, single_pass
+   local pcap_file, single_pass = nil, false
    function opt.o (arg) 
       pcap_file = arg
       target = pcap_file
@@ -184,12 +185,12 @@ function run (args)
 
    local v4_input, v4_output, v6_input, v6_output
 
-   local function finish_vlan(input, output, vlan)
-      if not vlan then return input, output end
+   local function finish_vlan(input, output, tag)
+      if not tag then return input, output end
 
       -- Add and remove the common vlan tag.
-      config.app(c, "untag", vlan.Untagger, {tag=vlan})
-      config.app(c, "tag", vlan.Tagger, {tag=vlan})
+      config.app(c, "untag", vlan.Untagger, {tag=tag})
+      config.app(c, "tag", vlan.Tagger, {tag=tag})
       config.link(c, "tag.output -> " .. input)
       config.link(c, input .. " -> untag.input")
       return 'tag.input', 'untag.output'
@@ -327,14 +328,13 @@ function run (args)
       print("      destination IPv4 and Port adjusted per client")
       print("IPv4 frame sizes: " .. table.concat(sizes,","))
       local rate = v6 and rate/2 or rate
-      config.app(c, "v4generator", Lwaftrgen, { 
-         mode = 'from-internet',
-         sizes = sizes, count = count, aftr_ipv6 = aftr_ipv6, rate = rate,
-         src_mac = v4_src_mac, dst_mac = v4_dst_mac, vlan = v4_vlan,
-         b4_ipv6 = b4_ipv6, b4_ipv4 = b4_ipv4, b4_port = b4_port,
-         public_ipv4 = public_ipv4, single_pass = single_pass })
-      config.link(c, v4_output .. " -> v4generator.input")
-      config.link(c, "v4generator.output -> " .. v4_input)
+      config.app(c, "inetgen", InetGen, {
+         sizes = sizes, rate = rate, count = count, single_pass = single_pass,
+         b4_ipv4 = b4_ipv4, b4_port = b4_port, public_ipv4 = public_ipv4 })
+      if v6_output then
+         config.link(c, v6_output .. " -> inetgen.input")
+      end
+      config.link(c, "inetgen.output -> " .. v4_input)
    end
    if v6 then
       print()
@@ -344,14 +344,14 @@ function run (args)
       for i,size in ipairs(sizes) do sizes_ipv6[i] = size + 40 end
       print("IPv6 frame sizes: " .. table.concat(sizes_ipv6,","))
       local rate = v4 and rate/2 or rate
-      config.app(c, "v6generator", Lwaftrgen, { 
-         mode = 'from-b4',
-         sizes = sizes, count = count, aftr_ipv6 = aftr_ipv6, rate = rate,
-         src_mac = v6_src_mac, dst_mac = v6_dst_mac, vlan = v6_vlan,
-         b4_ipv6 = b4_ipv6, b4_ipv4 = b4_ipv4, b4_port = b4_port,
-         public_ipv4 = public_ipv4, single_pass = single_pass })
-      config.link(c, v6_output .. " -> v6generator.input")
-      config.link(c, "v6generator.output -> " .. v6_input)
+      config.app(c, "b4gen", B4Gen, {
+         sizes = sizes, rate = rate, count = count, single_pass = single_pass,
+         b4_ipv6 = b4_ipv6, aftr_ipv6 = aftr_ipv6,
+         b4_ipv4 = b4_ipv4, b4_port = b4_port, public_ipv4 = public_ipv4 })
+      if v4_output then
+         config.link(c, v4_output .. " -> b4gen.input")
+      end
+      config.link(c, "b4gen.output -> " .. v6_input)
    end
 
    engine.busywait = true
