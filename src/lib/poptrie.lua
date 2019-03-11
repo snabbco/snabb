@@ -427,10 +427,12 @@ function selftest ()
    assert(t:lookup128(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F)) == 6)
 
    -- Random testing
-   local function reproduce (cases)
+   local function reproduce (cases, config)
       debug = true
       print("repoducing...")
-      local t = new{}
+      print("config:")
+      lib.print_object(config)
+      local t = new(config)
       for entry, case in ipairs(cases) do
          local a, l = unpack(case)
          if l <= 64 then
@@ -455,9 +457,9 @@ function selftest ()
          else print("128:",  t:lookup128(a)) end
       end
    end
-   local function r_assert (condition, cases)
+   local function r_assert (condition, cases, config)
       if condition then return end
-      reproduce(cases)
+      reproduce(cases, config)
       print("selftest failed")
       main.exit(1)
    end
@@ -468,28 +470,31 @@ function selftest ()
       -- ramp up the geometry below to crank up test coverage
       for entries = 1, 3 do
          for i = 1, 10 do
-            math.randomseed(seed+i)
-            cases = {}
-            local t = new{}
-            local k = {}
-            for entry = 1, entries do
-               local a, l = rs(), math.random(keysize)
-               cases[entry] = {a, l}
-               t:add(a, l, entry)
-               k[entry] = a
-            end
-            local v = {}
-            for entry, a in ipairs(k) do
-               v[entry] = t:rib_lookup(a, keysize)
-               r_assert(v[entry] > 0, cases)
-            end
-            t:build()
-            for entry, a in ipairs(k) do
-               r_assert(t:lookup(a) == v[entry], cases)
-               local l = cases[entry][2]
-               if l <= 32 then r_assert(t:lookup32(a) == v[entry], cases)
-               elseif l <= 64 then r_assert(t:lookup64(a) == v[entry], cases)
-               else r_assert(t:lookup128(a) == v[entry], cases) end
+            -- add {direct_pointing=true} to test direct pointing
+            for _, config in ipairs{ {} } do
+               math.randomseed(seed+i)
+               cases = {}
+               local t = new(config)
+               local k = {}
+               for entry = 1, entries do
+                  local a, l = rs(), math.random(keysize)
+                  cases[entry] = {a, l}
+                  t:add(a, l, entry)
+                  k[entry] = a
+               end
+               local v = {}
+               for entry, a in ipairs(k) do
+                  v[entry] = t:rib_lookup(a, keysize)
+                  r_assert(v[entry] > 0, cases, config)
+               end
+               t:build()
+               for entry, a in ipairs(k) do
+                  r_assert(t:lookup(a) == v[entry], cases)
+                  local l = cases[entry][2]
+                  if l <= 32 then r_assert(t:lookup32(a) == v[entry], cases)
+                  elseif l <= 64 then r_assert(t:lookup64(a) == v[entry], cases)
+                  else r_assert(t:lookup128(a) == v[entry], cases) end
+               end
             end
          end
       end
