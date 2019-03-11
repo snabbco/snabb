@@ -83,12 +83,17 @@ end
 -- Extract bits at offset
 -- key=uint8_t[?]
 function extract (key, offset, length)
-   assert(offset >= 0 and length > 0 and length <= 32)
-   assert(offset <= ffi.sizeof(key) * 8)
-   local byte_offset = math.min(math.floor(offset / 8), ffi.sizeof(key) - 4)
-   local bit_offset = offset - byte_offset*8
-   local dword = ffi.cast("uint32_t*", key + byte_offset)[0]
-   return band(rshift(dword, bit_offset), lshift(1, length) - 1)
+   local bits, read = 0, 0
+   local byte = math.floor(offset/8)
+   while read < length do
+      offset = math.max(offset - byte*8, 0)
+      local nbits = math.min(length - read, 8 - offset)
+      local x = band(rshift(key[byte], offset), lshift(1, nbits) - 1)
+      bits = bor(bits, lshift(x, read))
+      read = read + nbits
+      byte = math.min(byte + 1, ffi.sizeof(key) - 1)
+   end
+   return bits
 end
 
 -- Add key/value pair to RIB (intermediary binary trie)
