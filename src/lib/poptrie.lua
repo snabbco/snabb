@@ -331,8 +331,8 @@ end
 function Poptrie:lookup64 (key)
    return self.asm_lookup64(self.leaves, self.nodes, key, self.directmap)
 end
-function Poptrie:lookup64 (key)
-   return self.asm_lookup64(self.leaves, self.nodes, key, self.directmap)
+function Poptrie:lookup128 (key)
+   return self.asm_lookup128(self.leaves, self.nodes, key, self.directmap)
 end
 
 function Poptrie:fib_info ()
