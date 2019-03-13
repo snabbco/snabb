@@ -558,6 +558,58 @@ local function generator(Dst)
   |->onef:;  .dword  0,  0,  0, 2^24
 end
 
+-- USAGE
+--
+-- First allocate and initialize a gcm_data state using the encryption key and
+-- a derived hash subkey. This is done i.e. like so:
+--
+--   gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
+--   aes_keyexp_128_enc_avx(key, gcm_data)
+--   (or aes_keyexp_256_enc_avx)
+--   hash_subkey = ffi.new("uint8_t[16]")
+--   aesni_encrypt_128_single_block(gcm_data, hash_subkey)
+--   (or aesni_encrypt_256_single_block)
+--   aesni_gcm_precomp_avx_gen4(gcm_data, hash_subkey)
+-- 
+-- Then your gcm_data state is ready for use with aesni_gcm_enc_128_avx_gen4,
+-- aesni_gcm_dec_128_avx_gen4, aesni_gcm_enc_256_avx_gen4, and
+-- aesni_gcm_dec_256_avx_gen4.
+-- Make sure to check the resulting authentication tags! (auth16_equal)
+--
+-- Arguments to aes_keyexp_128_enc:
+--  1) uint8_t  key[16]
+--  2) gcm_data *state       (aligned to 16 bytes)
+--
+-- Arguments to aes_keyexp_256_enc:
+--  1) uint8_t  key[32]
+--  2) gcm_data *state       (aligned to 16 bytes)
+--
+-- Arguments to aesni_encrypt_128_single_block, aesni_encrypt_256_single_block:
+--  1) gcm_data *state       (aligned to 16 bytes)
+--  2) uint8_t block[16]
+--
+-- Arguments to aesni_gcm_precomp_avx_gen4:
+--  1) gcm_data *state       (aligned to 16 bytes)
+--  2) uint8_t  hash_subkey[16]
+--
+-- Arguments to aesni_gcm_enc_128_avx_gen4, aesni_gcm_dec_128_avx_gen4,
+-- aesni_gcm_enc_256_avx_gen4, aesni_gcm_dec_256_avx_gen4:
+--  1) gcm_data *state      (aligned to 16 bytes)
+--  2) uint8_t  out[len]
+--  3) uint8_t  in[len]     (can be the same as out, i.e. "in-place")
+--  4) uint64_t len
+--  5) uint8_t  iv[16]      (96 bit IV, 4 byte padding, aligned to 16 bytes)
+--  6) uint8_t  aad[addlen]
+--  7) uint64_t aadlen      (multiple of 4 and <= 16)
+--  8) uint8_t  tag[taglen]
+--  9) uint64_t taglen      (should be 16 for all intents and purposes)
+--
+-- Arguments to auth16_equal:
+--  1) uint8_t x[16]
+--  2) uint8_t y[16]
+-- Returns:
+--  zero only if x and y are equal.
+
 local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
 generator(Dst)
 local mcode, size = Dst:build()
