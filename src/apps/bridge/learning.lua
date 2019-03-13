@@ -121,11 +121,6 @@ function bridge:expire_entries (now)
 end
 
 function bridge:push (input, port)
-   local now = self.tsc:stamp()
-   if now - self.scan_tstamp > self.scan_interval then
-      self:expire_entries(now)
-   end
-
    local table = self.mac_table
 
    for _ = 1, nreadable(input) do
@@ -185,6 +180,13 @@ function bridge:push (input, port)
    for _ = 1, nreadable(self.discard) do
       packet.free(receive(self.discard))
       counter.add(self.shm["packets-discarded"])
+   end
+end
+
+function bridge:housekeeping()
+   local now = self.tsc:stamp()
+   if now - self.scan_tstamp > self.scan_interval then
+      self:expire_entries(now)
    end
 end
 
