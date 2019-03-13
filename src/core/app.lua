@@ -68,6 +68,10 @@ maxsleep = 100
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
 busywait = false
 
+-- always_push: If true, always call push() methods even if the
+-- receiving link is empty
+always_push = false
+
 -- True when the engine is running the breathe loop.
 local running = false
 
@@ -533,6 +537,7 @@ function pace_breathing ()
    end
 end
 
+local empty = link.empty
 function breathe ()
    running = true
    monotonic_now = C.get_monotonic_time()
@@ -552,9 +557,14 @@ function breathe ()
       local spec = breathe_push_order[i]
       local app = spec.app
       if spec.method and not app.dead then
-         zone(app.zone)
-         with_restart(app, spec.method, spec.link, spec.arg)
-         zone()
+         if always_push or not empty(spec.link) then
+            zone(app.zone)
+            with_restart(app, spec.method, spec.link, spec.arg)
+            zone()
+         end
+      end
+      if app.housekeeping then
+         app:housekeeping()
       end
    end
    counter.add(breaths)
@@ -660,6 +670,7 @@ end
 
 function selftest ()
    print("selftest: app")
+   always_push = true
    local App = { push = true }
    function App:new () return setmetatable({}, {__index = App}) end
    local c1 = config.new()
