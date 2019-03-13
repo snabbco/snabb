@@ -334,11 +334,6 @@ local function from_south (self, p)
 end
 
 function nd_light:push ()
-   if self._next_hop.nsent == 0 and self._eth_header == nil then
-      -- Kick off address resolution
-      self._next_hop.timer_cb()
-   end
-
    local cache = self._cache
    local l_in = self.input.south
    local l_out = self.output.north
@@ -379,6 +374,13 @@ function nd_light:push ()
             counter.add(self.shm.txerrors)
          end
       end
+   end
+end
+
+function nd_light:housekeeping ()
+   if self._next_hop.nsent == 0 and self._eth_header == nil then
+      -- Kick off address resolution
+      self._next_hop.timer_cb()
    end
 end
 
