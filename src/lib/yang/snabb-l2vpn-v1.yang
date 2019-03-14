@@ -42,7 +42,7 @@ module snabb-l2vpn-v1 {
            sub-agent that provides the actual MIBs to the SNMP server";
       }
     }
-    
+
     grouping address-families {
       container address-families {
         container ipv4 {
@@ -63,7 +63,45 @@ module snabb-l2vpn-v1 {
         }
       }
     }
-    
+
+    grouping address-family-choice {
+      choice address-family {
+        mandatory true;
+        case ipv4 {
+          container ipv4 {
+            leaf local-address {
+              type inet:ipv4-address;
+              mandatory true;
+              description
+                "The IPv4 address of the local endpoint";
+            }
+            leaf remote-address {
+              type inet:ipv4-address;
+              mandatory true;
+              description
+                "The IPv4 address of the remote endpoint";
+            }
+          }
+        }
+        case ipv6 {
+          container ipv6 {
+            leaf local-address {
+              type inet:ipv6-address;
+              mandatory true;
+              description
+                "The IPv6 address of the local endpoint";
+            }
+            leaf remote-address {
+              type inet:ipv6-address;
+              mandatory true;
+              description
+                "The IPv6 address of the remote endpoint";
+            }
+          }
+        }
+      }
+    }
+
     list interface {
       description
         "A list of interface definitions.";
@@ -241,6 +279,41 @@ module snabb-l2vpn-v1 {
       } // trunk
       
     } // interface
+
+    list ipsec {
+      description
+        "A list of pairs of addresses for which communication must be protected
+         by IPsec.  This policy will be applied to all tunnels between
+         the specified endpoint addresses, irrespective of the VPLS
+         instance to which they belong.";
+
+      key "name";
+
+      leaf name {
+        type string;
+        description
+          "The name of the connection to which IPsec will be applied.  It is
+           arbitrary and has no significance for other parts of the
+           configuration.";
+      }
+
+      leaf encryption-algorithm {
+        type enumeration {
+          enum "aes-gcm-16-icv";
+        }
+        default aes-gcm-16-icv;
+        description
+          "The encryption algorithm to use.  Currently, only aes-gcm-16-icv is
+           supported";
+      }
+
+      container endpoints {
+        description
+          "The IP addresses of the local and remote endpoints. ipv4 and ipv6 are
+           mutually exclusive.";
+        uses address-family-choice;
+      }
+    }
     
     list vpls {
       description
@@ -323,13 +396,13 @@ module snabb-l2vpn-v1 {
                 
                 leaf size {
                   type uint32;
-                  default 256;
+                  default 1024;
                   description
                     "The initial size (number of entries) of the MAC address table";
                 }
                 leaf timeout {
                   type uint16;
-                  default 60;
+                  default 600;
                   description
                     "The interval in seconds after which an entry is expired from the MAC
                      address table.";
@@ -341,18 +414,14 @@ module snabb-l2vpn-v1 {
                     "Whether to log periodic statistics about table usage and resize
                      events.";
                 }
-                leaf copy-on-resize {
-                  type boolean;
-                  default true;
+                leaf max-occupy {
+                  type decimal64;
+                  default 0.4;
                   description
-                    "Whether to copy the entries when the MAC address table is resized.";
-                }
-                leaf resize-max {
-                  type uint32;
-                  default 65536;
-                  description
-                    "The maximum number of entreis to which the MAC address table will grow
-                     through automatic resizing.";
+                    "The maximum load-factor of the hash table before automatic re-sizing
+                     is initiated.  The load factor is defined as the
+                     ratio of the number of occupied entries and the
+                     size of the table.";
                 }
               } // mac-table
               
@@ -409,41 +478,7 @@ module snabb-l2vpn-v1 {
             "The IP addresses of the local and remote endpoints of the tunnel. ipv4
              and ipv6 are mutually exclusive.";
 
-          choice address-family {
-            mandatory true;
-            case ipv4 {
-              container ipv4 {
-                leaf local-address {
-                  type inet:ipv4-address;
-                  mandatory true;
-                  description
-                    "The IPv4 address of the local tunnel endpoint";
-                }
-                leaf remote-address {
-                  type inet:ipv4-address;
-                  mandatory true;
-                  description
-                    "The IPv4 address of the remote tunnel endpoint";
-                }
-              }
-            }
-            case ipv6 {
-              container ipv6 {
-                leaf local-address {
-                  type inet:ipv6-address;
-                  mandatory true;
-                  description
-                    "The IPv6 address of the local tunnel endpoint";
-                }
-                leaf remote-address {
-                  type inet:ipv6-address;
-                  mandatory true;
-                  description
-                    "The IPv6 address of the remote tunnel endpoint";
-                }
-              }
-            }
-          }
+          uses address-family-choice;
         }
           
         container tunnel {

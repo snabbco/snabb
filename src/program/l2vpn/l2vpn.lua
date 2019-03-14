@@ -700,14 +700,15 @@ function parse_config (main_config)
 
    local ipsec_assocs = {}
    for _, config in pairs(main_config.ipsec) do
-      local af = check_af(config.afi)
-      local sd_pair = src_dst_pair(af, config.remote_address, config.local_address)
+      local afi, addrs = singleton(config.endpoints)
+      local af = check_af(afi)
+      local sd_pair = src_dst_pair(af, addrs.remote_address, addrs.local_address)
       assert(not ipsec_assocs[sd_pair],
              ("Multiple definitions for IPsec association %s<->%s"):format(
                 config.remote_address, config.local_address))
-      local assoc = { auditing = true }
-      for _, k in ipairs({ 'aead', 'local_address', 'remote_address' }) do
-         assoc[k] = config[k]
+      local assoc = { aead = config.encryption_algorithm, auditing = true }
+      for _, k in ipairs({ 'local_address', 'remote_address' }) do
+         assoc[k] = addrs[k]
       end
       ipsec_assocs[sd_pair] = assoc
    end
@@ -848,8 +849,7 @@ function parse_config (main_config)
                size = from.size,
                timeout = from.timeout,
                verbose = from.verbose,
-               copy_on_resize = from.copy_on_resize,
-               max_size = from.max_size
+               max_occupy = from.max_occupy,
             }
             bridge_group.config = to
          end
