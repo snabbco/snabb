@@ -382,7 +382,9 @@ function Reassembler:push ()
 end
 
 function Reassembler:housekeeping ()
-   self.incoming_ipv6_fragments_alarm:check()
+   if self.use_alarms then
+      self.incoming_ipv6_fragments_alarm:check()
+   end
 
    local now = self.tsc:stamp()
    if now - self.scan_tstamp > self.scan_interval then

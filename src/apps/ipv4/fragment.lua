@@ -367,7 +367,9 @@ function Fragmenter:push ()
 end
 
 function Fragmenter:housekeeping ()
-   self.outgoing_ipv4_fragments_alarm:check()
+   if self.use_alarms then
+      self.outgoing_ipv4_fragments_alarm:check()
+   end
 end
 
 function selftest()
