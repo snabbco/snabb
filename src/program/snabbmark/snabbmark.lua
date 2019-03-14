@@ -11,6 +11,14 @@ local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 
+local pmu = require('lib.pmu')
+local has_pmu_counters, err = pmu.is_available()
+if not has_pmu_counters then
+   io.stderr:write('No PMU available: '..err..'\n')
+else
+   pmu.setup()
+end
+
 function run (args)
    local command = table.remove(args, 1)
    if command == 'basic1' and #args == 1 then
@@ -351,29 +359,36 @@ function esp (npackets, packet_size, mode, direction, profile)
    ip:payload_length(payload_size)
    d:payload(payload, payload_size)
    d:push(ip)
-   if not mode == "tunnel" then
+   if not (mode == "tunnel") then
       local eth = ethernet:new({type=0x86dd})
       d:push(eth)
    end
    local plain = d:packet()
    local conf = { spi = 0x0,
-                  mode = "aes-gcm-128-12",
+                  aead = "aes-gcm-16-icv",
                   key = "00112233445566778899AABBCCDDEEFF",
                   salt = "00112233"}
    local enc, dec = esp.encrypt:new(conf), esp.decrypt:new(conf)
    local encap, decap
    if mode == "tunnel" then
       encap = function (p) return enc:encapsulate_tunnel(p, 41) end
-      decap = function (p) return dec:decapsulate_tunnel(p) end
+      decap = function (p) return (dec:decapsulate_tunnel(p))   end
    else
       encap = function (p) return enc:encapsulate_transport6(p) end
       decap = function (p) return dec:decapsulate_transport6(p) end
    end
    if direction == "encapsulate" then
       if profile then profiler.start(profile) end
+      local function test_encapsulate ()
+         for i = 1, npackets do
+            packet.free(encap(packet.clone(plain)))
+         end
+      end
       local start = C.get_monotonic_time()
-      for i = 1, npackets do
-         packet.free(encap(packet.clone(plain)))
+      if has_pmu_counters then
+         pmu.profile(test_encapsulate)
+      else
+         test_encapsulate()
       end
       local finish = C.get_monotonic_time()
       if profile then profiler.stop() end
@@ -382,12 +397,19 @@ function esp (npackets, packet_size, mode, direction, profile)
             :format(packet_size, gbits(bps)))
    else
       local encapsulated = encap(packet.clone(plain))
+      local function test_decapsulate ()
+         for i = 1, npackets do
+            packet.free(decap(packet.clone(encapsulated)))
+            dec.seq.no = 0
+            dec.window[0] = 0
+         end
+      end
       if profile then profiler.start(profile) end
       local start = C.get_monotonic_time()
-      for i = 1, npackets do
-         packet.free(decap(packet.clone(encapsulated)))
-         dec.seq.no = 0
-         dec.window[0] = 0
+      if has_pmu_counters then
+         pmu.profile(test_decapsulate)
+      else
+         test_decapsulate()
       end
       local finish = C.get_monotonic_time()
       if profile then profiler.stop() end
@@ -396,14 +418,6 @@ function esp (npackets, packet_size, mode, direction, profile)
             :format(packet_size, gbits(bps)))
    end
 end
-
-local pmu = require('lib.pmu')
-local has_pmu_counters, err = pmu.is_available()
-if not has_pmu_counters then
-   io.stderr:write('No PMU available: '..err..'\n')
-end
-
-if has_pmu_counters then pmu.setup() end
 
 local function measure(f, iterations)
    local set

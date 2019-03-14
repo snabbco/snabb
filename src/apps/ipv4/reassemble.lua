@@ -136,6 +136,7 @@ local reassembler_config_params = {
    max_fragments_per_reassembly = { default=40 },
    -- Maximum number of seconds to keep a partially reassembled packet
    reassembly_timeout = { default = 60 },
+   use_alarms = { default = true }
 }
 
 
@@ -181,21 +182,23 @@ function Reassembler:new(conf)
    o.scan_tstamp = o.tsc:stamp()
    o.scan_interval = o.tsc:tps() * scan_time / scan_chunks + 0ULL
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='incoming-ipv4-fragments'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Incoming IPv4 fragments over N fragments/s',
+   if o.use_alarms then
+      alarms.add_to_inventory {
+         [{alarm_type_id='incoming-ipv4-fragments'}] = {
+            resource=tostring(S.getpid()),
+            has_clear=true,
+            description='Incoming IPv4 fragments over N fragments/s',
+         }
       }
-   }
-   local incoming_fragments_alarm = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='incoming-ipv4-fragments'}] = {
-         perceived_severity='warning',
-         alarm_text='More than 10,000 IPv4 fragments per second',
+      local incoming_fragments_alarm = alarms.declare_alarm {
+         [{resource=tostring(S.getpid()),alarm_type_id='incoming-ipv4-fragments'}] = {
+            perceived_severity='warning',
+            alarm_text='More than 10,000 IPv4 fragments per second',
+         }
       }
-   }
-   o.incoming_ipv4_fragments_alarm = CounterAlarm.new(incoming_fragments_alarm,
-      1, 1e4, o, "in-ipv4-frag-needs-reassembly")
+      o.incoming_ipv4_fragments_alarm = CounterAlarm.new(incoming_fragments_alarm,
+         1, 1e4, o, "in-ipv4-frag-needs-reassembly")
+   end
 
    return setmetatable(o, {__index=Reassembler})
 end
