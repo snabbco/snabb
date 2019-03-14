@@ -1075,7 +1075,12 @@ function run (parameters)
       { schema_name = "snabb-l2vpn-v1",
         setup_fn = setup_l2vpn,
         log_level = "INFO",
-        initial_configuration = initial_config })
+        initial_configuration = initial_config,
+        worker_opts = {
+           jit_opts = jit_opts,
+           jit_dump = { jit_conf.dump.opts, jit_conf.dump.file }
+        }
+   })
 
    manager:main(5)
    local worker_pid = manager.workers.l2vpn.pid
