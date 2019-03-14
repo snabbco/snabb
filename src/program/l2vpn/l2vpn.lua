@@ -844,14 +844,14 @@ function parse_config (main_config)
             -- The YANG parser transforms the mac_table config
             -- into a FFI struct :(  We need to transform it back
             -- into a table
-            local from = bridge_group.config
+            local from = bridge_group.config.mac_table
             local to = {
                size = from.size,
                timeout = from.timeout,
                verbose = from.verbose,
                max_occupy = from.max_occupy,
             }
-            bridge_group.config = to
+            bridge_group.config.mac_table = to
          end
          local bridge =
             App:new('bridge_'..vpls_name,
