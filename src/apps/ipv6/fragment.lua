@@ -291,8 +291,6 @@ function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
    local south, north = self.input.south, self.output.north
 
-   self.outgoing_ipv6_fragments_alarm:check()
-
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
@@ -363,6 +361,10 @@ function Fragmenter:push ()
          self:expire_pmtu()
       end
    end
+end
+
+function Fragmenter:housekeeping ()
+   self.outgoing_ipv6_fragments_alarm:check()
 end
 
 function selftest()
