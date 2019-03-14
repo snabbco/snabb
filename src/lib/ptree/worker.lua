@@ -104,7 +104,6 @@ function Worker:main ()
    if self.jit_dump then
       require("jit.dump").start(unpack(self.jit_dump))
    end
-   engine.always_push = false
    repeat
       self.breathe()
       if next_time < engine.now() then

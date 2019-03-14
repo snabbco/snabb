@@ -990,7 +990,6 @@ local function create_app_graph ()
 end
 
 local function setup_l2vpn (config)
-   print("SETUP L2VPN")
    clear_state()
    parse_config(config.l2vpn_config)
    return { l2vpn = create_app_graph() }
@@ -1077,6 +1076,7 @@ function run (parameters)
         log_level = "INFO",
         initial_configuration = initial_config,
         worker_opts = {
+           measure_latency = false,
            jit_opts = jit_opts,
            jit_dump = { jit_conf.dump.opts, jit_conf.dump.file }
         }
