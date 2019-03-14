@@ -41,12 +41,37 @@ local manager_config_spec = {
    initial_configuration = {required=true},
    schema_name = {required=true},
    worker_default_scheduling = {default={}},
+   worker_opts = {default={}},
    default_schema = {},
    log_level = {default=default_log_level},
    rpc_trace_file = {},
    cpuset = {default=cpuset.global_cpuset()},
    Hz = {default=100},
 }
+
+function value_to_string (value, string)
+   string = string or ''
+   local type = type(value)
+   if type == 'table'  then
+      string = string.."{ "
+      if #value == 0 then
+         for key, value in pairs(value) do
+            string = string..key.." = "
+            string = value_to_string(value, string)..", "
+         end
+      else
+         for _, value in ipairs(value) do
+            string = value_to_string(value, string)..", "
+         end
+      end
+      string = string.." }"
+   elseif type == 'string' then
+      string = string..("%q"):format(value)
+   else
+      string = string..("%s"):format(value)
+   end
+   return string
+end
 
 local function open_socket (file)
    S.signal('pipe', 'ign')
@@ -77,6 +102,7 @@ function new_manager (conf)
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
    ret.worker_default_scheduling = conf.worker_default_scheduling
+   ret.worker_opts = conf.worker_opts
    ret.workers = {}
    ret.state_change_listeners = {}
 
@@ -165,7 +191,7 @@ end
 function Manager:start_worker(sched_opts)
    local code = {
       scheduling.stage(sched_opts),
-      "require('lib.ptree.worker').main()"
+      "require('lib.ptree.worker').main("..value_to_string(self.worker_opts)..")"
    }
    return worker.start("worker", table.concat(code, "\n"))
 end

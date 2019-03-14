@@ -21,6 +21,8 @@ local worker_config_spec = {
    no_report = {default=false},
    report = {default={showapps=true,showlinks=true}},
    Hz = {default=1000},
+   jit_opts = {default={}},
+   jit_dump = {default={}},
 }
 
 function new_worker (conf)
@@ -32,6 +34,8 @@ function new_worker (conf)
    ret.channel = channel.create('config-worker-channel', 1e6)
    ret.alarms_channel = alarm_codec.get_channel()
    ret.pending_actions = {}
+   ret.jit_opts = conf.jit_opts
+   ret.jit_dump = conf.jit_dump
 
    ret.breathe = engine.breathe
    if conf.measure_latency then
@@ -94,6 +98,13 @@ end
 function Worker:main ()
    local stop = engine.now() + self.duration
    local next_time = engine.now()
+   if self.jit_opts then
+      require("jit.opt").start(unpack(self.jit_opts))
+   end
+   if self.jit_dump then
+      require("jit.dump").start(unpack(self.jit_dump))
+   end
+   engine.always_push = false
    repeat
       self.breathe()
       if next_time < engine.now() then
