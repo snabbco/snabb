@@ -218,6 +218,12 @@ function Manager:compute_scheduling_for_worker(id, app_graph)
    return ret
 end
 
+function Manager:update_worker_graph(id, new_graph)
+   local actions = self.support.compute_config_actions(
+      self.workers[id].graph, new_graph, {}, 'load')
+   self:enqueue_config_actions_for_worker(id, actions)
+end
+
 function Manager:start_worker_for_graph(id, graph)
    local scheduling = self:compute_scheduling_for_worker(id, graph)
    self:info('Starting worker %s.', id)
