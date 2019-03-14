@@ -1,0 +1,539 @@
+module snabb-l2vpn-v1 {
+  namespace snabb:l2vpn;
+  prefix l2vpn;
+  
+  import ietf-inet-types { prefix inet; }
+  import ietf-yang-types { prefix yang; }
+  
+  organization "SWITCH";
+  contact "Alexander Gall <alexander.gall@switch.ch>";
+  description
+    "Configuration for the Snabb Switch L2VPN Program";
+  
+  revision 2019-02-03 {
+    description
+      "Initial revision.";
+  }
+  
+  container l2vpn-config {
+    description
+      "Configuration for Snabb L2VPN.";
+    
+    container snmp {
+      leaf enable {
+        type boolean;
+        description
+          "Whether to enable SNMP. This will instantiate MIB objects for
+           interfaces and pseudowires";
+      }
+      leaf interval {
+        type uint8;
+        default 5;
+        description
+          "The interval at which the SNMP objects will be synchronized with the
+           state of the program.";
+      }
+      leaf shmem-dir {
+        type string;
+        default "";
+        description
+          "The name of the directory where the the MIB-related shared memory
+           segments reside.  This directory is shared with an SNMP
+           sub-agent that provides the actual MIBs to the SNMP server";
+      }
+    }
+    
+    grouping address-families {
+      container address-families {
+        container ipv4 {
+          leaf address {
+            type inet:ipv4-address;
+          }
+          leaf next-hop {
+            type inet:ipv4-address;
+          }
+        }
+        container ipv6 {
+          leaf address {
+            type inet:ipv6-address;
+          }
+          leaf next-hop {
+            type inet:ipv6-address;
+          }
+        }
+      }
+    }
+    
+    list interface {
+      description
+        "A list of interface definitions.";
+      
+      key "name";
+      min-elements 1;
+        
+      leaf name {
+        type string;
+        mandatory true;
+        description
+          "The name of the interface. This name appears as the <ifName> and
+           <ifDescr> SNMP OIDs";
+      }
+      
+      leaf description {
+        type string;
+        description
+          "A free-form description of the function of the interface. This string
+           appears as the <ifAlias> SNMP OID";
+      }
+      
+      container driver {
+        leaf path {
+          type string;
+          mandatory true;
+          description
+            "The path of the Snabb driver to use for the interface in 'dotted'
+             notation, e.g. 'apps.intel_mp.intel_mp'";
+        }
+        leaf name {
+          type string;
+          mandatory true;
+          description
+            "The name of the driver object to instantiate for the interface,
+             relative to <path> (i.e. 'require(path)[name]'";
+        }
+        leaf config {
+          type string;
+          description
+            "A string containing a literal Lua expression.  The result of the
+             evaluation of this expression is passed as argument to
+             the call of the driver's new() method";
+        }
+        leaf extra-config {
+          description
+            "A string containing a literal Lua expression which must evaluate to a
+             table.  If the expression given in <config> is a table,
+             it is merged with this table. If a key is present in both
+             tables, the one from <extra-config> takes precedence.";
+          type string;
+        }          
+      }
+      
+      container mirror {
+        description
+          "Traffic mirror configuration for the interface.";
+        
+        leaf rx {
+          type boolean;
+          description
+            "Whether to enable mirroring for incoming packets.";
+        }
+        leaf tx {
+          type boolean;
+          description
+            "Whether to enable mirroring for outgoing packets.";
+        }
+        leaf type {
+          type enumeration {
+            enum "tap";
+            enum "pcap";
+          }
+          default "tap";
+          description
+            "The method to use for providing access to mirrored traffic. If set to
+             <tap>, the traffic is senf to a TAP interface where it
+             can be collected with standard tools (e.g. tcpdump).  If
+             no explicit <name> is given, the name of the TAP inteface
+             is derived from the name of the mirrored interface as
+             follows: slashes are replaced by hyphens and the
+             direction ('rx' ot 'tx') is appended to the end of the
+             name separeted by an underscore.  The name is truncated
+             at the system's limit for interface names (the IFNAMSIZ
+             constant, which currently has the value 16).
+
+             If set to <pcap>, the mirrored packets are written to a
+             file in pcap format.  If no explicit <name> is given, it
+             defaults to '/tmp/' followed by the name derived from the
+             interface as described above with an additional '.pcap'
+             appended to the final path name";
+        }
+        leaf name {
+          type string;
+          description
+            "If given, overrides the names of either the TAP interface or pcap file
+             as described in <type>.  The name is augmented with the suffix '_rx' or
+             '_tx', depending on the direction.";
+        }
+      }
+      
+      leaf mtu {
+        type uint16;
+        mandatory true;
+        description
+          "The MTU of the interface including the entire L2 header (e.g. 14 bytes
+           for an untagged interface, 18 bytes for a single-tagged
+           interface";
+      }
+
+      uses address-families;
+
+      container trunk {
+        leaf enable {
+          type boolean;
+          mandatory true;
+          description
+            "Whether to configure the interface as a VLAN trunk";
+        }
+        leaf encapsulation {
+          default "dot1q";
+          type enumeration {
+            enum dot1q;
+            enum dot1ad;
+            enum raw;
+          }
+          description
+            "The type of encapsulation to use in VLAN tags. This determines the
+             value of the 'Tag Protocol Identifier field'. For 'dot1q'
+             and 'dot1ad' the values are 0x8100 and
+             0x88a8. respectively.  It is possible to chose an
+             arbitrary TPID by setting the encapsulation to 'raw' and
+             setting <tpid> to the desired value.";
+        }
+        leaf tpid {
+          type uint16;
+          description
+            "If <encapsulation> is 'raw', this is the number that will be used as
+             the 'Tag Protocol Identifier'.";
+        }
+        
+        list vlan {
+          description
+            "A list of VLANs to be transported on the trunk.";
+          
+          key "vid";
+          min-elements 1;
+              
+          leaf vid {
+            type uint16 {
+              range 0..4095;
+            }
+            mandatory true;
+            description
+              "The VLAN ID.";
+          }
+          leaf description {
+            type string;
+            description
+              "A free-form description of the function of the interface. This string
+                 appears as the <description> SNMP OID";
+          }
+          leaf mtu {
+            type uint16;
+            description
+              "The MTU of the sub-interface including the L2 header.  This number can
+                 be smaller than the MTU of the underlying physical
+                 interface but must not exceed it.";
+          }
+            
+          uses address-families;
+            
+        } // vlan
+        
+      } // trunk
+      
+    } // interface
+    
+    list vpls {
+      description
+        "A list of VPLS definitions.";
+        
+      key "name";
+        
+      leaf name {
+        type string;
+        mandatory true;
+        description
+          "The name of the VPLS instance.";
+      }
+      leaf description {
+        type string;
+        description
+          "A brief description of the VPLS. TODO: MIB object";
+      }
+      leaf mtu {
+        type uint16;
+        mandatory true;
+        description
+          "The MTU of the L2 domain provided by the VPLS.  A VPLS instance will
+           fail to start unless all of its attachment circuits have a
+           matching MTU.  This value is also propagated throughout the
+           control-channels of the pseudowires to remote instances of
+           the VPLS. A pseudowire is considered to be in a 'down'
+           state operationally if the MTUs at each endpoint do not
+           match.";
+      }
+      leaf uplink {
+        type string;
+        mandatory true;
+        description
+          "The name of the interface used as the uplink for the VPLS as it
+           appears in the 'interface' list.  This is effectively a
+           static route for outbound packets.";
+      }
+        
+      container bridge {
+        description
+          "The configuration for the bridge module associated with the VPLS to
+             which all pseudowires and attachment circuits are
+             connected.  The bridge module will not be created if the
+             VPLS only contains a single pseusowire and a single
+             attachment circuit.  In that case, the pseudowire is
+             connected directly to the attachment circuit.
+
+             As a mechanism for loop prevention, the bridge enforces a
+             split-horizon policy on all ports to which a pseudowire
+             connects: packets arriving from a pseudowire are never
+             forwarded to any other pseudowire.  As a consequence, the
+             pseudowires that make up a VPLS are required to form a
+             full mesh.";
+
+        choice type {
+          case flooding {
+            leaf flooding {
+              type empty;
+              description
+                "A 'flooding' bridge forwards a copy of a frame received on a port to
+                   all other port, only subject to the restriction of
+                   the split-horizon policy.";
+            }
+          }
+          case learning {
+            container learning {
+              description
+                " A 'learning' bridge behaves like a flooding bridge for multicast
+                    packets and packets addressed to unknown unicast
+                    destinations.  The unicast source address of each
+                    incoming frame is added to the list of known
+                    addresses of the ingress port such that all future
+                    packets destined to that address are only
+                    transmitted on that particular port.";
+
+              container mac-table {
+                description
+                  "Configuration of the MAC table associated with the learning bridge.";
+                
+                leaf size {
+                  type uint32;
+                  default 256;
+                  description
+                    "The initial size (number of entries) of the MAC address table";
+                }
+                leaf timeout {
+                  type uint16;
+                  default 60;
+                  description
+                    "The interval in seconds after which an entry is expired from the MAC
+                     address table.";
+                }
+                leaf verbose {
+                  type boolean;
+                  default false;
+                  description
+                    "Whether to log periodic statistics about table usage and resize
+                     events.";
+                }
+                leaf copy-on-resize {
+                  type boolean;
+                  default true;
+                  description
+                    "Whether to copy the entries when the MAC address table is resized.";
+                }
+                leaf resize-max {
+                  type uint32;
+                  default 65536;
+                  description
+                    "The maximum number of entreis to which the MAC address table will grow
+                     through automatic resizing.";
+                }
+              } // mac-table
+              
+            }
+          }
+        } // choice
+          
+      } // bridge
+
+      list attachment-circuit {
+        key "name";
+          
+        leaf name {
+          type string;
+          mandatory true;
+          description
+            "An arbitrary name that identifies this attachment circuit.";
+        }
+        leaf interface {
+          type string;
+          mandatory true;
+          description
+            "The name of the interface as it appears in the 'interface' list.";
+        }
+      }
+        
+      list pseudowire {
+        key "name";
+          
+        leaf name {
+          type string;
+          mandatory true;
+          description
+            "An arbitrary name that identifies this pseudowire.";
+        }
+        leaf vc-id {
+          type uint16;
+          mandatory true;
+          description
+            "The VC ID associated with this pseudowire. It is used to distinguish
+             pseudowires between the same pair of addresses.  In other
+             words, the triple (local address, remote address, VC ID)
+             must be unique among the set of all pseudowires known to
+             the system. The range of valid values depends on the
+             tunnel protocol, because the VC ID has to be transported
+             in the tunnel header.  Certain tunnels do not support a
+             VC ID at all. In that case, the vc-id parameter must be
+             set to zero and the uniqueness property applies to the
+             pair (local address, remote address).";
+        }
+          
+        container transport {
+          description
+            "The IP addresses of the local and remote endpoints of the tunnel. ipv4
+             and ipv6 are mutually exclusive.";
+
+          choice address-family {
+            mandatory true;
+            case ipv4 {
+              container ipv4 {
+                leaf local-address {
+                  type inet:ipv4-address;
+                  mandatory true;
+                  description
+                    "The IPv4 address of the local tunnel endpoint";
+                }
+                leaf remote-address {
+                  type inet:ipv4-address;
+                  mandatory true;
+                  description
+                    "The IPv4 address of the remote tunnel endpoint";
+                }
+              }
+            }
+            case ipv6 {
+              container ipv6 {
+                leaf local-address {
+                  type inet:ipv6-address;
+                  mandatory true;
+                  description
+                    "The IPv6 address of the local tunnel endpoint";
+                }
+                leaf remote-address {
+                  type inet:ipv6-address;
+                  mandatory true;
+                  description
+                    "The IPv6 address of the remote tunnel endpoint";
+                }
+              }
+            }
+          }
+        }
+          
+        container tunnel {
+          description
+            "The type and configuration of the tunnel protocol. Only a single
+             selection is allowed.  Currently supported tunnels are
+             l2tpv3 (in the flavor of 'Keyed IPv6 Tunnel', RFC 8159)
+             and GRE.";
+          
+          choice tunnel-type {
+            mandatory true;
+            case l2tpv3 {
+              container l2tpv3 {
+                description
+                  "The configuration of the l2tpv3 tunnel type.";
+                
+                mandatory true;
+                leaf local_cookie {
+                  type string;
+                  default "\x00\x00\x00\x00\x00\x00\x00\x00";
+                  description
+                    "The value of the local cookie (expected in the header of incoming
+                     packets) as a binary string of exactly 8
+                     characters.  The string is evaluated as a Lua
+                     string and may contain any escape sequence
+                     supported by Lua.";
+                }
+                leaf remote_cookie {
+                  type string;
+                  default "\x00\x00\x00\x00\x00\x00\x00\x00";
+                  description
+                    "The value of the remote cookie (written to the header of outgoing
+                     packets) as a binary string of exactly 8
+                     characters.  The string is evaluated as a Lua
+                     string and may contain any escape sequence
+                     supported by Lua.";
+                }
+              }
+            }
+            case gre {
+              container gre {
+                presence
+                  "There are no configurable elements for this tunnel type.";
+                description
+                  "The GRE tunnel uses the value 0x6558 (Transparent Ethernet Bridging)
+                   for the protocol header field.  The key field is
+                   used to transport the VC ID. Checksumming is not
+                   supported.";
+                
+                leaf dummy {
+                  type boolean;
+                  description
+                    "This optional node is ignored. It exists to work around a bug
+                     in the YANG parser which doesn't recognize an empty presence container";
+                }
+              }
+            }
+          }
+        } // tunnel
+        
+        container control-channel {
+          description
+            "The configuration of the proprietary control-channel between tunnel
+               endpoints.";
+          
+          leaf enable {
+            type boolean;
+            default true;
+            description
+              "Whether to enable the control-channel for this pseudowire.";
+          }
+          leaf heartbeat {
+            type uint16;
+            default 10;
+            description
+              "The interval in seconds at which heartbeat messages are sent to the
+                 peer.";
+          }
+          leaf dead-factor {
+            type uint16;
+            default 3;
+            description
+              "The number of heartbeat intervals without receiving heartbeat messages
+                 after which the peer is decalred to be dead.  Like
+                 the tunnel itself, the operational status of a
+                 pseudowire is unidirectional.";
+          }
+        } // control-channel
+        
+      } // pw
+    } // vpls
+  } // l2vpn-config
+}

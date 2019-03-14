@@ -69,6 +69,8 @@ local ffi = require("ffi")
 local C = ffi.C
 local usage_msg = require("program.l2vpn.README_inc")
 local lib = require("core.lib")
+local yang = require("lib.yang.yang")
+local ptree = require("lib.ptree.ptree")
 local counter = require("core.counter")
 local macaddress = require("lib.macaddress")
 local shm = require("core.shm")
@@ -312,38 +314,56 @@ local function nil_or_empty_p (t)
    return(true)
 end
 
-function parse_intf(config)
-   print("Setting up interface "..config.name)
+local function eval (expr, msg)
+   local result, err = loadstring("return ("..expr..")")
+   assert(result, "Invalid Lua expression"..msg..": "
+             ..expr..": "..(err or ''))
+   return result()
+end
+
+-- Return the key and value of a table with a single entry
+local function singleton (t)
+   local iter, state = pairs(t)
+   return iter(state)
+end
+
+function parse_intf(name, config)
+   print("Setting up interface "..name)
    print("  Description: "..(config.description or "<none>"))
    local intf = {
       description = config.description,
-      name = config.name,
+      name = name,
       -- The normalized name is used in app and link names
-      nname = normalize_name(config.name),
+      nname = normalize_name(name),
    }
 
    -- NIC driver
    local drv_c = config.driver
-   if type(drv_c.config) == "table" then
-      if (drv_c.config.pciaddr) then
-         print("  PCI address: "..drv_c.config.pciaddr)
-	 intf.pci_address = drv_c.config.pciaddr
+   local drv_config = eval(drv_c.config, " in driver configuration")
+
+   if type(drv_config) == "table" then
+      if (drv_config.pciaddr) then
+         print("  PCI address: "..drv_config.pciaddr)
+	 intf.pci_address = drv_config.pciaddr
       end
-      drv_c.config.mtu = config.mtu
+      drv_config.mtu = config.mtu
       if drv_c.extra_config then
-         -- If present, extra_config must be a table, whose elements
-         -- are merged with the regular config.  This feature allows
-         -- for more flexibility when the configuration is created by
-         -- a Lua-agnostic layer on top, e.g. by a NixOS module
-         assert(type(drv_c.extra_config) == "table",
+
+         -- If present, extra_config must evaluate to a table, whose
+         -- elements are merged with the regular config.  This feature
+         -- allows for more flexibility when the configuration is
+         -- created by a Lua-agnostic layer on top, e.g. by a NixOS
+         -- module
+         local extra_config = eval(drv_c.extra_config, "in driver extra configuration")
+         assert(type(extra_config) == "table",
                 "Driver extra configuration must be a table")
-         for k, v in pairs(drv_c.extra_config) do
-            drv_c.config[k] = v
+         for k, v in pairs(extra_config) do
+            drv_config[k] = v
          end
       end
    end
    intf.app = App:new('intf_'..intf.nname,
-                      require(drv_c.path)[drv_c.name], drv_c.config)
+                      require(drv_c.path)[drv_c.name], drv_config)
    local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
    assert(driver_helper,
           "Unsupported driver (missing driver helper)"
@@ -359,17 +379,16 @@ function parse_intf(config)
    -- Port mirror configuration
    if config.mirror then
       local mirror = config.mirror
-      local mtype = mirror.type or 'tap'
-      assert(type(mtype) == "string", "Mirror type must be a string")
+      local mtype = mirror.type
       for _, dir in ipairs({ 'rx', 'tx' }) do
          local mirror_socket
          if mirror[dir] then
             if mtype == "pcap" then
                local file
-               if type(mirror[dir]) == "string" then
-                  file = mirror[dir]
+               if mirror.name then
+                  file = mirror.name.."_"..dir
                else
-                  file = '/tmp/'..string.gsub(config.name, "/", "-")
+                  file = '/tmp/'..string.gsub(intf.name, "/", "-")
                      .."_"..dir..".pcap"
                end
                local mirror = App:new('tap_'..intf.nname..'_pcap_'..dir,
@@ -378,10 +397,10 @@ function parse_intf(config)
                print("    "..dir.." port-mirror on pcap file "..file)
             elseif mtype == "tap" then
                local tap_name
-               if type(mirror[dir]) == "string" then
-                  tap_name = mirror[dir]
+               if mirror.name then
+                  tap_name = mirror.name.."_"..dir
                else
-                  tap_name = string.gsub(config.name, "/", "-")
+                  tap_name = string.gsub(intf.name, "/", "-")
                   tap_name = string.sub(tap_name, 0, const.IFNAMSIZ-3).."_"..dir
                end
                local mirror = App:new('tap_'..intf.nname..'_'..dir,
@@ -523,7 +542,7 @@ function parse_intf(config)
       -- instance of the VLAN multiplexer.
       print("    Trunking mode: enabled")
       intf.subintfs = {}
-      assert(#config.afs == 0,
+      assert(nil_or_empty_p(config.address_families),
              "Address family configuration not allowed in trunking mode")
       local encap = trunk.encapsulation or "dot1q"
       assert(encap == "dot1q" or encap == "dot1ad" or
@@ -538,11 +557,12 @@ function parse_intf(config)
 
       -- Process VLANs and create sub-interfaces
       print("  Sub-Interfaces")
-      for n, vlan in ipairs(trunk.vlans) do
-         local vid = vlan.vid
+      local sub_intf_id = 0
+      for vid, vlan in pairs(trunk.vlan) do
          assert(type(vid) == "number" and vid >= 0 and vid < 4095,
-                "Invalid VLAN ID "..vid.." for sub-interface #"..n)
-         local name = config.name..'.'..vid
+                "Invalid VLAN ID "..vid.." for sub-interface #"..sub_intf_id)
+         sub_intf_id = sub_intf_id + 1
+         local name = intf.name..'.'..vid
          assert(not intf.subintfs[name], "Duplicate VID: "..vid)
 
          local mtu = vlan.mtu or intf.mtu
@@ -560,14 +580,14 @@ function parse_intf(config)
             mtu = mtu,
          }
          intf.subintfs[name] = subintf
-         print("    "..config.name.."."..vid)
+         print("    "..intf.name.."."..vid)
          print("      Description: "..(vlan.description or '<none>'))
          print("      L2 configuration")
          print("        VLAN ID: "..(vid > 0 and vid or "<untagged>"))
          print("        MTU: "..subintf.mtu)
          local socket = vmux:socket((vid == 0 and 'native') or 'vlan'..vid)
-         if not nil_or_empty_p(vlan.afs) then
-            subintf.l3 = process_afs(vlan.afs, vid,
+         if not nil_or_empty_p(vlan.address_families) then
+            subintf.l3 = process_afs(vlan.address_families, vid,
                                      socket, "    ")
          else
             subintf.l2 = socket
@@ -579,19 +599,18 @@ function parse_intf(config)
       end
    else
       print("    Trunking mode: disabled")
-      if not nil_or_empty_p(config.afs) then
-         intf.l3 = process_afs(config.afs, nil, intf.l2, "")
+      if not nil_or_empty_p(config.address_families) then
+         intf.l3 = process_afs(config.address_families, nil, intf.l2, "")
       end
    end
 
    return intf
 end
 
-function parse_config (args)
-   local main_config = lib.parse(args, params)
+function parse_config (main_config)
    local intfs = state.intfs
-   for _, config in ipairs(main_config.interfaces) do
-      local intf = parse_intf(config)
+   for name, config in pairs(main_config.interface) do
+      local intf = parse_intf(name, config)
       assert(not intfs[intf.name], "Duplicate interface name: "..intf.name)
       intfs[intf.name] = intf
       for name, subintf in pairs(intf.subintfs or {}) do
@@ -616,6 +635,15 @@ function parse_config (args)
          },
          proto = 115,
          mk_vc_config_fn = function (vc_id, cc_vc_id, tunnel_config)
+            local function maybe_eval_cookie(name)
+               local s = tunnel_config[name]
+               if s then
+                  tunnel_config[name] = eval("'"..s.."'",'')
+               end
+            end
+            for _, cookie in ipairs({ 'local_cookie', 'remote_cookie' }) do
+               maybe_eval_cookie(cookie)
+            end
             return {
                [vc_id] = tunnel_config,
                [cc_vc_id] = {
@@ -648,7 +676,7 @@ function parse_config (args)
       }
    }
    local function add_pw (afi, intf, uplink, local_addr, remote_addr,
-                          vc_id, tunnel_config)
+                          vc_id, type, config, cc)
       local dispatch = dispatchers[afi][uplink]
       if not dispatch then
          dispatch = App:new('disp_'..normalize_name(uplink).."_"..afi,
@@ -660,7 +688,6 @@ function parse_config (args)
          dispatchers[afi][uplink] = dispatch
       end
 
-      local type = tunnel_config.type
       local tunnel_info = assert(tunnel_infos[type],
                                  "Unsupported tunnel type :"..type)
       assert(tunnel_info.afs[afi],
@@ -710,7 +737,6 @@ function parse_config (args)
 
       local tunnel = sd_entry.tunnels[type]
       if not tunnel then
-         local config = lib.parse(tunnel_config.config, tunnel_info.params)
          tunnel = App:new(type.."_"..sd_entry.index,
                           tunnel_info.class,
                           { vcs =
@@ -748,53 +774,57 @@ function parse_config (args)
       print("  Uplink is on "..uplink)
       intf.used = true
 
+      local bridge_type, bridge_config = singleton(vpls.bridge)
       local bridge_group = {
-         config = vpls.bridge,
+         type = bridge_type,
+         config = bridge_config,
          pws = {},
          acs = {}
       }
-      assert(bridge_types[bridge_group.config.type],
-             "Invalid bridge type: "..bridge_group.config.type)
       bridge_groups[vpls_name] = bridge_group
 
       local local_addresses = { ipv4 = {}, ipv6 = {} }
       print("  Creating pseudowires")
-      for name, pw in pairs(vpls.pw) do
+      for name, pw in pairs(vpls.pseudowire) do
          print("    "..name)
-         local af = af_classes[pw.afi]
-         assert(af, "Invalid address family identifier"..pw.afi)
-         assert(intf.l3[pw.afi].configured,
-                "Address family "..pw.afi.." not enabled on uplink")
-         assert(af:pton(pw.local_address),
-                "Invalid local "..pw.afi.." address "..pw.local_address)
-         assert(af:pton(pw.remote_address),
-                "Invalid remote "..pw.afi.." address "..pw.remote_address)
-         print("      AFI: "..pw.afi)
-         print("      Local address: "..pw.local_address)
-         print("      Remote address: "..pw.remote_address)
+         assert(pw.transport, "Transport configuration missing")
+         local afi, transport = singleton(pw.transport)
+         local af = af_classes[afi]
+         assert(intf.l3[afi].configured,
+                "Address family "..afi.." not enabled on uplink")
+         assert(af:pton(transport.local_address),
+                "Invalid local "..afi.." address "..transport.local_address)
+         assert(af:pton(transport.remote_address),
+                "Invalid remote "..afi.." address "..transport.remote_address)
+         print("      AFI: "..afi)
+         print("      Local address: "..transport.local_address)
+         print("      Remote address: "..transport.remote_address)
          print("      VC ID: "..pw.vc_id)
-         local tunnel_config = pw.tunnel or vpls.tunnel
-         print("      Encapsulation: "..tunnel_config.type)
+
+         assert(pw.tunnel, "Tunnel configuration missing")
+         local tunnel_type, tunnel_config = singleton(pw.tunnel)
+         local cc = pw.control_channel
+         print("      Encapsulation: "..tunnel_type)
+         print("      Control-channel: "..(cc.enable and 'enabled' or 'disabled'))
 
          local socket, cc_socket =
-            add_pw(pw.afi, intf, uplink, af:pton(pw.local_address),
-                   af:pton(pw.remote_address),
-                   pw.vc_id, tunnel_config)
+            add_pw(afi, intf, uplink, af:pton(transport.local_address),
+                   af:pton(transport.remote_address),
+                   pw.vc_id, tunnel_type, tunnel_config, cc)
          local cc_app
          if cc_socket then
-            local cc_config = pw.cc or vpls.cc or {}
             cc_app = App:new('cc_'..vpls_name..'_'..name,
                              require("program.l2vpn.control_channel").control_channel,
                              {
-                                enable = pw.cc or vpls.cc,
-                                heartbeat = cc_config.heartbeat,
-                                dead_factor = cc_config.dead_factor,
+                                enable = cc.enable,
+                                heartbeat = cc.heartbeat,
+                                dead_factor = cc.dead_factor,
                                 name = vpls_name..'_'..name,
                                 description = vpls.description,
                                 mtu = vpls.mtu,
                                 vc_id = pw.vc_id,
-                                afi = pw.afi,
-                                peer_addr = pw.remote_address })
+                                afi = afi,
+                                peer_addr = transport.remote_address })
             connect_duplex(cc_socket, cc_app:socket('south'))
          end
          table.insert(bridge_group.pws,
@@ -803,15 +833,15 @@ function parse_config (args)
                         cc_app = cc_app,
                         cc_socket = cc_socket })
 
-         if not local_addresses[pw.afi][pw.local_address] then
-            table.insert(intf.l3[pw.afi].fragmenter:arg().pmtu_local_addresses,
-                         pw.local_address)
-            local_addresses[pw.afi][pw.local_address] = true
+         if not local_addresses[afi][transport.local_address] then
+            table.insert(intf.l3[afi].fragmenter:arg().pmtu_local_addresses,
+                         transport.local_address)
+            local_addresses[afi][transport.local_address] = true
          end
       end
 
       print("  Creating attachment circuits")
-      for name, t in pairs(vpls.ac) do
+      for name, t in pairs(vpls.attachment_circuit) do
          local ac = t.interface
          print("    "..name)
          assert(type(ac) == "string",
@@ -851,12 +881,26 @@ function parse_config (args)
          bridge_group.pws[1].cc_app:arg().local_if_alias =
             bridge_group.acs[1].description
       else
+         if bridge_group.type == "learning" then
+            -- The YANG parser transforms the mac_table config
+            -- into a FFI struct :(  We need to transform it back
+            -- into a table
+            local from = bridge_group.config
+            local to = {
+               size = from.size,
+               timeout = from.timeout,
+               verbose = from.verbose,
+               copy_on_resize = from.copy_on_resize,
+               max_size = from.max_size
+            }
+            bridge_group.config = to
+         end
          local bridge =
             App:new('bridge_'..vpls_name,
-                    require("apps.bridge."..bridge_group.config.type).bridge,
+                    require("apps.bridge."..bridge_group.type).bridge,
                     { ports = {},
                       split_horizon_groups = { pw = {} },
-                      config = bridge_group.config.config })
+                      config = bridge_group.config })
          for _, pw in ipairs(bridge_group.pws) do
             connect_duplex(pw.socket, bridge:socket(pw.name))
             table.insert(bridge:arg().split_horizon_groups.pw, pw.name)
@@ -890,12 +934,12 @@ function parse_config (args)
    end
 end
 
-local function setup_shm_and_snmp (main_config)
+local function setup_shm_and_snmp (main_config, pid)
    -- For each interface, attach to the shm frame that stores
    -- the statistics counters
    for _, intf in pairs(state.intfs) do
       if not intf.vlan then
-         local stats_path = intf.driver_helper.stats_path(intf)
+         local stats_path = "/"..pid.."/"..intf.driver_helper.stats_path(intf)
          intf.stats = shm.open_frame(stats_path)
       end
    end
@@ -987,6 +1031,13 @@ local function create_app_graph ()
    return graph
 end
 
+local function setup_l2vpn (config)
+   print("SETUP L2VPN")
+   clear_state()
+   parse_config(config.l2vpn_config)
+   return { l2vpn = create_app_graph() }
+end
+
 local long_opts = {
    duration = "D",
    reconfig = "r",
@@ -1051,7 +1102,7 @@ function run (parameters)
    end
    if #parameters ~= 1 then usage () end
 
-   local file = table.remove(parameters, 1)
+   local config_file = table.remove(parameters, 1)
 
    local engine_opts = { no_report = true, measure_latency = false }
    if duration ~= 0 then engine_opts.duration = duration end
@@ -1061,44 +1112,31 @@ function run (parameters)
    if jit_conf.dump then
       require("jit.dump").start(jit_conf.dump.opts, jit_conf.dump.file)
    end
-   local mtime = 0
-   local loop = true
-   while loop do
-      local stat, err = S.stat(file)
-      if not stat then
-         error("Can't stat "..file..": "..tostring(err))
-      end
-      if mtime ~= stat.mtime then
-         -- This is a very crude and disruptive way to pick up changes
-         -- of the configuration while the system is running. It
-         -- requires setting -D to a reasonable non-zero value. By
-         -- default, the configuration is instantiated only once and
-         -- engine.main() runs indefinitely.  The proper way to do
-         -- this is to write a YANG schema and use core.config.
-         print("Instantiating configuration")
-         clear_state()
-         local main_config = assert(loadfile(file))()
-         parse_config(main_config)
-         engine.configure(create_app_graph())
-         setup_shm_and_snmp(main_config)
-         -- Reconfigure ND/ARP apps with proper MAC addresses from the
-         -- interfaces to which they are attached
-         for name, nd in pairs(state.nds) do
-            local mac = macaddress:new(counter.read(nd.intf.stats.macaddr))
-            nd.app:arg().local_mac = ethernet:pton(ethernet:ntop(mac.bytes))
-         end
-         for name, arp in pairs(state.arps) do
-            local mac = macaddress:new(counter.read(arp.intf.stats.macaddr))
-            arp.app:arg().self_mac = ethernet:pton(ethernet:ntop(mac.bytes))
-         end
-         engine.configure(create_app_graph())
-         jit.flush()
-      end
-      mtime = stat.mtime
-      engine.main(engine_opts)
-      loop = reconfig
+   clear_state()
+   local initial_config =
+      yang.load_configuration(config_file,
+                              {  schema_name = "snabb-l2vpn-v1",
+                                 verbose = true })
+
+   local manager = ptree.new_manager(
+      { schema_name = "snabb-l2vpn-v1",
+        setup_fn = setup_l2vpn,
+        log_level = "INFO",
+        initial_configuration = initial_config })
+
+   manager:main(5)
+   local worker_pid = manager.workers.l2vpn.pid
+   setup_shm_and_snmp(initial_config.l2vpn_config, worker_pid)
+   for name, nd in pairs(state.nds) do
+      local mac = macaddress:new(counter.read(nd.intf.stats.macaddr))
+      nd.app:arg().local_mac = ethernet:pton(ethernet:ntop(mac.bytes))
    end
-   if jit_conf.p then
-      require("jit.p").stop()
+   for name, arp in pairs(state.arps) do
+      local mac = macaddress:new(counter.read(arp.intf.stats.macaddr))
+      arp.app:arg().self_mac = ethernet:pton(ethernet:ntop(mac.bytes))
    end
+   local new_graph = create_app_graph()
+   --print(require("inspect")(new_graph))
+   manager:update_worker_graph('l2vpn', new_graph)
+   manager:main()
 end
