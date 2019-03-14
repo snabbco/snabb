@@ -139,6 +139,7 @@ local reassembler_config_params = {
    max_fragments_per_reassembly = { default=40 },
    -- Maximum number of seconds to keep a partially reassembled packet
    reassembly_timeout = { default = 60 },
+   use_alarms = { default = true }
 }
 
 function Reassembler:new(conf)
@@ -183,21 +184,23 @@ function Reassembler:new(conf)
    o.scan_tstamp = o.tsc:stamp()
    o.scan_interval = o.tsc:tps() * scan_time / scan_chunks + 0ULL
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='incoming-ipv6-fragments'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Incoming IPv6 fragments over N fragments/s',
+   if o.use_alarms then
+      alarms.add_to_inventory {
+         [{alarm_type_id='incoming-ipv6-fragments'}] = {
+            resource=tostring(S.getpid()),
+            has_clear=true,
+            description='Incoming IPv6 fragments over N fragments/s',
+         }
       }
-   }
-   local incoming_fragments_alarm = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='incoming-ipv6-fragments'}] = {
-         perceived_severity='warning',
-         alarm_text='More than 10,000 IPv6 fragments per second',
+      local incoming_fragments_alarm = alarms.declare_alarm {
+         [{resource=tostring(S.getpid()),alarm_type_id='incoming-ipv6-fragments'}] = {
+            perceived_severity='warning',
+            alarm_text='More than 10,000 IPv6 fragments per second',
+         }
       }
-   }
-   o.incoming_ipv6_fragments_alarm = CounterAlarm.new(incoming_fragments_alarm,
-      1, 1e4, o, "in-ipv6-frag-needs-reassembly")
+      o.incoming_ipv6_fragments_alarm = CounterAlarm.new(incoming_fragments_alarm,
+         1, 1e4, o, "in-ipv6-frag-needs-reassembly")
+   end
 
    return setmetatable(o, {__index=Reassembler})
 end
@@ -348,15 +351,6 @@ end
 function Reassembler:push ()
    local input, output = self.input.input, self.output.output
 
-   self.incoming_ipv6_fragments_alarm:check()
-
-   do
-      local now = self.tsc:stamp()
-      if now - self.scan_tstamp > self.scan_interval then
-         self:expire(now)
-      end
-   end
-
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
@@ -384,6 +378,17 @@ function Reassembler:push ()
       local pkt = link.receive(input)
       self:handle_fragment(pkt)
       packet.free(pkt)
+   end
+end
+
+function Reassembler:housekeeping ()
+   if self.use_alarms then
+      self.incoming_ipv6_fragments_alarm:check()
+   end
+
+   local now = self.tsc:stamp()
+   if now - self.scan_tstamp > self.scan_interval then
+      self:expire(now)
    end
 
    if self.next_counter_update < engine.now() then

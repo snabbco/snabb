@@ -13,8 +13,6 @@ according to the configuration supplied in the CONFIG file.
                              before the the engine is restarted.  In this mode,
                              the program runs indefinitely. Currently,
                              reconfiguration is rather disruptive.
-  -l FILE,   --logfile FILE  Set FILE as the default destination for all
-                             output of the Snabb logging facility
   -d,        --debug         Enable additional debugging checks.
   -j CMD,    --jit CMD       Control LuaJIT behavior. Available commands:
                                -jv=FILE, --jit v=FILE

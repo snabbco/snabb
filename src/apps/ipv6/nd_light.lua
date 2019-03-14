@@ -47,6 +47,7 @@ local tlv = require("lib.protocol.icmp.ipv6.nd.options.tlv")
 local filter = require("lib.pcap.filter")
 local timer = require("core.timer")
 local lib = require("core.lib")
+local logger = require("lib.logger")
 
 nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
@@ -236,7 +237,7 @@ function nd_light:new (arg)
       p = ffi.new("struct packet *[1]"),
       mem = ffi.new("uint8_t *[1]")
    }
-   o._logger = lib.logger_new({ module = 'nd_light' })
+   o._logger = logger.new({ module = 'nd_light' })
 
    return o
 end
@@ -334,11 +335,6 @@ local function from_south (self, p)
 end
 
 function nd_light:push ()
-   if self._next_hop.nsent == 0 and self._eth_header == nil then
-      -- Kick off address resolution
-      self._next_hop.timer_cb()
-   end
-
    local cache = self._cache
    local l_in = self.input.south
    local l_out = self.output.north
@@ -379,6 +375,13 @@ function nd_light:push ()
             counter.add(self.shm.txerrors)
          end
       end
+   end
+end
+
+function nd_light:housekeeping ()
+   if self._next_hop.nsent == 0 and self._eth_header == nil then
+      -- Kick off address resolution
+      self._next_hop.timer_cb()
    end
 end
 

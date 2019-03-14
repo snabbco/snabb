@@ -94,115 +94,17 @@ local reass_ipv6 = require("apps.ipv6.reassemble").Reassembler
 local frag_ipv4 = require("apps.ipv4.fragment").Fragmenter
 local reass_ipv4 = require("apps.ipv4.reassemble").Reassembler
 
-local afs_params = {
-   default = {},
-   keysof = {
-      address = { required = true },
-      next_hop = { required = true },
-      next_hop_mac = { default = nil }
-   },
-}
-
-local tunnel_params = {
-   type = { required = true },
-   config = { default = {} }
-}
-
-local params = {
-   shmem_dir = { default = nil },
-   snmp = {
-      config =
-         {
-            enable = { default = false },
-            interval = { default = 5 },
-         }
-   },
-   interfaces = {
-      required = true,
-      listof = {
-         name = { required = true },
-         description = { default = '' },
-         driver = {
-            required = { true },
-            config = {
-               path = { required = true },
-               name = { required = true },
-               config = {{ default = {} }
-               },
-               extra_config = { default = {} }
-            }
-         },
-         mirror = {
-            config = {
-               rx = { default = false },
-               tx = { default = false },
-               type = { default = 'tap' }
-            }
-         },
-         mtu = { required = true },
-         afs = afs_params,
-         trunk = {
-            enable = { default = false },
-            encapsulation = { default = 'dot1q' },
-            vlans = {
-               required = true,
-               listof = {
-                  description = { default = '' },
-                  mtu = { default = nil },
-                  vid = { required = true },
-                  afs = afs_params,
-               }
-            }
-         }
-      }
-   },
-   vpls = {
-      required = true,
-      keysof = {
-         description = { default = '' },
-         mtu = { required = true },
-         uplink = { required = true },
-         bridge = {
-            config = {
-               type = { default = 'learning' },
-               config = { default = {} }
-            }
-         },
-         tunnel = {
-            default = {
-               type = "gre"
-            },
-            config = tunnel_params
-         },
-         cc = { default = {} },
-         ac = {
-            required = true,
-            keysof = {
-               interface = { required = true }
-            }
-         },
-         pw = {
-            required = true,
-            keysof = {
-               afi = { required = true },
-               local_address = { required = true },
-               remote_address = { required = true },
-               vc_id = { required = true },
-               tunnel = {
-                  config = tunnel_params
-               },
-               cc = { default = {} },
-            }
-         }
-      }
-   }
-}
-
 local bridge_types = { flooding = true, learning = true }
 
 function usage ()
    print(usage_msg)
    main.exit(0)
+end
+
+local function merge (a, b)
+   for k, v in pairs(b) do
+      a[k] = v
+   end
 end
 
 local state
@@ -280,6 +182,8 @@ end
 --     This function is called after the driver has been created
 --     and receives the driver object as input.  It returns the
 --     path to the shm frame where the driver stores its stats counters.
+--   config ()
+--     return a table with driver-specific configuration
 local driver_helpers = {
    ['apps.intel_mp.intel_mp.Intel'] = {
       link_names = function ()
@@ -287,6 +191,9 @@ local driver_helpers = {
       end,
       stats_path = function (intf)
          return 'pci/'..intf.pci_address
+      end,
+      config = function ()
+         return { use_alarms = false }
       end
    },
    ['apps.tap.tap.Tap'] = {
@@ -295,7 +202,8 @@ local driver_helpers = {
       end,
       stats_path = function (intf)
          return 'apps/'..intf.app:name()
-      end
+      end,
+      config = function () return {} end
    },
 }
 
@@ -304,6 +212,22 @@ af_classes = {
    ipv4 = ipv4,
    ipv6 = ipv6,
 }
+
+local function check_af (afi)
+   return assert(af_classes[afi], "Invalid address family identifier: "..afi)
+end
+
+local function src_dst_pair (af, src, dst)
+   local function maybe_convert(addr)
+      if type(addr) == "string" then
+         return assert(af:pton(addr))
+      else
+         return addr
+      end
+   end
+   return string.format("%s%s", af:ntop(maybe_convert(src)),
+                        af:ntop(maybe_convert(dst)))
+end
 
 local function nil_or_empty_p (t)
    if not t then return true end
@@ -340,6 +264,7 @@ function parse_intf(name, config)
    -- NIC driver
    local drv_c = config.driver
    local drv_config = eval(drv_c.config, " in driver configuration")
+   local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
 
    if type(drv_config) == "table" then
       if (drv_config.pciaddr) then
@@ -347,6 +272,7 @@ function parse_intf(name, config)
 	 intf.pci_address = drv_config.pciaddr
       end
       drv_config.mtu = config.mtu
+      merge(drv_config, driver_helper.config())
       if drv_c.extra_config then
 
          -- If present, extra_config must evaluate to a table, whose
@@ -364,7 +290,6 @@ function parse_intf(name, config)
    end
    intf.app = App:new('intf_'..intf.nname,
                       require(drv_c.path)[drv_c.name], drv_config)
-   local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
    assert(driver_helper,
           "Unsupported driver (missing driver helper)"
              ..drv_c.path.."."..drv_c.name)
@@ -453,10 +378,11 @@ function parse_intf(name, config)
          fragmenter = App:new('frag_v6_'..intf.nname..vid_suffix(vid),
                               frag_ipv6,
                               { mtu = intf.mtu - 14, pmtud = true,
-                                pmtu_local_addresses = {} })
+                                pmtu_local_addresses = {},
+                                use_alarms = false })
          local reassembler = App:new('reass_v6_'..intf.nname..vid_suffix(vid),
                                      reass_ipv6,
-                                     {})
+                                     { use_alarms = false })
          local nd_north = nd:socket('north')
          connect(nd_north, fragmenter:socket('south'))
          connect(fragmenter:socket('output'), nd_north)
@@ -487,10 +413,11 @@ function parse_intf(name, config)
          fragmenter = App:new('frag_v4_'..intf.nname..vid_suffix(vid),
                               frag_ipv4,
                               { mtu = intf.mtu - 14, pmtud = true,
-                                pmtu_local_addresses = {} })
+                                pmtu_local_addresses = {},
+                                use_alarms = false })
          local reassembler = App:new('reass_v4_'..intf.nname..vid_suffix(vid),
                                      reass_ipv4,
-                                     {})
+                                     { use_alarms = false })
          local arp_north = arp:socket('north')
          connect(arp_north, fragmenter:socket('south'))
          connect(fragmenter:socket('output'), arp_north)
@@ -676,7 +603,7 @@ function parse_config (main_config)
       }
    }
    local function add_pw (afi, intf, uplink, local_addr, remote_addr,
-                          vc_id, type, config, cc)
+                          vc_id, type, config, ipsec_assocs)
       local dispatch = dispatchers[afi][uplink]
       if not dispatch then
          dispatch = App:new('disp_'..normalize_name(uplink).."_"..afi,
@@ -701,9 +628,8 @@ function parse_config (main_config)
                    .." (range 1.."..tunnel_info.vc_id_max..")")
       end
 
-      local af = af_classes[afi]
-      local sd_pair = string.format("%s%s", af:ntop(remote_addr),
-                                    af:ntop(local_addr))
+      local af = check_af(afi)
+      local sd_pair = src_dst_pair(af, remote_addr, local_addr)
       local sd_entry
       for index, entry in ipairs(pws) do
          if entry.sd_pair == sd_pair then
@@ -718,6 +644,25 @@ function parse_config (main_config)
       if not sd_entry then
          local index = #pws + 1
 
+         -- Insert an IPsec app if the SD pair is part of a configured
+         -- association
+         local assoc = ipsec_assocs[sd_pair]
+         local socket
+         if assoc then
+            print("      IPsec: "..assoc.aead)
+            local esp_module = afi == "ipv4" and "Transport4_IKE" or
+               "Transport6_IKE"
+            local ipsec = App:new('ipsec_'..afi.."_"..index,
+                                  require("apps.ipsec.esp")[esp_module],
+                                  assoc)
+            connect_duplex(dispatch:socket('sd_'..index),
+                           ipsec:socket('encapsulated'))
+            socket = ipsec:socket('decapsulated')
+         else
+            print("      IPsec: disabled")
+            socket = dispatch:socket('sd_'..index)
+         end
+
          -- Each (source, destination) pair connects to a dedicated
          -- protocol multiplexer.
          local protomux = App:new('pmux_'..index,
@@ -725,8 +670,7 @@ function parse_config (main_config)
                                   { src = local_addr, dst = remote_addr, links = {} })
          dispatch:arg().links['sd_'..index] = { src = remote_addr,
                                                 dst = local_addr }
-         connect_duplex(dispatch:socket('sd_'..index),
-                        protomux:socket('south'))
+         connect_duplex(socket, protomux:socket('south'))
          sd_entry = { sd_pair = sd_pair,
                       index = index,
                       protomux = protomux,
@@ -752,6 +696,20 @@ function parse_config (main_config)
       end
 
       return tunnel:socket(('vc_%d'):format(vc_id)), tunnel:socket(('vc_%d'):format(vc_id + 0x8000))
+   end
+
+   local ipsec_assocs = {}
+   for _, config in pairs(main_config.ipsec) do
+      local af = check_af(config.afi)
+      local sd_pair = src_dst_pair(af, config.remote_address, config.local_address)
+      assert(not ipsec_assocs[sd_pair],
+             ("Multiple definitions for IPsec association %s<->%s"):format(
+                config.remote_address, config.local_address))
+      local assoc = { auditing = true }
+      for _, k in ipairs({ 'aead', 'local_address', 'remote_address' }) do
+         assoc[k] = config[k]
+      end
+      ipsec_assocs[sd_pair] = assoc
    end
 
    local bridge_groups = {}
@@ -810,7 +768,7 @@ function parse_config (main_config)
          local socket, cc_socket =
             add_pw(afi, intf, uplink, af:pton(transport.local_address),
                    af:pton(transport.remote_address),
-                   pw.vc_id, tunnel_type, tunnel_config, cc)
+                   pw.vc_id, tunnel_type, tunnel_config, ipsec_assocs)
          local cc_app
          if cc_socket then
             cc_app = App:new('cc_'..vpls_name..'_'..name,
@@ -1041,7 +999,6 @@ end
 local long_opts = {
    duration = "D",
    reconfig = "r",
-   logfile = "l",
    debug = "d",
    jit = "j",
    help = "h",
@@ -1059,10 +1016,6 @@ function run (parameters)
       else
          usage()
       end
-   end
-   function opt.l (arg)
-      local logfh = assert(io.open(arg, "a"))
-      lib.logger_default.fh = logfh
    end
    function opt.h (arg) usage() end
    function opt.d (arg) _G.developer_debug = true end
@@ -1136,7 +1089,6 @@ function run (parameters)
       arp.app:arg().self_mac = ethernet:pton(ethernet:ntop(mac.bytes))
    end
    local new_graph = create_app_graph()
-   --print(require("inspect")(new_graph))
    manager:update_worker_graph('l2vpn', new_graph)
    manager:main()
 end

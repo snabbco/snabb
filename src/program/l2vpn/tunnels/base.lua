@@ -3,6 +3,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local lib = require("core.lib")
 local ctable = require("lib.ctable_perfect")
+local logger = require("lib.logger")
 
 tunnel = {
    config = {
@@ -54,7 +55,7 @@ function tunnel:_new (config, name, class, size, params,
          keys = keys_list,
          default_value = default_value })
 
-   o.logger = lib.logger_new({ module = name })
+   o.logger = logger.new({ module = name })
    o.header_scratch = class:new()
    o.handle_unknown_header_fn = unknown_header_fn
 
@@ -86,8 +87,7 @@ function tunnel:push (sin)
    for _ = 1, link.nreadable(sin) do
       local p = link.receive(sin)
       assert(p.length > 0)
-      local key = ffi.cast(self.key_ptr_t, p.data)
-      local entry = self.ctab:lookup_ptr(ffi.cast("uint8_t *", key))
+      local entry = self.ctab:lookup_ptr(ffi.cast("uint8_t *", p.data))
       link.transmit(entry.value.link, packet.shiftleft(p, entry.value.shift))
    end
 
