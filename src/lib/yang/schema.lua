@@ -930,9 +930,9 @@ function resolve(schema, features)
 end
 
 local primitive_types = {
-   ['ietf-inet-types']=lib.set('ipv4-address', 'ipv6-address',
-                           'ipv4-prefix', 'ipv6-prefix'),
-   ['ietf-yang-types']=lib.set('mac-address')
+   -- ['ietf-inet-types']=lib.set('ipv4-address', 'ipv6-address',
+   --                         'ipv4-prefix', 'ipv6-prefix'),
+   -- ['ietf-yang-types']=lib.set('mac-address')
 }
 
 -- NB: mutates schema in place!
