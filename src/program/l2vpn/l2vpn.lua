@@ -634,9 +634,10 @@ function parse_config (main_config)
       for index, entry in ipairs(pws) do
          if entry.sd_pair == sd_pair then
             assert(not entry.vc_ids[vc_id],
-                   "Non-unique pseudowire: ", af:ntop(remote_addr),
-                   af:ntop(local_addr), vc_id)
-            entry.vc_ids[vc_id] = vc_id
+                   ("Non-unique pseudowire: %s <-> %s VC ID %d"):
+                      format(af:ntop(remote_addr),
+                             af:ntop(local_addr), vc_id))
+            entry.vc_ids[vc_id] = true
             sd_entry = entry
             break
          end
@@ -675,7 +676,7 @@ function parse_config (main_config)
                       index = index,
                       protomux = protomux,
                       tunnels = {},
-                      vc_ids = { vc_id = true } }
+                      vc_ids = { [vc_id] = true } }
          table.insert(pws, sd_entry)
       end
 
@@ -690,10 +691,22 @@ function parse_config (main_config)
                             ancillary_data = {
                                remote_addr = af:ntop(remote_addr),
                                local_addr = af:ntop(local_addr) } })
+         sd_entry.tunnels[type] = tunnel
          sd_entry.protomux:arg().links[type] = { proto = tunnel_info.proto }
          connect_duplex(sd_entry.protomux:socket(type),
                         tunnel:socket('south'))
       end
+
+      local vcs = {}
+      for vc_id, _ in pairs(sd_entry.vc_ids) do
+         local vc_set = tunnel_info.mk_vc_config_fn(vc_id,
+                                                    vc_id + 0x8000,
+                                                    config)
+         for vc, arg in pairs(vc_set) do
+            vcs[vc] = arg
+         end
+      end
+      tunnel:arg().vcs = vcs
 
       return tunnel:socket(('vc_%d'):format(vc_id)), tunnel:socket(('vc_%d'):format(vc_id + 0x8000))
    end
@@ -714,6 +727,7 @@ function parse_config (main_config)
    end
 
    local bridge_groups = {}
+   local local_addresses = { ipv4 = {}, ipv6 = {} }
    for vpls_name, vpls in pairs(main_config.vpls) do
       local function assert_vpls (cond, msg)
          assert(cond, "VPLS "..vpls_name..": "..msg)
@@ -742,7 +756,6 @@ function parse_config (main_config)
       }
       bridge_groups[vpls_name] = bridge_group
 
-      local local_addresses = { ipv4 = {}, ipv6 = {} }
       print("  Creating pseudowires")
       for name, pw in pairs(vpls.pseudowire) do
          print("    "..name)
