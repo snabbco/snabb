@@ -490,3 +490,8 @@ function control_channel:push ()
       packet.free(p)
    end
 end
+
+function control_channel:stop ()
+   timer.cancel(self._cc.timer_xmit)
+   timer.cancel(self._cc.timer_hb)
+end
