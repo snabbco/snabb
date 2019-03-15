@@ -1010,7 +1010,7 @@ end
 
 local long_opts = {
    duration = "D",
-   reconfig = "r",
+   ["busy-wait"] = "b",
    debug = "d",
    jit = "j",
    help = "h",
@@ -1018,7 +1018,7 @@ local long_opts = {
 
 function run (parameters)
    local duration = 0
-   local reconfig = false
+   local busywait = false
    local jit_conf = {}
    local jit_opts = {}
    local opt = {}
@@ -1030,6 +1030,9 @@ function run (parameters)
       end
    end
    function opt.h (arg) usage() end
+   function opt.b (arg)
+      busywait = true
+   end
    function opt.d (arg) _G.developer_debug = true end
    function opt.j (arg)
       if arg:match("^v") then
@@ -1051,14 +1054,9 @@ function run (parameters)
          table.insert(jit_opts, opt)
       end
    end
-   function opt.r (arg) reconfig = true end
 
    -- Parse command line arguments
-   parameters = lib.dogetopt(parameters, opt, "hdj:D:l:r", long_opts)
-   if (reconfig and not (duration > 0)) then
-      print("--reconfig requires --duration > 0 to take effect")
-      usage()
-   end
+   parameters = lib.dogetopt(parameters, opt, "hbdj:D:", long_opts)
 
    if #jit_opts then
       require("jit.opt").start(unpack(jit_opts))
@@ -1085,6 +1083,9 @@ function run (parameters)
         setup_fn = setup_l2vpn,
         log_level = "INFO",
         initial_configuration = initial_config,
+        worker_default_scheduling = {
+           busywait = busywait
+        },
         worker_opts = {
            duration = duration ~= 0 and duration or nil,
            measure_latency = false,
