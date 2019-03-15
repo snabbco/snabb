@@ -17,7 +17,37 @@ module snabb-l2vpn-v1 {
   
   container l2vpn-config {
     description
-      "Configuration for Snabb L2VPN.";
+      "Configuration for the Snabb L2VPN program.";
+
+    container luajit {
+      description
+        "LuaJIT runtime settings";
+
+      leaf-list option {
+        type string;
+        description
+          "A LuaJIT runtime option.";
+      }
+      container dump {
+        leaf enable {
+          type boolean;
+          default false;
+          description
+            "Whether to enable the JIT dump facility.";
+        }
+        leaf option {
+          type string;
+          description
+            "Options for the LuaJIT trace dumper.";
+        }
+        leaf file {
+          type string;
+          default "/tmp/dump";
+          description
+            "Location of the LuaJIT dump file.";
+        }
+      }
+    }
     
     container snmp {
       leaf enable {

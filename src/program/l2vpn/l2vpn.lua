@@ -1047,8 +1047,6 @@ function run (parameters)
       usage()
    end
 
-   -- Defaults: sizemcode=32, maxmcode=512
-   require("jit.opt").start('sizemcode=256', 'maxmcode=2048')
    if #jit_opts then
       require("jit.opt").start(unpack(jit_opts))
    end
@@ -1056,8 +1054,6 @@ function run (parameters)
 
    local config_file = table.remove(parameters, 1)
 
-   local engine_opts = { no_report = true, measure_latency = false }
-   if duration ~= 0 then engine_opts.duration = duration end
    if jit_conf.p then
       require("jit.p").start(jit_conf.p.opts, jit_conf.p.file)
    end
@@ -1070,15 +1066,18 @@ function run (parameters)
                               {  schema_name = "snabb-l2vpn-v1",
                                  verbose = true })
 
+   local jit_config = initial_config.l2vpn_config.luajit
    local manager = ptree.new_manager(
       { schema_name = "snabb-l2vpn-v1",
         setup_fn = setup_l2vpn,
         log_level = "INFO",
         initial_configuration = initial_config,
         worker_opts = {
+           duration = duration ~= 0 and duration or nil,
            measure_latency = false,
-           jit_opts = jit_opts,
-           jit_dump = { jit_conf.dump.opts, jit_conf.dump.file }
+           jit_opts = jit_config.option,
+           jit_dump = jit_config.dump and jit_config.dump.enable and
+              jit_config.dump
         }
    })
 
@@ -1095,5 +1094,5 @@ function run (parameters)
    end
    local new_graph = create_app_graph()
    manager:update_worker_graph('l2vpn', new_graph)
-   manager:main()
+   manager:main(duration ~= 0 and (duration + 5) or nil)
 end

@@ -21,8 +21,8 @@ local worker_config_spec = {
    no_report = {default=false},
    report = {default={showapps=true,showlinks=true}},
    Hz = {default=1000},
-   jit_opts = {default={}},
-   jit_dump = {default={}},
+   jit_opts = {},
+   jit_dump = {},
 }
 
 function new_worker (conf)
@@ -31,6 +31,7 @@ function new_worker (conf)
    ret.period = 1/conf.Hz
    ret.duration = conf.duration or 1/0
    ret.no_report = conf.no_report
+   ret.report = conf.report
    ret.channel = channel.create('config-worker-channel', 1e6)
    ret.alarms_channel = alarm_codec.get_channel()
    ret.pending_actions = {}
@@ -102,7 +103,7 @@ function Worker:main ()
       require("jit.opt").start(unpack(self.jit_opts))
    end
    if self.jit_dump then
-      require("jit.dump").start(unpack(self.jit_dump))
+      require("jit.dump").start(self.jit_dump.option, self.jit_dump.file)
    end
    repeat
       self.breathe()
