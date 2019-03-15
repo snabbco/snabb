@@ -25,7 +25,7 @@ function new(args)
       grace_period = args.grace_period or 10,
       action = args.action or 'flush',
       tips_url = args.tips_url or default_tips_url,
-      last_flush = 0,
+      last_flush = now(), -- Start in the grace period.
       last_value = ffi.new('uint64_t[1]'),
       current_value = ffi.new('uint64_t[1]'),
    }
