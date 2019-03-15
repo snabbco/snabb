@@ -11,6 +11,11 @@ module snabb-softwire-v2 {
   description
    "Configuration for the Snabb Switch lwAFTR.";
 
+  revision 2018-10-13 {
+    description
+      "Add flow-label setting.";
+  }
+
   revision 2017-04-17 {
     description
       "Removal of br-address leaf-list and  br leaf. It adds the
