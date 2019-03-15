@@ -1,12 +1,53 @@
 # Change Log
 
+## [2018.09.03]
+
+### Features
+
+ * Add new "revision" declaration to snabb-softwire-v2 YANG module,
+   corresponding to addition of flow-label nodes back in version
+   2018.09.01.  No changes to the schema otherwise.
+
+ * Add new performance diagnostics that will print warnings for common
+   system misconfigurations, such as missing `isolcpus` declarations or
+   the use of power-saving CPU frequency scaling strategies.  These
+   warnings detect conditions which are described in the performance
+   tuning document.
+
+     https://github.com/Igalia/snabb/pull/1212
+     https://github.com/snabbco/snabb/blob/master/src/doc/performance-tuning.md
+
+ * Improve `snabb lwaftr run --help` output.  Try it out!
+
+### Bug fixes
+
+ * Ingress drop monitor treats startup as part of grace period (10
+   seconds by default), postponing the start of dropped packet detection
+   until after the system has settled down.
+
+     https://github.com/Igalia/snabb/issues/1216
+     https://github.com/Igalia/snabb/pull/1217
+
+ * Fix PCI/NUMA affinity diagnostics.
+
+     https://github.com/Igalia/snabb/pull/1211
+
+ * New YANG schema revisions cause Snabb to recompile configurations.
+
+     https://github.com/Igalia/snabb/pull/1209
+
+ * Re-enable NUMA binding on newer kernels (including the kernel used by
+   Ubuntu 18.04).
+
+     https://github.com/Igalia/snabb/pull/1207
+
 ## [2018.09.02]
 
 ### Features
 
 * Add benchmarking test for 2 instances each with 2 queues (total of 4
   queues).
-  
+
     https://github.com/Igalia/snabb/pull/1206
 
 ### Bug fixes
