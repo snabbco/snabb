@@ -103,7 +103,8 @@ function Worker:main ()
       require("jit.opt").start(unpack(self.jit_opts))
    end
    if self.jit_dump then
-      require("jit.dump").start(self.jit_dump.option, self.jit_dump.file)
+      local file = self.jit_dump.file:gsub('%%p', S.getpid())
+      require("jit.dump").start(self.jit_dump.option, file)
    end
    repeat
       self.breathe()
