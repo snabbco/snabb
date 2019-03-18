@@ -93,6 +93,8 @@ local frag_ipv6 = require("apps.ipv6.fragment").Fragmenter
 local reass_ipv6 = require("apps.ipv6.reassemble").Reassembler
 local frag_ipv4 = require("apps.ipv4.fragment").Fragmenter
 local reass_ipv4 = require("apps.ipv4.reassemble").Reassembler
+local Receiver = require("apps.interlink.receiver").Receiver
+local Transmitter = require("apps.interlink.transmitter").Transmitter
 
 local bridge_types = { flooding = true, learning = true }
 
@@ -107,7 +109,8 @@ local function merge (a, b)
    end
 end
 
-local state
+local state, data_plane, ctrl_plane
+
 local function clear_state ()
    state =  {
       intfs = {},
@@ -158,9 +161,6 @@ function Graph:app_graph ()
    end
    return graph
 end
-
-local data_plane = Graph:new()
-local ctrl_plane = Graph:new()
 
 local App = {}
 function App:new (graph, name, class, initial_arg)
@@ -825,19 +825,32 @@ function parse_config (main_config)
                    pw.vc_id, tunnel_type, tunnel_config, ipsec_assocs)
          local cc_app
          if cc_socket then
-            cc_app = App:new(data_plane, 'cc_'..vpls_name..'_'..name,
+            local qname = vpls_name..'_'..name
+            cc_app = App:new(ctrl_plane, 'cc_'..qname,
                              require("program.l2vpn.control_channel").control_channel,
                              {
                                 enable = cc.enable,
                                 heartbeat = cc.heartbeat,
                                 dead_factor = cc.dead_factor,
-                                name = vpls_name..'_'..name,
+                                name = qname,
                                 description = vpls.description,
                                 mtu = vpls.mtu,
                                 vc_id = pw.vc_id,
                                 afi = afi,
                                 peer_addr = transport.remote_address })
-            data_plane:connect_duplex(cc_socket, cc_app:socket('south'))
+            local ctrl_ilink_rx = App:new(ctrl_plane, 'ilink_to_cc_'..qname,
+                                          Receiver)
+            ctrl_plane:connect(ctrl_ilink_rx:socket('output'), cc_app:socket('south'))
+            local ctrl_ilink_tx = App:new(ctrl_plane, 'ilink_from_cc_'..qname,
+                                          Transmitter)
+            ctrl_plane:connect(cc_app:socket('south'), ctrl_ilink_tx:socket('input'))
+
+            local data_ilink_rx = App:new(data_plane, 'ilink_from_cc_'..qname,
+                                          Receiver)
+            data_plane:connect(data_ilink_rx:socket('output'), cc_socket)
+            local data_ilink_tx = App:new(data_plane, 'ilink_to_cc_'..qname,
+                                          Transmitter)
+            data_plane:connect(cc_socket, data_ilink_tx:socket('input'))
          end
          table.insert(bridge_group.pws,
                       { name = vpls_name..'_'..name,
@@ -1032,8 +1045,11 @@ end
 
 local function setup_l2vpn (config)
    clear_state()
+   data_plane = Graph:new()
+   ctrl_plane = Graph:new()
    parse_config(config.l2vpn_config)
-   return { l2vpn = data_plane:app_graph() }
+   return { data_plane = data_plane:app_graph(),
+            control_plane = ctrl_plane:app_graph() }
 end
 
 local long_opts = {
@@ -1123,7 +1139,7 @@ function run (parameters)
    })
 
    manager:main(5)
-   local worker_pid = manager.workers.l2vpn.pid
+   local worker_pid = manager.workers.data_plane.pid
    setup_shm_and_snmp(initial_config.l2vpn_config, worker_pid)
    for name, nd in pairs(state.nds) do
       local mac = macaddress:new(counter.read(nd.intf.stats.macaddr))
@@ -1133,6 +1149,6 @@ function run (parameters)
       local mac = macaddress:new(counter.read(arp.intf.stats.macaddr))
       arp.app:arg().self_mac = ethernet:pton(ethernet:ntop(mac.bytes))
    end
-   manager:update_worker_graph('l2vpn', data_plane:app_graph())
+   manager:update_worker_graph('data_plane', data_plane:app_graph())
    manager:main(duration ~= 0 and (duration + 5) or nil)
 end
