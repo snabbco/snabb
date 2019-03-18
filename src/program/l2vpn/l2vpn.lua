@@ -110,22 +110,65 @@ end
 local state
 local function clear_state ()
    state =  {
-      apps = {},
-      links = {},
       intfs = {},
       nds = {},
       arps = {},
    }
 end
 
+local Graph = {}
+function Graph:new ()
+   return setmetatable(
+      {
+         _apps = {},
+         _links ={},
+      }, { __index = Graph })
+end
+
+function Graph:apps ()
+   return self._apps
+end
+
+function Graph:links ()
+   return self._links
+end
+
+function Graph:add_app (app, name)
+   assert(not self._apps[name], "Duplicate app "..name)
+   self._apps[name] = app
+end
+
+function Graph:connect (from, to)
+   table.insert(self._links, from.output()..' -> '..to.input())
+end
+
+function Graph:connect_duplex (from, to)
+   self:connect(from, to)
+   self:connect(to, from)
+end
+
+function Graph:app_graph ()
+   local graph = app_graph.new()
+   for name, app in pairs(self:apps()) do
+      -- Copy arg to allow app reconfiguration
+      app_graph.app(graph, app:name(), app:class(), lib.deepcopy(app:arg()))
+   end
+   for _, linkspec in ipairs(self:links()) do
+      app_graph.link(graph, linkspec)
+   end
+   return graph
+end
+
+local data_plane = Graph:new()
+local ctrl_plane = Graph:new()
+
 local App = {}
-function App:new (name, class, initial_arg)
-   assert(not state.apps[name], "Duplicate app "..name)
+function App:new (graph, name, class, initial_arg)
    local self = setmetatable({}, { __index = App })
-   state.apps[name] = self
    self._name = name
    self._class = class
    self:arg(initial_arg)
+   graph:add_app(self, name)
    return self
 end
 
@@ -157,15 +200,6 @@ end
 
 function App:socket (input, output)
    return socket(self, input, self, output)
-end
-
-local function connect (from, to)
-   table.insert(state.links, from.output()..' -> '..to.input())
-end
-
-local function connect_duplex (from, to)
-   connect(from, to)
-   connect(to, from)
 end
 
 local function normalize_name (name)
@@ -288,7 +322,7 @@ function parse_intf(name, config)
          end
       end
    end
-   intf.app = App:new('intf_'..intf.nname,
+   intf.app = App:new(data_plane, 'intf_'..intf.nname,
                       require(drv_c.path)[drv_c.name], drv_config)
    assert(driver_helper,
           "Unsupported driver (missing driver helper)"
@@ -316,7 +350,8 @@ function parse_intf(name, config)
                   file = '/tmp/'..string.gsub(intf.name, "/", "-")
                      .."_"..dir..".pcap"
                end
-               local mirror = App:new('tap_'..intf.nname..'_pcap_'..dir,
+               local mirror = App:new(data_plane,
+                                      'tap_'..intf.nname..'_pcap_'..dir,
                                       PcapWriter, file)
                mirror_socket = mirror:socket('input')
                print("    "..dir.." port-mirror on pcap file "..file)
@@ -328,23 +363,23 @@ function parse_intf(name, config)
                   tap_name = string.gsub(intf.name, "/", "-")
                   tap_name = string.sub(tap_name, 0, const.IFNAMSIZ-3).."_"..dir
                end
-               local mirror = App:new('tap_'..intf.nname..'_'..dir,
+               local mirror = App:new(data_plane, 'tap_'..intf.nname..'_'..dir,
                                       Tap, { name = tap_name, mtu = config.mtu})
                mirror_socket = mirror:socket('input', 'output')
-               local sink = App:new('sink_'..intf.nname..'_tap_'..dir,
+               local sink = App:new(data_plane, 'sink_'..intf.nname..'_tap_'..dir,
                                     Sink)
-               connect(mirror_socket, sink:socket('input'))
+               data_plane:connect(mirror_socket, sink:socket('input'))
                print("    "..dir.." port-mirror on tap interface "..tap_name)
             else
                error("Illegal mirror type: "..mtype)
             end
-            local tee = App:new('tee_'..intf.nname..'_'..dir, Tee)
-            connect(tee:socket('mirror'), mirror_socket)
+            local tee = App:new(data_plane, 'tee_'..intf.nname..'_'..dir, Tee)
+            data_plane:connect(tee:socket('mirror'), mirror_socket)
             if dir == "rx" then
-               connect(intf.l2, tee:socket('input'))
+               data_plane:connect(intf.l2, tee:socket('input'))
                intf.l2.output = tee:socket('pass').output
             else
-               connect(tee:socket('pass'), intf.l2)
+               data_plane:connect(tee:socket('pass'), intf.l2)
                intf.l2.input = tee:socket('input').input
             end
          end
@@ -365,7 +400,7 @@ function parse_intf(name, config)
                      ..config.next_hop_mac)
          end
 
-         local nd = App:new('nd_'..intf.nname..vid_suffix(vid),
+         local nd = App:new(data_plane, 'nd_'..intf.nname..vid_suffix(vid),
                             nd_light,
                             { local_ip  = ipv6:pton(config.address),
                               local_mac = ethernet:pton("00:00:00:00:00:00"),
@@ -373,20 +408,22 @@ function parse_intf(name, config)
                               next_hop = ipv6:pton(config.next_hop),
                               quiet = true })
          state.nds[nd:name()] = { app = nd, intf = intf }
-         connect_duplex(nd:socket('south'), socket_in)
+         data_plane:connect_duplex(nd:socket('south'), socket_in)
 
-         fragmenter = App:new('frag_v6_'..intf.nname..vid_suffix(vid),
+         fragmenter = App:new(data_plane,
+                              'frag_v6_'..intf.nname..vid_suffix(vid),
                               frag_ipv6,
                               { mtu = intf.mtu - 14, pmtud = true,
                                 pmtu_local_addresses = {},
                                 use_alarms = false })
-         local reassembler = App:new('reass_v6_'..intf.nname..vid_suffix(vid),
+         local reassembler = App:new(data_plane,
+                                     'reass_v6_'..intf.nname..vid_suffix(vid),
                                      reass_ipv6,
                                      { use_alarms = false })
          local nd_north = nd:socket('north')
-         connect(nd_north, fragmenter:socket('south'))
-         connect(fragmenter:socket('output'), nd_north)
-         connect(fragmenter:socket('north'),
+         data_plane:connect(nd_north, fragmenter:socket('south'))
+         data_plane:connect(fragmenter:socket('output'), nd_north)
+         data_plane:connect(fragmenter:socket('north'),
                  reassembler:socket('input'))
          return socket(fragmenter, 'input', reassembler, 'output'), fragmenter
       end,
@@ -400,7 +437,7 @@ function parse_intf(name, config)
                      ..config.next_hop_mac)
          end
 
-         local arp = App:new('arp_'..intf.nname..vid_suffix(vid),
+         local arp = App:new(data_plane, 'arp_'..intf.nname..vid_suffix(vid),
                              arp,
                              { self_ip  = ipv4:pton(config.address),
                                self_mac = ethernet:pton("00:00:00:00:00:00"),
@@ -408,20 +445,22 @@ function parse_intf(name, config)
                                   ethernet:pton(config.next_hop_mac or nil),
                                next_ip = ipv4:pton(config.next_hop) })
          state.arps[arp:name()] = { app = arp, intf = intf }
-         connect_duplex(arp:socket('south'), socket_in)
+         data_plane:connect_duplex(arp:socket('south'), socket_in)
 
-         fragmenter = App:new('frag_v4_'..intf.nname..vid_suffix(vid),
+         fragmenter = App:new(data_plane,
+                              'frag_v4_'..intf.nname..vid_suffix(vid),
                               frag_ipv4,
                               { mtu = intf.mtu - 14, pmtud = true,
                                 pmtu_local_addresses = {},
                                 use_alarms = false })
-         local reassembler = App:new('reass_v4_'..intf.nname..vid_suffix(vid),
+         local reassembler = App:new(data_plane,
+                                     'reass_v4_'..intf.nname..vid_suffix(vid),
                                      reass_ipv4,
                                      { use_alarms = false })
          local arp_north = arp:socket('north')
-         connect(arp_north, fragmenter:socket('south'))
-         connect(fragmenter:socket('output'), arp_north)
-         connect(fragmenter:socket('north'),
+         data_plane:connect(arp_north, fragmenter:socket('south'))
+         data_plane:connect(fragmenter:socket('output'), arp_north)
+         data_plane:connect(fragmenter:socket('north'),
                  reassembler:socket('input'))
          return socket(fragmenter, 'input', reassembler, 'output'), fragmenter
       end
@@ -444,9 +483,9 @@ function parse_intf(name, config)
 
       if af_configs.ipv4 and af_configs.ipv6 then
          -- Add a demultiplexer for IPv4/IPv6
-         local afd = App:new('af_mux_'..intf.nname..vid_suffix(vid),
+         local afd = App:new(data_plane, 'af_mux_'..intf.nname..vid_suffix(vid),
                              af_mux)
-         connect_duplex(afd:socket('south'), socket)
+         data_plane:connect_duplex(afd:socket('south'), socket)
          for _, afi in ipairs({ 'ipv4', 'ipv6' }) do
             afs[afi].socket_in = afd:socket(afi)
          end
@@ -478,9 +517,9 @@ function parse_intf(name, config)
       print("      Encapsulation "..
                (type(encap) == "string" and encap
                    or string.format("ether-type 0x%04x", encap)))
-      local vmux = App:new('vmux_'..intf.nname, VlanMux,
+      local vmux = App:new(data_plane, 'vmux_'..intf.nname, VlanMux,
                            { encapsulation = encap })
-      connect_duplex(vmux:socket('trunk'), intf.l2)
+      data_plane:connect_duplex(vmux:socket('trunk'), intf.l2)
 
       -- Process VLANs and create sub-interfaces
       print("  Sub-Interfaces")
@@ -606,11 +645,12 @@ function parse_config (main_config)
                           vc_id, type, config, ipsec_assocs)
       local dispatch = dispatchers[afi][uplink]
       if not dispatch then
-         dispatch = App:new('disp_'..normalize_name(uplink).."_"..afi,
+         dispatch = App:new(data_plane,
+                            'disp_'..normalize_name(uplink).."_"..afi,
                             require("program.l2vpn.dispatch").dispatch,
                             { afi = afi, links = {} })
-         connect_duplex(dispatch:socket('south'),
-                        intf.l3[afi].socket_out)
+         data_plane:connect_duplex(dispatch:socket('south'),
+                                   intf.l3[afi].socket_out)
          intf.l3[afi].used = true
          dispatchers[afi][uplink] = dispatch
       end
@@ -653,11 +693,11 @@ function parse_config (main_config)
             print("      IPsec: "..assoc.aead)
             local esp_module = afi == "ipv4" and "Transport4_IKE" or
                "Transport6_IKE"
-            local ipsec = App:new('ipsec_'..afi.."_"..index,
+            local ipsec = App:new(data_plane, 'ipsec_'..afi.."_"..index,
                                   require("apps.ipsec.esp")[esp_module],
                                   assoc)
-            connect_duplex(dispatch:socket('sd_'..index),
-                           ipsec:socket('encapsulated'))
+            data_plane:connect_duplex(dispatch:socket('sd_'..index),
+                                      ipsec:socket('encapsulated'))
             socket = ipsec:socket('decapsulated')
          else
             print("      IPsec: disabled")
@@ -666,12 +706,12 @@ function parse_config (main_config)
 
          -- Each (source, destination) pair connects to a dedicated
          -- protocol multiplexer.
-         local protomux = App:new('pmux_'..index,
+         local protomux = App:new(data_plane, 'pmux_'..index,
                                   require("program.l2vpn.transports."..afi).transport,
                                   { src = local_addr, dst = remote_addr, links = {} })
          dispatch:arg().links['sd_'..index] = { src = remote_addr,
                                                 dst = local_addr }
-         connect_duplex(socket, protomux:socket('south'))
+         data_plane:connect_duplex(socket, protomux:socket('south'))
          sd_entry = { sd_pair = sd_pair,
                       index = index,
                       protomux = protomux,
@@ -682,7 +722,7 @@ function parse_config (main_config)
 
       local tunnel = sd_entry.tunnels[type]
       if not tunnel then
-         tunnel = App:new(type.."_"..sd_entry.index,
+         tunnel = App:new(data_plane, type.."_"..sd_entry.index,
                           tunnel_info.class,
                           { vcs =
                                tunnel_info.mk_vc_config_fn(vc_id,
@@ -693,8 +733,8 @@ function parse_config (main_config)
                                local_addr = af:ntop(local_addr) } })
          sd_entry.tunnels[type] = tunnel
          sd_entry.protomux:arg().links[type] = { proto = tunnel_info.proto }
-         connect_duplex(sd_entry.protomux:socket(type),
-                        tunnel:socket('south'))
+         data_plane:connect_duplex(sd_entry.protomux:socket(type),
+                                   tunnel:socket('south'))
       end
 
       local vcs = {}
@@ -785,7 +825,7 @@ function parse_config (main_config)
                    pw.vc_id, tunnel_type, tunnel_config, ipsec_assocs)
          local cc_app
          if cc_socket then
-            cc_app = App:new('cc_'..vpls_name..'_'..name,
+            cc_app = App:new(data_plane, 'cc_'..vpls_name..'_'..name,
                              require("program.l2vpn.control_channel").control_channel,
                              {
                                 enable = cc.enable,
@@ -797,7 +837,7 @@ function parse_config (main_config)
                                 vc_id = pw.vc_id,
                                 afi = afi,
                                 peer_addr = transport.remote_address })
-            connect_duplex(cc_socket, cc_app:socket('south'))
+            data_plane:connect_duplex(cc_socket, cc_app:socket('south'))
          end
          table.insert(bridge_group.pws,
                       { name = vpls_name..'_'..name,
@@ -844,7 +884,7 @@ function parse_config (main_config)
       if #bridge_group.pws == 1 and #bridge_group.acs == 1 then
          -- No bridge needed for a p2p VPN
          local pw, ac = bridge_group.pws[1], bridge_group.acs[1]
-         connect_duplex(pw.socket, ac.l2)
+         data_plane:connect_duplex(pw.socket, ac.l2)
          -- For a p2p VPN, pass the name and description of the AC
          -- interface so the PW module can set up the proper
          -- service-specific MIB
@@ -867,19 +907,19 @@ function parse_config (main_config)
             bridge_group.config.mac_table = to
          end
          local bridge =
-            App:new('bridge_'..vpls_name,
+            App:new(data_plane, 'bridge_'..vpls_name,
                     require("apps.bridge."..bridge_group.type).bridge,
                     { ports = {},
                       split_horizon_groups = { pw = {} },
                       config = bridge_group.config })
          for _, pw in ipairs(bridge_group.pws) do
-            connect_duplex(pw.socket, bridge:socket(pw.name))
+            data_plane:connect_duplex(pw.socket, bridge:socket(pw.name))
             table.insert(bridge:arg().split_horizon_groups.pw, pw.name)
          end
          for _, ac in ipairs(bridge_group.acs) do
             local ac_name = normalize_name(ac.name)
-            connect_duplex(ac.l2,
-                           bridge:socket(ac_name))
+            data_plane:connect_duplex(ac.l2,
+                                      bridge:socket(ac_name))
             table.insert(bridge:arg().ports, ac_name)
          end
       end
@@ -888,17 +928,17 @@ function parse_config (main_config)
    -- Create sinks for unused interfaces
    for name, intf in pairs(intfs) do
       if intf.l2 and not intf.used and not intf.subintfs then
-         local sink = App:new('sink_'..intf.nname,
+         local sink = App:new(data_plane, 'sink_'..intf.nname,
                               Sink, {})
-         connect_duplex(intf.l2, sink:socket('input'))
+         data_plane:connect_duplex(intf.l2, sink:socket('input'))
       elseif intf.l3 then
          for afi, state in pairs(intf.l3) do
             if state.configured and not state.used then
                -- Create sink for a L3 interface not connected to
                -- a dispatcher
-               local sink = App:new('sink_'..intf.nname..'_'..afi,
+               local sink = App:new(data_plane, 'sink_'..intf.nname..'_'..afi,
                                     Sink, {})
-               connect_duplex(state.socket_out, sink:socket('input'))
+               data_plane:connect_duplex(state.socket_out, sink:socket('input'))
             end
          end
       end
@@ -962,7 +1002,7 @@ local function setup_shm_and_snmp (main_config, pid)
             -- sub-interface transmits to the "virtual wire".
             local function find_linkspec (pattern)
                pattern = string.gsub(pattern, '%.', '%%.')
-               for _, linkspec in ipairs(state.links) do
+               for _, linkspec in ipairs(data_plane:links()) do
                   if string.match(linkspec, pattern) then
                      return linkspec
                   end
@@ -990,22 +1030,10 @@ local function setup_shm_and_snmp (main_config, pid)
    end
 end
 
-local function create_app_graph ()
-   local graph = app_graph.new()
-   for name, app in pairs(state.apps) do
-      -- Copy arg to allow app reconfiguration
-      app_graph.app(graph, app:name(), app:class(), lib.deepcopy(app:arg()))
-   end
-   for _, linkspec in ipairs(state.links) do
-      app_graph.link(graph, linkspec)
-   end
-   return graph
-end
-
 local function setup_l2vpn (config)
    clear_state()
    parse_config(config.l2vpn_config)
-   return { l2vpn = create_app_graph() }
+   return { l2vpn = data_plane:app_graph() }
 end
 
 local long_opts = {
@@ -1071,7 +1099,6 @@ function run (parameters)
    if jit_conf.dump then
       require("jit.dump").start(jit_conf.dump.opts, jit_conf.dump.file)
    end
-   clear_state()
    local initial_config =
       yang.load_configuration(config_file,
                               {  schema_name = "snabb-l2vpn-v1",
@@ -1106,7 +1133,6 @@ function run (parameters)
       local mac = macaddress:new(counter.read(arp.intf.stats.macaddr))
       arp.app:arg().self_mac = ethernet:pton(ethernet:ntop(mac.bytes))
    end
-   local new_graph = create_app_graph()
-   manager:update_worker_graph('l2vpn', new_graph)
+   manager:update_worker_graph('l2vpn', data_plane:app_graph())
    manager:main(duration ~= 0 and (duration + 5) or nil)
 end
