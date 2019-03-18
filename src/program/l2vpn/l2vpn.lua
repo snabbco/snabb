@@ -682,15 +682,20 @@ function parse_config (main_config)
             break
          end
       end
+
+      local assoc = ipsec_assocs[sd_pair]
+      if assoc then
+         print("      IPsec: "..assoc.aead)
+      else
+         print("      IPsec: disabled")
+      end
       if not sd_entry then
          local index = #pws + 1
 
          -- Insert an IPsec app if the SD pair is part of a configured
          -- association
-         local assoc = ipsec_assocs[sd_pair]
          local socket
          if assoc then
-            print("      IPsec: "..assoc.aead)
             local esp_module = afi == "ipv4" and "Transport4_IKE" or
                "Transport6_IKE"
             local ipsec = App:new(data_plane, 'ipsec_'..afi.."_"..index,
@@ -700,7 +705,6 @@ function parse_config (main_config)
                                       ipsec:socket('encapsulated'))
             socket = ipsec:socket('decapsulated')
          else
-            print("      IPsec: disabled")
             socket = dispatch:socket('sd_'..index)
          end
 
