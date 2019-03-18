@@ -5,9 +5,10 @@ module(...,package.seeall)
 local shm = require("core.shm")
 local interlink = require("lib.interlink")
 
-local Receiver = {name="apps.interlink.Receiver"}
+Receiver = {name="apps.interlink.Receiver"}
 
 function Receiver:new (queue)
+   if type(queue) ~= "string" then queue = nil end
    packet.enable_group_freelist()
    return setmetatable({attached=false, queue=queue}, {__index=Receiver})
 end
@@ -54,5 +55,3 @@ function Receiver.shutdown (pid)
       shm.unlink(backlink)
    end
 end
-
-return Receiver

@@ -178,8 +178,8 @@ function shutdown (pid)
       if not ok then print(err) end
    end
    -- Run cleanup hooks
-   safely(function () require("apps.interlink.receiver").shutdown(pid) end)
-   safely(function () require("apps.interlink.transmitter").shutdown(pid) end)
+   safely(function () require("apps.interlink.receiver").Receiver.shutdown(pid) end)
+   safely(function () require("apps.interlink.transmitter").Transmitter.shutdown(pid) end)
    -- Parent process performs additional cleanup steps.
    -- (Parent is the process whose 'group' folder is not a symlink.)
    local st, err = S.lstat(shm.root.."/"..pid.."/group")
