@@ -314,8 +314,11 @@ module snabb-l2vpn-v1 {
       description
         "A list of pairs of addresses for which communication must be protected
          by IPsec.  This policy will be applied to all tunnels between
-         the specified endpoint addresses, irrespective of the VPLS
-         instance to which they belong.";
+         the addresses covered by the traffic selector, irrespective
+         of the VPLS instance to which they belong.  The keys must be generated
+         by the IKE daemon and passed to the L2VPN process.  The IKE daemon must
+         be configured with an IPsec policy with matching encryption algorithm and
+         traffic selector.";
 
       key "name";
 
@@ -337,7 +340,7 @@ module snabb-l2vpn-v1 {
            supported";
       }
 
-      container endpoints {
+      container traffic-selector {
         description
           "The IP addresses of the local and remote endpoints. ipv4 and ipv6 are
            mutually exclusive.";

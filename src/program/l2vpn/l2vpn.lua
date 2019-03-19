@@ -757,7 +757,8 @@ function parse_config (main_config)
 
    local ipsec_assocs = {}
    for _, config in pairs(main_config.ipsec) do
-      local afi, addrs = singleton(config.endpoints)
+      print(require("inspect")(config))
+      local afi, addrs = singleton(config.traffic_selector)
       local af = check_af(afi)
       local sd_pair = src_dst_pair(af, addrs.remote_address, addrs.local_address)
       assert(not ipsec_assocs[sd_pair],
