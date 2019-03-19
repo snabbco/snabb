@@ -634,7 +634,7 @@ function parse_config (main_config)
                [cc_vc_id] = {}
             }
          end,
-         vc_id_max = 0xFFFFFFFF,
+         vc_id_max = 0x7FFF,
          afs = {
             ipv4 = true,
             ipv6 = true
@@ -728,11 +728,7 @@ function parse_config (main_config)
       if not tunnel then
          tunnel = App:new(data_plane, type.."_"..sd_entry.index,
                           tunnel_info.class,
-                          { vcs =
-                               tunnel_info.mk_vc_config_fn(vc_id,
-                                                           vc_id + 0x8000,
-                                                           config),
-                            ancillary_data = {
+                          { ancillary_data = {
                                remote_addr = af:ntop(remote_addr),
                                local_addr = af:ntop(local_addr) } })
          sd_entry.tunnels[type] = tunnel
