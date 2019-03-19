@@ -585,7 +585,7 @@ module snabb-l2vpn-v1 {
           }
           leaf heartbeat {
             type uint16;
-            default 10;
+            default 5;
             description
               "The interval in seconds at which heartbeat messages are sent to the
                  peer.";
