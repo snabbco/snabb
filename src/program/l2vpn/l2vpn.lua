@@ -986,7 +986,7 @@ local function setup_shm_and_snmp (main_config, pid)
                                   ifName = name,
                                   ifAlias = intf.description, },
                   string.gsub(name, '/', '-'), stats,
-                  main_config.shmem_dir, snmp.interval or 5)
+                  snmp.shmem_dir, snmp.interval or 5)
             else
                print("Can't enable SNMP for interface "..name
                         ..": no statistics counters available")
@@ -1041,7 +1041,7 @@ local function setup_shm_and_snmp (main_config, pid)
                                ifName = name,
                                ifAlias = intf.description, },
                string.gsub(name, '/', '-'), counters,
-               main_config.shmem_dir, snmp.interval or 5)
+               snmp.shmem_dir, snmp.interval or 5)
          end
       end
    end
