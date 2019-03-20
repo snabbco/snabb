@@ -121,6 +121,7 @@ function bridge:expire_entries (now)
 end
 
 function bridge:push (input, port)
+   local now = self.tsc:stamp()
    local table = self.mac_table
 
    for _ = 1, nreadable(input) do
