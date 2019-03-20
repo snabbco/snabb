@@ -203,9 +203,9 @@ function Poptrie:build_node (rib, node_index, default)
          end
       end
    end
-   -- Allocate child nodes (this has to be done before recursing into build()
-   -- because their indices into the nodes array need to be node.base1 + index,
-   -- and build() will advance the node_base.)
+   -- Allocate child nodes (this has to be done before recursing into
+   -- build_node() because their indices into the nodes array need to be
+   -- node.base1 + index, and build() will advance the node_base.)
    local child_nodes = {}
    for index = 0, 2^Poptrie.k - 1 do
       if children[index] then
