@@ -132,6 +132,7 @@ function bridge:push (input, port)
          transmit(self.learn, p)
       else
          entry.value.port = port.index
+         entry.value.tstamp = now
          transmit(input, p)
       end
    end
@@ -146,7 +147,7 @@ function bridge:push (input, port)
       if not table:lookup_ptr(key) then
          local value = self.value
          value.port = port.index
-         value.tstamp = self.tsc:stamp()
+         value.tstamp = now
          table:add(key, value)
          counter.add(self.shm["addresses-learned"])
       end
