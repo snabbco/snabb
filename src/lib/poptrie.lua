@@ -60,10 +60,24 @@ function new (init)
          self.directmap = array(Poptrie.base_t, 2^self.s)
       end
    end
-   self.asm_lookup32 = poptrie_lookup.generate(self, 32)
-   self.asm_lookup64 = poptrie_lookup.generate(self, 64)
-   self.asm_lookup128 = poptrie_lookup.generate(self, 128)
+   self:configure_lookup()
    return self
+end
+
+local asm_cache = {}
+
+function Poptrie:configure_lookup ()
+   local config = ("leaf_compression=%s,direct_pointing=%s,s=%s")
+      :format(self.leaf_compression, self.direct_pointing, self.s)
+   if not asm_cache[config] then
+      asm_cache[config] = {
+         poptrie_lookup.generate(self, 32),
+         poptrie_lookup.generate(self, 64),
+         poptrie_lookup.generate(self, 128)
+      }
+   end
+   self.asm_lookup32, self.asm_lookup64, self.asm_lookup128 =
+      unpack(asm_cache[config])
 end
 
 function Poptrie:grow_nodes ()
