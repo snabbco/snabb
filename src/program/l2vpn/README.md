@@ -4,14 +4,14 @@
 
 ### General Architecture
 
-The program `program.l2vpn.l2vpn` (sometimes abbreviated by `l2vpn` in
-this document) implements a virtual multi-port Ethernet switch on top
-of a plain IPv6 packet-switched network based on the architecture laid
-out in RFC 4664.  From a customer perspective, the service consists of
-a set of physical ports attached to the provider's network at
-arbitrary locations with the semantics of a simple Ethernet switch,
-a.k.a. _learning bridge_.  Each such port is called an _attachment
-circuit_ (AC).
+The program `program.l2vpn.l2vpn` (abbreviated by `l2vpn` in this
+document) implements a virtual multi-port Ethernet switch on top of a
+plain IP (v4/v6) packet-switched network based on the architecture
+described in [RFC 4664](https://tools.ietf.org/html/rfc4664).  From a
+customer perspective, the service consists of a set of physical ports
+attached to the provider's network at arbitrary locations with the
+semantics of a simple Ethernet switch, a.k.a. _learning bridge_.  Each
+such port is called an _attachment circuit_ (AC).
 
 <a name="overview_MAC_learning"></a>Conceptually, the processing of an
 Ethernet frame entering the virtual switch through any of the ACs
@@ -20,17 +20,14 @@ address and adds it to the list of addresses reachable through the
 ingress AC port.  This list is called the _MAC destination address
 table_, or _MAC table_ for short.  Next, the switch extracts the MAC
 destination address and forwards the frame according to the following
-rules unless the address is a multicast address:
+rules:
 
-   * If the destination address is not found in any of the MAC tables,
-     the frame is forwarded to all ACs except the one on which it was
-     received
+   * If the destination address is not found in any of the MAC tables
+     or is a multicast address, the frame is forwarded to all ACs
+     except the one on which it was received
 
    * If the destination address is found in in one of the MAC tables,
      it is forwarded out of the corresponding port only
-
-If the destination address is a multicast address, the frame is
-forwarded to all egress ports except the one on which it was received.
 
 Because the virtual switch is composed of distinct physical devices,
 only the MAC tables of local ACs are directly accessible.  Therefore,
@@ -194,7 +191,7 @@ when sending packets in the inbound direction.  The ND module is the
 feature that identifies the uplink as a "L3-port", while the ACs are
 L2-ports without the need for neighbor discovery.
 
-The box labelled `Frag` is a collections of apps that performs IP
+The box labelled `Frag` is a collection of apps that performs IP
 fragmentation and reassembly for packets destined to any of the
 pseudowires connected to the dispatcher. Initially, the path MTU
 (PMTU) for all outgoing packets is equal to the MTU of the uplink
@@ -245,18 +242,21 @@ The following tunneling protocols are supported.
 
 #### GRE
 
-The GRE protocol version 0 is supported according to RFCs 1701, 2784
-and 2890 with the restriction that only the `key` extensions is
-available, which is set to the _VC ID_ assigned to the PW.  The 2-byte
-protocol identifier carried in every GRE header is set to the value
-`0x6558` assigned to "Transparent Ethernet Bridging" (see the [IEEE
-Ethertype
+The GRE protocol version 0 is supported according to RFCs
+[1701](https://tools.ietf.org/html/rfc1701),
+[2784](https://tools.ietf.org/html/rfc2784) and
+[2890](https://tools.ietf.org/html/rfc2890) with the restriction that
+only the `key` extension is available, which is set to the _VC ID_
+assigned to the PW.  The implementation limits the range of valid VC
+IDs from 1 to 32767, see below. The 2-byte protocol identifier carried
+in every GRE header is set to the value `0x6558` assigned to
+"Transparent Ethernet Bridging" (see the [IEEE Ethertype
 assignments](http://standards-oui.ieee.org/ethertype/eth.txt))
 
 #### <a name="tunnel_keyed_ipv6">Keyed IPv6 Tunnel</a>
 
 The keyed IPv6 tunnel is a stripped down version of the L2TPv3
-protocol as specified by the Internet Draft
+protocol as specified by
 [`RFC8159`](https://tools.ietf.org/html/rfc8159).
 
 The protocol is only defined for transport over IPv6 and does not make
@@ -270,7 +270,7 @@ two fields:
 Since the pseudowire associated with a tunnel is already uniquely
 identified by the IPv6 addresses of the endpoints, the session ID is
 not actually needed to assign a packet to a particular VPLS instance.
-The draft recommends setting the session ID to the value `0xffffffff`,
+The RFC recommends setting the session ID to the value `0xFFFFFFFF`,
 which is enforced by this implementation.
 
 The cookie is used to protect against spoofing and brute-force blind
@@ -309,13 +309,14 @@ L2TPv3, it is provided by a control-channel which is part of L2TPv3
 itself (unless static configuration is used).
 
 The connection verification is provided by another separate protocol
-called VCCV (RFC5085).  VCCV requires a signalling protocol to be used
-in order to negotiate the "CC" (control channel) and "CV" (connection
-verification) modes to be used by the peers.  Currently, VCCV is only
-specified for MPLS/LDP and L2TPv3, i.e. it is not possible to
-implement it for any of the currently available tunneling protocols
-(it is not specified for GRE and the keyed IPv6 tunnel does not make
-use of the L2TPv3 control channel).
+called VCCV ([RFC5085](https://tools.ietf.org/html/rfc5085)).  VCCV
+requires a signalling protocol to be used in order to negotiate the
+"CC" (control channel) and "CV" (connection verification) modes to be
+used by the peers.  Currently, VCCV is only specified for MPLS/LDP and
+L2TPv3, i.e. it is not possible to implement it for any of the
+tunneling protocols currently supported by `l2vpn` (it is not
+specified for GRE and the keyed IPv6 tunnel does not make use of the
+L2TPv3 control channel).
 
 The simple control-channel protocol provided here uses a TLV encoding
 to transmit information from one peer to the other.  The data is
@@ -367,103 +368,134 @@ endpoints must be obtained by the operator.
 
 ## Configuration
 
-The `program.l2vpn.l2vpn` expects a configuration file containing a
-Lua expression which returns a table that contains the complete
-configuration of the VPNTP that is to be instantiated.  The generic
-form of this expression is as follows:
+The configuration for the `l2vpn` program is represented as an
+instance of a YANG schema expressed in the syntax of YANG itself
+[(`RFC6020`)](https://tools.ietf.org/html/rfc6020).  It consists of
+five major sections in the form of _containers_ (in the context of
+YANG).
 
 ```
-return {
-  [ shmem_dir = <shmem_dir>, ]
-  [ snmp = {
-      enable = true | false,
-      interval = <interval>
-    }, ]
-  interfaces = <interface_config>,
-  vpls = {
-    <vpls1> = <vpls_config>,
-    <vpls2> = <vpls_config>,
-    ...
+l2vpn-config {
+  luajit {}
+  snmp {}
+  interface {}
+  ipsec {}
+  vpls {}
 }
 ```
 
-The `shmem_dir` and `snmp` options set global properties with respect
-to [SNMP](#SNMP).  The `shmem_dir` option sets the path to a directory
-in the local file system where the shared memory segments used to
-store raw SNMP objects are located.  It is used as a rendez-vous point
-with the external program which is used to provide access to these
-objects via an actual SNMP agent.
-
-By default, the drivers do not populate any interface-related SNMP
-MIBs.  If support for the interface MIBs is desired, the `snmp` table
-muste be supplied with `enable` set to `true`.  The `interval` option
-specifies the interval in seconds in which the shared memory segments
-used to interact with the SNMP agents are refreshed from the underlying
-data objects such as interface counters. The default value is 5 seconds.
-
-Note that SNMP support in the pseudowire module is always enabled.
-The `enable` option only affects the interface-related MIBs.
-
-The `<interface_config>` will be discussed in detail
-[below](#interface-abstraction). The `<vpls_config>` are Lua tables as
-described below and the keys of the `vpls` table (`<vpls1>`,
-`<vpls2>`, etc.) represent the names of the VPLS instances contained
-in the VPNTP.
-
-### <a name="vpls-instance-config">VPLS instance configuration</a>
-
-The `vpls` table in the VPNTP configuration table contains one entry
-for each VPLS that will be part of the VPNTP.  The keys of the table
-provide the names of those VPLS instances, hence the fragment
+Refer to the [complete YANG schema](#yang-schema) for the definitions
+of each section.  The following sections show fragments of the YANG
+schema with an obvious pseudo-notation to denote altrenative values
+for options and optional items. E.g.
 
 ```
-return {
-  vpls = {
-    foo = <vpls_config>,
-    bar = <vpls_config>,
-  }
+foo {
+  bar a | b | c;
+  [ baz <baz> ; ]
 }
 ```
 
-will create two VPLS instances named `foo` and `bar`.  The names don't
-have any particular significance and are only used in diagnostic
-output and to generate identifiers for the network of Snabb
-applications from the configuration.
+would describe a container called `foo`, which contains a leaf node
+called `bar` that can take one of three values `a`, `b` or `c` and an
+optional leaf node called `baz` whose value will be referred to in the
+text as `<baz>`.
 
-Each VPLS configuration `<vpls_config>` is a table of the following
-form.
+### Section `luajit`
+
+This section allows the configuration of features of the LuaJIT
+runtime system.  An _option_ can be any item from the *Parameter*
+table of the [LuaJIT CLI reference](http://luajit.org/running.html).
+Recommended option settings for the `l2vpn` program are as follows
 
 ```
-<vpls_name> = {
-  description = <description>,
-  mtu = <mtu>,
-  uplink = <uplink_interface>,
-  bridge = <bridge_config>,
-  ac = {
-    <ac_1> = { interface = <ac_interface> },
-    <ac_2> = { interface = <ac_interface> },
-    ...
-  },
-  tunnel = <tunnel_config>,
-  cc = <cc_config>,
-  pw = {
-    <pw_1> = <pw_config>,
-    <pw_2> = <pw_config>,
-   ...
-  }
+luajit {
+  option "sizemcode=2048";
+  option "maxmcode=8192";
+  option "maxtrace=2000";
+  option "maxsnap=6000";
+  option "maxrecord=8000";
 }
 ```
 
-The keys define the properties of the VPLS instance.
+Valid values for `dump/option` can be found in the [LuaJIT Git
+repository](https://github.com/LuaJIT/LuaJIT/blob/master/src/jit/dump.lua).
+The value `+rs` gives the most details.  It should only be used for
+debugging purposes.  A value of `t` is fairly light-weight and only
+shows the start, end and abort of JIT traces.  Example configuration:
+
+```
+luajit {
+  dump {
+    enable true;
+    option "+rs";
+    file "/tmp/dump-%p";
+}
+```
+
+Note that the pattern `%p` will be replaced by the ID of the worker
+process in which the instance of LuaJIT is executing.  This allows
+keeping separate dump files for the data-plane and control-plane
+processes.
+
+### Section `snmp`
+
+This section configures global properties related to [SNMP](#SNMP).
+This only affects SNMP for MIBs related to interfaces.  SNMP for
+pseudowires is always enabled.
+
+### Section `interface`
+
+Each interface known to `l2vpn` must be configured as an item of a
+list of all interfaces.  Each interface is uniquely identified by the
+value of the `name` leaf node. See the section about [interface
+abstraction](#interface-abstraction) for more details.
+
+### Section `ipsec`
+
+See [IPsec](#ipsec) for a description of the `ipsec` configuration.
+
+### Section <a name="vpls-instance-config">`vpls`</a>
+
+This section configures an instance of a VPLS as an item of a list of
+all VPLS instances.  Each VPLS is unqiuely identified by the value of
+the `name` leaf node.  The structure of a VPLS configuration is as
+follows
+
+```
+vpls {
+  name <name>;
+  [ description <description>; ]
+  uplink <uplink>;
+  mtu <mtu>;
+  bridge {}
+  attachment-circuit {}
+  [ attachment-circuit {}
+    ... ]
+  pseudowire {}
+  [ pseudowire {}
+    ... ]
+}
+```
+
+A brief documentation of these items is included in the [YANG
+schema](#yang-schema). Since this is the central piece of
+configuration of the `l2vpn` program, a more detailed description of
+the items follows here.
+
+   * `name`
+
+      The name doesn't have any particular significance but must be
+      unique among all `vpls` instances.  It is also used in
+      diagnostic output.
 
    * `description`
 
-     a human readable description of the purpose of the VPLS instance
-     as a Lua string
+     A human readable description of the purpose of the VPLS instance.
 
    * `mtu`
 
-     the MTU in bytes of all ACs connected to the VPLS instance
+     The MTU in bytes of all ACs connected to the VPLS instance
      including the Ethernet header (but neither the CRC, SOF nor
      preamble, also see [the definition of the interface MTU](#MTU)).
      As with any Ethernet bridge (and IP subnet), it is mandatory that
@@ -482,217 +514,205 @@ The keys define the properties of the VPLS instance.
 
    * `uplink`
 
-     a reference to an interface defined in the global `interfaces`
+     A reference to an interface defined in the global `interfaces`
      definition, for example
      ```
-     uplink = "TenGigE0/1"
+     uplink "TenGigE0/1";
      ```
 
      or
+
      ```
-     uplink = "TenGigE0/1.100"  
+     uplink "TenGigE0/1.100";
      ```
 
      The referenced interface must be configured as a L3-port, i.e. it
-     must contain an `addressFamilies` section.  (see the [interface
+     must contain an `address-families` section.  (see the [interface
      abstraction](#interface-abstraction) section for details)
 
    * `bridge`
 
-     if the VPLS contains more than one pseudowire or connects more
-     than one AC at any location, a bridge is needed to perform
-     forwarding of Ethernet frames.  The `bridge` key selects the type
-     of switch and its properties.  Its value is a Lua table:
+     If the VPLS contains more than one pseudowire or connects more
+     than one AC, a bridge is needed to perform forwarding of Ethernet
+     frames.  The configuration of the bridge is supplied in the
+     `bridge` container, which allows the choice between two types of
+     bridges named `learning` and `flooding`
+
      ```
-     bridge = {
-       type = "learning" | "flooding",
-       -- learning configuration
-       config = {
-         mac_table = {
-           timeout = <MAC_timeout>
+     bridge {
+       learning {
+         mac-table {
+           size 1024;
+           timeout 600;
+           verbose false;
+           max-occupy 0.4;
          }
        }
      }
      ```
 
-     If omitted, the default configuration
      ```
-     bridge = { type = "flooding" }
+     bridge {
+       flooding {}
+     }
      ```
-     is used.
-        
-     If `type` is set to `"flooding"`, the bridge will send copies of
-     all Ethernet frames received on any port to all other ports,
-     i.e. every frame will be flooded across the entire VPLS.  Any
-     other key in the table is ignored.
 
-     If `type` is set to `"learning"`, the bridge performs MAC
-     learning as described in the [overview](#overview_MAC_learning).
-     The table `config` sets the properties of the bridge. It contains
-     a single key `mac_table`, whose value is another table that
-     represents the configuration of the underlying MAC address table
-     as implemented by the `apps.bridge.mac_table` module.  Please
-     refer to the documentation of that module for a complete
-     description of configuration options.  The most important one is
-     the `timeout` parameter, which specifies the time in seconds,
-     after which a MAC address that has been learned on a port is
-     removed from the table if no frame that carries the address in
-     its source address field has been seen during that interval.  The
-     default is 60 seconds.
+     If `flooding` is selected, the bridge will send copies of all
+     Ethernet frames received on any port to all other ports,
+     i.e. every frame will be flooded across the entire VPLS.
+
+     If `learning` is selected, the bridge performs MAC learning as
+     described in the [overview](#overview_MAC_learning).  The
+     `mac-table` container sets the properties of the MAC table
+     associated with the bridge.
+
+        * `size`
+
+           The number of MAC addresses that the table can store
+
+        * `timeout`
+
+          The number of seconds after which an inactive MAC address is
+          purged from the table.
+
+        * `verbose`
+
+          If set to `true`, the current usage of the table is printed
+          every `timeout` seconds, including the number of used
+          entries, the total number of entries and their ratio. The
+          latter is a measure of the occupancy of the hash table.
+
+        * `max-occupy`
+
+          The maximum occupancy (ratio of used entries and total
+          number of entries) at which the MAC table size is increased
+          by a factor of 2.
 
      If the VPLS is a VPWS (i.e. a point-to-point VPN with a single AC
      at each end), an actual bridge is not necessary.  In this case,
      the bridge module is not instantiated and the local end of the
-     pseudowire is "short-circuited" to the AC and a message to this
-     effect is logged.
+     pseudowire is "short-circuited" to the AC.
 
-   * `ac`
+   * `attachment-circuit`
 
-     this table specifies the ACs that are assigned to the VPLS as
-     references to interfaces defined in the global `interfaces`
-     configuration, for example
+     Each attachment circuit is configured as a separate instance of
+     the `attachment-circuit` list.  Each instance contains a name,
+     which must be unique but has otherwise no significance, and the
+     name of the interface, for example
+
      ```
-     ac = {
-       AC_1 = { interface = "TenGigE0/0" },
-       AC_2 = { interface = "TenGigE0/1.100" },
-       AC_3 = { interface = "TenGigE0/1.200" },
+     attachment-circuit {
+       name "AC_1";
+       interface "TenGigE0/0";
      }
-     ```
- 
-     would define three ACs named `AC_1`, `AC_2` and `AC_3`.  The
-     first one refers to a physical interface called `TenGigE0/0`
-     while the other two refer to VLAN-based sub-interfaces associated
-     with the physical interface called `TenGigE0/1`.  Interfaces
-     configured as AC must be L2-ports, i.e. they must not have an
-     `addressFamilies` configuration associated with them (see the
-     [interface abstraction](#interface-abstraction) section for
-     details).
-
-   * `tunnel`
-
-     a table that specifies the default tunnel configuration for all
-     pseudowires that do not contain a tunnel configuration
-     themselves.  It is optional.  If it is omitted, all pseudowires
-     must have an explicit tunnel configuration.  The table is of the
-     form
-     ```
-     <tunnel_config> = {
-       type = "gre" | "l2tpv3",
-       config = { -- Type-specific configuration }
+     attachment-circuit {
+       name "AC_2";
+       interface "TenGigE0/1.100";
      }
      ```
 
-     The `type` selects either the [GRE or L2TPv3
-     encapsulation](#tunnel_protos).  The type-specific configurations are
-     as follows
+     defines two ACs named `AC_1` and `AC_2`.  The first one refers to
+     a physical interface called `TenGigE0/0` while the other refers
+     to a VLAN-based sub-interface associated with the physical
+     interface called `TenGigE0/1`.  Interfaces configured as AC must
+     be L2-ports, i.e. they must not have an `address-families`
+     configuration associated with them (see the [interface
+     abstraction](#interface-abstraction) section for details).
 
-      * GRE
+   * `pseudowire`
 
-        No specific configuration required or allowed.
+     Each pseudowire that is to be associated with the VPLS must be
+     configured with an instance of the `pseudowire` list containing
+     the following elements
 
-      * L2TPv3
+      * `name`
+
+         An arbitrary name which must be unique among the pseudowires
+         of a VPLS
+
+      * `vc-id`
+
+        A number in a range specific to the encapsulation type that
+        serves as a distinguisher between pseudowires with the same
+        transport addresses. The tuple (`local-address`,
+        `remote-address`, `vc-id`) must uniquely identify each
+        pseudowire within an instance of the `l2vpn` program.
+
+      * `transport`
+
+        The IP protocol and addresses of the local and remote tunnel
+        endpoints. There must be either a `ipv4` or `ipv6`
+        sub-container, e.g.
 
         ```
-        {
-          type = "l2tpv3",
-          config = {
-            local_cookie = <local_cookie>,
-            remote_cookie = <remote_cookie>
+        transport {
+          ipv4 {
+            local-address "192.0.2.1";
+            remote-address "192.0.2.2";
           }
         }
         ```
 
-        The mandatory `<local_cookie>` and `<remote_cookie>` keys must
-        specify 64-bit numbers for the purpose [explained
-        above](#tunnel_keyed_ipv6).  The cookies are unidirectional,
-        i.e. one's local cookie must be equal to the other's remote
-        cookie.  The value must consist of a sequence of 8 bytes,
-        e.g. a Lua string of length 8 like
-        `'\x00\x11\x22\x33\x44\x55\x66\x77'`.
+        ```
+        transport {
+          ipv6 {
+            local-address "2001:db8:0:1::1";
+            remote-address "2001:db8:0:2::2";
+          }
+        }
+        ```
 
-   * `cc`
+      * `tunnel`
 
-     a table that specifies the default control channel configuration
-     for all pseudowires that do not contain such a configuration
-     themselves.  It is optional.  If omitted, the pseudowires that
-     don't specify a control-channel will not make use of the control
-     channel (but note that it is an error if one end of the
-     pseudowire uses the control-channel and the other doesn't).  The
-     table is of the form
-     ```
-     <cc_config> = {
-       heartbeat = <heartbeat>,
-       dead_factor = <dead_factor>
-     }
-     ```
+        The type and configuration of the encapsulation used on top of
+        the transport protocol.  Currently, two types are supported
 
-     `<heartbeat>` is the interval in seconds at which the pseudowire
-     sends control messages to its peer.  This number itself is
-     transmitted within the control message as the `heartbeat`
-     parameter.  The value 0 disables the control channel.  The value
-     of the `dead_factor`, which must be an integer, is used to detect
-     when the remote endpoint can no longer reach the local endpoint
-     in the following manner, see the [description of the
-     control-channel](#control_channel) for details.
+        ```
+        tunnel {
+          l2tpv3 {
+            local-cookie <value>;
+            remote-cookie <value>;
+          }
+        }
+        ```
 
-   * `pw`
+        ```
+        tunnel {
+          gre {}
+        }
+        ```
 
-     this table contains one key per pseudowire which is part of the
-     VPLS instance.  The keys represent the (arbitrary) names of these
-     pseudowires, e.g.
-     ```
-     pw = {
-       pw_1 = <pw_config>,
-       pw_2 = <pw_config>,
-     }
-     ```
+        The `<value>` for the L2TPv3 cookies must be Lua strings that
+        evaluate to 8-byte binary objects.  For example, the sequence
+        of 8 bytes of zero can be represented as
+        "\x00\x00\x00\x00\x00\x00\x00\x00".  The value of the
+        `local-cookie` is what is expected to be found in incoming
+        packets while the vlaue of the `remote-cookie` is placed into
+        outgoing packets.
 
-     defines two pseudowires named `pw_1` and `pw_2`.  Each
-     configuration is a Lua table of the form
-     ```
-     <pw_config> = {
-       afi = "ipv4" | "ipv6",
-       local_address = <local_address>,
-       remote_address = <remote_address>,
-       vc_id = <vc_id>,
-       tunnel = <tunnel_config>, -- optional
-       cc = <cc_config>          -- optional
-     }
-     ```
+        The GRE encapsulation requires no additional configuration.
 
-     The mandatory key `afi` selects the address family.  The
-     mandatory keys `local_address` and `remote_address` specify the
-     local and remote endpoint addresses within that address family.
-     The `tunnel` and `cc` keys specify the configurations of the
-     tunnel and control-channel of the pseudowire, respectively, as
-     described above.
+      * `control-channel`
 
-     The mandatory key `vc_id` specifies the VC ID to use for this PW.
-     The tuple (`local_address`, `remote_address`, `vc_id`) must be
-     unique.  For tunnel protocols which do not support VC IDs (like
-     L2TPv3), the `vc_id` must be set to 0.
+        A container that specifies the control channel configuration
+        for the pseudowire
 
-     The tunnel configuration is mandatory for a pseudowire, either
-     through the default at the VPLS top-level configuration or the
-     specific configuration here.
+        ```
+        control-channel {
+          enable true;
+          heartbeat 5;
+          dead-factor 3;
+        }
+        ```
 
-     If neither a local nor a default control-channel configuration
-     exists, the pseudowire will not transmit any control messages and
-     expects to receive none either.  The reception of a control
-     message from the remote end is considered an error.  In that
-     case, a message will be logged and the pseudowire will be marked
-     as down, i.e. no packets will be forwarded in either direction.
-
-     To disable the control-channel on a per-PW basis when it is
-     enabled by default, an explicit `cc` section must be added to the
-     PW with the `heartbeat` parameter set to 0, i.e.
-     ```
-     <pw_config> = {
-       address = <remote_address>,
-       tunnel = <tunnel_config>, -- optional
-       cc = { heartbeat = 0}
-     }
-     ```
+        The `enable` leaf node specifies whether the control channel
+        should be enabled. `heartbeat` is the interval in seconds at
+        which the pseudowire sends control messages to its peer.  This
+        number itself is transmitted within the control message as the
+        `heartbeat` parameter. The value of the `dead_factor`, which
+        must be an integer, is used to detect when the remote endpoint
+        can no longer reach the local endpoint, see the [description
+        of the control-channel](#control_channel) for details.
 
 ### Examples
 
@@ -717,64 +737,63 @@ flooding-bridge is optimized away.
 Endpoint `A`:
 
 ```
-return {
-  shmem_dir = '/tmp/snabb-shmem',
-  snmp = { enable = true },
-  interfaces = {
-    {
-      name = "TenGigE0/1",
-      description = "uplink",
-      driver = {
-        path = "apps.intel_mp.intel_mp",
-        name = "Intel",
-        config = { pciaddr = "0000:04:00.1", rxq = 0, txq = 0 },
-      },
-    },
-    mtu = 9206,
-    afs = {
-      ipv6 = {
-        address = "2001:db8:0:C101:0:0:0:2",
-        next_hop = "2001:db8:0:C101:0:0:0:1" },
+l2vpn-config {
+  snmp {
+    enable true;
+  }
+  interface {
+    name "TenGigE0/1";
+    description "uplink";
+    driver {
+      path "apps.intel_mp.intel_mp";
+      name "Intel";
+      config "{ pciaddr = '0000:04:00.1', rxq = 0, txq = 0 }";
+    }
+    mtu 9206;
+    address-families {
+      ipv6 {
+        address "2001:db8:0:C101:0:0:0:2";
+        next-hop "2001:db8:0:C101:0:0:0:1";
       }
-    },
-    {
-      name = "TenGigE0/0",
-      description = "AC",
-      driver = {
-        path = "apps.intel_mp.intel_mp",
-        name = "Intel",
-        config = { pciaddr = "0000:04:00.0", rxq = 0, txq = 0 }
-      },
-    },
-    mtu = 9206,
-  },
-  vpls = {
-    myvpn = {
-      description = "Endpoint A of a point-to-point L2 VPN",
-      uplink = "TenGigE0/1",
-      mtu = 1514,
-      ac = {
-        ac_A = { interface = "TenGigE0/0" },
-      },
-      tunnel = {
-        type = 'l2tpv3',
-        config = {
-          local_cookie  = '\x00\x11\x22\x33\x44\x55\x66\x77',
-          remote_cookie = '\x77\x66\x55\x44\x33\x33\x11\x00'
+    }
+  interface {
+    name "TenGigE0/0";
+    description "AC";
+    driver {
+      path "apps.intel_mp.intel_mp";
+      name "Intel";
+      config "{ pciaddr = '0000:04:00.0', rxq = 0, txq = 0 }";
+    }
+    mtu 9206;
+  }
+  vpls {
+    name "myvpn";
+    description "Endpoint A of a point-to-point L2 VPN";
+    uplink "TenGigE0/1";
+    mtu 1514;
+    attachment-circuit {
+      name "ac_A";
+      interface "TenGigE0/0";
+    }
+    pseusowire {
+      name "pw_B";
+      vc-id 0;
+      transport {
+        ipv6 {
+          local-address "2001:db8:0:1:0:0:0:1";
+          remote-address "2001:db8:0:1:0:0:0:2";
         }
-      },
-      cc = {
-        heartbeat = 2,
-        dead_factor = 4
-      },
-      pw = {
-        pw_B = {
-          afi = "ipv6",
-          local_address = "2001:db8:0:1:0:0:0:1",
-          remote_address = "2001:db8:0:1:0:0:0:2",
-          vc_id = 0
-        },
       }
+      tunnel {
+        l2tpv3 {
+          local-cookie "\x00\x11\x22\x33\x44\x55\x66\x77";
+          remote-cookie "\x77\x66\x55\x44\x33\x33\x11\x00";
+        }
+      }
+      control-channel {
+        heartbeat 2;
+        dead-factor 4;
+      },
     }
   }
 }
@@ -783,71 +802,669 @@ return {
 Endpoint `B`:
 
 ```
-return {
-  shmem_dir = '/tmp/snabb-shmem',
-  snmp = { enable = true },
-  interfaces = {
-    {
-      name = "TenGigE0/1",
-      description = "uplink",
-      driver = {
-        path = "apps.intel_mp.intel_mp",
-        name = "Intel",
-        config = { pciaddr = "0000:04:00.1", rxq = 0, txq = 0 },
-      },
-    },
-    mtu = 9206,
-    afs = {
-      ipv6 = {
-        address = "2001:db8:0:C102:0:0:0:2",
-        next_hop = "2001:db8:0:C102:0:0:0:1" },
+l2vpn-config {
+  snmp {
+    enable true;
+  }
+  interface {
+    name "TenGigE0/1";
+    description "uplink";
+    driver {
+      path "apps.intel_mp.intel_mp";
+      name "Intel";
+      config "{ pciaddr = '0000:04:00.1', rxq = 0, txq = 0 }";
+    }
+    mtu 9206;
+    address-families {
+      ipv6 {
+        address "2001:db8:0:C102:0:0:0:2";
+        next-hop "2001:db8:0:C102:0:0:0:1";
       }
-    },
-    {
-      name = "TenGigE0/0",
-      description = "AC",
-      driver = {
-        path = "apps.intel_mp.intel_mp",
-        name = "Intel",
-        config = { pciaddr = "0000:04:00.0", rxq = 0, txq = 0 },
-      },
-    },
-    mtu = 9206,
-  },
-  vpls = {
-    myvpn = {
-      description = "Endpoint B of a point-to-point L2 VPN",
-      uplink = "TenGigE0/1",
-      mtu = 1514,
-      vc_id = 1,
-      ac = {
-        ac_B = { interface = "TenGigE0/0" }
-      },
-      address = "2001:db8:0:1:0:0:0:2",
-      tunnel = {
-        type = 'l2tpv3',
-        config = {
-          local_cookie  = '\x77\x66\x55\x44\x33\x33\x11\x00',
-          remote_cookie = '\x00\x11\x22\x33\x44\x55\x66\x77'
+    }
+    interface {
+      name "TenGigE0/0";
+      description "AC";
+      driver {
+        path "apps.intel_mp.intel_mp";
+        name "Intel";
+        config "{ pciaddr = '0000:04:00.0', rxq = 0, txq = 0 }";
+      }
+    }
+    mtu 9206;
+  }
+  vpls {
+    name "myvpn";
+    description "Endpoint B of a point-to-point L2 VPN";
+    uplink "TenGigE0/1";
+    mtu 1514;
+    attachment-circuit {
+      name "ac_B";
+      interface "TenGigE0/0";
+    }
+    pseudowire {
+      name "pw_A";
+      vc_id = 0;
+      transport {
+        ipv6 {
+          local-address "2001:db8:0:1:0:0:0:2";
+          remote-address "2001:db8:0:1:0:0:0:1";
         }
-      },
-      cc = {
-        heartbeat = 2,
-        dead_factor = 4
-      },
-      pw = {
-        pw_A = {
-          afi = "ipv6",
-          local_address = "2001:db8:0:1:0:0:0:2",
-          remot_address = "2001:db8:0:1:0:0:0:1".
-          vc_id = 0
-        },
+      }
+      tunnel {
+        l2tpv3 {
+          local-cookie "\x77\x66\x55\x44\x33\x33\x11\x00";
+          remote-cookie "\x00\x11\x22\x33\x44\x55\x66\x77";
+        }
+      }
+      control-channel {
+        heartbeat 2;
+        dead_factor 4;
       }
     }
   }
 }
 ```
 
+### <a name="yang-schema">Complete YANG schema</a>
+
+```
+module snabb-l2vpn-v1 {
+  namespace snabb:l2vpn;
+  prefix l2vpn;
+
+  import ietf-inet-types { prefix inet; }
+  import ietf-yang-types { prefix yang; }
+
+  organization "SWITCH";
+  contact "Alexander Gall <alexander.gall@switch.ch>";
+  description
+    "Configuration for the Snabb Switch L2VPN Program";
+
+  revision 2019-02-03 {
+    description
+      "Initial revision.";
+  }
+
+  container l2vpn-config {
+    description
+      "Configuration for the Snabb L2VPN program.";
+
+    container luajit {
+      description
+        "LuaJIT runtime settings";
+
+      leaf-list option {
+        type string;
+        description
+          "A LuaJIT runtime option.";
+      }
+      container dump {
+        leaf enable {
+          type boolean;
+          default false;
+          description
+            "Whether to enable the JIT dump facility.";
+        }
+        leaf option {
+          type string;
+          description
+            "Options for the LuaJIT trace dumper.";
+        }
+        leaf file {
+          type string;
+          default "/tmp/dump";
+          description
+            "Location of the LuaJIT dump file.  The file name may contain the
+             string '%p', which will be replaced by the ID of the
+             worker process in which the LuaJIT instance is executing";
+        }
+      }
+    }
+
+    container snmp {
+      leaf enable {
+        type boolean;
+        description
+          "Whether to enable SNMP. This will instantiate MIB objects for
+           interfaces and pseudowires";
+      }
+      leaf interval {
+        type uint8;
+        default 5;
+        description
+          "The interval at which the SNMP objects will be synchronized with the
+           state of the program.";
+      }
+    }
+
+    grouping address-families {
+      container address-families {
+        container ipv4 {
+          leaf address {
+            type inet:ipv4-address;
+          }
+          leaf next-hop {
+            type inet:ipv4-address;
+          }
+        }
+        container ipv6 {
+          leaf address {
+            type inet:ipv6-address;
+          }
+          leaf next-hop {
+            type inet:ipv6-address;
+          }
+        }
+      }
+    }
+
+    grouping address-family-choice {
+      choice address-family {
+        mandatory true;
+        case ipv4 {
+          container ipv4 {
+            leaf local-address {
+              type inet:ipv4-address;
+              mandatory true;
+              description
+                "The IPv4 address of the local endpoint";
+            }
+            leaf remote-address {
+              type inet:ipv4-address;
+              mandatory true;
+              description
+                "The IPv4 address of the remote endpoint";
+            }
+          }
+        }
+        case ipv6 {
+          container ipv6 {
+            leaf local-address {
+              type inet:ipv6-address;
+              mandatory true;
+              description
+                "The IPv6 address of the local endpoint";
+            }
+            leaf remote-address {
+              type inet:ipv6-address;
+              mandatory true;
+              description
+                "The IPv6 address of the remote endpoint";
+            }
+          }
+        }
+      }
+    }
+
+    list interface {
+      description
+        "A list of interface definitions.";
+
+      key "name";
+      min-elements 1;
+
+      leaf name {
+        type string;
+        mandatory true;
+        description
+          "The name of the interface. This name appears as the <ifName> and
+           <ifDescr> SNMP OIDs";
+      }
+
+      leaf description {
+        type string;
+        description
+          "A free-form description of the function of the interface. This string
+           appears as the <ifAlias> SNMP OID";
+      }
+
+      container driver {
+        leaf path {
+          type string;
+          mandatory true;
+          description
+            "The path of the Snabb driver to use for the interface in 'dotted'
+             notation, e.g. 'apps.intel_mp.intel_mp'";
+        }
+        leaf name {
+          type string;
+          mandatory true;
+          description
+            "The name of the driver object to instantiate for the interface,
+             relative to <path> (i.e. 'require(path)[name]'";
+        }
+        leaf config {
+          type string;
+          description
+            "A string containing a literal Lua expression.  The result of the
+             evaluation of this expression is passed as argument to
+             the call of the driver's new() method";
+        }
+        leaf extra-config {
+          description
+            "A string containing a literal Lua expression which must evaluate to a
+             table.  If the expression given in <config> is a table,
+             it is merged with this table. If a key is present in both
+             tables, the one from <extra-config> takes precedence.";
+          type string;
+        }
+      }
+
+      container mirror {
+        description
+          "Traffic mirror configuration for the interface.";
+
+        leaf rx {
+          type boolean;
+          description
+            "Whether to enable mirroring for incoming packets.";
+        }
+        leaf tx {
+          type boolean;
+          description
+            "Whether to enable mirroring for outgoing packets.";
+        }
+        leaf type {
+          type enumeration {
+            enum "tap";
+            enum "pcap";
+          }
+          default "tap";
+          description
+            "The method to use for providing access to mirrored traffic. If set to
+             <tap>, the traffic is senf to a TAP interface where it
+             can be collected with standard tools (e.g. tcpdump).  If
+             no explicit <name> is given, the name of the TAP inteface
+             is derived from the name of the mirrored interface as
+             follows: slashes are replaced by hyphens and the
+             direction ('rx' ot 'tx') is appended to the end of the
+             name separeted by an underscore.  The name is truncated
+             at the system's limit for interface names (the IFNAMSIZ
+             constant, which currently has the value 16).
+
+             If set to <pcap>, the mirrored packets are written to a
+             file in pcap format.  If no explicit <name> is given, it
+             defaults to '/tmp/' followed by the name derived from the
+             interface as described above with an additional '.pcap'
+             appended to the final path name";
+        }
+        leaf name {
+          type string;
+          description
+            "If given, overrides the names of either the TAP interface or pcap file
+             as described in <type>.  The name is augmented with the suffix '_rx' or
+             '_tx', depending on the direction.";
+        }
+      }
+
+      leaf mtu {
+        type uint16;
+        mandatory true;
+        description
+          "The MTU of the interface including the entire L2 header (e.g. 14 bytes
+           for an untagged interface, 18 bytes for a single-tagged
+           interface";
+      }
+
+      uses address-families;
+
+      container trunk {
+        leaf enable {
+          type boolean;
+          mandatory true;
+          description
+            "Whether to configure the interface as a VLAN trunk";
+        }
+        leaf encapsulation {
+          default "dot1q";
+          type enumeration {
+            enum dot1q;
+            enum dot1ad;
+            enum raw;
+          }
+          description
+            "The type of encapsulation to use in VLAN tags. This determines the
+             value of the 'Tag Protocol Identifier field'. For 'dot1q'
+             and 'dot1ad' the values are 0x8100 and
+             0x88a8. respectively.  It is possible to chose an
+             arbitrary TPID by setting the encapsulation to 'raw' and
+             setting <tpid> to the desired value.";
+        }
+        leaf tpid {
+          type uint16;
+          description
+            "If <encapsulation> is 'raw', this is the number that will be used as
+             the 'Tag Protocol Identifier'.";
+        }
+
+        list vlan {
+          description
+            "A list of VLANs to be transported on the trunk.";
+
+          key "vid";
+          min-elements 1;
+
+          leaf vid {
+            type uint16 {
+              range 0..4095;
+            }
+            mandatory true;
+            description
+              "The VLAN ID.";
+          }
+          leaf description {
+            type string;
+            description
+              "A free-form description of the function of the interface. This string
+                 appears as the <description> SNMP OID";
+          }
+          leaf mtu {
+            type uint16;
+            description
+              "The MTU of the sub-interface including the L2 header.  This number can
+                 be smaller than the MTU of the underlying physical
+                 interface but must not exceed it.";
+          }
+
+          uses address-families;
+
+        } // vlan
+      } // trunk
+    } // interface
+
+    list ipsec {
+      description
+        "A list of pairs of addresses for which communication must be protected
+         by IPsec.  This policy will be applied to all tunnels between
+         the addresses covered by the traffic selector, irrespective
+         of the VPLS instance to which they belong.  The keys must be generated
+         by the IKE daemon and passed to the L2VPN process.  The IKE daemon must
+         be configured with an IPsec policy with matching encryption algorithm and
+         traffic selector.";
+
+      key "name";
+
+      leaf name {
+        type string;
+        description
+          "The name of the connection to which IPsec will be applied.  It is
+           arbitrary and has no significance for other parts of the
+           configuration.";
+      }
+
+      leaf encryption-algorithm {
+        type enumeration {
+          enum "aes-gcm-16-icv";
+        }
+        default aes-gcm-16-icv;
+        description
+          "The encryption algorithm to use.  Currently, only aes-gcm-16-icv is
+           supported";
+      }
+
+      container traffic-selector {
+        description
+          "The IP addresses of the local and remote endpoints. ipv4 and ipv6 are
+           mutually exclusive.";
+        uses address-family-choice;
+      }
+    }
+
+    list vpls {
+      description
+        "A list of VPLS definitions.";
+
+      key "name";
+
+      leaf name {
+        type string;
+        mandatory true;
+        description
+          "The name of the VPLS instance.";
+      }
+      leaf description {
+        type string;
+        description
+          "A brief description of the VPLS. TODO: MIB object";
+      }
+      leaf mtu {
+        type uint16;
+        mandatory true;
+        description
+          "The MTU of the L2 domain provided by the VPLS.  A VPLS instance will
+           fail to start unless all of its attachment circuits have a
+           matching MTU.  This value is also propagated throughout the
+           control-channels of the pseudowires to remote instances of
+           the VPLS. A pseudowire is considered to be in a 'down'
+           state operationally if the MTUs at each endpoint do not
+           match.";
+      }
+      leaf uplink {
+        type string;
+        mandatory true;
+        description
+          "The name of the interface used as the uplink for the VPLS as it
+           appears in the 'interface' list.  This is effectively a
+           static route for outbound packets.";
+      }
+
+      container bridge {
+        description
+          "The configuration for the bridge module associated with the VPLS to
+             which all pseudowires and attachment circuits are
+             connected.  The bridge module will not be created if the
+             VPLS only contains a single pseusowire and a single
+             attachment circuit.  In that case, the pseudowire is
+             connected directly to the attachment circuit.
+
+             As a mechanism for loop prevention, the bridge enforces a
+             split-horizon policy on all ports to which a pseudowire
+             connects: packets arriving from a pseudowire are never
+             forwarded to any other pseudowire.  As a consequence, the
+             pseudowires that make up a VPLS are required to form a
+             full mesh.";
+
+        choice type {
+          case flooding {
+            leaf flooding {
+              type empty;
+              description
+                "A 'flooding' bridge forwards a copy of a frame received on a port to
+                   all other port, only subject to the restriction of
+                   the split-horizon policy.";
+            }
+          }
+          case learning {
+            container learning {
+              description
+                " A 'learning' bridge behaves like a flooding bridge for multicast
+                    packets and packets addressed to unknown unicast
+                    destinations.  The unicast source address of each
+                    incoming frame is added to the list of known
+                    addresses of the ingress port such that all future
+                    packets destined to that address are only
+                    transmitted on that particular port.";
+
+              container mac-table {
+                description
+                  "Configuration of the MAC table associated with the learning bridge.";
+
+                leaf size {
+                  type uint32;
+                  default 1024;
+                  description
+                    "The initial size (number of entries) of the MAC address table";
+                }
+                leaf timeout {
+                  type uint16;
+                  default 600;
+                  description
+                    "The interval in seconds after which an inactive entry is expired from
+                     the MAC address table.";
+                }
+                leaf verbose {
+                  type boolean;
+                  default false;
+                  description
+                    "Whether to log periodic statistics about table usage and resize
+                     events.";
+                }
+                leaf max-occupy {
+                  type decimal64;
+                  default 0.4;
+                  description
+                    "The maximum load-factor of the hash table before automatic re-sizing
+                     is initiated.  The load factor is defined as the
+                     ratio of the number of occupied entries and the
+                     size of the table.";
+                }
+              } // mac-table
+            }
+          }
+        } // choice
+      } // bridge
+
+      list attachment-circuit {
+        key "name";
+
+        leaf name {
+          type string;
+          mandatory true;
+          description
+            "An arbitrary name that identifies this attachment circuit.";
+        }
+        leaf interface {
+          type string;
+          mandatory true;
+          description
+            "The name of the interface as it appears in the 'interface' list.";
+        }
+      }
+
+      list pseudowire {
+        key "name";
+
+        leaf name {
+          type string;
+          mandatory true;
+          description
+            "An arbitrary name that identifies this pseudowire.";
+        }
+        leaf vc-id {
+          type uint16;
+          mandatory true;
+          description
+            "The VC ID associated with this pseudowire. It is used to distinguish
+             pseudowires between the same pair of addresses.  In other
+             words, the triple (local address, remote address, VC ID)
+             must be unique among the set of all pseudowires known to
+             the system. The range of valid values depends on the
+             tunnel protocol, because the VC ID has to be transported
+             in the tunnel header.  Certain tunnels do not support a
+             VC ID at all. In that case, the vc-id parameter must be
+             set to zero and the uniqueness property applies to the
+             pair (local address, remote address).";
+        }
+
+        container transport {
+          description
+            "The IP addresses of the local and remote endpoints of the tunnel. ipv4
+             and ipv6 are mutually exclusive.";
+
+          uses address-family-choice;
+        }
+
+        container tunnel {
+          description
+            "The type and configuration of the tunnel protocol. Only a single
+             selection is allowed.  Currently supported tunnels are
+             l2tpv3 (in the flavor of 'Keyed IPv6 Tunnel', RFC 8159)
+             and GRE.";
+
+          choice tunnel-type {
+            mandatory true;
+            case l2tpv3 {
+              container l2tpv3 {
+                description
+                  "The configuration of the l2tpv3 tunnel type.";
+
+                mandatory true;
+                leaf local-cookie {
+                  type string;
+                  default "\x00\x00\x00\x00\x00\x00\x00\x00";
+                  description
+                    "The value of the local cookie (expected in the header of incoming
+                     packets) as a binary string of exactly 8
+                     characters.  The string is evaluated as a Lua
+                     string and may contain any escape sequence
+                     supported by Lua.";
+                }
+                leaf remote-cookie {
+                  type string;
+                  default "\x00\x00\x00\x00\x00\x00\x00\x00";
+                  description
+                    "The value of the remote cookie (written to the header of outgoing
+                     packets) as a binary string of exactly 8
+                     characters.  The string is evaluated as a Lua
+                     string and may contain any escape sequence
+                     supported by Lua.";
+                }
+              }
+            }
+            case gre {
+              container gre {
+                presence
+                  "There are no configurable elements for this tunnel type.";
+                description
+                  "The GRE tunnel uses the value 0x6558 (Transparent Ethernet Bridging)
+                   for the protocol header field.  The key field is
+                   used to transport the VC ID. Checksumming is not
+                   supported.";
+
+                leaf dummy {
+                  type boolean;
+                  description
+                    "This optional node is ignored. It exists to work around a bug
+                     in the YANG parser which doesn't recognize an empty presence container";
+                }
+              }
+            }
+          }
+        } // tunnel
+
+        container control-channel {
+          description
+            "The configuration of the proprietary control-channel between tunnel
+               endpoints.";
+
+          leaf enable {
+            type boolean;
+            default true;
+            description
+              "Whether to enable the control-channel for this pseudowire.";
+          }
+          leaf heartbeat {
+            type uint16;
+            default 5;
+            description
+              "The interval in seconds at which heartbeat messages are sent to the
+                 peer.";
+          }
+          leaf dead-factor {
+            type uint16;
+            default 3;
+            description
+              "The number of heartbeat intervals without receiving heartbeat messages
+                 after which the peer is decalred to be dead.  Like
+                 the tunnel itself, the operational status of a
+                 pseudowire is unidirectional.";
+          }
+        } // control-channel
+      } // pw
+    } // vpls
+  } // l2vpn-config
+}
+```
 ## <a name="interface-abstraction">Interface Abstraction</a>
 
 Currently, the view of an interface in the Snabb architecture is
@@ -862,71 +1479,8 @@ networking device.
 ### Configuration Template
 
 Each physical interface that is to be used by the `l2vpn` program is
-configured by a Lua table of the following form
-
-```
-{
-  name = <name>,
-  [ description = <description>, ]
-  driver = {
-    path = <path>,
-    name = <name>,
-    config = {
-      pciaddr = <pciaddress>,
-    },
-  },
-  [ mirror = {
-      [ rx = true | false | <rx_name>, ]
-      [ tx = true | false | <tx_name>, ]
-      [ type = "tap" | "pcap", ]
-    }, ]
-  mtu = <mtu>,
-  [ -- only allowed if trunk.enable == false
-    afs = {
-      ipv6 = {
-        address = <address>,
-        next_hop = <next_hop>,
-        [ next_hop_mac = <next_hop_mac>, ]
-      },
-      ipv4 = {
-        address = <address>,
-        next_hop = <next_hop>,
-        [ next_hop_mac = <next_hop_mac>, ]
-      },
-
-    }, ]
-  [ trunk = {
-      enable = true | false,
-      encapsulation = "dot1q" | "dot1ad" | <number>,
-      vlans = {
-        {
-          [ description = <description>, ]
-          vid = <vid>,
-          [ mtu = <mtu>, ]
-          [ afs = {
-              ipv6 = {
-                address = <address>,
-                next_hop = <next_hop>,
-                [ next_hop_mac = <next_hop_mac>, ]
-              },
-              ipv4 = {
-                address = <address>,
-                next_hop = <next_hop>,
-                [ next_hop_mac = <next_hop_mac>, ]
-              }
-            } ]
-         },
-         ...
-      }
-    } ]
-}
-```
-
-In this pseudo-code, square brackets enclose optional elements, angle
-brackets denote configurable items and the ellipsis stands for an
-arbitrary number of additional configuration elements of the previous
-type (in this case a Lua table describing a VLAN).  All elements will
-be discussed in the following sections.
+configured by an instance of the `interface` list as shown in the YANG
+schema above.
 
 ### Naming vs Addressing
 
@@ -959,18 +1513,18 @@ interfaces, including using the PCI address verbatim, i.e. with a
 configuration fragment like this:
 
 ```
-local address = "0000:03:00.0"
-interfaces = {
-  {
-     name = address,
-     driver = {
-        path = "apps.intel_mp.intel_mp",
-        name = "Intel",
-        config = { pciaddr = address, rxq = 0, txq = 0 },
+interface {
+  name "0000:03:00.0";
+  driver {
+    path "apps.intel_mp.intel_mp";
+    name "Intel";
+    config "{ pciaddr = '0000:03:00.0', rxq = 0, txq = 0 }";
      },
   },
 }
 ```
+
+Note that `config` must be a literal Lua expression.
 
 This convention doesn't play well with the naming convention for
 sub-interfaces introduced later on (due to the dot in the PCI address)
@@ -998,15 +1552,13 @@ This is the convention we will use in the remainder of this document.
 For example:
 
 ```
-interfaces = {
-  {
-     name = "TenGigE0/0",
-     driver = {
-        path = "apps.intel_mp.intel_mp",
-        name = "Intel",
-        config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
-     },
-  },
+interface {
+  name "TenGigE0/0";
+  driver {
+    path "apps.intel_mp.intel_mp";
+    name "Intel";
+    config "{ pciaddr = '0000:03:00.0', rxq = 0, txq = 0 }";
+  }
 }
 ```
 
@@ -1015,14 +1567,15 @@ one would use a configuration like the following (see the complete
 [configuration of a VPLS instance](#vpls-instance-config)).
 
 ```
-vpls = {
-  vpls1 = {
-    ac = {
-      ac1 = "TenGigE0/0",
-    },
-    .
-    .
-    .
+vpls {
+  name "vpls1";
+  attachment-circuit {
+    name "ac1";
+    interface "TenGigE0/0";
+  }
+  .
+  .
+  .
 }
 ```
 
@@ -1031,22 +1584,20 @@ vpls = {
 The following items make up the basic configuration of an interface
 
 ```
-name = <name>,
-[ description = <description>, ]
-driver = {
-  path = <path>,
-  name = <name>,
-  config = {
-    pciaddr = <pciaddress>,
-  },
-  [ extra_config = <extra_config>, ]
+name <name>;
+description <description>;
+driver {
+  path <path>;
+  name <name>;
+  config "{ pciaddr = <pciaddress> }";
+  extra_config <extra_config>;
 },
 ```
 
 The `name` and `pciaddr` items have already been discussed in the
-previous section.  The `description` can be any valid Lua string
-describing the purpose of the interface in the current configuration.
-It defaults to the empty string.
+previous section.  The `description` is a string describing the
+purpose of the interface in the current configuration.  It defaults to
+the empty string.
 
 The `path` must be a string that represents the path to the Lua module
 that implements the driver, while `name` must be a string that
@@ -1062,12 +1613,13 @@ For example, for the Intel NIC, `path` would be
 the `require` will be passed to the `confi.app()` API call to create
 an instance of the driver.
 
-The `config` table is passed as argument to the constructor of the
-driver module.  It is driver-specific.  For a physical interface, it
-will typically include at least the PCI address, for example
+The `config` will be evaluated as a Lua expression which is passed as
+argument to the constructor of the driver module.  It is
+driver-specific.  For a physical interface, it will typically include
+at least the PCI address, for example
 
 ```
-config = { pciaddr = "0000:03:00.0" }
+config "{ pciaddr = '0000:03:00.0' }"
 
 ```
 
@@ -1093,15 +1645,16 @@ It is allowed to use a different data type than a table for the
 `config` paramter to support non-standard drivers.  In that case, the
 MTU cannot automatically be passed to the driver.
 
-The optional element `extra_config` must be a table.  It will be
-merged with the `config` table to form the final configuration of the
-driver.  When elements with the same name exist in both tables, the
-one from `extra_config` takes precedence.  The main purpose of this
-feature is to support Lua-agnostic front-ends that generate the entire
-`l2vpn` configuration or parts of it from a higher layer of
-abstraction.
+The optional element `extra_config` must also be a Lua expression
+which must evaluate to a table.  It will be merged with the `config`
+table to form the final configuration of the driver.  When elements
+with the same name exist in both tables, the one from `extra_config`
+takes precedence.  The main purpose of this feature is to support
+Lua-agnostic front-ends that generate the entire `l2vpn` configuration
+or parts of it from a higher layer of abstraction.
 
-If `config` is not a table, `extra_config` is ignored.
+If `config` does not evaluate to a Lua table, `extra_config` is
+ignored.
 
 ### L2 Configuration
 
@@ -1109,19 +1662,20 @@ Every physical interface is associated with parameters that control
 its behavior at the Ethernet layer (L2) consisting of the items
 
 ```
-mtu = <mtu>,
-[ trunk = {
-    enable = true | false,
-    encapsulation = "dot1q" | "dot1ad" | <number>,
-  }, ]
-[ mirror = {
-    [ rx = true | false | <rx_name>, ]
-    [ tx = true | false | <tx_name>, ]
-    [ type = "tap" | "pcap", ]
-  }, ]
+mtu <mtu>;
+trunk {
+  enable true | false;
+  encapsulation dot1q | dot1ad | raw;
+  tpid <tpid>;
+}
+mirror {
+  rx true | false;
+  tx true | false;
+  type tap | pcap;
+}
 ```
 
-The `vlans` section of the trunk configuration is not shown here and
+The `vlan` section of the trunk configuration is not shown here and
 will be discussed with the concept of
 [sub-interfaces](#sub-interfaces).
 
@@ -1151,32 +1705,30 @@ interpreted and removed by the `l2vpn` program itself as opposed to
 tags that only have meaning to the customer and must be ignored by the
 `l2vpn` program.
 
-If the `trunk.enable` field is set to `false` or the the entire
-`trunk` table is omitted, no service-delimiting tag is expected on
-packets received from the interface (anything beyond the source and
-destination MAC addresses is ignored) and no tag is added when packets
-are transmitted to the interface.  This configuration puts the
-physical interface into L2-mode where Ethernet frames are simply
-forwarded without any manipulations performed on them.  In
+If `trunk/enable` is set to `false`, no service-delimiting tag is
+expected on packets received from the interface (anything beyond the
+source and destination MAC addresses is ignored) and no tag is added
+when packets are transmitted to the interface.  This configuration
+puts the physical interface into L2-mode where Ethernet frames are
+simply forwarded without any manipulations performed on them.  In
 conventional switches, this is sometimes referred to as a
 _switchport_.  The following example shows a complete interface
 configuration for this case:
 
 ```
-{
-   name = "TenGigE0/0",
-   driver = {
-      path = "apps.intel_mp.intel_mp",
-      name = "Intel",
-      config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
-   },
-   mtu = 1514,
-   trunk = { enable = false }
+interface {
+  name "TenGigE0/0";
+  driver {
+  path "apps.intel_mp.intel_mp";
+  name "Intel";
+  config = "{ pciaddr = '0000:03:00.0', rxq = 0, txq = 0 }";
+  mtu = 1514,
+  trunk { enable false; }
 },
 ```
 
-If the `trunk.enable` field is set to `true`, a service-delimiting tag
-is expected to be present immediately following the Ethernet header on
+If `trunk/enable` is set to `true`, a service-delimiting tag is
+expected to be present immediately following the Ethernet header on
 received packets (also referred to as the "outer" tag).  The
 `encapsulation` field determines the value of the TPID field expected
 in the tag as described [above](#ac-modes).  In this configuration,
@@ -1186,7 +1738,7 @@ transported on the trunk and how they should be processed by the
 `l2vpn` application.  This is further discussed
 [below](#sub-interfaces).
 
-Packets whose Ethertype field does not match that of the configured
+Packets whose Ethertype field do not match that of the configured
 encapsulation, are silently dropped unless the ["native
 VLAN"](#native-vlan) feature is enabled.
 
@@ -1198,10 +1750,10 @@ packets actually contain two tags and the MTU must be set to 1522
 bytes in order for the customer to be able to transport 1500-byte IP
 packets within her VLANs.
 
-The optional `mirror` table is used to configure per-direction
+The `mirror` container is used to configure per-direction
 port-mirroring of the traffic that is received from (`rx`) or sent to
 (`tx`) the interface.  Mirroring is enabled by setting the
-corresponding option to `true` or a string.
+corresponding option to `true`.
 
 If the `type` option is not specified or is set to `tap`, a `Tap`
 device is created to which a copy of all packets in the selected
@@ -1213,83 +1765,88 @@ First, all slashes are replaced by hyphens, then the name is truncated
 to 13 characters (corresponding to the system limit `IFNAMSIZ`, which
 is 16 on a Linux system, minus 3) and the string `_rx` or `_tx` is
 appended, depending on the selected direction of traffic.  If the
-mirror selector is set to a string, that string is used as the name of
-the `Tap` device.
+`name` option is specified, it is used as the name of the interface
+instead, with `_rx` or `_tx` appended and subjected to the same rules
+of truncation to the maximum length.
 
 If the `type` option is set to `pcap`, the packets are written to a
-file in the `pcap` format.  If the mirror selector is `true`, the
+file in the `pcap` format.  If the `name` option is not set, the
 filename is constructed by replacing slashes by hyphens in the name of
 the interface and appending the string `_rx.pcap` or `_tx.pcap`,
 depending on the selected direction of traffic.  The full path name is
-constructed by prepending the file name with `/tmp/`.  If the mirror
-selector is a string, that string is used as the file name.
+constructed by prepending the file name with `/tmp/`.  If the `name`
+option is set, it is used as the complete path name of the file
+instead with `_rx.pcap` or `_tx.pcap` appended depending on the
+direction of the mirrored traffic.
 
 Examples: the fragment
 ```
-{
-  name = "TenGigE1/1",
-  mirror = {
-    rx = true,
-    tx = 'foo'
+interface {
+  name "TenGigE1/1";
+  mirror {
+    rx true;
   }
 }
 ```
-will create the `Tap` devices `TenGigE1-1_rx` and `foo`, where as
+will create the `Tap` device `TenGigE1-1_rx` and
 ```
-{
-  name = "TenGigE1/1",
-  mirror = {
-    rx = '/tmp/foo_rx.pcap',
-    tx = true,
-    type = 'pcap'
+interface {
+  name "TenGigE1/1";
+  mirror {
+    rx true;
+    tx true;
+    type pcap;
+    name "/tmp/foo";
   }
 }
 ```
-will create the files `/tmp/foo_rx.pcap` and `/tmp/TenGigE1-1_tx.pcap`.
+will create the files `/tmp/foo_rx.pcap` and `/tmp/foo_tx.pcap`.
 
-Enabling port-mirroring incurs a substantial performance penalty due to
-the packet replication.
+Enabling port-mirroring incurs a substantial performance penalty due
+to the packet replication and possibly system calls required to
+transmit the mirrored packets to the TAP device.
 
 ### Address-family (L3) Configuration
 
 A L2-port as discussed in the previous section can be turned into a
 L3-port by adding a section containing address-family-specific
-configurations called `afs`:
+configurations:
 
 ```
-{
-  name = <name>,
-  [ description = <description>, ]
-  driver = {
-    path = <path>,
-    name = <name>,
-    config = {
+interface {
+  name <name>;
+  [ description = <description>; ]
+  driver {
+    path <path>;
+    name <name>;
+    config "{
       pciaddr = <pciaddress>,
-    },
-  },
-  mtu = <mtu>,
-  trunk = { enable = false },
-  afs = {
-    ipv6 = {
-      address = <address>,
-      next_hop = <next_hop>,
-      [ next_hop_mac = <next_hop_mac>, ]
-    },
-    ipv4 = {
-      address = <address>,
-      next_hop = <next_hop>,
-      [ next_hop_mac = <next_hop_mac>, ]
+    }";
+  }
+  mtu <mtu>;
+  trunk { enable false; }
+  address-families {
+    ipv6 {
+      address <address>;
+      next-hop <next_hop>;
+      [ next-hop-mac <next_hop_mac>; ]
+    }
+    ipv4 {
+      address <address>;
+      next-hop <next_hop>;
+      [ next-hop-mac <next_hop_mac>; ]
     }
   }
 }
 ```
 
-The `afs` table can contain configurations of either or both address
-families.  Both are restricted to a single address per interface.
+The `address-families` container can contain configurations of either
+or both address families.  Both are restricted to a single address per
+interface.
 
 Like on a conventional system, the main configuration option is the
-assignment of a an address to the interface.  Currently, the notion of
-a subnet mask is not supported, see below.
+assignment of an address to the interface.  Currently, the notion of a
+subnet mask is not supported, see below.
 
 The presence of any L3 interface implies that the system also provides
 
@@ -1325,7 +1882,7 @@ a specific L3-port via the VPLS configuration to which the
 corresponding pseudowire belongs (via the `uplink` item in the [VPLS
 configuration](#vpls-instance-config)).  This can be viewed as a kind
 of policy-based routing decision.  Each L3-port is associated with a
-static next-hop which is essentially a interface-specific
+static next-hop which is essentially an interface-specific
 default-route.  This is the purpose of the `<next_hop>` configuration
 item, which must be a complete IP address. This is the only address
 for which outbound neighbor discovery needs to be performed and it is
@@ -1363,7 +1920,7 @@ functions
      * If ND for the next-hop has not completed, drop
        the packet
 
-If the MAC address for `next_hop` is set via the `next_hop_mac`
+If the MAC address for `next-hop` is set via the `next-hop-mac`
 configuration option, neighbor discovery need not be performed for
 outgoing packets.
 
@@ -1385,35 +1942,37 @@ The previous two sections discussed how a physical interface can be
 configured as either a L2- or L3-port in the absence of a trunk.  The
 exact same configurations are available on the sub-interface level if
 trunking is enabled.  In this case, the physical interface is not
-allowed to have a `afs` configuration section.
+allowed to have a `address-families` configuration section.
 
-Sub-interfaces are created by adding one table per VLAN in the `vlans`
-table of the trunk configuration:
+Sub-interfaces are created by adding one container per VLAN in the
+trunk configuration:
 
 ```
-trunk = {
-  enable = true,
-  encapsulation = "dot1q" | "dot1ad" | <number>,
-  vlans = {
-    {
-      [ description = <description>, ]
-      vid = <vid>,
-      [ mtu = <mtu>, ]
-      [ afs = {
-          ipv6 = {
-            address = <address>,
-            next_hop = <next_hop>,
-            [ next_hop_mac = <next_hop_mac> ]
+trunk {
+  enable true;
+  encapsulation dot1q | dot1ad | raw;
+  vlan {
+    description = <description>, ]
+    vid <vid>;
+    [ mtu <mtu>; ]
+    [ address-families {
+         ipv6 {
+            address <address>;
+            next-hop <next_hop>;
+            [ next-hop-mac <next_hop_mac>; ]
           },
-          ipv4 = {
-            address = <address>,
-            next_hop = <next_hop>,
-            [ next_hop_mac = <next_hop_mac> ]
+          ipv4 {
+            address <address>;
+            next-hop <next_hop>;
+            [ next-hop-mac =<next_hop_mac>; ]
           }
-        } ]
-     },
-     ...
+      }
+    ]
   }
+  vlan {
+    ...
+  }
+  ...
 }
 ```
 
@@ -1421,36 +1980,36 @@ The `<vid>` selects the VLAN ID to which the sub-interface is mapped.
 It must be unique among the sub-interfaces of the same physical
 interface and must be in the range 0-4094, where the ID 0 plays a
 special role as explained below.  A sub-interface does not have a
-`name` item.  Instead, its name is automatically constructed by
+`name` node.  Instead, its name is automatically constructed by
 appending the `<vid>` to the name of the physical interface, separated
 by a dot.  For example,
 
 ```
-{
-  name = "TenGigE0/0",
-  driver = {
-     path = "apps.intel_mp.intel_mp",
-     name = "Intel",
-     config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
-  },
-  mtu = 1518,
-  trunk = {
-    enable = true,
-    encapsulation = "dot1q",
-    vlans = {
-      { vid = 1 }
+interface {
+  name "TenGigE0/0";
+  driver {
+    path "apps.intel_mp.intel_mp";
+    name "Intel";
+    config "{ pciaddr = '0000:03:00.0', rxq = 0, txq = 0 }";
+  }
+  mtu 1518;
+  trunk {
+    enable true;
+    encapsulation dot1q;
+    vlan {
+      vid 1;
     }
   }
-},
+}
 ```
 
 will create the sub-interface named `TenGigE0/0.1` as a L2-port.  This
 convention is chosen because it is the de-facto standard on
 traditional devices and it is one of the reasons why using the PCI
-address as an interface's name is not practical (because the PCI
-address uses a dot to separate the "function" element in the standard
-syntax).  A sub-interface is configured as a L3-port exactly like a
-physical port as explained in the previous section.
+address as an interface's name is not practical (due to the PCI
+address containing a dot to separate the "function" element in the
+standard syntax).  A sub-interface is configured as a L3-port exactly
+like a physical port as explained in the previous section.
 
 The optional `mtu` parameter can be used to assign an MTU to the
 sub-interface which is smaller than the MTU of the physical interface.
@@ -1473,23 +2032,25 @@ can be mapped to a dedicated sub-interface that uses the reserved VLAN
 ID 0.  For example,
 
 ```
-{
-  name = "TenGigE0/0",
-  driver = {
-     path = "apps.intel_mp.intel_mp",
-     name = "Intel",
-     config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
-  },
-  mtu = 1518,
-  trunk = {
-    enable = true,
-    encapsulation = "dot1q",
-    vlans = {
-      { vid = 0 },
-      { vid = 1 }
+interface {
+  name "TenGigE0/0";
+  driver {
+    path "apps.intel_mp.intel_mp";
+    name "Intel";
+    config "{ pciaddr = '0000:03:00.0', rxq = 0, txq = 0 }";
+  }
+  mtu 1518;
+  trunk {
+    enable true;
+    encapsulation dot1q;
+    vlan {
+      vid 0;
+    }
+    vlan {
+      vid 1;
     }
   }
-},
+}
 ```
 
 creates the sub-interfaces `TenGigE0/0.0` and `TenGigE0/0.1`.  Packets
@@ -1565,29 +2126,28 @@ sets `ifName` to the same value objects from the interface name. The
 example
 
 ```
-interfaces = {
-  {
-     name = "TenGigE0/0",
-     description = "AC customer A",
-     driver = {
-        path = "apps.intel_mp.intel_mp",
-        name = "Intel",
-        config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
-     },
-     mtu = 1514,
-     trunk = { enable = false }
-  },
-  {
-     name = "TenGigE0/1",
-     description = "AC customer B",
-     driver = {
-        path = "apps.intel_mp.intel_mp",
-        name = "Intel",
-        config = { pciaddr = "0000:03:00.1", rxq = 0, txq = 0 },
-     },
-     mtu = 1514,
-     trunk = { enable = false }
-  },
+interface {
+  name "TenGigE0/0";
+  description "AC customer A";
+  driver {
+    path "apps.intel_mp.intel_mp";
+    name "Intel";
+    config "{ pciaddr = '0000:03:00.0', rxq = 0, txq = 0 }";
+  }
+  mtu 1514;
+  trunk { enable false; }
+}
+interface {
+  name "TenGigE0/1";
+  description "AC customer B";
+  driver {
+    path "apps.intel_mp.intel_mp";
+    name "Intel";
+    config "{ pciaddr = '0000:03:00.1', rxq = 0, txq = 0 }";
+  }
+  mtu 1514;
+  trunk { enable false; }
+}
 ```
 
 would create the objects
@@ -1615,6 +2175,355 @@ still use those versions and didn't even bother to support the
 standardized version at all, like Cisco.  The `cpw*` MIBs are used on
 most Cisco devices and are almost but not quite identical to their
 `pw*` counterparts.
+
+## <a name="ipsec">IPsec</a>
+
+A pseudowire can be protected by IPsec for authentication and
+confidentiality.  An IPsec policy is applied to all traffic between a
+given pair of addresses. If an instance of the `l2vpn` contains
+multiple pseudowires between the same pair of addresses, all of them
+are protected by the same policy.  Therefore, the IPsec configuration
+is located outside the VPLS configuration at the top-level `l2vpn`
+configuration.  It consists of one instance per IPsec policy of an
+`ipsec` container
+
+```
+ipsec {
+  name <name>;
+  encryption-algorithm aes-gcm-16-icv;
+  traffic-selector {
+    ipv4 {
+      local-address <local_address>;
+      remote-address <remote_address>;
+    } |
+    ipv6 {
+      local-address <local_address>;
+      remote-address <remote_address>;
+    }
+  }
+}
+```
+
+The `<name>` is arbitrary but must be unique among all IPsec policies.
+Currently, only `aes-gcm-16-icv` is supported.  Authentication of the
+endpoints and the negotiation of keying material must be supplied by
+an external service that implements the IKE protocol.
+
+### Dynamic Key Exchange
+
+The `l2vpn` program relies on a modified version of the [Strongswan
+IPsec suite](https://www.strongswan.org/) to provide authentication
+and key exchange through their IKE daemon called `charon`.  The
+[modified
+version](https://github.com/alexandergall/strongswan/tree/kernel-snabb-5.6.3)
+is based on release 5.6.3.
+
+The IKE protocol requires connectivity between the PE devices over
+regular (non-Snabb) interfaces to establish the security associations
+(SA) used for IKE itself as well as the child-SAs used by `l2vpn` to
+protect its pseudowires.
+
+#### Building the `kernel-snabb` plugin
+
+To build the `charon` plugin that supports Snabb applications, simply
+add the option `--enable-kernel-snabb` to the invocation of
+`configure` in the build recipe for you Linux distribution.
+
+In the following, it is assumed that the native `systemd` variant of
+`charon` is used (called `charon-systemd`).
+
+#### Configuring IKE
+
+For the purpose of illustration, we assume the following setup of a
+pair of systems with two pseudowires between them that should be
+protected by IPsec.
+
+   * System `A`
+
+      * Regular IP address `10.0.1.1` used for IKE
+      * Local address `192.168.1.1` for VPLS instance `vplsv4`
+      * Local address `2001:db8:0:1::1` for VPLS instance `vplsv6`
+
+   * System `B`
+
+      * Regular IP address `10.0.2.1` used for IKE
+      * Local address `192.168.2.1` for VPLS instance `vplsv4`
+      * Local address `2001:db8:0:2::1` for VPLS instance `vplsv6`
+
+The relevant part of the `l2vpn` configuration of endpoint `A` is as
+follows
+
+```
+l2vpn-config {
+  ipsec {
+    name "ipsec_vplsv4";
+    encryption-algorithm aes-gcm-16-icv;
+    traffic-selector {
+      ipv4 {
+        local-address "192.168.1.1";
+        remote-address "192.168.2.1";
+      }
+    }
+  }
+  ipsec {
+    name "ipsec_vplsv6";
+    encryption-algorithm aes-gcm-16-icv;
+    traffic-selector {
+      ipv6 {
+        local-address "2001:db8:0:1::1";
+        remote-address "2001:db8:0:2::1";
+      }
+    }
+  }
+
+  vpls {
+    name "vplsv4";
+    vc-id 1;
+    transport {
+      ipv4 {
+        local-address "192.168.1.1";
+        remote-address "192.168.2.1";
+      }
+    }
+    tunnel {
+      gre {}
+    }
+  }
+  vpls {
+    name "vplsv6";
+    vc-id 0;
+    transport {
+      ipv6 {
+        local-address "2001:db8:0:1::1";
+        remote-address "2001:db8:0:2::1";
+      }
+    }
+    tunnel {
+      l2tpv3 {}
+    }
+  }
+}
+```
+
+On system `B`
+
+```
+l2vpn-config {
+  ipsec {
+    name "ipsec_vplsv4";
+    encryption-algorithm aes-gcm-16-icv;
+    traffic-selector {
+      ipv4 {
+        local-address "192.168.2.1";
+        remote-address "192.168.1.1";
+      }
+    }
+  }
+  ipsec {
+    name "ipsec_vplsv6";
+    encryption-algorithm aes-gcm-16-icv;
+    traffic-selector {
+      ipv6 {
+        local-address "2001:db8:0:2::1";
+        remote-address "2001:db8:0:1::1";
+      }
+    }
+  }
+
+  vpls {
+    name "vplsv4";
+    vc-id 1;
+    transport {
+      ipv4 {
+        local-address "192.168.2.1";
+        remote-address "192.168.1.1";
+      }
+    }
+    tunnel {
+      gre {}
+    }
+  }
+  vpls {
+    name "vplsv6";
+    vc-id 0;
+    transport {
+      ipv6 {
+        local-address "2001:db8:0:2::1";
+        remote-address "2001:db8:0:1::1";
+      }
+    }
+    tunnel {
+      l2tpv3 {}
+    }
+  }
+}
+```
+
+The `charon` daemon requires two configuration files,
+`strongswan.conf` and `swanctl.conf`.  The former must contain
+
+```
+charon-systemd {
+  plugins {
+    kernel-snabb {
+      load = 1000
+    }
+  }
+}
+```
+
+in order to prefer the Snabb plugin over the regular kernel plugin
+(usually `kernel-netlink`).
+
+The actual IKE configuration is provided by `swanctl.conf`. It must
+define one `connection` per IKE peer and one child-SA per pseudowire.
+In this example, the configuration on system `A` could look as
+follows.
+
+```
+connections {
+  system_B {
+    local_addrs = 10.0.1.1
+    remote_addrs = 10.0.2.1
+    version = 2
+    remote-B {
+      auth = psk
+      id = vpls_psk
+    }
+    local-A {
+      auth = psk
+      id = vpls_psk
+    }
+    proposals = aes128-sha256-x25519-esn
+
+    children {
+      vplsv4 {
+        esp_proposals = aes128gcm128-x25519-esn
+        local_ts = 192.168.1.1/32
+        remote_ts = 192.168.2.1/32
+        mode = tunnel
+      }
+      vplsv6 {
+        esp_proposals = aes128gcm128-x25519-esn
+        local_ts = 2001:db8:0:1::1/128
+        remote_ts = 2001:db8:0:2::1/128
+        mode = tunnel
+      }
+    }
+  }
+}
+secrets {
+  ike-vpn {
+    id-main = vpls_psk
+    secret = 0sFpZAZqEN6Ti9sqt4ZP5EWcqx
+  }
+}
+
+```
+
+This assumes that a pre-shared key (PSK) is used to authenticate the
+IKE peers (any other authentication mechanism supported by Strongswan
+could be used as well).
+
+The configuration must meet the following requirements.
+
+   * The proposal must include an algorithm of type `aes128gcm128`
+     with a suitable Diffie-Hellman group (in this example the
+     elliptic curve 25519)
+
+   * The proposal must include "extended sequence numbers" (`esn`)
+
+   * Each child must contain exactly one traffic selector for
+     `local_ts` and `remote_ts`
+
+   * The traffic selector must be a host address (/32 or /128)
+
+   * The traffic selectors must match exactly the addresses configured
+     in the `traffic-selector` of the `l2vpn` configuration.
+
+   * The `mode` must be set to `tunnel`
+
+Here, the configuration of system `B` would look like
+
+```
+connections {
+  system_A {
+    local_addrs = 10.0.2.1
+    remote_addrs = 10.0.1.1
+    version = 2
+    remote-A {
+      auth = psk
+      id = vpls_psk
+    }
+    local-B {
+      auth = psk
+      id = vpls_psk
+    }
+    proposals = aes128-sha256-x25519-esn
+
+    children {
+      vplsv4 {
+        esp_proposals = aes128gcm128-x25519-esn
+        local_ts = 192.168.2.1/32
+        remote_ts = 192.168.1.1/32
+        mode = tunnel
+      }
+      vplsv6 {
+        esp_proposals = aes128gcm128-x25519-esn
+        local_ts = 2001:db8:0:2::1/128
+        remote_ts = 2001:db8:0:1::1/128
+        mode = tunnel
+      }
+    }
+  }
+}
+secrets {
+  ike-vpn {
+    id-main = vpls_psk
+    secret = 0sFpZAZqEN6Ti9sqt4ZP5EWcqx
+  }
+}
+
+```
+
+#### Initiation, re-keying
+
+For a successful key-exchange, the `l2vpn` program must already be
+running.  The exchange can then be initiated on the command line using
+
+```
+$ swanctl --initiate --child vplsv4
+```
+
+and
+
+```
+$ swanctl --initiate --child vplsv6
+```
+
+A successful initiation should look like this:
+
+```
+[IKE] establishing CHILD_SA vplsv6{2}
+[ENC] generating CREATE_CHILD_SA request 0 [ N(ESP_TFC_PAD_N) SA No KE TSi TSr ]
+[NET] sending packet: from 10.0.1.1[500] to 10.0.2.1[500] (304 bytes)
+[NET] received packet: from 10.0.2.1[500] to 10.0.1.1[500] (304 bytes)
+[ENC] parsed CREATE_CHILD_SA response 0 [ N(ESP_TFC_PAD_N) SA No KE TSi TSr ]
+[IKE] received ESP_TFC_PADDING_NOT_SUPPORTED, not using ESPv3 TFC padding
+[IKE] CHILD_SA vplsv6{2} established with SPIs 00000101_i 00000123_o and TS 2001:DB8:0:1::1/128 === 2001:DB8:0:2::1/128
+initiate completed successfully
+```
+
+The connection can be initialized by either side. Re-keying of the IKE
+SA happens automatically. Re-keying of the child SAa is not necessary
+but can be triggered manually if desired, e.g. by
+
+```
+$ swanctl --rekey --child vplsv6
+```
+
+Initiataion must be performed whenever the `l2vpn` is started or
+restarted.
 
 ## External Routing
 

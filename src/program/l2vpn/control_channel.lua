@@ -7,6 +7,7 @@ local logger = require("lib.logger")
 local cc_proto = require("program.l2vpn.cc_proto")
 local ipc_mib = require("lib.ipc.shmem.mib")
 local datagram = require("lib.protocol.datagram")
+local shm = require("core.shm")
 
 -- Set SNMP OperStatus based on inbound/outbound status.  The
 -- semantics are slightly different in the CISCO-IETF-PW-MIB and the
@@ -181,7 +182,6 @@ control_channel = {
       vc_id = { required = true },
       afi = { required = true },
       peer_addr = { required = true },
-      shmem_dir = { default = '/var/lib/snabb/shmem' },
    }
 }
 
@@ -242,7 +242,8 @@ function control_channel:new (conf)
    ---- which are associated with the same PW in the case of tagged
    ---- ACs.
 
-   local mib = ipc_mib:new({ directory = conf.shmem_dir,
+   shm.mkdir('snmp')
+   local mib = ipc_mib:new({ directory = shm.root..'/snmp',
                              filename = conf.name })
 
    --

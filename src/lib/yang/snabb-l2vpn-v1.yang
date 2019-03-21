@@ -1,20 +1,20 @@
 module snabb-l2vpn-v1 {
   namespace snabb:l2vpn;
   prefix l2vpn;
-  
+
   import ietf-inet-types { prefix inet; }
   import ietf-yang-types { prefix yang; }
-  
+
   organization "SWITCH";
   contact "Alexander Gall <alexander.gall@switch.ch>";
   description
     "Configuration for the Snabb Switch L2VPN Program";
-  
+
   revision 2019-02-03 {
     description
       "Initial revision.";
   }
-  
+
   container l2vpn-config {
     description
       "Configuration for the Snabb L2VPN program.";
@@ -44,11 +44,13 @@ module snabb-l2vpn-v1 {
           type string;
           default "/tmp/dump";
           description
-            "Location of the LuaJIT dump file.";
+            "Location of the LuaJIT dump file.  The file name may contain the
+             string '%p', which will be replaced by the ID of the
+             worker process in which the LuaJIT instance is executing";
         }
       }
     }
-    
+
     container snmp {
       leaf enable {
         type boolean;
@@ -62,14 +64,6 @@ module snabb-l2vpn-v1 {
         description
           "The interval at which the SNMP objects will be synchronized with the
            state of the program.";
-      }
-      leaf shmem-dir {
-        type string;
-        default "";
-        description
-          "The name of the directory where the the MIB-related shared memory
-           segments reside.  This directory is shared with an SNMP
-           sub-agent that provides the actual MIBs to the SNMP server";
       }
     }
 
@@ -135,10 +129,10 @@ module snabb-l2vpn-v1 {
     list interface {
       description
         "A list of interface definitions.";
-      
+
       key "name";
       min-elements 1;
-        
+
       leaf name {
         type string;
         mandatory true;
@@ -146,14 +140,14 @@ module snabb-l2vpn-v1 {
           "The name of the interface. This name appears as the <ifName> and
            <ifDescr> SNMP OIDs";
       }
-      
+
       leaf description {
         type string;
         description
           "A free-form description of the function of the interface. This string
            appears as the <ifAlias> SNMP OID";
       }
-      
+
       container driver {
         leaf path {
           type string;
@@ -183,13 +177,13 @@ module snabb-l2vpn-v1 {
              it is merged with this table. If a key is present in both
              tables, the one from <extra-config> takes precedence.";
           type string;
-        }          
+        }
       }
-      
+
       container mirror {
         description
           "Traffic mirror configuration for the interface.";
-        
+
         leaf rx {
           type boolean;
           description
@@ -232,7 +226,7 @@ module snabb-l2vpn-v1 {
              '_tx', depending on the direction.";
         }
       }
-      
+
       leaf mtu {
         type uint16;
         mandatory true;
@@ -272,14 +266,14 @@ module snabb-l2vpn-v1 {
             "If <encapsulation> is 'raw', this is the number that will be used as
              the 'Tag Protocol Identifier'.";
         }
-        
+
         list vlan {
           description
             "A list of VLANs to be transported on the trunk.";
-          
+
           key "vid";
           min-elements 1;
-              
+
           leaf vid {
             type uint16 {
               range 0..4095;
@@ -301,13 +295,11 @@ module snabb-l2vpn-v1 {
                  be smaller than the MTU of the underlying physical
                  interface but must not exceed it.";
           }
-            
+
           uses address-families;
-            
+
         } // vlan
-        
       } // trunk
-      
     } // interface
 
     list ipsec {
@@ -347,13 +339,13 @@ module snabb-l2vpn-v1 {
         uses address-family-choice;
       }
     }
-    
+
     list vpls {
       description
         "A list of VPLS definitions.";
-        
+
       key "name";
-        
+
       leaf name {
         type string;
         mandatory true;
@@ -385,7 +377,7 @@ module snabb-l2vpn-v1 {
            appears in the 'interface' list.  This is effectively a
            static route for outbound packets.";
       }
-        
+
       container bridge {
         description
           "The configuration for the bridge module associated with the VPLS to
@@ -426,7 +418,7 @@ module snabb-l2vpn-v1 {
               container mac-table {
                 description
                   "Configuration of the MAC table associated with the learning bridge.";
-                
+
                 leaf size {
                   type uint32;
                   default 1024;
@@ -437,8 +429,8 @@ module snabb-l2vpn-v1 {
                   type uint16;
                   default 600;
                   description
-                    "The interval in seconds after which an entry is expired from the MAC
-                     address table.";
+                    "The interval in seconds after which an inactive entry is expired from
+                     the MAC address table.";
                 }
                 leaf verbose {
                   type boolean;
@@ -457,16 +449,14 @@ module snabb-l2vpn-v1 {
                      size of the table.";
                 }
               } // mac-table
-              
             }
           }
         } // choice
-          
       } // bridge
 
       list attachment-circuit {
         key "name";
-          
+
         leaf name {
           type string;
           mandatory true;
@@ -480,10 +470,10 @@ module snabb-l2vpn-v1 {
             "The name of the interface as it appears in the 'interface' list.";
         }
       }
-        
+
       list pseudowire {
         key "name";
-          
+
         leaf name {
           type string;
           mandatory true;
@@ -505,7 +495,7 @@ module snabb-l2vpn-v1 {
              set to zero and the uniqueness property applies to the
              pair (local address, remote address).";
         }
-          
+
         container transport {
           description
             "The IP addresses of the local and remote endpoints of the tunnel. ipv4
@@ -513,23 +503,23 @@ module snabb-l2vpn-v1 {
 
           uses address-family-choice;
         }
-          
+
         container tunnel {
           description
             "The type and configuration of the tunnel protocol. Only a single
              selection is allowed.  Currently supported tunnels are
              l2tpv3 (in the flavor of 'Keyed IPv6 Tunnel', RFC 8159)
              and GRE.";
-          
+
           choice tunnel-type {
             mandatory true;
             case l2tpv3 {
               container l2tpv3 {
                 description
                   "The configuration of the l2tpv3 tunnel type.";
-                
+
                 mandatory true;
-                leaf local_cookie {
+                leaf local-cookie {
                   type string;
                   default "\x00\x00\x00\x00\x00\x00\x00\x00";
                   description
@@ -539,7 +529,7 @@ module snabb-l2vpn-v1 {
                      string and may contain any escape sequence
                      supported by Lua.";
                 }
-                leaf remote_cookie {
+                leaf remote-cookie {
                   type string;
                   default "\x00\x00\x00\x00\x00\x00\x00\x00";
                   description
@@ -560,7 +550,7 @@ module snabb-l2vpn-v1 {
                    for the protocol header field.  The key field is
                    used to transport the VC ID. Checksumming is not
                    supported.";
-                
+
                 leaf dummy {
                   type boolean;
                   description
@@ -571,12 +561,12 @@ module snabb-l2vpn-v1 {
             }
           }
         } // tunnel
-        
+
         container control-channel {
           description
             "The configuration of the proprietary control-channel between tunnel
                endpoints.";
-          
+
           leaf enable {
             type boolean;
             default true;
@@ -600,7 +590,6 @@ module snabb-l2vpn-v1 {
                  pseudowire is unidirectional.";
           }
         } // control-channel
-        
       } // pw
     } // vpls
   } // l2vpn-config

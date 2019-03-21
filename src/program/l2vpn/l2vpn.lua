@@ -510,10 +510,11 @@ function parse_intf(name, config)
       intf.subintfs = {}
       assert(nil_or_empty_p(config.address_families),
              "Address family configuration not allowed in trunking mode")
-      local encap = trunk.encapsulation or "dot1q"
-      assert(encap == "dot1q" or encap == "dot1ad" or
-                (type(encap) == "number"),
-             "Illegal encapsulation mode "..encap)
+      local encap = trunk.encapsulation
+      if encap == "raw" then
+         encap = assert(trunk.tpid,
+                        "tpid required for raw mode encapsulation")
+      end
       print("      Encapsulation "..
                (type(encap) == "string" and encap
                    or string.format("ether-type 0x%04x", encap)))
@@ -974,6 +975,9 @@ local function setup_shm_and_snmp (main_config, pid)
 
    local snmp = main_config.snmp or { enable = false }
    if snmp.enable then
+      local shm_subdir = 'snmp'
+      local shm_dir = shm.root.."/"..shm_subdir
+      shm.mkdir(shm_subdir)
       for name, intf in pairs(state.intfs) do
          if not intf.vlan then
             -- Set up SNMP for physical interfaces
@@ -983,7 +987,7 @@ local function setup_shm_and_snmp (main_config, pid)
                                   ifName = name,
                                   ifAlias = intf.description, },
                   string.gsub(name, '/', '-'), stats,
-                  snmp.shmem_dir, snmp.interval or 5)
+                  shm_dir, snmp.interval or 5)
             else
                print("Can't enable SNMP for interface "..name
                         ..": no statistics counters available")
@@ -1038,7 +1042,7 @@ local function setup_shm_and_snmp (main_config, pid)
                                ifName = name,
                                ifAlias = intf.description, },
                string.gsub(name, '/', '-'), counters,
-               snmp.shmem_dir, snmp.interval or 5)
+               shm_dir, snmp.interval or 5)
          end
       end
    end
