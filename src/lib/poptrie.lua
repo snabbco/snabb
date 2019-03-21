@@ -534,9 +534,15 @@ function selftest ()
    if pmu.is_available() then
       local t = new{direct_pointing=false}
       local k = {}
-      local numentries = lib.getenv("SNABB_POPTRIE_NUMENTRIES") or 10000
-      local numhit = lib.getenv("SNABB_POPTRIE_NUMHIT") or 100
-      local keysize = lib.getenv("SNABB_POPTRIE_KEYSIZE") or 32
+      local numentries = tonumber(
+         lib.getenv("SNABB_POPTRIE_NUMENTRIES") or 10000
+      )
+      local numhit = tonumber(
+         lib.getenv("SNABB_POPTRIE_NUMHIT") or 100
+      )
+      local keysize = tonumber(
+         lib.getenv("SNABB_POPTRIE_KEYSIZE") or 32
+      )
       for entry = 0, numentries - 1 do
          local a, l = rs(), math.random(keysize)
          t:add(a, l, entry)
