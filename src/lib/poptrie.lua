@@ -534,12 +534,13 @@ function selftest ()
    if pmu.is_available() then
       local t = new{direct_pointing=false}
       local k = {}
-      local numentries = 10000
-      local keysize = 32
+      local numentries = lib.getenv("SNABB_POPTRIE_NUMENTRIES") or 10000
+      local numhit = lib.getenv("SNABB_POPTRIE_NUMHIT") or 100
+      local keysize = lib.getenv("SNABB_POPTRIE_KEYSIZE") or 32
       for entry = 0, numentries - 1 do
          local a, l = rs(), math.random(keysize)
          t:add(a, l, entry)
-         k[entry % 100 + 1] = a
+         k[entry % numhit + 1] = a
       end
       local function build ()
          t:build()
@@ -556,7 +557,8 @@ function selftest ()
       local function lookup128 (iter)
          for i=1,iter do t:lookup128(k[i%#k+1]) end
       end
-      print("PMU analysis (numentries="..numentries..", keysize="..keysize..")")
+      print(("PMU analysis (numentries=%d, numhit=%d, keysize=%d)")
+         :format(numentries, numhit, keysize))
       pmu.setup()
       time("build", build)
       measure("lookup", lookup, 1e5)
