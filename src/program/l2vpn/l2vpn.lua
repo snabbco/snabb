@@ -754,7 +754,6 @@ function parse_config (main_config)
 
    local ipsec_assocs = {}
    for _, config in pairs(main_config.ipsec) do
-      print(require("inspect")(config))
       local afi, addrs = singleton(config.traffic_selector)
       local af = check_af(afi)
       local sd_pair = src_dst_pair(af, addrs.remote_address, addrs.local_address)
@@ -1110,9 +1109,9 @@ function run (parameters)
    if #jit_opts then
       require("jit.opt").start(unpack(jit_opts))
    end
-   if #parameters ~= 1 then usage () end
 
-   local config_file = table.remove(parameters, 1)
+   if #parameters < 1 or #parameters > 2 then usage () end
+   local config_file, state_dir = unpack(parameters)
 
    if jit_conf.p then
       require("jit.p").start(jit_conf.p.opts, jit_conf.p.file)
@@ -1145,6 +1144,16 @@ function run (parameters)
 
    manager:main(5)
    local worker_pid = manager.workers.data_plane.pid
+   if state_dir then
+      local function write_pid (pid, file)
+         local f = assert(io.open(state_dir.."/"..file, "w"))
+         assert(f:write(("%d"):format(pid)))
+         assert(f:close())
+      end
+      write_pid(S.getpid(), 'master.pid')
+      write_pid(worker_pid, 'data.pid')
+      write_pid(manager.workers.control_plane.pid, 'ctrl.pid')
+   end
    setup_shm_and_snmp(initial_config.l2vpn_config, worker_pid)
    for name, nd in pairs(state.nds) do
       local mac = macaddress:new(counter.read(nd.intf.stats.macaddr))

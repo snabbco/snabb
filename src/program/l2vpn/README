@@ -1,7 +1,9 @@
-Usage: l2vpn [OPTION]... CONFIG
+Usage: l2vpn [OPTION]... CONFIG [STATEDIR]
 
 Provision an endpoint for a Ethernet point-to-point or multipoint VPN
-according to the configuration supplied in the CONFIG file.
+according to the configuration supplied in the CONFIG file.  If STATEDIR
+is supplied, the PIDs of the master and worker processes are stored in
+that directory.
 
   -D TIME,   --duration TIME Time in seconds for which the application will
                              be run.  If TIME is equal to 0, the application
