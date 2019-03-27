@@ -601,14 +601,18 @@ end
 --   (or aesni_encrypt_256_single_block)
 --   aesni_gcm_precomp_avx_gen4(gcm_data, hash_subkey)
 -- 
--- Then your gcm_data state is ready for use with aesni_gcm_enc_128_avx_gen4,
--- aesni_gcm_dec_128_avx_gen4, aesni_gcm_enc_256_avx_gen4, and
--- aesni_gcm_dec_256_avx_gen4 and aad_prehash.
+-- Then your gcm_data state is ready for use with aesni_gcm_enc_*_avx_gen4,
+-- aesni_gcm_dec_*_avx_gen4, and aad_prehash.
 --
 -- If your AAD is <= 16 bytes you can pad it to 16 bytes with zero bits and
--- pass it to aesni_gcm_enc_avx_gen4 and aesni_gcm_dec_avx_gen4 as is. However,
--- if your AAD exceeds 16 bytes you need to pre-hash it using aad_prehash and
--- use the resulting 16 byte output.
+-- pass it to aesni_gcm_enc_*_avx_gen4 and aesni_gcm_dec_*_avx_gen4 as is.
+-- However, if your AAD exceeds 16 bytes you need to pre-hash it using
+-- aad_prehash and use the resulting 16 byte output. You still need to pass the
+-- actual length of the AAD (i.e., as supplied to aad_prehash) to
+-- aesni_gcm_enc_*_avx_gen4 and aesni_gcm_dec_*_avx_gen4!
+
+-- You can also use aad_prehash on <= 16 byte AAD, but that amounts to a NOOP.
+-- Either way, the AAD’s length MUST be a multiple of four (i.e., not zero).
 --
 -- Make sure to check the resulting authentication tags, i.e. using
 -- auth16_equal!
@@ -643,7 +647,7 @@ end
 --  4) uint64_t len
 --  5) uint8_t  iv[16]      (96 bit IV, padded with bytes 0001, aligned to 16 bytes)
 --  6) uint8_t  aad[16]     (16 bytes, output of aad_prehash if aadlen > 16)
---  7) uint64_t aadlen      (a multiple of 4)
+--  7) uint64_t aadlen      (a multiple of 4, the actual aadlen as passed to aad_prehash)
 --  8) uint8_t  tag[taglen]
 --  9) uint64_t taglen      (should be 16 for all intents and purposes)
 --
