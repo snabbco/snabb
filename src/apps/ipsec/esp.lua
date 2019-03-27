@@ -209,6 +209,10 @@ function Transport_IKE:new (conf)
    return self
 end
 
+function Transport_IKE:stop ()
+   shm.delete_frame(self.sa_frame)
+end
+
 function Transport_IKE:maybe_update_key (dir, update_fn)
    local cache = self.sas[dir]
    local sa = self.sa_frame[dir]
