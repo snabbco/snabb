@@ -476,15 +476,16 @@ endpoints must be obtained by the operator.
 The configuration for the `l2vpn` program is represented as an
 instance of a YANG schema expressed in the syntax of YANG itself
 [(`RFC6020`)](https://tools.ietf.org/html/rfc6020).  It consists of
-five major sections in the form of _containers_ (in the context of
-YANG).
+the following major sections in the form of _containers_ or _lists_
+(in the context of YANG).
 
 ```
 l2vpn-config {
   luajit {}
   snmp {}
   interface {}
-  ipsec {}
+  peers {}
+  transport {}
   vpls {}
 }
 ```
@@ -556,9 +557,153 @@ list of all interfaces.  Each interface is uniquely identified by the
 value of the `name` leaf node. See the section about [interface
 abstraction](#interface-abstraction) for more details.
 
-### Section `ipsec`
+### Section `peers`
 
-See [IPsec](#ipsec) for a description of the `ipsec` configuration.
+This section defines an inventory of all systems that play the role of
+*PE* devices for any VPLS instances defined by the configuration.
+They are referred to as _peers_ rather than PE devices in this
+context.  Each peer has a unique name and a list of IPv4 and IPv6
+addresses associated with it.  Each address can be used as one
+endpoint of a pseudowire as detailed in the
+[`transport`](#transport-config) section.
+
+The list of peers is divided into a local part and a remote part.
+There must be exactly one local peer and at least one remote peer.
+The local peer defines the name and addresses of the local system.
+
+```
+peers {
+  local {
+    name <peer-name>;
+    [ endpoint {
+        name <endpoint-name>;
+        ipv4 <ipv4-address> | ipv6 <ip6-address>;
+      } ]
+    [ ... ]
+  }
+  remote {
+    name <peer-name>;
+    [ endpoint {
+        name <endpoint-name>;
+        ipv4 <ipv4-address> | ipv6 <ip6-address>;
+      } ]
+    [ ... ]
+  }
+  [ remote ... ]
+}
+```
+
+The following fragment defines a set of three peers.
+
+```
+peers {
+  local {
+    name "local";
+    endpoint {
+      name "l_v4";
+      ipv4 "192.0.2.1";
+    }
+    endpoint {
+      name "l_v6";
+      ipv6 "2001:db8::1";
+    }
+  }
+  remote {
+    name "remote1";
+    endpoint {
+      name "r1_v4";
+      ipv4 "192.0.2.2";
+    }
+    endpoint {
+      name "r1_v6";
+      ipv6 "2001:db8::2";
+    }
+  }
+  remote {
+    name "remote2";
+    endpoint {
+      name "r2_v4";
+      ipv4 "192.0.2.3";
+    }
+  }
+}
+```
+
+### Section <a name="transport-config">`transport`</a>
+
+A `transport` is an ordered pair of addresses of a specific address
+family that make up the endpoints of a pseudowire.  The local endpoint
+must be chosen from the local peer and the remote endpoint must be
+chosen from any of the remote peers.
+
+The reference to an address is composed of the name of the peer and
+the name of the endpoint within that peer.  It is an error to
+reference an address whose address family doesn't match that of the
+transport.
+
+Each transport has a unique name by which it can be referred to in the
+context of a pseudowire assigned to a VPLS instance.
+
+```
+transport {
+  name <transport-name>;
+  address-family ipv4 | ipv6;
+  local {
+    peer <peer-name>;
+    endpoint <endpoint-name>;
+  }
+  remote {
+    peer <peer-name>;
+    endpoint <endpoint-name>;
+  }
+  ipsec {
+  }
+}
+```
+
+The `ipsec` container is descriped in the [IPsec](#ipsec) section.
+
+For example, given the peers from the previous section, the following
+fragment defines three transports between the peers.
+
+```
+transport {
+  name "r1_v4";
+  address-family ipv4;
+  local {
+    peer "local";
+    endpoint "l_v4";
+  }
+  remote {
+    peer "remote1";
+    endpoint "r1_v4";
+  }
+}
+transport {
+  name "r1_v6";
+  address-family ipv6;
+  local {
+    peer "local";
+    endpoint "l_v6";
+  }
+  remote {
+    peer "remote1";
+    endpoint "r1_v6";
+  }
+}
+transport {
+  name "r2_v4";
+  address-family ipv4;
+  local {
+    peer "local";
+    endpoint "l_v4";
+  }
+  remote {
+    peer "remote1";
+    endpoint "r2_v4";
+  }
+}
+```
 
 ### Section <a name="vpls-instance-config">`vpls`</a>
 
@@ -745,32 +890,13 @@ the items follows here.
 
       * `transport`
 
-        The IP protocol and addresses of the local and remote tunnel
-        endpoints. There must be either a `ipv4` or `ipv6`
-        sub-container, e.g.
-
-        ```
-        transport {
-          ipv4 {
-            local-address "192.0.2.1";
-            remote-address "192.0.2.2";
-          }
-        }
-        ```
-
-        ```
-        transport {
-          ipv6 {
-            local-address "2001:db8:0:1::1";
-            remote-address "2001:db8:0:2::2";
-          }
-        }
-        ```
+        The name of the transport to use for this pseudowire.  It must
+        match exactly the value of the _name_ node of the transport.
 
       * `tunnel`
 
         The type and configuration of the encapsulation used on top of
-        the transport protocol.  Currently, two types are supported
+        the transport.  Currently, two types are supported
 
         ```
         tunnel {
@@ -861,6 +987,7 @@ l2vpn-config {
         next-hop "2001:db8:0:C101:0:0:0:1";
       }
     }
+  }
   interface {
     name "TenGigE0/0";
     description "AC";
@@ -870,6 +997,34 @@ l2vpn-config {
       config "{ pciaddr = '0000:04:00.0', rxq = 0, txq = 0 }";
     }
     mtu 9206;
+  }
+  peers {
+    local {
+      name "A";
+      endpoint {
+        name "local";
+        ipv6 "2001:db8:0:1:0:0:0:1";
+      }
+    }
+    remote {
+      name "B";
+      endpoint {
+        name "remote";
+        ipv6 "2001:db8:0:1:0:0:0:2";
+      }
+    }
+  }
+  transport {
+    name "transport";
+    address-family "ipv6";
+    local {
+      peer "A";
+      endpoint "local";
+    }
+    remote {
+      peer "B";
+      endpoint "remote";
+    }
   }
   vpls {
     name "myvpn";
@@ -883,12 +1038,7 @@ l2vpn-config {
     pseusowire {
       name "pw_B";
       vc-id 0;
-      transport {
-        ipv6 {
-          local-address "2001:db8:0:1:0:0:0:1";
-          remote-address "2001:db8:0:1:0:0:0:2";
-        }
-      }
+      transport "transport";
       tunnel {
         l2tpv3 {
           local-cookie "\x00\x11\x22\x33\x44\x55\x66\x77";
@@ -926,16 +1076,44 @@ l2vpn-config {
         next-hop "2001:db8:0:C102:0:0:0:1";
       }
     }
-    interface {
-      name "TenGigE0/0";
-      description "AC";
-      driver {
-        path "apps.intel_mp.intel_mp";
-        name "Intel";
-        config "{ pciaddr = '0000:04:00.0', rxq = 0, txq = 0 }";
-      }
+  }
+  interface {
+    name "TenGigE0/0";
+    description "AC";
+    driver {
+      path "apps.intel_mp.intel_mp";
+      name "Intel";
+      config "{ pciaddr = '0000:04:00.0', rxq = 0, txq = 0 }";
     }
     mtu 9206;
+  }
+  peers {
+    local {
+      name "B";
+      endpoint {
+        name "local";
+        ipv6 "2001:db8:0:1:0:0:0:2";
+      }
+    }
+    remote {
+      name "A";
+      endpoint {
+        name "remote";
+        ipv6 "2001:db8:0:1:0:0:0:1";
+      }
+    }
+  }
+  transport {
+    name "transport";
+    address-family "ipv6";
+    local {
+      peer "B";
+      endpoint "local";
+    }
+    remote {
+      peer "A";
+      endpoint "remote";
+    }
   }
   vpls {
     name "myvpn";
@@ -949,12 +1127,7 @@ l2vpn-config {
     pseudowire {
       name "pw_A";
       vc_id = 0;
-      transport {
-        ipv6 {
-          local-address "2001:db8:0:1:0:0:0:2";
-          remote-address "2001:db8:0:1:0:0:0:1";
-        }
-      }
+      transport "transport";
       tunnel {
         l2tpv3 {
           local-cookie "\x77\x66\x55\x44\x33\x33\x11\x00";
@@ -1042,60 +1215,32 @@ module snabb-l2vpn-v1 {
       }
     }
 
-    grouping address-families {
+    grouping interface-address-families {
       container address-families {
         container ipv4 {
           leaf address {
             type inet:ipv4-address;
+            description
+              "The IPv4 address assigned to the L3 interface, without netmask.";
           }
           leaf next-hop {
             type inet:ipv4-address;
+            description
+              "The IPv4 next-hop address used for all packets leaving the L3
+               interface. The address is assumed to be on-net.";
           }
         }
         container ipv6 {
           leaf address {
             type inet:ipv6-address;
+             description
+              "The IPv6 address assigned to the L3 interface, without netmask.";
           }
           leaf next-hop {
             type inet:ipv6-address;
-          }
-        }
-      }
-    }
-
-    grouping address-family-choice {
-      choice address-family {
-        mandatory true;
-        case ipv4 {
-          container ipv4 {
-            leaf local-address {
-              type inet:ipv4-address;
-              mandatory true;
-              description
-                "The IPv4 address of the local endpoint";
-            }
-            leaf remote-address {
-              type inet:ipv4-address;
-              mandatory true;
-              description
-                "The IPv4 address of the remote endpoint";
-            }
-          }
-        }
-        case ipv6 {
-          container ipv6 {
-            leaf local-address {
-              type inet:ipv6-address;
-              mandatory true;
-              description
-                "The IPv6 address of the local endpoint";
-            }
-            leaf remote-address {
-              type inet:ipv6-address;
-              mandatory true;
-              description
-                "The IPv6 address of the remote endpoint";
-            }
+            description
+              "The IPv6 next-hop address used for all packets leaving the L3
+               interface. The address is assumed to be on-net.";
           }
         }
       }
@@ -1211,7 +1356,7 @@ module snabb-l2vpn-v1 {
            interface";
       }
 
-      uses address-families;
+      uses interface-address-families;
 
       container trunk {
         leaf enable {
@@ -1271,47 +1416,149 @@ module snabb-l2vpn-v1 {
                  interface but must not exceed it.";
           }
 
-          uses address-families;
+          uses interface-address-families;
 
         } // vlan
       } // trunk
     } // interface
 
-    list ipsec {
+    container peers {
       description
-        "A list of pairs of addresses for which communication must be protected
-         by IPsec.  This policy will be applied to all tunnels between
-         the addresses covered by the traffic selector, irrespective
-         of the VPLS instance to which they belong.  The keys must be generated
-         by the IKE daemon and passed to the L2VPN process.  The IKE daemon must
-         be configured with an IPsec policy with matching encryption algorithm and
-         traffic selector.";
+        "Definition of peers between which transport of L2 packets can be
+         established.  There must be exactly one peer in the local
+         list and at least one in the remote list.  Each peer has a
+         list of IPv4 or IPv6 addresses associated with it.  Unique
+         pairs of local and remote addresses can be defined as
+         communication channels through the transport configuration item.";
+
+      grouping peer {
+        description
+          "";
+
+        leaf name {
+          type string;
+          description
+            "The name of the local system.";
+        }
+
+        list endpoint {
+          description
+            "An ipv4 or ipv6 address which can be used as an endpoint for a
+             pseudowire.";
+
+          key "name";
+
+          leaf name {
+            type string;
+            description
+              "The name of the endpoint. The pair of peer name and endpoint name is
+               used to select the remote and local addresses for a transport.";
+          }
+
+          choice address-by-family {
+            mandatory true;
+            case ipv4 {
+              leaf ipv4 {
+                type inet:ipv4-address;
+                mandatory true;
+                description
+                  "An IPv4 address.";
+              }
+            }
+            case ipv6 {
+              leaf ipv6 {
+                type inet:ipv6-address;
+                mandatory true;
+                description
+                  "An IPv6 address.";
+              }
+            }
+          }
+        }
+      }
+
+      list local {
+        min-elements 1;
+        max-elements 1;
+
+        key "name";
+        uses peer;
+      }
+
+      list remote {
+        min-elements 1;
+
+        key "name";
+        uses peer;
+      }
+    }
+
+    list transport {
+      min-elements 1;
+      description
+        "A transport is a pair of addresses selected from the set of endpoints
+         of all configured peers, with the restriction that the local
+         endpoint must be selected from the local peer and the remote
+         endpoint must be selected from any of the remote peers.  The
+         address families of the addresses must match the address
+         family chosen for the transport.";
 
       key "name";
 
+      grouping endpoint-selector {
+        leaf peer {
+          type string;
+          mandatory true;
+          description
+            "The name of the peer from which to select an endpoint address.";
+        }
+        leaf endpoint {
+          type string;
+          mandatory true;
+          description
+            "The name of the endpoint relative to the selected peer.";
+        }
+      }
+
       leaf name {
         type string;
+        mandatory true;
         description
-          "The name of the connection to which IPsec will be applied.  It is
-           arbitrary and has no significance for other parts of the
-           configuration.";
+          "The name of this transport.";
       }
-
-      leaf encryption-algorithm {
+      leaf address-family {
         type enumeration {
-          enum "aes-gcm-16-icv";
+          enum "ipv4";
+          enum "ipv6";
         }
-        default aes-gcm-16-icv;
-        description
-          "The encryption algorithm to use.  Currently, only aes-gcm-16-icv is
-           supported";
+        mandatory true;
       }
-
-      container traffic-selector {
+      container local {
         description
-          "The IP addresses of the local and remote endpoints. ipv4 and ipv6 are
-           mutually exclusive.";
-        uses address-family-choice;
+          "The selector of an address from the local peer.";
+        uses endpoint-selector;
+      }
+      container remote {
+        description
+          "The selector of an address from any of the remote peers.";
+        uses endpoint-selector;
+      }
+      container ipsec {
+        leaf enable {
+          type boolean;
+          default false;
+          description
+            "Whether to enable IPsec for this transport.";
+        }
+        leaf encryption-algorithm {
+          type enumeration {
+            enum "aes-gcm-16-icv";
+          }
+          default aes-gcm-16-icv;
+          description
+            "The encryption algorithm to use.  Currently, only aes-gcm-16-icv is
+             supported";
+        }
       }
     }
 
@@ -1455,6 +1702,7 @@ module snabb-l2vpn-v1 {
           description
             "An arbitrary name that identifies this pseudowire.";
         }
+
         leaf vc-id {
           type uint16;
           mandatory true;
@@ -1471,12 +1719,11 @@ module snabb-l2vpn-v1 {
              pair (local address, remote address).";
         }
 
-        container transport {
+        leaf transport {
+          type string;
+          mandatory true;
           description
-            "The IP addresses of the local and remote endpoints of the tunnel. ipv4
-             and ipv6 are mutually exclusive.";
-
-          uses address-family-choice;
+            "The name of the transport to use for this pseudowire.";
         }
 
         container tunnel {
@@ -2284,35 +2531,22 @@ most Cisco devices and are almost but not quite identical to their
 ## <a name="ipsec">IPsec</a>
 
 A pseudowire can be protected by IPsec for authentication and
-confidentiality.  An IPsec policy is applied to all traffic between a
-given pair of addresses. If an instance of the `l2vpn` contains
-multiple pseudowires between the same pair of addresses, all of them
-are protected by the same policy.  Therefore, the IPsec configuration
-is located outside the VPLS configuration at the top-level `l2vpn`
-configuration.  It consists of one instance per IPsec policy of an
-`ipsec` container
+confidentiality.  An IPsec policy is applied to a specific transport.
+This implies that all pseudowire using the same transport are covered
+by the same policy.  Configuration-wise, IPsec is covered by the
+`ipsec` container within a `transport`.
 
 ```
 ipsec {
-  name <name>;
+  enable true | false;
   encryption-algorithm aes-gcm-16-icv;
-  traffic-selector {
-    ipv4 {
-      local-address <local_address>;
-      remote-address <remote_address>;
-    } |
-    ipv6 {
-      local-address <local_address>;
-      remote-address <remote_address>;
-    }
-  }
 }
 ```
 
-The `<name>` is arbitrary but must be unique among all IPsec policies.
-Currently, only `aes-gcm-16-icv` is supported.  Authentication of the
-endpoints and the negotiation of keying material must be supplied by
-an external service that implements the IKE protocol.
+Currently, the only supported algorithm is `aes-gcm-16-icv`.
+Authentication of the endpoints and the negotiation of keying material
+must be supplied by an external service that implements the IKE
+protocol.
 
 ### Dynamic Key Exchange
 
@@ -2339,6 +2573,11 @@ In the following, it is assumed that the native `systemd` variant of
 
 #### Configuring IKE
 
+The configuration of IKE associations is closely related to the list
+of peers.  Essentially, one must establish one IKE SA per pair of
+peers which is referenced by a transport that has IPsec enabled.
+
+
 For the purpose of illustration, we assume the following setup of a
 pair of systems with two pseudowires between them that should be
 protected by IPsec.
@@ -2360,36 +2599,65 @@ follows
 
 ```
 l2vpn-config {
-  ipsec {
-    name "ipsec_vplsv4";
-    encryption-algorithm aes-gcm-16-icv;
-    traffic-selector {
-      ipv4 {
-        local-address "192.168.1.1";
-        remote-address "192.168.2.1";
+  peers {
+    local {
+      name "A";
+      endpoint {
+        name "v4";
+        ipv4 "192.168.1.1";
+      }
+      endpoint {
+        name "v6";
+        ipv6 "2001:db8:0:1::1";
       }
     }
-  }
-  ipsec {
-    name "ipsec_vplsv6";
-    encryption-algorithm aes-gcm-16-icv;
-    traffic-selector {
-      ipv6 {
-        local-address "2001:db8:0:1::1";
-        remote-address "2001:db8:0:2::1";
+    remote {
+      name "B";
+      endpoint {
+        name "v4";
+        ipv4 "192.168.2.1";
       }
-    }
-  }
+      endpoint {
+        name "v6";
+        ipv6 "2001:db8:0:2::1";
+      }
 
+    }
+  }
+  transport {
+    name "v4";
+    address-family "ipv4";
+    local {
+      peer "A";
+      endpoint "v4";
+    }
+    remote {
+      peer "B";
+      endpoint "v4";
+    }
+    ipsec {
+      enable true;
+    }
+  }
+  transport {
+    name "v6";
+    address-family "ipv6";
+    local {
+      peer "A";
+      endpoint "v6";
+    }
+    remote {
+      peer "B";
+      endpoint "v6";
+    }
+    ipsec {
+      enable true;
+    }
+  }
   vpls {
     name "vplsv4";
     vc-id 1;
-    transport {
-      ipv4 {
-        local-address "192.168.1.1";
-        remote-address "192.168.2.1";
-      }
-    }
+    transport "v4";
     tunnel {
       gre {}
     }
@@ -2397,12 +2665,7 @@ l2vpn-config {
   vpls {
     name "vplsv6";
     vc-id 0;
-    transport {
-      ipv6 {
-        local-address "2001:db8:0:1::1";
-        remote-address "2001:db8:0:2::1";
-      }
-    }
+    transport "v6";
     tunnel {
       l2tpv3 {}
     }
@@ -2414,36 +2677,65 @@ On system `B`
 
 ```
 l2vpn-config {
-  ipsec {
-    name "ipsec_vplsv4";
-    encryption-algorithm aes-gcm-16-icv;
-    traffic-selector {
-      ipv4 {
-        local-address "192.168.2.1";
-        remote-address "192.168.1.1";
+  peers {
+    local {
+      name "B";
+      endpoint {
+        name "v4";
+        ipv4 "192.168.2.1";
+      }
+      endpoint {
+        name "v6";
+        ipv6 "2001:db8:0:2::1";
       }
     }
-  }
-  ipsec {
-    name "ipsec_vplsv6";
-    encryption-algorithm aes-gcm-16-icv;
-    traffic-selector {
-      ipv6 {
-        local-address "2001:db8:0:2::1";
-        remote-address "2001:db8:0:1::1";
+    remote {
+      name "A";
+      endpoint {
+        name "v4";
+        ipv4 "192.168.1.1";
       }
-    }
-  }
+      endpoint {
+        name "v6";
+        ipv6 "2001:db8:0:1::1";
+      }
 
+    }
+  }
+  transport {
+    name "v4";
+    address-family "ipv4";
+    local {
+      peer "B";
+      endpoint "v4";
+    }
+    remote {
+      peer "A";
+      endpoint "v4";
+    }
+    ipsec {
+      enable true;
+    }
+  }
+  transport {
+    name "v6";
+    address-family "ipv6";
+    local {
+      peer "B";
+      endpoint "v6";
+    }
+    remote {
+      peer "A";
+      endpoint "v6";
+    }
+    ipsec {
+      enable true;
+    }
+  }
   vpls {
     name "vplsv4";
     vc-id 1;
-    transport {
-      ipv4 {
-        local-address "192.168.2.1";
-        remote-address "192.168.1.1";
-      }
-    }
+    transport "v4";
     tunnel {
       gre {}
     }
@@ -2451,12 +2743,7 @@ l2vpn-config {
   vpls {
     name "vplsv6";
     vc-id 0;
-    transport {
-      ipv6 {
-        local-address "2001:db8:0:2::1";
-        remote-address "2001:db8:0:1::1";
-      }
-    }
+    transport "v6";
     tunnel {
       l2tpv3 {}
     }

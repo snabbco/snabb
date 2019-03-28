@@ -67,60 +67,32 @@ module snabb-l2vpn-v1 {
       }
     }
 
-    grouping address-families {
+    grouping interface-address-families {
       container address-families {
         container ipv4 {
           leaf address {
             type inet:ipv4-address;
+            description
+              "The IPv4 address assigned to the L3 interface, without netmask.";
           }
           leaf next-hop {
             type inet:ipv4-address;
+            description
+              "The IPv4 next-hop address used for all packets leaving the L3
+               interface. The address is assumed to be on-net.";
           }
         }
         container ipv6 {
           leaf address {
             type inet:ipv6-address;
+             description
+              "The IPv6 address assigned to the L3 interface, without netmask.";
           }
           leaf next-hop {
             type inet:ipv6-address;
-          }
-        }
-      }
-    }
-
-    grouping address-family-choice {
-      choice address-family {
-        mandatory true;
-        case ipv4 {
-          container ipv4 {
-            leaf local-address {
-              type inet:ipv4-address;
-              mandatory true;
-              description
-                "The IPv4 address of the local endpoint";
-            }
-            leaf remote-address {
-              type inet:ipv4-address;
-              mandatory true;
-              description
-                "The IPv4 address of the remote endpoint";
-            }
-          }
-        }
-        case ipv6 {
-          container ipv6 {
-            leaf local-address {
-              type inet:ipv6-address;
-              mandatory true;
-              description
-                "The IPv6 address of the local endpoint";
-            }
-            leaf remote-address {
-              type inet:ipv6-address;
-              mandatory true;
-              description
-                "The IPv6 address of the remote endpoint";
-            }
+            description
+              "The IPv6 next-hop address used for all packets leaving the L3
+               interface. The address is assumed to be on-net.";
           }
         }
       }
@@ -236,7 +208,7 @@ module snabb-l2vpn-v1 {
            interface";
       }
 
-      uses address-families;
+      uses interface-address-families;
 
       container trunk {
         leaf enable {
@@ -296,47 +268,149 @@ module snabb-l2vpn-v1 {
                  interface but must not exceed it.";
           }
 
-          uses address-families;
+          uses interface-address-families;
 
         } // vlan
       } // trunk
     } // interface
 
-    list ipsec {
+    container peers {
       description
-        "A list of pairs of addresses for which communication must be protected
-         by IPsec.  This policy will be applied to all tunnels between
-         the addresses covered by the traffic selector, irrespective
-         of the VPLS instance to which they belong.  The keys must be generated
-         by the IKE daemon and passed to the L2VPN process.  The IKE daemon must
-         be configured with an IPsec policy with matching encryption algorithm and
-         traffic selector.";
+        "Definition of peers between which transport of L2 packets can be
+         established.  There must be exactly one peer in the local
+         list and at least one in the remote list.  Each peer has a
+         list of IPv4 or IPv6 addresses associated with it.  Unique
+         pairs of local and remote addresses can be defined as
+         communication channels through the transport configuration item.";
+
+      grouping peer {
+        description
+          "";
+
+        leaf name {
+          type string;
+          description
+            "The name of the local system.";
+        }
+
+        list endpoint {
+          description
+            "An ipv4 or ipv6 address which can be used as an endpoint for a
+             pseudowire.";
+
+          key "name";
+
+          leaf name {
+            type string;
+            description
+              "The name of the endpoint. The pair of peer name and endpoint name is
+               used to select the remote and local addresses for a transport.";
+          }
+
+          choice address-by-family {
+            mandatory true;
+            case ipv4 {
+              leaf ipv4 {
+                type inet:ipv4-address;
+                mandatory true;
+                description
+                  "An IPv4 address.";
+              }
+            }
+            case ipv6 {
+              leaf ipv6 {
+                type inet:ipv6-address;
+                mandatory true;
+                description
+                  "An IPv6 address.";
+              }
+            }
+          }
+        }
+      }
+
+      list local {
+        min-elements 1;
+        max-elements 1;
+
+        key "name";
+        uses peer;
+      }
+
+      list remote {
+        min-elements 1;
+
+        key "name";
+        uses peer;
+      }
+    }
+
+    list transport {
+      min-elements 1;
+      description
+        "A transport is a pair of addresses selected from the set of endpoints
+         of all configured peers, with the restriction that the local
+         endpoint must be selected from the local peer and the remote
+         endpoint must be selected from any of the remote peers.  The
+         address families of the addresses must match the address
+         family chosen for the transport.";
 
       key "name";
 
+      grouping endpoint-selector {
+        leaf peer {
+          type string;
+          mandatory true;
+          description
+            "The name of the peer from which to select an endpoint address.";
+        }
+        leaf endpoint {
+          type string;
+          mandatory true;
+          description
+            "The name of the endpoint relative to the selected peer.";
+        }
+      }
+
       leaf name {
         type string;
+        mandatory true;
         description
-          "The name of the connection to which IPsec will be applied.  It is
-           arbitrary and has no significance for other parts of the
-           configuration.";
+          "The name of this transport.";
       }
-
-      leaf encryption-algorithm {
+      leaf address-family {
         type enumeration {
-          enum "aes-gcm-16-icv";
+          enum "ipv4";
+          enum "ipv6";
         }
-        default aes-gcm-16-icv;
-        description
-          "The encryption algorithm to use.  Currently, only aes-gcm-16-icv is
-           supported";
+        mandatory true;
       }
-
-      container traffic-selector {
+      container local {
         description
-          "The IP addresses of the local and remote endpoints. ipv4 and ipv6 are
-           mutually exclusive.";
-        uses address-family-choice;
+          "The selector of an address from the local peer.";
+        uses endpoint-selector;
+      }
+      container remote {
+        description
+          "The selector of an address from any of the remote peers.";
+        uses endpoint-selector;
+      }
+      container ipsec {
+        leaf enable {
+          type boolean;
+          default false;
+          description
+            "Whether to enable IPsec for this transport.";
+        }
+        leaf encryption-algorithm {
+          type enumeration {
+            enum "aes-gcm-16-icv";
+          }
+          default aes-gcm-16-icv;
+          description
+            "The encryption algorithm to use.  Currently, only aes-gcm-16-icv is
+             supported";
+        }
       }
     }
 
@@ -480,6 +554,7 @@ module snabb-l2vpn-v1 {
           description
             "An arbitrary name that identifies this pseudowire.";
         }
+
         leaf vc-id {
           type uint16;
           mandatory true;
@@ -496,12 +571,11 @@ module snabb-l2vpn-v1 {
              pair (local address, remote address).";
         }
 
-        container transport {
+        leaf transport {
+          type string;
+          mandatory true;
           description
-            "The IP addresses of the local and remote endpoints of the tunnel. ipv4
-             and ipv6 are mutually exclusive.";
-
-          uses address-family-choice;
+            "The name of the transport to use for this pseudowire.";
         }
 
         container tunnel {

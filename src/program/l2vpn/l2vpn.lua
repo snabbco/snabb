@@ -109,6 +109,14 @@ local function merge (a, b)
    end
 end
 
+local function tlen (t)
+   local length = 0
+   for _, _ in pairs(t) do
+      length = length + 1
+   end
+   return length
+end
+
 local state, data_plane, ctrl_plane
 
 local function clear_state ()
@@ -247,11 +255,8 @@ af_classes = {
    ipv6 = ipv6,
 }
 
-local function check_af (afi)
-   return assert(af_classes[afi], "Invalid address family identifier: "..afi)
-end
-
 local function src_dst_pair (af, src, dst)
+   local af = af_classes[af]
    local function maybe_convert(addr)
       if type(addr) == "string" then
          return assert(af:pton(addr))
@@ -591,7 +596,7 @@ function parse_config (main_config)
    -- pair (source, destination). An integer called the sd_index is
    -- assigned to each (source, destination) pair to identify it
    -- uniquely.
-   local pws = {}
+   local transports = {}
    local dispatchers = { ipv4 = {}, ipv6 = {} }
    local tunnel_infos = {
       l2tpv3 = {
@@ -642,8 +647,12 @@ function parse_config (main_config)
          }
       }
    }
-   local function add_pw (afi, intf, uplink, local_addr, remote_addr,
-                          vc_id, type, config, ipsec_assocs)
+   local function add_pw (transport, intf, uplink, vc_id, type, config)
+      local afi = transport.afi
+      local af = af_classes[afi]
+      local local_addr = af:pton(transport.local_address)
+      local remote_addr = af:pton(transport.remote_address)
+
       local dispatch = dispatchers[afi][uplink]
       if not dispatch then
          dispatch = App:new(data_plane,
@@ -669,77 +678,63 @@ function parse_config (main_config)
                    .." (range 1.."..tunnel_info.vc_id_max..")")
       end
 
-      local af = check_af(afi)
-      local sd_pair = src_dst_pair(af, remote_addr, local_addr)
-      local sd_entry
-      for index, entry in ipairs(pws) do
-         if entry.sd_pair == sd_pair then
-            assert(not entry.vc_ids[vc_id],
-                   ("Non-unique pseudowire: %s <-> %s VC ID %d"):
-                      format(af:ntop(remote_addr),
-                             af:ntop(local_addr), vc_id))
-            entry.vc_ids[vc_id] = true
-            sd_entry = entry
-            break
-         end
-      end
+      assert(not transport.vc_ids[vc_id],
+             ("Non-unique pseudowire: %s <-> %s VC ID %d"):
+                format(af:ntop(remote_addr),
+                       af:ntop(local_addr), vc_id))
+      transport.vc_ids[vc_id] = true
 
-      local assoc = ipsec_assocs[sd_pair]
-      if assoc then
-         print("      IPsec: "..assoc.aead)
+      local ipsec = transport.ipsec
+      if ipsec.enable then
+         print("      IPsec: "..ipsec.encryption_algorithm)
       else
          print("      IPsec: disabled")
       end
-      if not sd_entry then
-         local index = #pws + 1
+      if not transport.protomux then
+         local index = transport.index
 
-         -- Insert an IPsec app if the SD pair is part of a configured
-         -- association
-         local socket
-         if assoc then
+         local socket = dispatch:socket('tp_'..index)
+         if ipsec.enable then
             local esp_module = afi == "ipv4" and "Transport4_IKE" or
                "Transport6_IKE"
             local ipsec = App:new(data_plane, 'ipsec_'..afi.."_"..index,
                                   require("apps.ipsec.esp")[esp_module],
-                                  assoc)
-            data_plane:connect_duplex(dispatch:socket('sd_'..index),
+                                  {
+                                     aead = ipsec.encryption_algorithm,
+                                     auditing = true,
+                                     local_address = transport.local_address,
+                                     remote_address = transport.remote_address })
+            data_plane:connect_duplex(dispatch:socket('tp_'..index),
                                       ipsec:socket('encapsulated'))
             socket = ipsec:socket('decapsulated')
-         else
-            socket = dispatch:socket('sd_'..index)
          end
 
-         -- Each (source, destination) pair connects to a dedicated
-         -- protocol multiplexer.
+         -- Each transport connects to a dedicated protocol
+         -- multiplexer.
          local protomux = App:new(data_plane, 'pmux_'..index,
                                   require("program.l2vpn.transports."..afi).transport,
                                   { src = local_addr, dst = remote_addr, links = {} })
-         dispatch:arg().links['sd_'..index] = { src = remote_addr,
+         dispatch:arg().links['tp_'..index] = { src = remote_addr,
                                                 dst = local_addr }
          data_plane:connect_duplex(socket, protomux:socket('south'))
-         sd_entry = { sd_pair = sd_pair,
-                      index = index,
-                      protomux = protomux,
-                      tunnels = {},
-                      vc_ids = { [vc_id] = true } }
-         table.insert(pws, sd_entry)
+         transport.protomux = protomux
       end
 
-      local tunnel = sd_entry.tunnels[type]
+      local tunnel = transport.tunnels[type]
       if not tunnel then
-         tunnel = App:new(data_plane, type.."_"..sd_entry.index,
+         tunnel = App:new(data_plane, type.."_"..transport.index,
                           tunnel_info.class,
                           { ancillary_data = {
                                remote_addr = af:ntop(remote_addr),
                                local_addr = af:ntop(local_addr) } })
-         sd_entry.tunnels[type] = tunnel
-         sd_entry.protomux:arg().links[type] = { proto = tunnel_info.proto }
-         data_plane:connect_duplex(sd_entry.protomux:socket(type),
+         transport.tunnels[type] = tunnel
+         transport.protomux:arg().links[type] = { proto = tunnel_info.proto }
+         data_plane:connect_duplex(transport.protomux:socket(type),
                                    tunnel:socket('south'))
       end
 
       local vcs = {}
-      for vc_id, _ in pairs(sd_entry.vc_ids) do
+      for vc_id, _ in pairs(transport.vc_ids) do
          local vc_set = tunnel_info.mk_vc_config_fn(vc_id,
                                                     vc_id + 0x8000,
                                                     config)
@@ -752,19 +747,51 @@ function parse_config (main_config)
       return tunnel:socket(('vc_%d'):format(vc_id)), tunnel:socket(('vc_%d'):format(vc_id + 0x8000))
    end
 
-   local ipsec_assocs = {}
-   for _, config in pairs(main_config.ipsec) do
-      local afi, addrs = singleton(config.traffic_selector)
-      local af = check_af(afi)
-      local sd_pair = src_dst_pair(af, addrs.remote_address, addrs.local_address)
-      assert(not ipsec_assocs[sd_pair],
-             ("Multiple definitions for IPsec association %s<->%s"):format(
-                config.remote_address, config.local_address))
-      local assoc = { aead = config.encryption_algorithm, auditing = true }
-      for _, k in ipairs({ 'local_address', 'remote_address' }) do
-         assoc[k] = addrs[k]
+   local index, sd_pairs = 1, {}
+   -- This should be handled by {min,max}-elements in the YANG schema,
+   -- but that check is not yet implemented there.
+   local nlpeers = tlen(main_config.peers['local'] or {})
+   assert(nlpeers == 1, "Exactly one local peer required, got "..nlpeers)
+   local nrpeers = tlen(main_config.peers.remote or {})
+   assert(nrpeers >= 1, "At least one remote peer required, got "..nrpeers)
+   for name, transport in pairs(main_config.transport) do
+      local function check(arg, fmt, ...)
+         assert(arg, ("Transport %s: %s"):format(name, fmt):format(...))
+         return arg
       end
-      ipsec_assocs[sd_pair] = assoc
+
+      local function address (type)
+         local function check2(arg, fmt, ...)
+            return check(arg, ("%s endpoint %s"):format(type, fmt), ...)
+         end
+
+         local t = check2(transport[type], "missing")
+         local peer = check2(main_config.peers[type][t.peer],
+                             "undefined peer %s", t.peer)
+         local ep = check2(peer.endpoint[t.endpoint],
+                           "undefinde endpoint %s for peer %s",
+                           t.endpoint, t.peer)
+         local af, addr = singleton(ep)
+         check2(af == transport.address_family, "address family mismatch for "..
+                   "endpoint %s of peer %s", t.endpoint, t.peer)
+         return addr
+      end
+
+      local lcl_addr, rmt_addr = address('local'), address('remote')
+      sd_pair = src_dst_pair(transport.address_family, lcl_addr, rmt_addr)
+      check(not sd_pairs[sd_pair], "endpoints already defined in "..
+               "transport %s", sd_pairs[sd_pair])
+      sd_pairs[sd_pair] = name
+      transports[name] = {
+         index = index,
+         afi = transport.address_family,
+         local_address = lcl_addr,
+         remote_address = rmt_addr,
+         vc_ids = {},
+         tunnels = {},
+         ipsec = transport.ipsec or { enable = false }
+      }
+      index = index + 1
    end
 
    local bridge_groups = {}
@@ -800,15 +827,12 @@ function parse_config (main_config)
       print("  Creating pseudowires")
       for name, pw in pairs(vpls.pseudowire) do
          print("    "..name)
-         assert(pw.transport, "Transport configuration missing")
-         local afi, transport = singleton(pw.transport)
-         local af = af_classes[afi]
+         local transport = assert(transports[pw.transport],
+                                  ("Undefined transport: %s"):
+                                     format(pw.transport))
+         local afi = transport.afi
          assert(intf.l3[afi].configured,
                 "Address family "..afi.." not enabled on uplink")
-         assert(af:pton(transport.local_address),
-                "Invalid local "..afi.." address "..transport.local_address)
-         assert(af:pton(transport.remote_address),
-                "Invalid remote "..afi.." address "..transport.remote_address)
          print("      AFI: "..afi)
          print("      Local address: "..transport.local_address)
          print("      Remote address: "..transport.remote_address)
@@ -821,9 +845,8 @@ function parse_config (main_config)
          print("      Control-channel: "..(cc.enable and 'enabled' or 'disabled'))
 
          local socket, cc_socket =
-            add_pw(afi, intf, uplink, af:pton(transport.local_address),
-                   af:pton(transport.remote_address),
-                   pw.vc_id, tunnel_type, tunnel_config, ipsec_assocs)
+            add_pw(transport, intf, uplink, pw.vc_id,
+                   tunnel_type, tunnel_config)
          local cc_app
          if cc_socket then
             local qname = vpls_name..'_'..name
