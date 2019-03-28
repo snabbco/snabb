@@ -290,6 +290,17 @@ local function singleton (t)
    return iter(state)
 end
 
+-- The yang module converts IP addresses to their numeric
+-- representation.  Revert to the printable representation.
+local function ntop (afi, addr)
+   assert(addr)
+   if afi == "ipv4" then
+      return require("lib.yang.util").ipv4_ntop(addr)
+   else
+      return ipv6:ntop(addr)
+   end
+end
+
 function parse_intf(name, config)
    print("Setting up interface "..name)
    print("  Description: "..(config.description or "<none>"))
@@ -397,9 +408,11 @@ function parse_intf(name, config)
 
    local afs_procs = {
       ipv6 = function (config, vid, socket_in, indent)
+         local address = ntop("ipv6", config.address)
+         local next_hop = ntop("ipv6", config.next_hop)
          -- FIXME: check fo uniqueness of subnet
-         print(indent.."    Address: "..config.address.."/64")
-         print(indent.."    Next-Hop: "..config.next_hop)
+         print(indent.."    Address: "..address.."/64")
+         print(indent.."    Next-Hop: "..next_hop)
          if config.next_hop_mac then
             print(indent.."    Next-Hop MAC address: "
                      ..config.next_hop_mac)
@@ -407,10 +420,10 @@ function parse_intf(name, config)
 
          local nd = App:new(data_plane, 'nd_'..intf.nname..vid_suffix(vid),
                             nd_light,
-                            { local_ip  = ipv6:pton(config.address),
+                            { local_ip  = ipv6:pton(address),
                               local_mac = ethernet:pton("00:00:00:00:00:00"),
                               remote_mac = config.next_hop_mac,
-                              next_hop = ipv6:pton(config.next_hop),
+                              next_hop = ipv6:pton(next_hop),
                               quiet = true })
          state.nds[nd:name()] = { app = nd, intf = intf }
          data_plane:connect_duplex(nd:socket('south'), socket_in)
@@ -434,9 +447,11 @@ function parse_intf(name, config)
       end,
 
       ipv4 = function (config, vid, socket_in, indent)
+         local address = ntop("ipv4", config.address)
+         local next_hop = ntop("ipv4", config.next_hop)
          -- FIXME: check fo uniqueness of subnet
-         print(indent.."    Address: "..config.address.."/24")
-         print(indent.."    Next-Hop: "..config.next_hop)
+         print(indent.."    Address: "..address.."/24")
+         print(indent.."    Next-Hop: "..next_hop)
          if config.next_hop_mac then
             print(indent.."    Next-Hop MAC address: "
                      ..config.next_hop_mac)
@@ -444,11 +459,11 @@ function parse_intf(name, config)
 
          local arp = App:new(data_plane, 'arp_'..intf.nname..vid_suffix(vid),
                              arp,
-                             { self_ip  = ipv4:pton(config.address),
+                             { self_ip  = ipv4:pton(address),
                                self_mac = ethernet:pton("00:00:00:00:00:00"),
                                next_mac = config.next_hop_mac and
                                   ethernet:pton(config.next_hop_mac or nil),
-                               next_ip = ipv4:pton(config.next_hop) })
+                               next_ip = ipv4:pton(next_hop) })
          state.arps[arp:name()] = { app = arp, intf = intf }
          data_plane:connect_duplex(arp:socket('south'), socket_in)
 
@@ -771,10 +786,10 @@ function parse_config (main_config)
          local ep = check2(peer.endpoint[t.endpoint],
                            "undefinde endpoint %s for peer %s",
                            t.endpoint, t.peer)
-         local af, addr = singleton(ep)
-         check2(af == transport.address_family, "address family mismatch for "..
+         local afi, addr = singleton(ep)
+         check2(afi == transport.address_family, "address family mismatch for "..
                    "endpoint %s of peer %s", t.endpoint, t.peer)
-         return addr
+         return ntop(afi, addr)
       end
 
       local lcl_addr, rmt_addr = address('local'), address('remote')
