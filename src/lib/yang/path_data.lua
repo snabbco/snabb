@@ -582,10 +582,63 @@ function uniqueness_checker_from_grammar(grammar)
    end
 end
 
+function minmax_elements_checker_from_grammar(grammar)
+   -- Generate checker for table (list, leaf-list)
+   local function minmax_assertion(grammar, name)
+      name = name or ""
+      local pairs = grammar.key_ctype and cltable.pairs or pairs
+      if not (grammar.min_elements or grammar.max_elements) then
+         return function () end
+      end
+      return function (tab)
+         local n = 0
+         for k1, v1 in pairs(tab) do
+            n = n + 1
+         end
+         if grammar.min_elements then
+            assert(n >= grammar.min_elements,
+                   name..": requires at least "..
+                      grammar.min_elements.." element(s)")
+         end
+         if grammar.max_elements then
+            assert(n <= grammar.max_elements,
+                   name..": must not have more than "..
+                      grammar.max_elements.." element(s)")
+         end
+      end
+   end
+   -- Visit tables with unique constraints in grammar and apply checker
+   local function visit_minmax_and_check(grammar, data, name)
+      if not data then return
+      elseif grammar.type == 'array' then
+         -- check min/max elements restrictions
+         minmax_assertion(grammar, name)(data)
+      elseif grammar.type == 'table' then
+         -- visit values
+         for name, value in pairs(grammar.values) do
+            for k, datum in pairs(data) do
+               visit_minmax_and_check(value, datum[name], name)
+            end
+         end
+         -- check min/max elements restrictions
+         minmax_assertion(grammar, name)(data)
+      elseif grammar.type == 'struct' then
+         -- visit members
+         for name, member in pairs(grammar.members) do
+            visit_minmax_and_check(member, data[name], name)
+         end
+      end
+   end
+   return function (data)
+      visit_minmax_and_check(grammar, data)
+   end
+end
+
 function consistency_checker_from_grammar(grammar)
    return function (data)
       leafref_checker_from_grammar(grammar)(data)
       uniqueness_checker_from_grammar(grammar)(data)
+      minmax_elements_checker_from_grammar(grammar)(data)
    end
 end
 
@@ -801,6 +854,121 @@ function selftest()
                                             testleaf2 "baz";
                                           }
    ]]))
+
+   -- Test min-elements and max-elements restrictions:
+   local minmax_schema = schema.load_schema([[module minmax-schema {
+      namespace "urn:ietf:params:xml:ns:yang:minmax-schema";
+      prefix "test";
+
+      list minmax_list_test {
+        key "testkey"; min-elements 1; max-elements 2;
+        leaf testkey { type string; mandatory true; }
+        leaf testleaf { type string; mandatory true; }
+      }
+
+      leaf-list minmax_leaflist_test {
+        type string; min-elements 1; max-elements 3;
+      }
+   }]])
+   local checker = consistency_checker_from_schema(minmax_schema, true)
+
+   -- Test minmax validation (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(minmax_schema,
+                                  mem.open_input_string [[
+                                     minmax_leaflist_test "baz";
+   ]]))
+   assert(not success)
+   print(result)
+
+   -- Test minmax validation (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(minmax_schema,
+                                  mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+   ]]))
+   assert(not success)
+   print(result)
+
+   -- Test minmax validation (should succeed)
+   checker(data.load_config_for_schema(minmax_schema,
+                                       mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+   ]]))
+
+   -- Test minmax validation (should succeed)
+   checker(data.load_config_for_schema(minmax_schema,
+                                       mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_list_test {
+                                       testkey "foo2";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+   ]]))
+
+   -- Test minmax validation (should succeed)
+   checker(data.load_config_for_schema(minmax_schema,
+                                       mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+   ]]))
+
+   -- Test minmax validation (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(minmax_schema,
+                                  mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_list_test {
+                                       testkey "foo2";
+                                       testleaf "bar";
+                                     }
+                                     minmax_list_test {
+                                       testkey "foo3";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+   ]]))
+   assert(not success)
+   print(result)
+
+   -- Test minmax validation (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(minmax_schema,
+                                  mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+   ]]))
+   assert(not success)
+   print(result)
 
    print("selftest: ok")
 end
