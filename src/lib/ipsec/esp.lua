@@ -356,7 +356,7 @@ function decrypt:decapsulate_tunnel (p)
    if p.length < self.MIN_SIZE then return nil end
 
    local ptext_start, ptext_length, next_header =
-      self:decrypt_payload(p.data, p.length)
+      self:decrypt_payload(p.data, p.length, nil, self.audit_v6)
 
    if not ptext_start then return nil end
 
