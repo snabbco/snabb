@@ -411,9 +411,9 @@ Recommended option settings for the `l2vpn` program are as follows
 
 ```
 luajit {
-  option "sizemcode=2048";
-  option "maxmcode=8192";
-  option "maxtrace=2000";
+  option "sizemcode=8192";
+  option "maxmcode=16384";
+  option "maxtrace=4000";
   option "maxsnap=6000";
   option "maxrecord=8000";
 }
@@ -456,10 +456,10 @@ abstraction](#interface-abstraction) for more details.
 
 This section defines an inventory of all systems that play the role of
 *PE* devices for any VPLS instances defined by the configuration.
-They are referred to as _peers_ rather than PE devices in the this
-context.  Each peer has a unique name and a list of IPv4 or IPv6
+They are referred to as _peers_ rather than PE devices in this
+context.  Each peer has a unique name and a list of IPv4 and IPv6
 addresses associated with it.  Each address can be used as one
-endpoint of a pseudowire as detailed in
+endpoint of a pseudowire as detailed in the
 [`transport`](#transport-config) section.
 
 The list of peers is divided into a local part and a remote part.
@@ -472,7 +472,9 @@ peers {
     name <peer-name>;
     [ endpoint {
         name <endpoint-name>;
-        ipv4 <ipv4-address> | ipv6 <ip6-address>;
+        address {
+          ipv4 <ipv4-address> | ipv6 <ip6-address>;
+        }
       } ]
     [ ... ]
   }
@@ -480,7 +482,9 @@ peers {
     name <peer-name>;
     [ endpoint {
         name <endpoint-name>;
-        ipv4 <ipv4-address> | ipv6 <ip6-address>;
+        address {
+          ipv4 <ipv4-address> | ipv6 <ip6-address>;
+        }
       } ]
     [ ... ]
   }
@@ -496,7 +500,9 @@ peers {
     name "local";
     endpoint {
       name "l_v4";
-      ipv4 "192.0.2.1";
+      address {
+        ipv4 "192.0.2.1";
+      }
     }
     endpoint {
       name "l_v6";
@@ -507,7 +513,9 @@ peers {
     name "remote1";
     endpoint {
       name "r1_v4";
-      ipv4 "192.0.2.2";
+      address {
+        ipv4 "192.0.2.2";
+      }
     }
     endpoint {
       name "r1_v6";
@@ -518,7 +526,9 @@ peers {
     name "remote2";
     endpoint {
       name "r2_v4";
-      ipv4 "192.0.2.3";
+      address {
+        ipv4 "192.0.2.3";
+      }
     }
   }
 }
@@ -532,7 +542,7 @@ must be chosen from the local peer and the remote endpoint must be
 chosen from any of the remote peers.
 
 The reference to an address is composed of the name of the peer and
-the name of the endpoint withing that peer.  It is an error to
+the name of the endpoint within that peer.  It is an error to
 reference an address whose address family doesn't match that of the
 transport.
 
@@ -551,8 +561,7 @@ transport {
     peer <peer-name>;
     endpoint <endpoint-name>;
   }
-  ipsec {
-  }
+  ipsec {}
 }
 ```
 
@@ -882,6 +891,7 @@ l2vpn-config {
         next-hop "2001:db8:0:C101:0:0:0:1";
       }
     }
+  }
   interface {
     name "TenGigE0/0";
     description "AC";
@@ -897,14 +907,18 @@ l2vpn-config {
       name "A";
       endpoint {
         name "local";
-        ipv6 "2001:db8:0:1:0:0:0:1";
+        address {
+          ipv6 "2001:db8:0:1:0:0:0:1";
+        }
       }
     }
     remote {
       name "B";
       endpoint {
         name "remote";
-        ipv6 "2001:db8:0:1:0:0:0:2";
+        address {
+          ipv6 "2001:db8:0:1:0:0:0:2";
+        }
       }
     }
   }
@@ -970,14 +984,14 @@ l2vpn-config {
         next-hop "2001:db8:0:C102:0:0:0:1";
       }
     }
-    interface {
-      name "TenGigE0/0";
-      description "AC";
-      driver {
-        path "apps.intel_mp.intel_mp";
-        name "Intel";
-        config "{ pciaddr = '0000:04:00.0', rxq = 0, txq = 0 }";
-      }
+  }
+  interface {
+    name "TenGigE0/0";
+    description "AC";
+    driver {
+      path "apps.intel_mp.intel_mp";
+      name "Intel";
+      config "{ pciaddr = '0000:04:00.0', rxq = 0, txq = 0 }";
     }
     mtu 9206;
   }
@@ -986,14 +1000,18 @@ l2vpn-config {
       name "B";
       endpoint {
         name "local";
-        ipv6 "2001:db8:0:1:0:0:0:2";
+        address {
+          ipv6 "2001:db8:0:1:0:0:0:2";
+        }
       }
     }
     remote {
       name "A";
       endpoint {
         name "remote";
-        ipv6 "2001:db8:0:1:0:0:0:1";
+        address {
+          ipv6 "2001:db8:0:1:0:0:0:1";
+        }
       }
     }
   }
@@ -1349,22 +1367,27 @@ module snabb-l2vpn-v1 {
                used to select the remote and local addresses for a transport.";
           }
 
-          choice address-by-family {
-            mandatory true;
-            case ipv4 {
-              leaf ipv4 {
-                type inet:ipv4-address;
-                mandatory true;
-                description
-                  "An IPv4 address.";
+          container address {
+            description
+              "The address of the endpoint, either IPv4 or IPv6.";
+
+            choice address-by-family {
+              mandatory true;
+              case ipv4 {
+                leaf ipv4 {
+                  type inet:ipv4-address;
+                  mandatory true;
+                  description
+                    "An IPv4 address.";
+                }
               }
-            }
-            case ipv6 {
-              leaf ipv6 {
-                type inet:ipv6-address;
-                mandatory true;
-                description
-                  "An IPv6 address.";
+              case ipv6 {
+                leaf ipv6 {
+                  type inet:ipv6-address;
+                  mandatory true;
+                  description
+                    "An IPv6 address.";
+                }
               }
             }
           }

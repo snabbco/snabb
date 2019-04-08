@@ -786,7 +786,7 @@ function parse_config (main_config)
          local ep = check2(peer.endpoint[t.endpoint],
                            "undefinde endpoint %s for peer %s",
                            t.endpoint, t.peer)
-         local afi, addr = singleton(ep)
+         local afi, addr = singleton(ep.address)
          check2(afi == transport.address_family, "address family mismatch for "..
                    "endpoint %s of peer %s", t.endpoint, t.peer)
          return ntop(afi, addr)

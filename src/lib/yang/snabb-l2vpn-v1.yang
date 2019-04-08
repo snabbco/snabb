@@ -307,22 +307,27 @@ module snabb-l2vpn-v1 {
                used to select the remote and local addresses for a transport.";
           }
 
-          choice address-by-family {
-            mandatory true;
-            case ipv4 {
-              leaf ipv4 {
-                type inet:ipv4-address;
-                mandatory true;
-                description
-                  "An IPv4 address.";
+          container address {
+            description
+              "The address of the endpoint, either IPv4 or IPv6.";
+
+            choice address-by-family {
+              mandatory true;
+              case ipv4 {
+                leaf ipv4 {
+                  type inet:ipv4-address;
+                  mandatory true;
+                  description
+                    "An IPv4 address.";
+                }
               }
-            }
-            case ipv6 {
-              leaf ipv6 {
-                type inet:ipv6-address;
-                mandatory true;
-                description
-                  "An IPv6 address.";
+              case ipv6 {
+                leaf ipv6 {
+                  type inet:ipv6-address;
+                  mandatory true;
+                  description
+                    "An IPv6 address.";
+                }
               }
             }
           }
