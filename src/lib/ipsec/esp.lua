@@ -293,9 +293,17 @@ end
 --   4. Move cleartext up to IP payload
 --   5. Shrink p by ESP overhead
 function decrypt:decapsulate_transport6 (p)
-   if p.length - TRANSPORT6_PAYLOAD_OFFSET < self.MIN_SIZE then return nil end
-
    local ip = ffi.cast(ipv6_ptr_t, p.data + ETHERNET_SIZE)
+
+   if ip.next_header ~= PROTOCOL then
+      logger:log(("Missing ESP header (src_ip=%s, dst_ip=%s, flow_id=0x%x)")
+            :format(ip and ipv6:ntop(ip.src_ip) or "unknown",
+                    ip and ipv6:ntop(ip.dst_ip) or "unknown",
+                    ip and ipv6_fl(ip) or 0))
+      return nil
+   end
+
+   if p.length - TRANSPORT6_PAYLOAD_OFFSET < self.MIN_SIZE then return nil end
 
    local payload = p.data + TRANSPORT6_PAYLOAD_OFFSET
    local payload_length = p.length - TRANSPORT6_PAYLOAD_OFFSET
@@ -316,6 +324,14 @@ end
 
 function decrypt:decapsulate_transport4 (p)
    local ip = ffi.cast(ipv4_ptr_t, p.data + ETHERNET_SIZE)
+
+   if ip.protocol ~= PROTOCOL then
+      logger:log(("Missing ESP header (src_ip=%s, dst_ip=%s)")
+            :format(ip and ipv4:ntop(ip.src_ip) or "unknown",
+                    ip and ipv4:ntop(ip.dst_ip) or "unknown"))
+      return nil
+   end
+
    local ihl = bit.band(bit.rshift(ntohs(ip.ihl_v_tos), 8), 0x0f)
    local ip_header_length = ihl*4
    local transport_payload_offset = ETHERNET_SIZE + ip_header_length

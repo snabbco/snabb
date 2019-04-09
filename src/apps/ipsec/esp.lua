@@ -6,6 +6,7 @@
 module(..., package.seeall)
 local ffi = require("ffi")
 local lib = require("core.lib")
+local logger = require("lib.logger")
 local shm = require("core.shm")
 local esp = require("lib.ipsec.esp")
 local ipsec_shm = require("lib.ipsec.shm")
@@ -181,6 +182,7 @@ function Transport_IKE:new (conf)
       {
          ike_check = lib.throttle(conf.ike_check_interval),
          conf = conf,
+         logger = logger.new({ module = "ESP-transport-IKE" }),
          -- Cache of current SAs
          sas = { ['in'] = { spi = 0 }, out = { spi = 0 } }
       }, {__index = self})
@@ -198,6 +200,8 @@ function Transport_IKE:new (conf)
                                        standard = true, key = key })
    local hash = hash_fn(self.hash_buf)
    local path = "/ipsec/"..bit.tohex(hash)
+   self.logger:log(("init %s <-> %s, SA path %s"):
+         format(conf.remote_address, conf.local_address, path))
    -- It is crucial that we don't pick up the keys used by a previous
    -- invocation, since that would break the aes-gcm cipher (re-use of
    -- nonces).
@@ -222,11 +226,17 @@ function Transport_IKE:maybe_update_key (dir, update_fn)
       -- removal.
       update_fn(self)
    elseif cache.spi ~= sa.spi or cache.tstamp ~= sa.tstamp then
-      if sa.enc_alg ~= ffi.C.ENCR_AES_GCM_16 then return nil end
+      if sa.enc_alg ~= ffi.C.ENCR_AES_GCM_16 then
+         self.logger:log(("unsupported algorithm, expected %d, got %d"):
+               format(ffi.C.ENCR_AES_GCM_16, sa.enc_alg))
+         return nil
+      end
       cache.spi = sa.spi
       cache.tstamp = sa.tstamp
       local enc_key = sa.enc_key.aes_gcm_16
       update_fn(self, sa.spi, enc_key.key, enc_key.salt, sa.replay_window)
+      self.logger:log(("updating key '%s', SPI 0x%08x(%d)"):
+            format(dir, sa.spi, sa.spi))
    end
 end
 
