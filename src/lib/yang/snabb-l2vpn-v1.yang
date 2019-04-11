@@ -19,6 +19,14 @@ module snabb-l2vpn-v1 {
     description
       "Configuration for the Snabb L2VPN program.";
 
+    leaf instance-name {
+      type string;
+      mandatory true;
+      description
+        "The name of the instance of the Snabb L2VPN program.  This is used to
+         distinguish different instances running on the same system.";
+    }
+
     container luajit {
       description
         "LuaJIT runtime settings";

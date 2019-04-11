@@ -864,7 +864,7 @@ function parse_config (main_config)
                    tunnel_type, tunnel_config)
          local cc_app
          if cc_socket then
-            local qname = vpls_name..'_'..name
+            local qname = main_config.instance_name..'_'..vpls_name..'_'..name
             cc_app = App:new(ctrl_plane, 'cc_'..qname,
                              require("program.l2vpn.control_channel").control_channel,
                              {
