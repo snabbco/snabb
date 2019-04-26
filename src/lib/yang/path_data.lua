@@ -308,8 +308,8 @@ local function adder_for_grammar(grammar, path)
             return config
          end
       elseif grammar.native_key or grammar.key_ctype then
-         -- cltable or string-keyed table.
-         local pairs = grammar.key_ctype and cltable.pairs or pairs
+         -- cltable or native-keyed table.
+         local pairs = grammar.native_key and pairs or cltable.pairs
          return function(config, subconfig)
             local tab = getter(config)
             for k,_ in pairs(subconfig) do
