@@ -10,13 +10,13 @@ as a hand-written, optimized assembler lookup routine.
 ```lua
 local pt = poptrie.new{direct_pointing=true}
 -- Associate prefixes of length to values (uint16_t)
-pt:add(0x00FF, 8, 1)
-pt:add(0x000F, 4, 2)
+pt:add(ipv4:pton("192.168.0.0"), 16, 1)
+pt:add(ipv4:pton("192.0.0.0"), 8, 2)
 pt:build()
-pt:lookup64(0x001F) ⇒ 2
-pt:lookup64(0x10FF) ⇒ 1
+pt:lookup32(ipv4:pton("192.1.2.3")) ⇒ 2
+pt:lookup32(ipv4:pton("192.168.2.3")) ⇒ 1
 -- The value zero denotes "no match"
-pt:lookup64(0x0000) ⇒ 0
+pt:lookup32(ipv4:pton("193.1.2.3")) ⇒ 0
 -- You can create a pre-built poptrie from its backing memory.
 local pt2 = poptrie.new{
    nodes = pt.nodes,
@@ -25,22 +25,25 @@ local pt2 = poptrie.new{
 }
 ```
 
-#### Known bugs and limitations
-
- - Only supports keys up to 64 bits wide
-
 #### Performance
+
+Note that performance tends to be memory-bound. The results below reflect ideal
+conditions with hot caches. See [Benchmarking Poptrie](https://mr.gy/blog/poptrie-dynasm.html#section-5).
 
 - Intel(R) Xeon(R) CPU E3-1246 v3 @ 3.50GHz (Haswell, Turbo off)
 
 ```
-PMU analysis (numentries=10000, keysize=32)
-build: 0.1290 seconds
-lookup: 13217.09 cycles/lookup 28014.35 instructions/lookup
-lookup64: 122.94 cycles/lookup 133.22 instructions/lookup
-build(direct_pointing): 0.1056 seconds
-lookup(direct_pointing): 5519.01 cycles/lookup 11412.01 instructions/lookup
-lookup64(direct_pointing): 89.82 cycles/lookup 70.72 instructions/lookup
+PMU analysis (numentries=10000, numhit=100, keysize=32)
+build: 0.1857 seconds
+lookup: 8460.17 cycles/lookup 18089.70 instructions/lookup
+lookup32: 62.71 cycles/lookup 99.99 instructions/lookup
+lookup64: 64.11 cycles/lookup 100.00 instructions/lookup
+lookup128: 74.44 cycles/lookup 118.66 instructions/lookup
+build(direct_pointing): 0.1676 seconds
+lookup(direct_pointing): 1306.68 cycles/lookup 3146.96 instructions/lookup
+lookup32(direct_pointing): 35.49 cycles/lookup 62.61 instructions/lookup
+lookup64(direct_pointing): 35.95 cycles/lookup 62.61 instructions/lookup
+lookup128(direct_pointing): 37.75 cycles/lookup 66.81 instructions/lookup
 ```
 
 #### Interface
@@ -65,10 +68,10 @@ Creates and returns a new `Poptrie` object.
 
 — Method **Poptrie:add** *prefix* *length* *value*
 
-Associates *value* to *prefix* of *length*. *Prefix* must be an unsigned
-integer (little-endian) of up to 64 bits. *Length* must be an an unsigned
-integer between 1 and 64. *Value* must be a 16‑bit unsigned integer, and should
-be greater than zero (see `lookup64` as to why.)
+Associates *value* to *prefix* of *length*. *Prefix* must be a `uint8_t *`
+pointing to at least `math.ceil(length/8)` bytes. *Length* must be an integer
+equal to or greater than 1. *Value* must be a 16‑bit unsigned integer, and
+should be greater than zero (see `lookup*` as to why.)
 
 — Method **Poptrie:build**
 
@@ -77,10 +80,20 @@ this method, the *leaves* and *nodes* fields of the `Poptrie` object will
 contain the leaves and nodes arrays respectively. These arrays can be used to
 construct a `Poptrie` object.
 
+
+— Method **Poptrie:lookup32** *key*
+
 — Method **Poptrie:lookup64** *key*
 
+— Method **Poptrie:lookup128** *key*
+
 Looks up *key* in the `Poptrie` object and returns the associated value or
-zero. *Key* must be an unsigned, little-endian integer of up to 64 bits.
+zero. *Key* must be a `uint8_t *` pointing to at least 4/8/16 bytes
+respectively.
 
 Unless the `Poptrie` object was initialized with leaves and nodes arrays, the
 user must call `Poptrie:build` before calling `Poptrie:lookup64`.
+
+It is an error to call these lookup routines on poptries that contain prefixes
+longer than supported by the individual lookup routine. I.e., you can only call
+`lookup64` on poptries with prefixes of less than or equal to 64 bits.
