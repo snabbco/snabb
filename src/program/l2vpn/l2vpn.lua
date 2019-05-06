@@ -1000,9 +1000,10 @@ end
 local function setup_shm_and_snmp (main_config, pid)
    -- For each interface, attach to the shm frame that stores
    -- the statistics counters
+   local path_prefix = '/'..pid..'/'
    for _, intf in pairs(state.intfs) do
       if not intf.vlan then
-         local stats_path = "/"..pid.."/"..intf.driver_helper.stats_path(intf)
+         local stats_path = path_prefix..intf.driver_helper.stats_path(intf)
          intf.stats = shm.open_frame(stats_path)
       end
    end
@@ -1051,7 +1052,7 @@ local function setup_shm_and_snmp (main_config, pid)
             counters.speed = map(stats.speed)
 
             -- Create mappings to the counters of the relevant VMUX
-            -- link The VMUX app replaces the physical network for a
+            -- link. The VMUX app replaces the physical network for a
             -- sub-interface.  Hence, its output is what the
             -- sub-interface receives and its input is what the
             -- sub-interface transmits to the "virtual wire".
@@ -1065,10 +1066,10 @@ local function setup_shm_and_snmp (main_config, pid)
                error("No links match pattern: "..pattern)
             end
             local tstats = shm.open_frame(
-               'links/'..
+               path_prefix..'links/'..
                   find_linkspec('^'..intf.vmux_socket.output()))
             local rstats = shm.open_frame(
-               'links/'..
+               path_prefix..'links/'..
                   find_linkspec(intf.vmux_socket.input()..'$'))
             counters.rxpackets = map(tstats.txpackets)
             counters.rxbytes = map(tstats.txbytes)
