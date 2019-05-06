@@ -816,6 +816,12 @@ function parse_config (main_config)
          assert(cond, "VPLS "..vpls_name..": "..msg)
       end
 
+      if not vpls.enable then
+         print("Disabled VPLS instance "..vpls_name
+                  .." ("..(vpls.description or "<no description>")..")")
+         break
+      end
+
       print("Creating VPLS instance "..vpls_name
             .." ("..(vpls.description or "<no description>")..")")
       print("  MTU: "..vpls.mtu)

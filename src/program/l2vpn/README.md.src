@@ -725,6 +725,7 @@ follows
 vpls {
   name <name>;
   [ description <description>; ]
+  [ enable true | false; ]
   uplink <uplink>;
   mtu <mtu>;
   bridge {}
@@ -752,6 +753,11 @@ the items follows here.
 
      A human readable description of the purpose of the VPLS instance.
 
+   * `enable`
+
+      Whether to enable this VPLS instance. If set to `false`, the
+      entire configuration is ignored.  The default is `true`.
+      
    * `mtu`
 
      The MTU in bytes of all ACs connected to the VPLS instance
@@ -1184,6 +1190,14 @@ module snabb-l2vpn-v1 {
     description
       "Configuration for the Snabb L2VPN program.";
 
+    leaf instance-name {
+      type string;
+      mandatory true;
+      description
+        "The name of the instance of the Snabb L2VPN program.  This is used to
+         distinguish different instances running on the same system.";
+    }
+
     container luajit {
       description
         "LuaJIT runtime settings";
@@ -1600,6 +1614,12 @@ module snabb-l2vpn-v1 {
         type string;
         description
           "A brief description of the VPLS. TODO: MIB object";
+      }
+      leaf enable {
+        type boolean;
+        default true;
+        description
+          "Whether to enable this VPLS instance.";
       }
       leaf mtu {
         type uint16;

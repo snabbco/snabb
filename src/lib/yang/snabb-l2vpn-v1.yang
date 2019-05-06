@@ -444,6 +444,12 @@ module snabb-l2vpn-v1 {
         description
           "A brief description of the VPLS. TODO: MIB object";
       }
+      leaf enable {
+        type boolean;
+        default true;
+        description
+          "Whether to enable this VPLS instance.";
+      }
       leaf mtu {
         type uint16;
         mandatory true;
