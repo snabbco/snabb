@@ -43,6 +43,7 @@ function bridge:new (conf_base)
    local conf = lib.parse(conf_base.config.mac_table, mac_params)
    o.verbose = conf.verbose
    o.learn = link.new("learn")
+   o.queue = link.new("queue")
 
    local params = {
       key_type = ffi.typeof("uint64_t"),
@@ -122,11 +123,8 @@ end
 
 function bridge:push (input, port)
    local now = self.tsc:stamp()
-   if now - self.scan_tstamp > self.scan_interval then
-      self:expire_entries(now)
-   end
-
    local table = self.mac_table
+   local queue = self.queue
 
    for _ = 1, nreadable(input) do
       local p = receive(input)
@@ -138,7 +136,7 @@ function bridge:push (input, port)
       else
          entry.value.port = port.index
          entry.value.tstamp = now
-         transmit(input, p)
+         transmit(queue, p)
       end
    end
 
@@ -156,11 +154,11 @@ function bridge:push (input, port)
          table:add(key, value)
          counter.add(self.shm["addresses-learned"])
       end
-      transmit(input, p)
+      transmit(queue, p)
    end
 
-   for _ = 1, nreadable(input) do
-      local p = receive(input)
+   for _ = 1, nreadable(queue) do
+      local p = receive(queue)
       local eth = ffi.cast(eth_ptr_t, p.data)
       local key = mac2u64(eth.ether_dhost)
       local entry = table:lookup_ptr(key)
@@ -186,6 +184,13 @@ function bridge:push (input, port)
    for _ = 1, nreadable(self.discard) do
       packet.free(receive(self.discard))
       counter.add(self.shm["packets-discarded"])
+   end
+end
+
+function bridge:housekeeping()
+   local now = self.tsc:stamp()
+   if now - self.scan_tstamp > self.scan_interval then
+      self:expire_entries(now)
    end
 end
 
