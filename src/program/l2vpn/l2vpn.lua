@@ -636,8 +636,8 @@ function parse_config (main_config)
                [cc_vc_id] = {
                    local_session = 0xFFFFFFFE,
                    remote_session = 0xFFFFFFFE,
-                   local_cookie = '\x00\x00\x00\x00\x00\x00\x00\x00',
-                   remote_cookie = '\x00\x00\x00\x00\x00\x00\x00\x00',
+                   local_cookie = tunnel_config.local_cookie,
+                   remote_cookie = tunnel_config.remote_cookie,
                }
             }
          end,
