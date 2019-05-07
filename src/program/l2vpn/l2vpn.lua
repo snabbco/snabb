@@ -96,6 +96,9 @@ local reass_ipv4 = require("apps.ipv4.reassemble").Reassembler
 local Receiver = require("apps.interlink.receiver").Receiver
 local Transmitter = require("apps.interlink.transmitter").Transmitter
 
+local initial_state
+local worker_pid
+
 local bridge_types = { flooding = true, learning = true }
 
 function usage ()
@@ -115,16 +118,6 @@ local function tlen (t)
       length = length + 1
    end
    return length
-end
-
-local state, data_plane, ctrl_plane
-
-local function clear_state ()
-   state =  {
-      intfs = {},
-      nds = {},
-      arps = {},
-   }
 end
 
 local Graph = {}
@@ -301,7 +294,9 @@ local function ntop (afi, addr)
    end
 end
 
-function parse_intf(name, config)
+function parse_intf(state, name, config)
+   local data_plane = state.data_plane
+
    print("Setting up interface "..name)
    print("  Description: "..(config.description or "<none>"))
    local intf = {
@@ -595,9 +590,18 @@ function parse_intf(name, config)
 end
 
 function parse_config (main_config)
+   local state = {
+      data_plane = Graph:new(),
+      ctrl_plane = Graph:new(),
+      intfs = {},
+      nds = {},
+      arps = {},
+   }
    local intfs = state.intfs
+   local data_plane, ctrl_plane = state.data_plane, state.ctrl_plane
+
    for name, config in pairs(main_config.interface) do
-      local intf = parse_intf(name, config)
+      local intf = parse_intf(state, name, config)
       assert(not intfs[intf.name], "Duplicate interface name: "..intf.name)
       intfs[intf.name] = intf
       for name, subintf in pairs(intf.subintfs or {}) do
@@ -819,7 +823,7 @@ function parse_config (main_config)
       if not vpls.enable then
          print("Disabled VPLS instance "..vpls_name
                   .." ("..(vpls.description or "<no description>")..")")
-         break
+         goto vpls_skip
       end
 
       print("Creating VPLS instance "..vpls_name
@@ -936,6 +940,7 @@ function parse_config (main_config)
                    .."VPLS ("..vpls.mtu..") and interface "
                    ..ac.." ("..eff_mtu..")")
       end
+      ::vpls_skip::
    end
 
    for vpls_name, bridge_group in pairs(bridge_groups) do
@@ -1001,104 +1006,167 @@ function parse_config (main_config)
          end
       end
    end
+
+   return state
 end
 
-local function setup_shm_and_snmp (main_config, pid)
-   -- For each interface, attach to the shm frame that stores
-   -- the statistics counters
-   local path_prefix = '/'..pid..'/'
-   for _, intf in pairs(state.intfs) do
-      if not intf.vlan then
-         local stats_path = path_prefix..intf.driver_helper.stats_path(intf)
-         intf.stats = shm.open_frame(stats_path)
-      end
+local function maybe_create_stats_frame (intf, pid)
+   if not intf.vlan and not intf.stats then
+      local stats_path = '/'..pid..'/'
+         ..intf.driver_helper.stats_path(intf)
+      intf.stats = shm.open_frame(stats_path)
+      counter.commit()
    end
-   -- Commit all counters to the backing store to make them available
-   -- immediately through the read-only frames we just created
-   counter.commit()
+end
 
-   local snmp = main_config.snmp or { enable = false }
-   if snmp.enable then
-      local shm_subdir = 'snmp'
-      local shm_dir = shm.root.."/"..shm_subdir
-      shm.mkdir(shm_subdir)
-      for name, intf in pairs(state.intfs) do
-         if not intf.vlan then
-            -- Set up SNMP for physical interfaces
-            local stats = intf.stats
-            if stats then
-               ifmib.init_snmp( { ifDescr = name,
-                                  ifName = name,
-                                  ifAlias = intf.description, },
-                  string.gsub(name, '/', '-'), stats,
-                  shm_dir, snmp.interval or 5)
-            else
-               print("Can't enable SNMP for interface "..name
-                        ..": no statistics counters available")
-            end
-         else
-            -- Set up SNMP for sub-interfaces
-            counter_t = ffi.typeof("struct counter")
-            local counters = {}
-            local function map (c)
-               return (c and ffi.cast("struct counter *", c)) or nil
-            end
-            counters.type = counter_t()
-            if intf.l3 then
-               counters.type.c = 0x1003ULL -- l3ipvlan
-            else
-               counters.type.c = 0x1002ULL -- l2vlan
-            end
-            -- Inherit the operational status, MAC address, MTU, speed
-            -- from the physical interface
-            local stats = intf.phys_intf.stats
-            counters.status = map(stats.status)
-            counters.macaddr = map(stats.macaddr)
-            counters.mtu = map(stats.mtu)
-            counters.speed = map(stats.speed)
+local function find_linkspecs (intf, links)
+   local function find_linkspec (pattern)
+      pattern = string.gsub(pattern, '%.', '%%.')
+      for _, linkspec in ipairs(links) do
+         if string.match(linkspec, pattern) then
+            return linkspec
+         end
+      end
+      error("No links match pattern: "..pattern)
+   end
+   return find_linkspec('^'..intf.vmux_socket.output()),
+   find_linkspec(intf.vmux_socket.input()..'$')
+end
 
-            -- Create mappings to the counters of the relevant VMUX
-            -- link. The VMUX app replaces the physical network for a
-            -- sub-interface.  Hence, its output is what the
-            -- sub-interface receives and its input is what the
-            -- sub-interface transmits to the "virtual wire".
-            local function find_linkspec (pattern)
-               pattern = string.gsub(pattern, '%.', '%%.')
-               for _, linkspec in ipairs(data_plane:links()) do
-                  if string.match(linkspec, pattern) then
-                     return linkspec
-                  end
-               end
-               error("No links match pattern: "..pattern)
-            end
-            local tstats = shm.open_frame(
-               path_prefix..'links/'..
-                  find_linkspec('^'..intf.vmux_socket.output()))
-            local rstats = shm.open_frame(
-               path_prefix..'links/'..
-                  find_linkspec(intf.vmux_socket.input()..'$'))
-            counters.rxpackets = map(tstats.txpackets)
-            counters.rxbytes = map(tstats.txbytes)
-            counters.rxdrop = map(tstats.txdrop)
-            counters.txpackets = map(rstats.rxpackets)
-            counters.txbytes = map(rstats.rxbytes)
+local function setup_snmp_for_interface (state, name, intf, interval, pid)
+   local shm_subdir = 'snmp'
+   local shm_dir = shm.root.."/"..shm_subdir
+   shm.mkdir(shm_subdir)
+   local normalized_name = string.gsub(name, '/', '-')
+
+   if not intf.vlan then
+      -- Physical interface
+      maybe_create_stats_frame(intf, pid)
+      if intf.stats then
+         intf.stats_timer =
             ifmib.init_snmp( { ifDescr = name,
                                ifName = name,
                                ifAlias = intf.description, },
-               string.gsub(name, '/', '-'), counters,
-               shm_dir, snmp.interval or 5)
-         end
+               normalized_name, intf.stats,
+               shm_dir, interval or 5)
+      else
+         print("Can't enable SNMP for interface "..name
+                  ..": no statistics counters available")
       end
+   else
+      -- Sub-interface
+      counter_t = ffi.typeof("struct counter")
+      local counters = {}
+      local function map (c)
+         return (c and ffi.cast("struct counter *", c)) or nil
+      end
+      counters.type = counter_t()
+      if intf.l3 then
+         counters.type.c = 0x1003ULL -- l3ipvlan
+      else
+         counters.type.c = 0x1002ULL -- l2vlan
+      end
+      -- Inherit the operational status, MAC address, MTU, speed
+      -- from the physical interface
+      maybe_create_stats_frame(intf.phys_intf, pid)
+      local stats = intf.phys_intf.stats
+      counters.status = map(stats.status)
+      counters.macaddr = map(stats.macaddr)
+      counters.mtu = map(stats.mtu)
+      counters.speed = map(stats.speed)
+
+      -- Create mappings to the counters of the relevant VMUX
+      -- link. The VMUX app replaces the physical network for a
+      -- sub-interface.  Hence, its output is what the
+      -- sub-interface receives and its input is what the
+      -- sub-interface transmits to the "virtual wire".
+      local path_prefix = '/'..pid..'/'
+      local spec_tx, spec_rx = find_linkspecs(intf, state.data_plane:links())
+      local tstats = shm.open_frame(path_prefix..'links/'..spec_tx)
+      local rstats = shm.open_frame(path_prefix..'links/'..spec_rx)
+      intf.tstats, intf.rstats = tstats, rstats
+      intf.link_spec = spec_tx..spec_rx
+
+      counters.rxpackets = map(tstats.txpackets)
+      counters.rxbytes = map(tstats.txbytes)
+      counters.rxdrop = map(tstats.txdrop)
+      counters.txpackets = map(rstats.rxpackets)
+      counters.txbytes = map(rstats.rxbytes)
+      intf.stats_timer =
+         ifmib.init_snmp({ ifDescr = name,
+                           ifName = name,
+                           ifAlias = intf.description, },
+            normalized_name, counters,
+            shm_dir, interval or 5)
    end
 end
 
+local old_intfs = {}
 local function setup_l2vpn (config)
-   clear_state()
-   data_plane = Graph:new()
-   ctrl_plane = Graph:new()
-   parse_config(config.l2vpn_config)
-   return { data_plane = data_plane:app_graph(),
-            control_plane = ctrl_plane:app_graph() }
+   local state = parse_config(config.l2vpn_config)
+   -- Used by initialization code before the main loop is entered
+   initial_state = initial_state or state
+
+   -- Interface changes require re-mapping of the statistics counters
+   -- for SNMP.  Unmapping can be done here, but new mappings must be
+   -- scheduled through a one-shot timer because the new configuration
+   -- has not yet been instantiated in the worker process when we get
+   -- here.
+   --
+   -- Sub-interfaces are particularly annoying.  They may get
+   -- re-connected from a bridge to a sink if no active VPLS connects
+   -- to them.  The link specs for that connection is saved to detect
+   -- this.
+   local snmp = config.l2vpn_config.snmp
+   for name, old_intf in pairs(old_intfs) do
+      local new_intf = state.intfs[name]
+      if (not new_intf or
+             (old_intf.vlan and old_intf.link_spec ~=
+                 table.concat({find_linkspecs(new_intf,
+                                              state.data_plane:links())},
+                    ""))) then
+
+         -- The interface has either gone away or it's a sub-interface
+         -- with changed link specs, remove all shm segments and stats
+         -- timers.
+         if not old_intf.vlan then
+            assert(old_intf.stats)
+            shm.delete_frame(old_intf.stats)
+         else
+            assert(old_intf.tstats)
+            assert(old_intf.rstats)
+            shm.delete_frame(old_intf.tstats)
+            shm.delete_frame(old_intf.rstats)
+         end
+         timer.cancel(old_intf.stats_timer)
+      elseif new_intf then
+         for _, k in ipairs({ 'stats', 'tstats', 'rstats',
+                              'stats_timer', 'link_spec' }) do
+            new_intf[k] = old_intf[k]
+         end
+      end
+   end
+
+   for name, intf in pairs(state.intfs) do
+      if not intf.stats_timer and snmp.enable and worker_pid then
+         -- Schedule a one-shot timer to set up SNMP for this
+         -- interface
+         timer.activate(timer.new("Interface "..name.." SNMP setup",
+                                  function ()
+                                     setup_snmp_for_interface(state, name, intf,
+                                                              snmp.interval,
+                                                              worker_pid)
+                                  end, 1e9 * 5))
+      elseif intf.stats_timer and not snmp.enable then
+         timer.cancel(intf.stats_timer)
+         intf.stats_timer = nil
+      end
+   end
+
+   old_intfs = state.intfs
+
+   return { data_plane = state.data_plane:app_graph(),
+            control_plane = state.ctrl_plane:app_graph() }
 end
 
 local long_opts = {
@@ -1188,7 +1256,7 @@ function run (parameters)
    })
 
    manager:main(5)
-   local worker_pid = manager.workers.data_plane.pid
+   worker_pid = manager.workers.data_plane.pid
    if state_dir then
       local function write_pid (pid, file)
          local f = assert(io.open(state_dir.."/"..file, "w"))
@@ -1199,15 +1267,27 @@ function run (parameters)
       write_pid(worker_pid, 'data.pid')
       write_pid(manager.workers.control_plane.pid, 'ctrl.pid')
    end
-   setup_shm_and_snmp(initial_config.l2vpn_config, worker_pid)
-   for name, nd in pairs(state.nds) do
+
+   -- Map stats for initial physical (non-vlan) interfaces
+   for name, intf in pairs(initial_state.intfs) do
+      maybe_create_stats_frame(intf, worker_pid)
+   end
+   local snmp = initial_config.l2vpn_config.snmp
+   if snmp.enable then
+      for name, intf in pairs(initial_state.intfs) do
+         setup_snmp_for_interface(initial_state, name, intf,
+                                  snmp.interval, worker_pid)
+      end
+   end
+
+   for name, nd in pairs(initial_state.nds) do
       local mac = macaddress:new(counter.read(nd.intf.stats.macaddr))
       nd.app:arg().local_mac = ethernet:pton(ethernet:ntop(mac.bytes))
    end
-   for name, arp in pairs(state.arps) do
+   for name, arp in pairs(initial_state.arps) do
       local mac = macaddress:new(counter.read(arp.intf.stats.macaddr))
       arp.app:arg().self_mac = ethernet:pton(ethernet:ntop(mac.bytes))
    end
-   manager:update_worker_graph('data_plane', data_plane:app_graph())
+   manager:update_worker_graph('data_plane', initial_state.data_plane:app_graph())
    manager:main(duration ~= 0 and (duration + 5) or nil)
 end
