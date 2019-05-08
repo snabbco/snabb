@@ -701,7 +701,7 @@ function parse_config (main_config)
              ("Non-unique pseudowire: %s <-> %s VC ID %d"):
                 format(af:ntop(remote_addr),
                        af:ntop(local_addr), vc_id))
-      transport.vc_ids[vc_id] = true
+      transport.vc_ids[vc_id] = type
 
       local ipsec = transport.ipsec
       if ipsec.enable then
@@ -753,12 +753,14 @@ function parse_config (main_config)
       end
 
       local vcs = {}
-      for vc_id, _ in pairs(transport.vc_ids) do
-         local vc_set = tunnel_info.mk_vc_config_fn(vc_id,
-                                                    vc_id + 0x8000,
-                                                    config)
-         for vc, arg in pairs(vc_set) do
-            vcs[vc] = arg
+      for vc_id, _type in pairs(transport.vc_ids) do
+         if _type == type then
+            local vc_set = tunnel_info.mk_vc_config_fn(vc_id,
+                                                       vc_id + 0x8000,
+                                                       config)
+            for vc, arg in pairs(vc_set) do
+               vcs[vc] = arg
+            end
          end
       end
       tunnel:arg().vcs = vcs
