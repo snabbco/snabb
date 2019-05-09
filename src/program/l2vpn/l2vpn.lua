@@ -143,6 +143,10 @@ function Graph:add_app (app, name)
 end
 
 function Graph:connect (from, to)
+   assert(not from.connected_out)
+   assert(not to.connected_in)
+   from.connected_out = true
+   to.connected_in = true
    table.insert(self._links, from.output()..' -> '..to.input())
 end
 
@@ -680,7 +684,6 @@ function parse_config (main_config)
                             { afi = afi, links = {} })
          data_plane:connect_duplex(dispatch:socket('south'),
                                    intf.l3[afi].socket_out)
-         intf.l3[afi].used = true
          dispatchers[afi][uplink] = dispatch
       end
 
@@ -840,7 +843,6 @@ function parse_config (main_config)
       assert_vpls(intf.l3, "Uplink interface "..uplink
                      .." is L2 when L3 is expected")
       print("  Uplink is on "..uplink)
-      intf.used = true
 
       local bridge_type, bridge_config = singleton(vpls.bridge)
       local bridge_group = {
@@ -927,10 +929,10 @@ function parse_config (main_config)
          assert_vpls(intf, "AC interface "..ac.." does not exist")
          assert_vpls(not intf.l3, "AC interface "..ac
                         .." is L3 when L2 is expected")
-         assert_vpls(not intf.used, "AC interface "..ac.." already "
-                        .."assigned to another VPLS")
+         assert_vpls(not intf.vpls, "AC interface "..ac.." already "
+                        .."assigned to VPLS instance "..(intf.vpls or ''))
          table.insert(bridge_group.acs, intf)
-         intf.used = true
+         intf.vpls = vpls_name
          -- Note: if the AC is the native VLAN on a trunk, the actual packets
          -- can carry frames which exceed the nominal MTU by 4 bytes.
          local eff_mtu = intf.mtu
@@ -990,17 +992,16 @@ function parse_config (main_config)
       end
    end
 
-   -- Create sinks for unused interfaces
+   -- Create sinks for interfaces not connected to any VPLS
    for name, intf in pairs(intfs) do
-      if intf.l2 and not intf.used and not intf.subintfs then
+      if intf.l2 and not intf.l2.connected_out then
          local sink = App:new(data_plane, 'sink_'..intf.nname,
                               Sink, {})
          data_plane:connect_duplex(intf.l2, sink:socket('input'))
       elseif intf.l3 then
          for afi, state in pairs(intf.l3) do
-            if state.configured and not state.used then
-               -- Create sink for a L3 interface not connected to
-               -- a dispatcher
+            local socket = state.socket_out
+            if socket and not socket.connected_out then
                local sink = App:new(data_plane, 'sink_'..intf.nname..'_'..afi,
                                     Sink, {})
                data_plane:connect_duplex(state.socket_out, sink:socket('input'))
