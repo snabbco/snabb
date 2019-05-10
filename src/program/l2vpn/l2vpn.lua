@@ -343,7 +343,8 @@ function parse_intf(state, name, config)
           "Unsupported driver (missing driver helper)"
              ..drv_c.path.."."..drv_c.name)
    intf.driver_helper = driver_helper
-   intf.l2 = intf.app:socket(driver_helper.link_names())
+   local intf_socket = intf.app:socket(driver_helper.link_names())
+   intf.l2_socket = { input = intf_socket.input, output = intf_socket.output }
 
    -- L2 configuration
    print("  L2 configuration")
@@ -391,11 +392,11 @@ function parse_intf(state, name, config)
             local tee = App:new(data_plane, 'tee_'..intf.nname..'_'..dir, Tee)
             data_plane:connect(tee:socket('mirror'), mirror_socket)
             if dir == "rx" then
-               data_plane:connect(intf.l2, tee:socket('input'))
-               intf.l2.output = tee:socket('pass').output
+               data_plane:connect(intf_socket, tee:socket('input'))
+               intf.l2_socket.output = tee:socket('pass').output
             else
-               data_plane:connect(tee:socket('pass'), intf.l2)
-               intf.l2.input = tee:socket('input').input
+               data_plane:connect(tee:socket('pass'), intf_socket)
+               intf.l2_socket.input = tee:socket('input').input
             end
          end
       end
@@ -539,7 +540,7 @@ function parse_intf(state, name, config)
                    or string.format("ether-type 0x%04x", encap)))
       local vmux = App:new(data_plane, 'vmux_'..intf.nname, VlanMux,
                            { encapsulation = encap })
-      data_plane:connect_duplex(vmux:socket('trunk'), intf.l2)
+      data_plane:connect_duplex(vmux:socket('trunk'), intf.l2_socket)
 
       -- Process VLANs and create sub-interfaces
       print("  Sub-Interfaces")
@@ -576,7 +577,7 @@ function parse_intf(state, name, config)
             subintf.l3 = process_afs(vlan.address_families, vid,
                                      socket, "    ")
          else
-            subintf.l2 = socket
+            subintf.l2_socket = socket
          end
 
          -- Store a copy of the vmux socket to find the proper shm
@@ -586,7 +587,7 @@ function parse_intf(state, name, config)
    else
       print("    Trunking mode: disabled")
       if not nil_or_empty_p(config.address_families) then
-         intf.l3 = process_afs(config.address_families, nil, intf.l2, "")
+         intf.l3 = process_afs(config.address_families, nil, intf.l2_socket, "")
       end
    end
 
@@ -951,7 +952,7 @@ function parse_config (main_config)
       if #bridge_group.pws == 1 and #bridge_group.acs == 1 then
          -- No bridge needed for a p2p VPN
          local pw, ac = bridge_group.pws[1], bridge_group.acs[1]
-         data_plane:connect_duplex(pw.socket, ac.l2)
+         data_plane:connect_duplex(pw.socket, ac.l2_socket)
          -- For a p2p VPN, pass the name and description of the AC
          -- interface so the PW module can set up the proper
          -- service-specific MIB
@@ -985,7 +986,7 @@ function parse_config (main_config)
          end
          for _, ac in ipairs(bridge_group.acs) do
             local ac_name = normalize_name(ac.name)
-            data_plane:connect_duplex(ac.l2,
+            data_plane:connect_duplex(ac.l2_socket,
                                       bridge:socket(ac_name))
             table.insert(bridge:arg().ports, ac_name)
          end
@@ -994,10 +995,10 @@ function parse_config (main_config)
 
    -- Create sinks for interfaces not connected to any VPLS
    for name, intf in pairs(intfs) do
-      if intf.l2 and not intf.l2.connected_out then
+      if intf.l2_socket and not intf.l2_socket.connected_out then
          local sink = App:new(data_plane, 'sink_'..intf.nname,
                               Sink, {})
-         data_plane:connect_duplex(intf.l2, sink:socket('input'))
+         data_plane:connect_duplex(intf.l2_socket, sink:socket('input'))
       elseif intf.l3 then
          for afi, state in pairs(intf.l3) do
             local socket = state.socket_out
