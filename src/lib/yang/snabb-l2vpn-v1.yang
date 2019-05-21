@@ -45,6 +45,7 @@ module snabb-l2vpn-v1 {
         }
         leaf option {
           type string;
+          default "";
           description
             "Options for the LuaJIT trace dumper.";
         }
@@ -62,6 +63,7 @@ module snabb-l2vpn-v1 {
     container snmp {
       leaf enable {
         type boolean;
+        default false;
         description
           "Whether to enable SNMP. This will instantiate MIB objects for
            interfaces and pseudowires";
@@ -76,6 +78,9 @@ module snabb-l2vpn-v1 {
     }
 
     grouping interface-address-families {
+      // All of these leafs should be mandatory, but the current YANG
+      // parser throws a cryptic error.  Requires a workaround in the
+      // interface parser in l2vpn.lua.
       container address-families {
         container ipv4 {
           leaf address {
@@ -93,7 +98,7 @@ module snabb-l2vpn-v1 {
         container ipv6 {
           leaf address {
             type inet:ipv6-address;
-             description
+            description
               "The IPv6 address assigned to the L3 interface, without netmask.";
           }
           leaf next-hop {
@@ -145,6 +150,7 @@ module snabb-l2vpn-v1 {
         }
         leaf config {
           type string;
+          default "{}";
           description
             "A string containing a literal Lua expression.  The result of the
              evaluation of this expression is passed as argument to
@@ -302,6 +308,8 @@ module snabb-l2vpn-v1 {
         }
 
         list endpoint {
+          min-elements 1;
+
           description
             "An ipv4 or ipv6 address which can be used as an endpoint for a
              pseudowire.";
@@ -474,20 +482,21 @@ module snabb-l2vpn-v1 {
       container bridge {
         description
           "The configuration for the bridge module associated with the VPLS to
-             which all pseudowires and attachment circuits are
-             connected.  The bridge module will not be created if the
-             VPLS only contains a single pseusowire and a single
-             attachment circuit.  In that case, the pseudowire is
-             connected directly to the attachment circuit.
+           which all pseudowires and attachment circuits are
+           connected.  The bridge module will not be created if the
+           VPLS only contains a single pseusowire and a single
+           attachment circuit.  In that case, the pseudowire is
+           connected directly to the attachment circuit.
 
-             As a mechanism for loop prevention, the bridge enforces a
-             split-horizon policy on all ports to which a pseudowire
-             connects: packets arriving from a pseudowire are never
-             forwarded to any other pseudowire.  As a consequence, the
-             pseudowires that make up a VPLS are required to form a
-             full mesh.";
+           As a mechanism for loop prevention, the bridge enforces a
+           split-horizon policy on all ports to which a pseudowire
+           connects: packets arriving from a pseudowire are never
+           forwarded to any other pseudowire.  As a consequence, the
+           pseudowires that make up a VPLS are required to form a full
+           mesh.";
 
         choice type {
+          default learning;
           case flooding {
             leaf flooding {
               type empty;

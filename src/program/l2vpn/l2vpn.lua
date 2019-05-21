@@ -311,6 +311,10 @@ function parse_intf(state, name, config)
    }
 
    -- NIC driver
+   -- YANG BUG: the peers container should be mandatory, because it
+   -- contains mandatory items (lists with min-elements > 0).  Work
+   -- around it with an explicit check.
+   assert(config.driver, 'Missing mandatory container "driver"')
    local drv_c = config.driver
    local drv_config = eval(drv_c.config, " in driver configuration")
    local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
@@ -408,6 +412,10 @@ function parse_intf(state, name, config)
 
    local afs_procs = {
       ipv6 = function (config, vid, socket_in, indent)
+         -- YANG BUG: address and next_hop should be marked mandatory
+         -- in the schema (also see comment in the schema)
+         assert(config.address, "Missing address")
+         assert(config.next_hop, "Missing next-hop")
          local address = ntop("ipv6", config.address)
          local next_hop = ntop("ipv6", config.next_hop)
          -- FIXME: check fo uniqueness of subnet
@@ -447,6 +455,10 @@ function parse_intf(state, name, config)
       end,
 
       ipv4 = function (config, vid, socket_in, indent)
+         -- YANG BUG: address and next_hop should be marked mandatory
+         -- in the schema (also see comment in the schema)
+         assert(config.address, "Missing address")
+         assert(config.next_hop, "Missing next-hop")
          local address = ntop("ipv4", config.address)
          local next_hop = ntop("ipv4", config.next_hop)
          -- FIXME: check fo uniqueness of subnet
@@ -501,7 +513,7 @@ function parse_intf(state, name, config)
          }
       }
 
-      if af_configs.ipv4 and af_configs.ipv6 then
+      if tlen(af_configs) > 1 then
          -- Add a demultiplexer for IPv4/IPv6
          local afd = App:new(data_plane, 'af_mux_'..intf.nname..vid_suffix(vid),
                              af_mux)
@@ -545,6 +557,9 @@ function parse_intf(state, name, config)
       -- Process VLANs and create sub-interfaces
       print("  Sub-Interfaces")
       local sub_intf_id = 0
+      -- YANG BUG: {min,max}-elements checks NYI
+      assert(tlen(trunk.vlan) > 0,
+             "At least one VLAN required")
       for vid, vlan in pairs(trunk.vlan) do
          assert(type(vid) == "number" and vid >= 0 and vid < 4095,
                 "Invalid VLAN ID "..vid.." for sub-interface #"..sub_intf_id)
@@ -773,8 +788,11 @@ function parse_config (main_config)
    end
 
    local index, sd_pairs = 1, {}
-   -- This should be handled by {min,max}-elements in the YANG schema,
-   -- but that check is not yet implemented there.
+   -- YANG BUG: the peers container should be mandatory, because it
+   -- contains mandatory items (lists with min-elements > 0).
+   assert(main_config.peers, 'Missing mandatory "peers" container')
+
+   -- YANG BUG: {min,max}-elements checks NYI
    local nlpeers = tlen(main_config.peers['local'] or {})
    assert(nlpeers == 1, "Exactly one local peer required, got "..nlpeers)
    local nrpeers = tlen(main_config.peers.remote or {})
@@ -787,7 +805,7 @@ function parse_config (main_config)
 
       local function address (type)
          local function check2(arg, fmt, ...)
-            return check(arg, ("%s endpoint %s"):format(type, fmt), ...)
+            return check(arg, ("%s endpoint: %s"):format(type, fmt), ...)
          end
 
          local t = check2(transport[type], "missing")
@@ -796,6 +814,9 @@ function parse_config (main_config)
          local ep = check2(peer.endpoint[t.endpoint],
                            "undefinde endpoint %s for peer %s",
                            t.endpoint, t.peer)
+         -- YANG BUG: the peers container should be mandatory, because
+         -- it contains mandatory items.
+         check2(ep.address, "missing address for endpoint %s of peer %s", t.endpoint, t.peer)
          local afi, addr = singleton(ep.address)
          check2(afi == transport.address_family, "address family mismatch for "..
                    "endpoint %s of peer %s", t.endpoint, t.peer)
@@ -845,6 +866,7 @@ function parse_config (main_config)
                      .." is L2 when L3 is expected")
       print("  Uplink is on "..uplink)
 
+      assert(vpls.bridge, "Missing bridge configuration")
       local bridge_type, bridge_config = singleton(vpls.bridge)
       local bridge_group = {
          type = bridge_type,
@@ -855,6 +877,8 @@ function parse_config (main_config)
       bridge_groups[vpls_name] = bridge_group
 
       print("  Creating pseudowires")
+      assert(tlen(vpls.pseudowire) > 0,
+             "At least one pseudowire required")
       for name, pw in pairs(vpls.pseudowire) do
          print("    "..name)
          local transport = assert(transports[pw.transport],
@@ -868,6 +892,8 @@ function parse_config (main_config)
          print("      Remote address: "..transport.remote_address)
          print("      VC ID: "..pw.vc_id)
 
+         -- YANG BUG: the peers container should be mandatory, because
+         -- it contains mandatory items.
          assert(pw.tunnel, "Tunnel configuration missing")
          local tunnel_type, tunnel_config = singleton(pw.tunnel)
          local cc = pw.control_channel
@@ -887,7 +913,7 @@ function parse_config (main_config)
                                 heartbeat = cc.heartbeat,
                                 dead_factor = cc.dead_factor,
                                 name = qname,
-                                description = vpls.description,
+                                description = vpls.description or '',
                                 mtu = vpls.mtu,
                                 vc_id = pw.vc_id,
                                 afi = afi,
@@ -920,6 +946,8 @@ function parse_config (main_config)
       end
 
       print("  Creating attachment circuits")
+      assert(tlen(vpls.attachment_circuit) > 0,
+             "At least one attachment circuit required")
       for name, t in pairs(vpls.attachment_circuit) do
          local ac = t.interface
          print("    "..name)
