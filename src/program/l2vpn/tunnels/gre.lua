@@ -34,6 +34,24 @@ function tunnel:new (config)
                     unknown_header)
 end
 
+function tunnel:info ()
+   return {
+      params = {},
+      proto = 47,
+      mk_vc_config_fn = function (vc_id, cc_vc_id, tunnel_config)
+         return {
+            [vc_id] = {},
+            [cc_vc_id] = {}
+         }
+      end,
+      vc_id_max = 0x7FFF,
+      afs = {
+         ipv4 = true,
+         ipv6 = true
+      }
+   }
+end
+
 function selftest ()
    local app_graph = config.new()
    local Source = require("apps.basic.basic_apps").Source

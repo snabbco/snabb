@@ -95,6 +95,10 @@ local frag_ipv4 = require("apps.ipv4.fragment").Fragmenter
 local reass_ipv4 = require("apps.ipv4.reassemble").Reassembler
 local Receiver = require("apps.interlink.receiver").Receiver
 local Transmitter = require("apps.interlink.transmitter").Transmitter
+local l2vpn_lib = require("program.l2vpn.lib")
+
+local tlen = l2vpn_lib.tlen
+local singleton = l2vpn_lib.singleton
 
 local initial_state
 local worker_pid
@@ -104,20 +108,6 @@ local bridge_types = { flooding = true, learning = true }
 function usage ()
    print(usage_msg)
    main.exit(0)
-end
-
-local function merge (a, b)
-   for k, v in pairs(b) do
-      a[k] = v
-   end
-end
-
-local function tlen (t)
-   local length = 0
-   for _, _ in pairs(t) do
-      length = length + 1
-   end
-   return length
 end
 
 local Graph = {}
@@ -265,28 +255,6 @@ local function src_dst_pair (af, src, dst)
                         af:ntop(maybe_convert(dst)))
 end
 
-local function nil_or_empty_p (t)
-   if not t then return true end
-   assert(type(t) == "table", type(t))
-   for _, _ in pairs(t) do
-      return(false)
-   end
-   return(true)
-end
-
-local function eval (expr, msg)
-   local result, err = loadstring("return ("..expr..")")
-   assert(result, "Invalid Lua expression"..msg..": "
-             ..expr..": "..(err or ''))
-   return result()
-end
-
--- Return the key and value of a table with a single entry
-local function singleton (t)
-   local iter, state = pairs(t)
-   return iter(state)
-end
-
 -- The yang module converts IP addresses to their numeric
 -- representation.  Revert to the printable representation.
 local function ntop (afi, addr)
@@ -316,7 +284,7 @@ function parse_intf(state, name, config)
    -- around it with an explicit check.
    assert(config.driver, 'Missing mandatory container "driver"')
    local drv_c = config.driver
-   local drv_config = eval(drv_c.config, " in driver configuration")
+   local drv_config = l2vpn_lib.eval(drv_c.config, " in driver configuration")
    local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
 
    if type(drv_config) == "table" then
@@ -325,7 +293,7 @@ function parse_intf(state, name, config)
 	 intf.pci_address = drv_config.pciaddr
       end
       drv_config.mtu = config.mtu
-      merge(drv_config, driver_helper.config())
+      l2vpn_lib.merge(drv_config, driver_helper.config())
       if drv_c.extra_config then
 
          -- If present, extra_config must evaluate to a table, whose
@@ -333,7 +301,8 @@ function parse_intf(state, name, config)
          -- allows for more flexibility when the configuration is
          -- created by a Lua-agnostic layer on top, e.g. by a NixOS
          -- module
-         local extra_config = eval(drv_c.extra_config, "in driver extra configuration")
+         local extra_config = l2vpn_lib.eval(drv_c.extra_config,
+                                             "in driver extra configuration")
          assert(type(extra_config) == "table",
                 "Driver extra configuration must be a table")
          for k, v in pairs(extra_config) do
@@ -540,7 +509,7 @@ function parse_intf(state, name, config)
       -- instance of the VLAN multiplexer.
       print("    Trunking mode: enabled")
       intf.subintfs = {}
-      assert(nil_or_empty_p(config.address_families),
+      assert(l2vpn_lib.nil_or_empty_p(config.address_families),
              "Address family configuration not allowed in trunking mode")
       local encap = trunk.encapsulation
       if encap == "raw" then
@@ -588,7 +557,7 @@ function parse_intf(state, name, config)
          print("        VLAN ID: "..(vid > 0 and vid or "<untagged>"))
          print("        MTU: "..subintf.mtu)
          local socket = vmux:socket((vid == 0 and 'native') or 'vlan'..vid)
-         if not nil_or_empty_p(vlan.address_families) then
+         if not l2vpn_lib.nil_or_empty_p(vlan.address_families) then
             subintf.l3 = process_afs(vlan.address_families, vid,
                                      socket, "    ")
          else
@@ -601,7 +570,7 @@ function parse_intf(state, name, config)
       end
    else
       print("    Trunking mode: disabled")
-      if not nil_or_empty_p(config.address_families) then
+      if not l2vpn_lib.nil_or_empty_p(config.address_families) then
          intf.l3 = process_afs(config.address_families, nil, intf.l2_socket, "")
       end
    end
@@ -637,55 +606,6 @@ function parse_config (main_config)
    -- uniquely.
    local transports = {}
    local dispatchers = { ipv4 = {}, ipv6 = {} }
-   local tunnel_infos = {
-      l2tpv3 = {
-         class = require("program.l2vpn.tunnels.l2tpv3").tunnel,
-         params = {
-            local_cookie = { required = true },
-            remote_cookie = { required = true }
-         },
-         proto = 115,
-         mk_vc_config_fn = function (vc_id, cc_vc_id, tunnel_config)
-            local function maybe_eval_cookie(name)
-               local s = tunnel_config[name]
-               if s then
-                  tunnel_config[name] = eval("'"..s.."'",'')
-               end
-            end
-            for _, cookie in ipairs({ 'local_cookie', 'remote_cookie' }) do
-               maybe_eval_cookie(cookie)
-            end
-            return {
-               [vc_id] = tunnel_config,
-               [cc_vc_id] = {
-                   local_session = 0xFFFFFFFE,
-                   remote_session = 0xFFFFFFFE,
-                   local_cookie = tunnel_config.local_cookie,
-                   remote_cookie = tunnel_config.remote_cookie,
-               }
-            }
-         end,
-         afs = {
-            ipv6 = true
-         }
-      },
-      gre = {
-         class = require("program.l2vpn.tunnels.gre").tunnel,
-         params = {},
-         proto = 47,
-         mk_vc_config_fn = function (vc_id, cc_vc_id, tunnel_config)
-            return {
-               [vc_id] = {},
-               [cc_vc_id] = {}
-            }
-         end,
-         vc_id_max = 0x7FFF,
-         afs = {
-            ipv4 = true,
-            ipv6 = true
-         }
-      }
-   }
    local function add_pw (transport, intf, uplink, vc_id, type, config)
       local afi = transport.afi
       local af = af_classes[afi]
@@ -703,8 +623,8 @@ function parse_config (main_config)
          dispatchers[afi][uplink] = dispatch
       end
 
-      local tunnel_info = assert(tunnel_infos[type],
-                                 "Unsupported tunnel type :"..type)
+      local tunnel_class = require("program.l2vpn.tunnels."..type).tunnel
+      local tunnel_info = tunnel_class:info()
       assert(tunnel_info.afs[afi],
              "Tunnel type "..type.." not supported for "
                 .."address family "..afi)
@@ -761,7 +681,7 @@ function parse_config (main_config)
       local tunnel = transport.tunnels[type]
       if not tunnel then
          tunnel = App:new(data_plane, type.."_"..transport.index,
-                          tunnel_info.class,
+                          tunnel_class,
                           { ancillary_data = {
                                remote_addr = af:ntop(remote_addr),
                                local_addr = af:ntop(local_addr) } })

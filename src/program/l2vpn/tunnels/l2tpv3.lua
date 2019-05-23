@@ -1,7 +1,10 @@
 module(..., package.seeall)
 local ffi = require("ffi")
 local base = require("program.l2vpn.tunnels.base").tunnel
+local lib = require("program.l2vpn.lib")
 local l2tpv3 = require("lib.protocol.keyed_ipv6_tunnel")
+
+local eval = lib.eval
 
 tunnel = setmetatable({}, { __index = base })
 
@@ -32,6 +35,39 @@ function tunnel:new (config)
 
    return self:_new(config, "L2TPv3", l2tpv3, l2tpv3:sizeof(), params, create_headers,
                     unknown_header)
+end
+
+function tunnel:info ()
+   return {
+      params = {
+         local_cookie = { required = true },
+         remote_cookie = { required = true }
+      },
+      proto = 115,
+      mk_vc_config_fn = function (vc_id, cc_vc_id, tunnel_config)
+         local function maybe_eval_cookie(name)
+            local s = tunnel_config[name]
+            if s then
+               tunnel_config[name] = eval("'"..s.."'",'')
+            end
+         end
+         for _, cookie in ipairs({ 'local_cookie', 'remote_cookie' }) do
+            maybe_eval_cookie(cookie)
+         end
+         return {
+            [vc_id] = tunnel_config,
+            [cc_vc_id] = {
+               local_session = 0xFFFFFFFE,
+               remote_session = 0xFFFFFFFE,
+               local_cookie = tunnel_config.local_cookie,
+               remote_cookie = tunnel_config.remote_cookie,
+            }
+         }
+      end,
+      afs = {
+         ipv6 = true
+      }
+   }
 end
 
 function selftest ()
