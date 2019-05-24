@@ -1121,11 +1121,45 @@ local function setup_l2vpn (config)
             control_plane = state.ctrl_plane:app_graph() }
 end
 
+local function do_ipsec_hash (parameters)
+   local siphash = require("lib.hash.siphash")
+
+   local hash_buf = {
+      ipv6 = ffi.new[[
+             struct {
+                uint8_t remote[16];
+                uint8_t local[16];
+             } __attribute__ ((__packed__))
+          ]],
+      ipv4 = ffi.new[[
+             struct {
+                uint8_t remote[4];
+                uint8_t local[4];
+             } __attribute__ ((__packed__))
+          ]],
+   }
+
+   assert(#parameters == 3)
+   local afi, loc, rem = unpack(parameters)
+   local af = require("lib.protocol."..afi)
+   local hash_buf = hash_buf[afi]
+
+   hash_buf['local']  = af:pton(loc)
+   hash_buf.remote  = af:pton(rem)
+   local key = ffi.new("uint8_t[16]", 0, 1, 2, 3, 4, 5, 6, 7,
+                       8, 9, 10, 11, 12, 13, 14, 15)
+   local hash_fn = siphash.make_hash({ size = ffi.sizeof(hash_buf),
+                                       standard = true, key = key })
+   local hash = hash_fn(hash_buf)
+   print("/ipsec/"..bit.tohex(hash))
+end
+
 local long_opts = {
    duration = "D",
    ["busy-wait"] = "b",
    debug = "d",
    jit = "j",
+   ipsec = "i",
    help = "h",
 }
 
@@ -1135,6 +1169,7 @@ function run (parameters)
    local jit_conf = {}
    local jit_opts = {}
    local opt = {}
+   local ipsec_hash = false
    function opt.D (arg)
       if arg:match("^[0-9]+$") then
          duration = tonumber(arg)
@@ -1143,6 +1178,9 @@ function run (parameters)
       end
    end
    function opt.h (arg) usage() end
+   function opt.i (arg)
+      ipsec_hash = true
+   end
    function opt.b (arg)
       busywait = true
    end
@@ -1169,7 +1207,12 @@ function run (parameters)
    end
 
    -- Parse command line arguments
-   parameters = lib.dogetopt(parameters, opt, "hbdj:D:", long_opts)
+   parameters = lib.dogetopt(parameters, opt, "hbdij:D:", long_opts)
+
+   if ipsec_hash then
+      do_ipsec_hash(parameters)
+      os.exit(0)
+   end
 
    if #jit_opts then
       require("jit.opt").start(unpack(jit_opts))

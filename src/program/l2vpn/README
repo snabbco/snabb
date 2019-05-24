@@ -1,4 +1,5 @@
 Usage: l2vpn [OPTION]... CONFIG [STATEDIR]
+       l2vpn --ipsec AF LOCAL_ADDR REMOTE_ADDR
 
 Provision an endpoint for a Ethernet point-to-point or multipoint VPN
 according to the configuration supplied in the CONFIG file.  If STATEDIR
@@ -24,3 +25,8 @@ that directory.
                              See luajit documentation for more information:
                                http://luajit.org/running.html
   -h,        --help          Print this usage message.
+
+The second synopsis is a helper function for internal use only.  It
+calculates a particular hash over a pair of IP addresses of the given
+address family AF (either "ipv4" or "ipv6") used to locate IPSec keys
+in $SNABB_SHM_ROOT/ipsec.
