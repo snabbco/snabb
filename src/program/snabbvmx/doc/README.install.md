@@ -34,7 +34,6 @@ Usage:
     snabbvmx check
     snabbvmx lwaftr
     snabbvmx query
-    snabbvmx top
 
 Use --help for per-command usage.
 
@@ -67,7 +66,6 @@ Usage:
     snabbvmx check
     snabbvmx lwaftr
     snabbvmx query
-    snabbvmx top
 ```
 
 ## SnabbVMX tools

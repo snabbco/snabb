@@ -47,6 +47,7 @@ V4=(
     udp-frominet-3frag-bound.pcap
     udp-frominet-bound.pcap
     ping-v4.pcap
+    ping-v4-ttl-32.pcap
     ping-v4-reply.pcap
     ping-v4-and-data.pcap
 )
@@ -110,6 +111,7 @@ V6=(
     udp-afteraftr-reassembled-ipv6-2frags.pcap
     udp-fromb4-2frags-bound.pcap
     ping-v6.pcap
+    ping-v6-hop-limit-32.pcap
     ping-v6-reply.pcap
     ping-v6-and-data.pcap
 )

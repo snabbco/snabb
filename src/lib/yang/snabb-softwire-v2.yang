@@ -723,6 +723,13 @@ module snabb-softwire-v2 {
          "Maximum packet size to recieve on the IPv6 interface.";
       }
 
+      leaf flow-label {
+        type uint32;
+        default 0;
+        description
+          "IPv6 flow label";
+      }
+
       uses traffic-filters;
       uses icmp-policy;
       uses vlan-tagging;

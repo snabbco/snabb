@@ -19,6 +19,13 @@ if [[ -z "$SNABB_PCI1" ]]; then
     exit $SKIPPED_CODE
 fi
 
+ping6=$(which ping6 2> /dev/null)
+if [[ $? == 0 ]]; then
+    ping6="ping6"
+else
+    ping6="ping -6"
+fi
+
 function fatal {
     local msg=$1
     echo "Error: $msg"
@@ -47,7 +54,7 @@ function bind_card {
 }
 
 function test_ping_to_internal_interface {
-    local out=$(ping6 -c 1 -I "$IFACE.v6" "$INTERNAL_IP")
+    local out=$($ping6 -c 1 -I "$IFACE.v6" "$INTERNAL_IP")
     local count=$(echo "$out" | grep -o -c " 0% packet loss")
     if [[ $count -eq 1 ]]; then
         echo "Success: Ping to internal interface"
@@ -62,7 +69,7 @@ function test_ping_to_external_interface {
     if [[ $count -eq 1 ]]; then
         echo "Success: Ping to external interface"
     else
-        fatal "Couldn't ping to internal interface"
+        fatal "Couldn't ping to external interface"
     fi
 
 }

@@ -19,14 +19,12 @@
 #include "lj_func.h"
 #include "lj_state.h"
 #include "lj_bc.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
-#endif
 #include "lj_strfmt.h"
 #include "lj_lex.h"
 #include "lj_parse.h"
 #include "lj_vm.h"
-#include "lj_vmevent.h"
+#include "lj_auditlog.h"
 
 /* -- Parser structures and definitions ----------------------------------- */
 
@@ -91,7 +89,7 @@ static LJ_AINLINE void expr_init(ExpDesc *e, ExpKind k, uint32_t info)
 static int expr_numiszero(ExpDesc *e)
 {
   TValue *o = expr_numtv(e);
-  return tvisint(o) ? (intV(o) == 0) : tviszero(o);
+  return tviszero(o);
 }
 
 /* Per-function linked list of scope blocks. */
@@ -241,7 +239,6 @@ GCstr *lj_parse_keepstr(LexState *ls, const char *str, size_t len)
   return s;
 }
 
-#if LJ_HASFFI
 /* Anchor cdata to avoid GC. */
 void lj_parse_keepcdata(LexState *ls, TValue *tv, GCcdata *cd)
 {
@@ -250,7 +247,6 @@ void lj_parse_keepcdata(LexState *ls, TValue *tv, GCcdata *cd)
   setcdataV(L, tv, cd);
   setboolV(lj_tab_set(L, ls->fs->kt, tv), 1);
 }
-#endif
 
 /* -- Jump list handling -------------------------------------------------- */
 
@@ -510,25 +506,16 @@ static void expr_toreg_nobranch(FuncState *fs, ExpDesc *e, BCReg reg)
   if (e->k == VKSTR) {
     ins = BCINS_AD(BC_KSTR, reg, const_str(fs, e));
   } else if (e->k == VKNUM) {
-#if LJ_DUALNUM
-    cTValue *tv = expr_numtv(e);
-    if (tvisint(tv) && checki16(intV(tv)))
-      ins = BCINS_AD(BC_KSHORT, reg, (BCReg)(uint16_t)intV(tv));
-    else
-#else
     lua_Number n = expr_numberV(e);
     int32_t k = lj_num2int(n);
     if (checki16(k) && n == (lua_Number)k)
       ins = BCINS_AD(BC_KSHORT, reg, (BCReg)(uint16_t)k);
     else
-#endif
       ins = BCINS_AD(BC_KNUM, reg, const_num(fs, e));
-#if LJ_HASFFI
   } else if (e->k == VKCDATA) {
     fs->flags |= PROTO_FFI;
     ins = BCINS_AD(BC_KCDATA, reg,
 		   const_gc(fs, obj2gco(cdataV(&e->u.nval)), LJ_TCDATA));
-#endif
   } else if (e->k == VRELOCABLE) {
     setbc_a(bcptr(fs, e), reg);
     goto noins;
@@ -772,13 +759,6 @@ static int foldarith(BinOpr opr, ExpDesc *e1, ExpDesc *e2)
   n = lj_vm_foldarith(expr_numberV(e1), expr_numberV(e2), (int)opr-OPR_ADD);
   setnumV(&o, n);
   if (tvisnan(&o) || tvismzero(&o)) return 0;  /* Avoid NaN and -0 as consts. */
-  if (LJ_DUALNUM) {
-    int32_t k = lj_num2int(n);
-    if ((lua_Number)k == n) {
-      setintV(&e1->u.nval, k);
-      return 1;
-    }
-  }
   setnumV(&e1->u.nval, n);
   return 1;
 }
@@ -947,7 +927,6 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
   } else {
     lua_assert(op == BC_UNM || op == BC_LEN);
     if (op == BC_UNM && !expr_hasjump(e)) {  /* Constant-fold negations. */
-#if LJ_HASFFI
       if (e->k == VKCDATA) {  /* Fold in-place since cdata is not interned. */
 	GCcdata *cd = cdataV(&e->u.nval);
 	int64_t *p = (int64_t *)cdataptr(cd);
@@ -957,20 +936,10 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
 	  *p = -*p;
 	return;
       } else
-#endif
       if (expr_isnumk(e) && !expr_numiszero(e)) {  /* Avoid folding to -0. */
 	TValue *o = expr_numtv(e);
-	if (tvisint(o)) {
-	  int32_t k = intV(o);
-	  if (k == -k)
-	    setnumV(o, -(lua_Number)k);
-	  else
-	    setintV(o, -k);
-	  return;
-	} else {
-	  o->u64 ^= U64x(80000000,00000000);
-	  return;
-	}
+        o->u64 ^= U64x(80000000,00000000);
+        return;
       }
     }
     expr_toanyreg(fs, e);
@@ -1350,10 +1319,7 @@ static void fs_fixup_k(FuncState *fs, GCproto *pt, void *kptr)
   for (i = 0; i < kt->asize; i++)
     if (tvhaskslot(&array[i])) {
       TValue *tv = &((TValue *)kptr)[tvkslot(&array[i])];
-      if (LJ_DUALNUM)
-	setintV(tv, (int32_t)i);
-      else
-	setnumV(tv, (lua_Number)i);
+      setnumV(tv, (lua_Number)i);
     }
   node = noderef(kt->node);
   hmask = kt->hmask;
@@ -1361,20 +1327,9 @@ static void fs_fixup_k(FuncState *fs, GCproto *pt, void *kptr)
     Node *n = &node[i];
     if (tvhaskslot(&n->val)) {
       ptrdiff_t kidx = (ptrdiff_t)tvkslot(&n->val);
-      lua_assert(!tvisint(&n->key));
       if (tvisnum(&n->key)) {
 	TValue *tv = &((TValue *)kptr)[kidx];
-	if (LJ_DUALNUM) {
-	  lua_Number nn = numV(&n->key);
-	  int32_t k = lj_num2int(nn);
-	  lua_assert(!tvismzero(&n->key));
-	  if ((lua_Number)k == nn)
-	    setintV(tv, k);
-	  else
-	    *tv = n->key;
-	} else {
-	  *tv = n->key;
-	}
+        *tv = n->key;
       } else {
 	GCobj *o = gcV(&n->key);
 	setgcref(((GCRef *)kptr)[~kidx], o);
@@ -1394,49 +1349,26 @@ static void fs_fixup_uv1(FuncState *fs, GCproto *pt, uint16_t *uv)
   memcpy(uv, fs->uvtmp, fs->nuv*sizeof(VarIndex));
 }
 
-#ifndef LUAJIT_DISABLE_DEBUGINFO
 /* Prepare lineinfo for prototype. */
 static size_t fs_prep_line(FuncState *fs, BCLine numline)
 {
-  return (fs->pc-1) << (numline < 256 ? 0 : numline < 65536 ? 1 : 2);
+  return (fs->pc+1) * sizeof(BCLine);
 }
 
 /* Fixup lineinfo for prototype. */
 static void fs_fixup_line(FuncState *fs, GCproto *pt,
-			  void *lineinfo, BCLine numline)
+			  uint32_t *lineinfo, BCLine numline)
 {
-  BCInsLine *base = fs->bcbase + 1;
-  BCLine first = fs->linedefined;
-  MSize i = 0, n = fs->pc-1;
+  int i;
   pt->firstline = fs->linedefined;
   pt->numline = numline;
   setmref(pt->lineinfo, lineinfo);
-  if (LJ_LIKELY(numline < 256)) {
-    uint8_t *li = (uint8_t *)lineinfo;
-    do {
-      BCLine delta = base[i].line - first;
-      lua_assert(delta >= 0 && delta < 256);
-      li[i] = (uint8_t)delta;
-    } while (++i < n);
-  } else if (LJ_LIKELY(numline < 65536)) {
-    uint16_t *li = (uint16_t *)lineinfo;
-    do {
-      BCLine delta = base[i].line - first;
-      lua_assert(delta >= 0 && delta < 65536);
-      li[i] = (uint16_t)delta;
-    } while (++i < n);
-  } else {
-    uint32_t *li = (uint32_t *)lineinfo;
-    do {
-      BCLine delta = base[i].line - first;
-      lua_assert(delta >= 0);
-      li[i] = (uint32_t)delta;
-    } while (++i < n);
-  }
+  for (i = 0; i <= fs->pc; i++) lineinfo[i] = fs->bcbase[i].line;
 }
 
 /* Prepare variable info for prototype. */
-static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar)
+static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar,
+                          size_t *ofsdeclname, const char *declname)
 {
   VarInfo *vs =ls->vstack, *ve;
   MSize i, n;
@@ -1474,27 +1406,26 @@ static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar)
     }
   }
   lj_buf_putb(&ls->sb, '\0');  /* Terminator for varinfo. */
+  /* Store function declaration name. */
+  *ofsdeclname = sbuflen(&ls->sb);
+  {
+    char *p;
+    int len = strlen(declname) + 1;
+    p = lj_buf_more(&ls->sb, len);
+    p = lj_buf_wmem(p, declname, len);
+    setsbufP(&ls->sb, p);
+  }
   return sbuflen(&ls->sb);
 }
 
 /* Fixup variable info for prototype. */
-static void fs_fixup_var(LexState *ls, GCproto *pt, uint8_t *p, size_t ofsvar)
+static void fs_fixup_var(LexState *ls, GCproto *pt, uint8_t *p, size_t ofsvar, size_t ofsdeclname)
 {
   setmref(pt->uvinfo, p);
   setmref(pt->varinfo, (char *)p + ofsvar);
+  setmref(pt->declname, (char*)p + ofsdeclname);
   memcpy(p, sbufB(&ls->sb), sbuflen(&ls->sb));  /* Copy from temp. buffer. */
 }
-#else
-
-/* Initialize with empty debug info, if disabled. */
-#define fs_prep_line(fs, numline)		(UNUSED(numline), 0)
-#define fs_fixup_line(fs, pt, li, numline) \
-  pt->firstline = pt->numline = 0, setmref((pt)->lineinfo, NULL)
-#define fs_prep_var(ls, fs, ofsvar)		(UNUSED(ofsvar), 0)
-#define fs_fixup_var(ls, pt, p, ofsvar) \
-  setmref((pt)->uvinfo, NULL), setmref((pt)->varinfo, NULL)
-
-#endif
 
 /* Check if bytecode op returns. */
 static int bcopisret(BCOp op)
@@ -1547,12 +1478,12 @@ static void fs_fixup_ret(FuncState *fs)
 }
 
 /* Finish a FuncState and return the new prototype. */
-static GCproto *fs_finish(LexState *ls, BCLine line)
+static GCproto *fs_finish(LexState *ls, BCLine line, char *declname)
 {
   lua_State *L = ls->L;
   FuncState *fs = ls->fs;
   BCLine numline = line - fs->linedefined;
-  size_t sizept, ofsk, ofsuv, ofsli, ofsdbg, ofsvar;
+  size_t sizept, ofsk, ofsuv, ofsli, ofsdbg, ofsvar, ofsdeclname;
   GCproto *pt;
 
   /* Apply final fixups. */
@@ -1564,7 +1495,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
   ofsk = sizept; sizept += fs->nkn*sizeof(TValue);
   ofsuv = sizept; sizept += ((fs->nuv+1)&~1)*2;
   ofsli = sizept; sizept += fs_prep_line(fs, numline);
-  ofsdbg = sizept; sizept += fs_prep_var(ls, fs, &ofsvar);
+  ofsdbg = sizept; sizept += fs_prep_var(ls, fs, &ofsvar, &ofsdeclname, declname);
 
   /* Allocate prototype and initialize its fields. */
   pt = (GCproto *)lj_mem_newgco(L, (MSize)sizept);
@@ -1582,16 +1513,13 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
   fs_fixup_k(fs, pt, (void *)((char *)pt + ofsk));
   fs_fixup_uv1(fs, pt, (uint16_t *)((char *)pt + ofsuv));
   fs_fixup_line(fs, pt, (void *)((char *)pt + ofsli), numline);
-  fs_fixup_var(ls, pt, (uint8_t *)((char *)pt + ofsdbg), ofsvar);
-
-  lj_vmevent_send(L, BC,
-    setprotoV(L, L->top++, pt);
-  );
+  fs_fixup_var(ls, pt, (uint8_t *)((char *)pt + ofsdbg), ofsvar, ofsdeclname);
 
   L->top--;  /* Pop table of constants. */
   ls->vtop = fs->vbase;  /* Reset variable stack. */
   ls->fs = fs->prev;
   lua_assert(ls->fs != NULL || ls->tok == TK_eof);
+  lj_auditlog_new_prototype(pt);
   return pt;
 }
 
@@ -1638,22 +1566,12 @@ static void expr_index(FuncState *fs, ExpDesc *t, ExpDesc *e)
   /* Already called: expr_toval(fs, e). */
   t->k = VINDEXED;
   if (expr_isnumk(e)) {
-#if LJ_DUALNUM
-    if (tvisint(expr_numtv(e))) {
-      int32_t k = intV(expr_numtv(e));
-      if (checku8(k)) {
-	t->u.s.aux = BCMAX_C+1+(uint32_t)k;  /* 256..511: const byte key */
-	return;
-      }
-    }
-#else
     lua_Number n = expr_numberV(e);
     int32_t k = lj_num2int(n);
     if (checku8(k) && n == (lua_Number)k) {
       t->u.s.aux = BCMAX_C+1+(uint32_t)k;  /* 256..511: const byte key */
       return;
     }
-#endif
   } else if (expr_isstrk(e)) {
     BCReg idx = const_str(fs, e);
     if (idx <= BCMAX_C) {
@@ -1837,7 +1755,8 @@ static BCReg parse_params(LexState *ls, int needself)
 static void parse_chunk(LexState *ls);
 
 /* Parse body of a function. */
-static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line)
+static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line,
+                       char *declname)
 {
   FuncState fs, *pfs = ls->fs;
   FuncScope bl;
@@ -1852,15 +1771,13 @@ static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line)
   bcemit_AD(&fs, BC_FUNCF, 0, 0);  /* Placeholder. */
   parse_chunk(ls);
   if (ls->tok != TK_end) lex_match(ls, TK_end, TK_function, line);
-  pt = fs_finish(ls, (ls->lastline = ls->linenumber));
+  pt = fs_finish(ls, (ls->lastline = ls->linenumber), declname);
   pfs->bcbase = ls->bcstack + oldbase;  /* May have been reallocated. */
   pfs->bclim = (BCPos)(ls->sizebcstack - oldbase);
   /* Store new prototype in the constant array of the parent. */
   expr_init(e, VRELOCABLE,
 	    bcemit_AD(pfs, BC_FNEW, 0, const_gc(pfs, obj2gco(pt), LJ_TPROTO)));
-#if LJ_HASFFI
   pfs->flags |= (fs.flags & PROTO_FFI);
-#endif
   if (!(pfs->flags & PROTO_CHILD)) {
     if (pfs->flags & PROTO_HAS_RETURN)
       pfs->flags |= PROTO_FIXUP_RETURN;
@@ -2005,7 +1922,7 @@ static void expr_simple(LexState *ls, ExpDesc *v)
     return;
   case TK_function:
     lj_lex_next(ls);
-    parse_body(ls, v, 0, ls->linenumber);
+    parse_body(ls, v, 0, ls->linenumber, "");
     return;
   default:
     expr_primary(ls, v);
@@ -2234,9 +2151,24 @@ static void parse_call_assign(LexState *ls)
   }
 }
 
+/* Convert the logged input into a canonical function declaration name. */
+static char *log_declname(char *log)
+{
+  char *end = log + strlen(log) - 1;
+  /* Strip off trailing chars e.g. change "myfunc (X" to "myfunc". */
+  while (end > log && *end != '(')  end--;	/* Rewind to '('. */
+  if (*end != '(') return log; else end--;	/* Skip '(' if present. */
+  while (end > log && *end == ' ')  end--;	/* Rewind over spaces. */
+  *(end+1) = '\0';				/* Truncate. */
+  return log;
+}
+
 /* Parse 'local' statement. */
 static void parse_local(LexState *ls)
 {
+  char log[128];
+  memset(&log[0], 0, sizeof(log));
+  lj_lex_log(ls, &log[0], sizeof(log)-1);
   if (lex_opt(ls, TK_function)) {  /* Local function declaration. */
     ExpDesc v, b;
     FuncState *fs = ls->fs;
@@ -2245,7 +2177,8 @@ static void parse_local(LexState *ls)
     v.u.s.aux = fs->varmap[fs->freereg];
     bcreg_reserve(fs, 1);
     var_add(ls, 1);
-    parse_body(ls, &b, 0, ls->linenumber);
+    lj_lex_endlog(ls);          /* Captured declared function name. */
+    parse_body(ls, &b, 0, ls->linenumber, log_declname(log));
     /* bcemit_store(fs, &v, &b) without setting VSTACK_VAR_RW. */
     expr_free(fs, &b);
     expr_toreg(fs, &b, v.u.s.info);
@@ -2254,6 +2187,7 @@ static void parse_local(LexState *ls)
   } else {  /* Local variable declaration. */
     ExpDesc e;
     BCReg nexps, nvars = 0;
+    lj_lex_endlog(ls);          /* Not used for variables. */
     do {  /* Collect LHS. */
       var_new(ls, nvars++, lex_str(ls));
     } while (lex_opt(ls, ','));
@@ -2274,6 +2208,9 @@ static void parse_func(LexState *ls, BCLine line)
   FuncState *fs;
   ExpDesc v, b;
   int needself = 0;
+  char log[128];
+  memset(log, 0, sizeof(log));
+  lj_lex_log(ls, log, sizeof(log)-1);
   lj_lex_next(ls);  /* Skip 'function'. */
   /* Parse function name. */
   var_lookup(ls, &v);
@@ -2283,7 +2220,8 @@ static void parse_func(LexState *ls, BCLine line)
     needself = 1;
     expr_field(ls, &v);
   }
-  parse_body(ls, &b, needself, line);
+  lj_lex_endlog(ls);
+  parse_body(ls, &b, needself, line, log_declname(log));
   fs = ls->fs;
   bcemit_store(fs, &v, &b);
   fs->bcbase[fs->pc - 1].line = line;  /* Set line for the store. */
@@ -2697,11 +2635,7 @@ GCproto *lj_parse(LexState *ls)
   FuncScope bl;
   GCproto *pt;
   lua_State *L = ls->L;
-#ifdef LUAJIT_DISABLE_DEBUGINFO
-  ls->chunkname = lj_str_newlit(L, "=");
-#else
   ls->chunkname = lj_str_newz(L, ls->chunkarg);
-#endif
   setstrV(L, L->top, ls->chunkname);  /* Anchor chunkname string. */
   incr_top(L);
   ls->level = 0;
@@ -2717,7 +2651,7 @@ GCproto *lj_parse(LexState *ls)
   parse_chunk(ls);
   if (ls->tok != TK_eof)
     err_token(ls, TK_eof);
-  pt = fs_finish(ls, ls->linenumber);
+  pt = fs_finish(ls, ls->linenumber, "<toplevel>");
   L->top--;  /* Drop chunkname. */
   lua_assert(fs.prev == NULL);
   lua_assert(ls->fs == NULL);

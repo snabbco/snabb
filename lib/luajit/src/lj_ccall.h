@@ -9,31 +9,15 @@
 #include "lj_obj.h"
 #include "lj_ctype.h"
 
-#if LJ_HASFFI
 
 /* -- C calling conventions ----------------------------------------------- */
 
-#if LJ_TARGET_X86ORX64
 
-#if LJ_TARGET_X86
-#define CCALL_NARG_GPR		2	/* For fastcall arguments. */
-#define CCALL_NARG_FPR		0
-#define CCALL_NRET_GPR		2
-#define CCALL_NRET_FPR		1	/* For FP results on x87 stack. */
-#define CCALL_ALIGN_STACKARG	0	/* Don't align argument on stack. */
-#elif LJ_ABI_WIN
-#define CCALL_NARG_GPR		4
-#define CCALL_NARG_FPR		4
-#define CCALL_NRET_GPR		1
-#define CCALL_NRET_FPR		1
-#define CCALL_SPS_EXTRA		4
-#else
 #define CCALL_NARG_GPR		6
 #define CCALL_NARG_FPR		8
 #define CCALL_NRET_GPR		2
 #define CCALL_NRET_FPR		2
 #define CCALL_VECTOR_REG	1	/* Pass vectors in registers. */
-#endif
 
 #define CCALL_SPS_FREE		1
 #define CCALL_ALIGN_CALLSTATE	16
@@ -49,86 +33,6 @@ typedef LJ_ALIGN(16) union FPRArg {
 
 typedef intptr_t GPRArg;
 
-#elif LJ_TARGET_ARM
-
-#define CCALL_NARG_GPR		4
-#define CCALL_NRET_GPR		2	/* For softfp double. */
-#if LJ_ABI_SOFTFP
-#define CCALL_NARG_FPR		0
-#define CCALL_NRET_FPR		0
-#else
-#define CCALL_NARG_FPR		8
-#define CCALL_NRET_FPR		4
-#endif
-#define CCALL_SPS_FREE		0
-
-typedef intptr_t GPRArg;
-typedef union FPRArg {
-  double d;
-  float f[2];
-} FPRArg;
-
-#elif LJ_TARGET_ARM64
-
-#define CCALL_NARG_GPR		8
-#define CCALL_NRET_GPR		2
-#define CCALL_NARG_FPR		8
-#define CCALL_NRET_FPR		4
-#define CCALL_SPS_FREE		0
-
-typedef intptr_t GPRArg;
-typedef union FPRArg {
-  double d;
-  float f;
-  uint32_t u32;
-} FPRArg;
-
-#elif LJ_TARGET_PPC
-
-#define CCALL_NARG_GPR		8
-#define CCALL_NARG_FPR		8
-#define CCALL_NRET_GPR		4	/* For complex double. */
-#define CCALL_NRET_FPR		1
-#define CCALL_SPS_EXTRA		4
-#define CCALL_SPS_FREE		0
-
-typedef intptr_t GPRArg;
-typedef double FPRArg;
-
-#elif LJ_TARGET_MIPS32
-
-#define CCALL_NARG_GPR		4
-#define CCALL_NARG_FPR		(LJ_ABI_SOFTFP ? 0 : 2)
-#define CCALL_NRET_GPR		(LJ_ABI_SOFTFP ? 4 : 2)
-#define CCALL_NRET_FPR		(LJ_ABI_SOFTFP ? 0 : 2)
-#define CCALL_SPS_EXTRA		7
-#define CCALL_SPS_FREE		1
-
-typedef intptr_t GPRArg;
-typedef union FPRArg {
-  double d;
-  struct { LJ_ENDIAN_LOHI(float f; , float g;) };
-} FPRArg;
-
-#elif LJ_TARGET_MIPS64
-
-/* FP args are positional and overlay the GPR array. */
-#define CCALL_NARG_GPR		8
-#define CCALL_NARG_FPR		0
-#define CCALL_NRET_GPR		2
-#define CCALL_NRET_FPR		(LJ_ABI_SOFTFP ? 0 : 2)
-#define CCALL_SPS_EXTRA		3
-#define CCALL_SPS_FREE		1
-
-typedef intptr_t GPRArg;
-typedef union FPRArg {
-  double d;
-  struct { LJ_ENDIAN_LOHI(float f; , float g;) };
-} FPRArg;
-
-#else
-#error "Missing calling convention definitions for this architecture"
-#endif
 
 #ifndef CCALL_SPS_EXTRA
 #define CCALL_SPS_EXTRA		0
@@ -161,19 +65,8 @@ typedef LJ_ALIGN(CCALL_ALIGN_CALLSTATE) struct CCallState {
   uint32_t spadj;		/* Stack pointer adjustment. */
   uint8_t nsp;			/* Number of stack slots. */
   uint8_t retref;		/* Return value by reference. */
-#if LJ_TARGET_X64
   uint8_t ngpr;			/* Number of arguments in GPRs. */
   uint8_t nfpr;			/* Number of arguments in FPRs. */
-#elif LJ_TARGET_X86
-  uint8_t resx87;		/* Result on x87 stack: 1:float, 2:double. */
-#elif LJ_TARGET_ARM64
-  void *retp;			/* Aggregate return pointer in x8. */
-#elif LJ_TARGET_PPC
-  uint8_t nfpr;			/* Number of arguments in FPRs. */
-#endif
-#if LJ_32
-  int32_t align1;
-#endif
 #if CCALL_NUM_FPR
   FPRArg fpr[CCALL_NUM_FPR];	/* Arguments/results in FPRs. */
 #endif
@@ -184,11 +77,10 @@ typedef LJ_ALIGN(CCALL_ALIGN_CALLSTATE) struct CCallState {
 /* -- C call handling ----------------------------------------------------- */
 
 /* Really belongs to lj_vm.h. */
-LJ_ASMF void LJ_FASTCALL lj_vm_ffi_call(CCallState *cc);
+LJ_ASMF void lj_vm_ffi_call(CCallState *cc);
 
 LJ_FUNC CTypeID lj_ccall_ctid_vararg(CTState *cts, cTValue *o);
 LJ_FUNC int lj_ccall_func(lua_State *L, GCcdata *cd);
 
-#endif
 
 #endif

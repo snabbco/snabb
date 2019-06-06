@@ -121,6 +121,9 @@ function ICMPEcho:respond_to_echo_request(pkt)
    out_h.ipv4.flags_and_fragment_offset =
       bit.band(out_h.ipv4.flags_and_fragment_offset, ipv4_fragment_offset_mask)
 
+   -- Set TTL.
+   out_h.ipv4.ttl = 64
+
    -- Recalculate IPv4 checksum.
    out_h.ipv4.checksum = 0
    out_h.ipv4.checksum = htons(

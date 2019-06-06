@@ -10,6 +10,7 @@ module(...,package.seeall)
 
 local S = require("syscall")
 local pci = require("lib.hardware.pci")
+local lib = require("core.lib")
 
 local bound_cpu
 local bound_numa_node
@@ -96,16 +97,74 @@ function unbind_cpu ()
    bound_cpu = nil
 end
 
+local blacklisted_kernels = {
+   '>=4.15',
+}
+local function sys_kernel ()
+   return lib.readfile('/proc/sys/kernel/osrelease', '*all'):gsub('%s$', '')
+end
+local function parse_version_number (str)
+   local t = {}
+   for each in str:gmatch("([^.]+)") do
+      table.insert(t, tonumber(each) or 0)
+   end
+   return t
+end
+local function equals (v1, v2)
+   for i, p1 in ipairs(v1) do
+      local p2 = v2[i] or 0
+      if p1 ~= p2 then return false end
+   end
+   return true
+end
+local function greater_or_equals (v1, v2)
+   for i, p1 in ipairs(v1) do
+      local p2 = v2[i] or 0
+      if p2 > p1 then return false end
+   end
+   return true
+end
+local function greater (v1, v2)
+   return greater_or_equals(v1, v2) and not equals(v1, v2)
+end
+function is_blacklisted_kernel (v)
+   for _, each in ipairs(blacklisted_kernels) do
+      -- Greater or equal.
+      if each:sub(1, 2) == '>=' then
+         each = each:sub(3, #each)
+         local v1, v2 = parse_version_number(v), parse_version_number(each)
+         if greater_or_equals(v1, v2) then return true end
+      -- Greater than.
+      elseif each:sub(1, 1) == '>' then
+         each = each:sub(2, #each)
+         local v1, v2 = parse_version_number(v), parse_version_number(each)
+         if greater(v1, v2) then return true end
+      -- Equals.
+      else
+         local v1, v2 = parse_version_number(v), parse_version_number(each)
+         if equals(v1, v2) then return true end
+      end
+   end
+   return false
+end
+
 function bind_to_cpu (cpu)
-   if cpu == bound_cpu then return end
+   local function contains (t, e)
+      for k,v in ipairs(t) do
+         if tonumber(v) == tonumber(e) then return true end
+      end
+      return false
+   end
    if not cpu then return unbind_cpu() end
+   if cpu == bound_cpu then return end
    assert(not bound_cpu, "already bound")
 
+   if type(cpu) ~= 'table' then cpu = {cpu} end
    assert(S.sched_setaffinity(0, cpu),
-      ("Couldn't set affinity for cpu %s"):format(cpu))
+      ("Couldn't set affinity for cpuset %s"):format(table.concat(cpu, ',')))
    local cpu_and_node = S.getcpu()
-   assert(cpu_and_node.cpu == cpu)
-   bound_cpu = cpu
+   assert(contains(cpu, cpu_and_node.cpu))
+   bound_cpu = cpu_and_node.cpu
 
    bind_to_numa_node (cpu_and_node.node)
 end
@@ -117,17 +176,27 @@ function unbind_numa_node ()
    bound_numa_node = nil
 end
 
-function bind_to_numa_node (node)
+function bind_to_numa_node (node, policy)
+   local kernel = sys_kernel()
+   if is_blacklisted_kernel(kernel) then
+      print(("WARNING: Buggy kernel '%s'. Not binding CPU to NUMA node."):format(kernel))
+      return
+   end
    if node == bound_numa_node then return end
    if not node then return unbind_numa_node() end
    assert(not bound_numa_node, "already bound")
 
    if supports_numa() then
-      assert(S.set_mempolicy('bind', node))
+      assert(S.set_mempolicy(policy or 'preferred', node))
 
       -- Migrate any pages that might have the wrong affinity.
       local from_mask = assert(S.get_mempolicy(nil, nil, nil, 'mems_allowed')).mask
-      assert(S.migrate_pages(0, from_mask, node))
+      local ok, err = S.migrate_pages(0, from_mask, node)
+      if not ok then
+         io.stderr:write(
+            string.format("Warning: Failed to migrate pages to NUMA node %d: %s\n",
+                          node, tostring(err)))
+      end
    end
 
    bound_numa_node = node
@@ -177,5 +246,10 @@ function selftest ()
    if pciaddr then
       test_pci_affinity(pciaddr)
    end
+
+   assert(greater(parse_version_number('4.15'), parse_version_number('4.4.80')))
+   assert(greater_or_equals(parse_version_number('4.15'), parse_version_number('4.15')))
+   assert(not greater(parse_version_number('4.14'), parse_version_number('4.15')))
+
    print('selftest: numa: ok')
 end

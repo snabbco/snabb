@@ -153,34 +153,6 @@ function RangeMap:iterate()
    return next_entry
 end
 
-local range_map_header_t = ffi.typeof[[
-struct {
-   uint32_t size;
-   uint32_t entry_size;
-}
-]]
-
-function RangeMap:save(stream)
-   local entry_size = ffi.sizeof(self.entry_type)
-   stream:write_ptr(range_map_header_t(self.size, entry_size),
-                    range_map_header_t)
-   stream:write_array(self.entries, self.entry_type, self.size)
-end
-
-function load(stream, value_type)
-   local map = {}
-   map.value_type = value_type
-   map.entry_type = make_entry_type(map.value_type)
-   map.type = make_entries_type(map.entry_type)
-
-   local header = stream:read_ptr(range_map_header_t)
-   assert(header.entry_size == ffi.sizeof(map.entry_type))
-   map.size = header.size
-   map.entries = stream:read_array(map.entry_type, map.size)
-   map.binary_search = binary_search.gen(map.size, map.entry_type)
-   return setmetatable(map, { __index = RangeMap })
-end
-
 function selftest()
    local builder = RangeMapBuilder.new(ffi.typeof('uint8_t'))
    builder:add(0, 1)

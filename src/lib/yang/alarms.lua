@@ -3,11 +3,27 @@ module(..., package.seeall)
 local data = require('lib.yang.data')
 local lib = require('core.lib')
 local util = require('lib.yang.util')
-local alarm_codec = require('lib.ptree.alarm_codec')
 local counter = require("core.counter")
 
 local format_date_as_iso_8601 = util.format_date_as_iso_8601
 local parse_date_as_iso_8601 = util.parse_date_as_iso_8601
+
+local alarm_handler
+function install_alarm_handler(handler)
+   alarm_handler = handler
+end
+
+local default_alarm_handler = {}
+function default_alarm_handler.raise_alarm(key, args)
+end
+function default_alarm_handler.clear_alarm(key)
+end
+function default_alarm_handler.add_to_inventory(key, args)
+end
+function default_alarm_handler.declare_alarm(key, args)
+end
+
+install_alarm_handler(default_alarm_handler)
 
 local control = {
    alarm_shelving = {
@@ -25,8 +41,35 @@ local state = {
    },
    shelved_alarms = {
       shelved_alarms = {}
+   },
+   notifications = {
+      alarm = {},
+      alarm_inventory_changed = {},
+      operator_action = {}
    }
 }
+
+local function clear_notifications ()
+   state.notifications.alarm = {}
+   state.notifications.alarm_inventory_changed = {}
+   state.notifications.operator_action = {}
+end
+
+function notifications ()
+   local ret = {}
+   local notifications = state.notifications
+   for k,v in pairs(notifications.alarm) do
+      table.insert(ret, v)
+   end
+   for k,v in pairs(notifications.alarm_inventory_changed) do
+      table.insert(ret, v)
+   end
+   for k,v in pairs(notifications.operator_action) do
+      table.insert(ret, v)
+   end
+   clear_notifications()
+   return ret
+end
 
 local function table_size (t)
    local size = 0
@@ -154,23 +197,32 @@ function alarm_type_keys:normalize (key)
    return self:fetch(alarm_type_id, alarm_type_qualifier)
 end
 
-function add_to_inventory (alarm_types)
-   assert(type(alarm_types) == 'table')
-   for key,args in pairs(alarm_types) do
-      alarm_codec.add_to_inventory(key, args)
-   end
-end
-
-function do_add_to_inventory (k, v)
-   local key = alarm_type_keys:normalize(k)
-   local resource = {v.resource}
+function add_to_inventory (key, args)
+   local key = alarm_type_keys:normalize(key)
+   alarm_handler.add_to_inventory(key, args)
+   local resource = {args.resource}
    -- Preserve previously defined resources.
    if state.alarm_inventory.alarm_type[key] then
       resource = state.alarm_inventory.alarm_type[key].resource
-      table.insert(resource, v.resource)
+      table.insert(resource, args.resource)
    end
-   state.alarm_inventory.alarm_type[key] = v
+   state.alarm_inventory.alarm_type[key] = args
    state.alarm_inventory.alarm_type[key].resource = resource
+   alarm_inventory_changed()
+end
+
+
+local function new_notification (event, value)
+   value = value or {}
+   assert(type(value) == "table")
+   local ret = {event=event}
+   for k,v in pairs(value) do ret[k] = v end
+   return ret
+end
+
+function alarm_inventory_changed()
+   table.insert(state.notifications.alarm_inventory_changed,
+                new_notification('alarm-inventory-changed'))
 end
 
 -- Single point to access alarm keys.
@@ -248,35 +300,33 @@ function default_alarms (alarms)
    end
 end
 
-function declare_alarm (alarms)
-   local k, v = next(alarms)
-   alarm_codec.declare_alarm(k, v)
-   local key = alarm_keys:normalize(k)
+function declare_alarm (key, args)
+   key = alarm_keys:normalize(key)
+   alarm_handler.declare_alarm(key, args)
+   local dst = alarm_list:lookup(key)
+   if dst then
+      -- Extend or overwrite existing alarm values.
+      for k, v in pairs(args) do dst[k] = v end
+      alarm_list:new(key, dst)
+   else
+      alarm_list:new(key, args)
+   end
    local alarm = {}
-   function alarm:raise (args)
-      alarm_codec.raise_alarm(key, args)
+   function alarm:raise (raise_args)
+      if raise_args then
+         local union = {}
+         for k,v in pairs(args) do union[k] = v end
+         for k,v in pairs(raise_args) do union[k] = v end
+         raise_args = union
+      else
+         raise_args = args
+      end
+      alarm_handler.raise_alarm(key, raise_args)
    end
    function alarm:clear ()
-      alarm_codec.clear_alarm(key)
+      alarm_handler.clear_alarm(key)
    end
    return alarm
-end
-
-function do_declare_alarm (key, args)
-   local function create_or_update (key, src)
-      local dst = alarm_list:lookup(key)
-      if dst then
-         -- Extend or overwrite existing alarm values.
-         for k, v in pairs(src) do
-            dst[k] = v
-         end
-         alarm_list:new(key, dst)
-      else
-         alarm_list:new(key, src)
-      end
-   end
-   key = alarm_keys:normalize(key)
-   create_or_update(key, args)
 end
 
 -- Raise alarm.
@@ -284,13 +334,27 @@ end
 -- The entry with latest time-stamp in this list MUST correspond to the leafs
 -- 'is-cleared', 'perceived-severity' and 'alarm-text' for the alarm.
 -- The time-stamp for that entry MUST be equal to the 'last-changed' leaf.
-local function add_status_change (alarm, status)
+local function add_status_change (key, alarm, status)
    alarm.status_change = alarm.status_change or {}
    alarm.perceived_severity = status.perceived_severity
    alarm.alarm_text = status.alarm_text
    alarm.last_changed = status.time
    state.alarm_list.last_changed = status.time
    table.insert(alarm.status_change, status)
+   add_alarm_notification(key, alarm)
+end
+
+function add_alarm_notification (key, alarm)
+   local notification = {
+      time                 = alarm.time,
+      resource             = key.resource,
+      alarm_type_id        = key.alarm_type_id,
+      alarm_type_qualifier = key.alarm_type_qualifier,
+      alt_resource         = alarm.alt_resource,
+      perceived_severity   = alarm.perceived_severity,
+      alarm_text           = alarm.alarm_text
+   }
+   state.notifications.alarm[key] = new_notification('alarm-notification', notification)
 end
 
 -- Creates a new alarm.
@@ -305,7 +369,7 @@ local function new_alarm (key, args)
       perceived_severity = args.perceived_severity or ret.perceived_severity,
       alarm_text = args.alarm_text or ret.alarm_text,
    }
-   add_status_change(ret, status)
+   add_status_change(key, ret, status)
    ret.last_changed = assert(status.time)
    ret.time_created = assert(ret.last_changed)
    ret.is_cleared = args.is_cleared
@@ -339,14 +403,14 @@ end
 -- An alarm gets updated if it needs a status change.  A status change implies
 -- to add a new status change to the alarm and update the alarm 'is_cleared'
 -- flag.
-local function update_alarm (alarm, args)
+local function update_alarm (key, alarm, args)
    if needs_status_change(alarm, args) then
       local status = {
          time = assert(format_date_as_iso_8601()),
          perceived_severity = assert(args.perceived_severity or alarm.perceived_severity),
          alarm_text = assert(args.alarm_text or alarm.alarm_text),
       }
-      add_status_change(alarm, status)
+      add_status_change(key, alarm, status)
       alarm.is_cleared = args.is_cleared
    end
 end
@@ -364,6 +428,8 @@ local function lookup_alarm (key)
    end
 end
 
+-- Notifications are only sent when a new alarm is raised, re-raised after being
+-- cleared and when an alarm is cleared.
 function raise_alarm (key, args)
    assert(key)
    args = args or {}
@@ -373,7 +439,7 @@ function raise_alarm (key, args)
    if not alarm then
       create_alarm(key, args)
    else
-      update_alarm(alarm, args)
+      update_alarm(key, alarm, args)
    end
 end
 
@@ -385,7 +451,7 @@ function clear_alarm (key)
    key = alarm_keys:normalize(key)
    local alarm = lookup_alarm(key)
    if alarm then
-      update_alarm(alarm, args)
+      update_alarm(key, alarm, args)
    end
 end
 
@@ -424,18 +490,25 @@ function set_operator_state (key, args)
       alarm.operator_state_change = {}
    end
    local time = format_date_as_iso_8601()
-   table.insert(alarm.operator_state_change, {
+   local status = {
       time = time,
       operator = 'admin',
       state = args.state,
       text = args.text,
-   })
+   }
+   table.insert(alarm.operator_state_change, status)
    if args.state == 'shelved' then
       shelve_alarm(key, alarm)
    elseif args.state == 'un-shelved' then
       unshelve_alarm(key, alarm)
    end
+   add_operator_action_notification(key, status)
    return true
+end
+
+function add_operator_action_notification (key, status)
+   local operator_action = state.notifications.operator_action
+   operator_action[key] = new_notification('operator-action', status)
 end
 
 -- Purge alarms.
@@ -669,22 +742,23 @@ function selftest ()
    end
 
    -- ARP alarm.
-   do_add_to_inventory({alarm_type_id='arp-resolution'}, {
+   add_to_inventory({alarm_type_id='arp-resolution'}, {
       resource='nic-v4',
       has_clear=true,
       description='Raise up if ARP app cannot resolve IP address',
    })
-   do_declare_alarm({resource='nic-v4', alarm_type_id='arp-resolution'}, {
+   declare_alarm({resource='nic-v4', alarm_type_id='arp-resolution'}, {
       perceived_severity = 'critical',
       alarm_text = 'Make sure you can ARP resolve IP addresses on NIC',
+      alt_resource={'nic-v4-2'},
    })
    -- NDP alarm.
-   do_add_to_inventory({alarm_type_id='ndp-resolution'}, {
+   add_to_inventory({alarm_type_id='ndp-resolution'}, {
       resource='nic-v6',
       has_clear=true,
       description='Raise up if NDP app cannot resolve IP address',
    })
-   do_declare_alarm({resource='nic-v6', alarm_type_id='ndp-resolution'}, {
+   declare_alarm({resource='nic-v6', alarm_type_id='ndp-resolution'}, {
       perceived_severity = 'critical',
       alarm_text = 'Make sure you can NDP resolve IP addresses on NIC',
    })
@@ -699,6 +773,8 @@ function selftest ()
    local key = alarm_keys:fetch('nic-v4', 'arp-resolution')
    raise_alarm(key)
    local alarm = assert(state.alarm_list.alarm[key])
+   assert(#alarm.alt_resource == 1)
+   assert(alarm.alt_resource[1] == 'nic-v4-2')
    assert(table_size(alarm.status_change) == 1)
    assert(state.alarm_list.number_of_alarms == 1)
 
@@ -793,7 +869,8 @@ function selftest ()
    -- Test toseconds.
    assert(toseconds({age_spec='weeks', value=1}) == 3600*24*7)
    local now = os.time()
-   assert(now == toseconds(format_date_as_iso_8601(now)))
+   assert(now == toseconds(format_date_as_iso_8601(now)),
+          now.." != "..toseconds(format_date_as_iso_8601(now)))
 
    -- Purge alarms by status.
    assert(table_size(state.alarm_list.alarm) == 1)

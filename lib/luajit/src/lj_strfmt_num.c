@@ -112,13 +112,8 @@ static char *lj_strfmt_wuint9(char *p, uint32_t u)
 ** enough digits to make both %.99e and %.99f do the right thing.
 */
 
-#if LJ_64
 #define ND_MUL2K_MAX_SHIFT	29
 #define ND_MUL2K_DIV1E9(val)	((uint32_t)((val) / 1000000000))
-#else
-#define ND_MUL2K_MAX_SHIFT	11
-#define ND_MUL2K_DIV1E9(val)	((uint32_t)((val) >> 9) / 1953125)
-#endif
 
 /* Multiply nd by 2^k and add carry_in (ndlo is assumed to be zero). */
 static uint32_t nd_mul2k(uint32_t* nd, uint32_t ndhi, uint32_t k,
@@ -583,7 +578,7 @@ SBuf *lj_strfmt_putfnum(SBuf *sb, SFormat sf, lua_Number n)
 /* -- Conversions to strings ---------------------------------------------- */
 
 /* Convert number to string. */
-GCstr * LJ_FASTCALL lj_strfmt_num(lua_State *L, cTValue *o)
+GCstr * lj_strfmt_num(lua_State *L, cTValue *o)
 {
   char buf[STRFMT_MAXBUF_NUM];
   MSize len = (MSize)(lj_strfmt_wfnum(NULL, STRFMT_G14, o->n, buf) - buf);

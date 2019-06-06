@@ -13,14 +13,11 @@ local long_opts = {
    test = "t",
    interactive = "i",
    debug = "d",
-   jit = "j",
    sigquit = "q",
    help = "h",
 }
 
 function run (parameters)
-   local profiling = false
-   local traceprofiling = false
    local start_repl = false
    local noop = true -- are we doing nothing?
    local program -- should we run a different program?
@@ -33,25 +30,6 @@ function run (parameters)
    function opt.d (arg) _G.developer_debug = true            end
    function opt.p (arg) program = arg                        end
    function opt.i (arg) start_repl = true       noop = false end
-   function opt.j (arg)
-      if arg:match("^v") then
-         local file = arg:match("^v=(.*)")
-         if file == '' then file = nil end
-         require("jit.v").start(file)
-      elseif arg:match("^p") then
-         local opts, file = arg:match("^p=([^,]*),?(.*)")
-         if file == '' then file = nil end
-         require("jit.p").start(opts, file)
-         profiling = true
-      elseif arg:match("^dump") then
-         local opts, file = arg:match("^dump=([^,]*),?(.*)")
-         if file == '' then file = nil end
-         require("jit.dump").on(opts, file)
-      elseif arg:match("^tprof") then
-         require("lib.traceprof.traceprof").start()
-         traceprofiling = true
-      end
-   end
    function opt.e (arg)
       local thunk, error = loadstring(arg)
       if thunk then thunk() else print(error) end
@@ -62,7 +40,7 @@ function run (parameters)
    end
 
    -- Execute command line arguments
-   parameters = lib.dogetopt(parameters, opt, "hl:p:t:die:j:P:q:", long_opts)
+   parameters = lib.dogetopt(parameters, opt, "hl:p:t:die:P:q:", long_opts)
 
    if program then
       local mod = (("program.%s.%s"):format(program, program))
@@ -75,10 +53,6 @@ function run (parameters)
    end
 
    if start_repl then repl() end
-   if profiling then require("jit.p").stop() end
-   if traceprofiling then
-      require("lib.traceprof.traceprof").stop()
-   end
 end
 
 function run_script (parameters)

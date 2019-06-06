@@ -85,9 +85,9 @@ local function parse_args(args)
 
    if #args == 2 then
       args = {
-         args[1],
+         args[2],
          'NIC', 'NIC',
-         args[2]
+         args[1]
       }
    end
    if #args == 0 or #args % 4 ~= 0 then show_usage(1) end
