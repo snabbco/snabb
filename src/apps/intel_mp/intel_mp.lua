@@ -309,6 +309,8 @@ Intel1g = setmetatable({}, {__index = Intel })
 Intel82599 = setmetatable({}, {__index = Intel})
 byPciID = {
   [0x1521] = { registers = "i350", driver = Intel1g, max_q = 8 },
+  -- FIXME: proper support for i340
+  [0x150e] = { registers = "i350", driver = Intel1g, max_q = 8 },
   [0x1533] = { registers = "i210", driver = Intel1g, max_q = 4 },
   [0x157b] = { registers = "i210", driver = Intel1g, max_q = 4 },
   [0x10fb] = { registers = "82599ES", driver = Intel82599, max_q = 16 }
@@ -350,7 +352,8 @@ function Intel:new (conf)
 
    local vendor = lib.firstline(self.path .. "/vendor")
    local device = lib.firstline(self.path .. "/device")
-   local byid = byPciID[tonumber(device)]
+   self.device = tonumber(device)
+   local byid = byPciID[self.device]
    assert(vendor == '0x8086', "unsupported nic")
    assert(byid, "unsupported intel nic")
    self = setmetatable(self, { __index = byid.driver})
@@ -1135,8 +1138,12 @@ function Intel1g:init ()
    -- 4.3.1 Software Reset (RST)
    self.r.CTRL(bits { RST = 26 })
    C.usleep(4*1000)
-   self.r.EEC:wait(bits { Auto_RD = 9 })
-   self.r.STATUS:wait(bits { PF_RST_DONE = 21 })
+   -- FIXME: the i340 hangs at both waits. We boldly
+   -- press on for now.
+   if self.device ~= 0x150e then
+      self.r.EEC:wait(bits { Auto_RD = 9 })
+      self.r.STATUS:wait(bits { PF_RST_DONE = 21 })
+   end
    self:disable_interrupts()                        -- 4.5.4
 
    -- use Internal PHY                             -- 8.2.5
