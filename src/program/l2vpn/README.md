@@ -823,6 +823,9 @@ the items follows here.
         }
         ```
 
+        `gre` is supported for IPv4 anf IPv6 transports, but `l2tpv3`
+        is restricted to IPv6 by its specification.
+        
         The `<value>` for the L2TPv3 cookies must be Lua strings that
         evaluate to 8-byte binary objects.  For example, the sequence
         of 8 bytes of zero can be represented as
@@ -1111,6 +1114,7 @@ module snabb-l2vpn-v1 {
         }
         leaf option {
           type string;
+          default "";
           description
             "Options for the LuaJIT trace dumper.";
         }
@@ -1128,6 +1132,7 @@ module snabb-l2vpn-v1 {
     container snmp {
       leaf enable {
         type boolean;
+        default false;
         description
           "Whether to enable SNMP. This will instantiate MIB objects for
            interfaces and pseudowires";
@@ -1142,6 +1147,9 @@ module snabb-l2vpn-v1 {
     }
 
     grouping interface-address-families {
+      // All of these leafs should be mandatory, but the current YANG
+      // parser throws a cryptic error.  Requires a workaround in the
+      // interface parser in l2vpn.lua.
       container address-families {
         container ipv4 {
           leaf address {
@@ -1159,7 +1167,7 @@ module snabb-l2vpn-v1 {
         container ipv6 {
           leaf address {
             type inet:ipv6-address;
-             description
+            description
               "The IPv6 address assigned to the L3 interface, without netmask.";
           }
           leaf next-hop {
@@ -1211,6 +1219,7 @@ module snabb-l2vpn-v1 {
         }
         leaf config {
           type string;
+          default "{}";
           description
             "A string containing a literal Lua expression.  The result of the
              evaluation of this expression is passed as argument to
@@ -1368,6 +1377,8 @@ module snabb-l2vpn-v1 {
         }
 
         list endpoint {
+          min-elements 1;
+
           description
             "An ipv4 or ipv6 address which can be used as an endpoint for a
              pseudowire.";
@@ -1404,6 +1415,24 @@ module snabb-l2vpn-v1 {
                 }
               }
             }
+          }
+
+          leaf address-NAT-inside {
+            type inet:ipv4-address;
+            description
+              "If IPsec is not enabled, a transport works behind a NAT as long as the
+               internal and external addresses remain fixed.  The IPv4
+               address of a remote peer behind a NAT is always its
+               external address.  However, if IPsec is enabled for the
+               transport and the remote peer is behind a NAT, the key
+               exchange process through IKE must be aware of the NAT
+               because the endpoint address is transmitted in the IKE
+               payload as traffic selector.  While the IKE daemon is
+               not tied to this schema, the traffic selector is also
+               used locally to match a security association (SA)
+               negotiated with IKE to the corresponding SA in the data
+               plane.  The purpose of this element is to pass this
+               information to the IPsec handler.";
           }
         }
       }
@@ -1540,20 +1569,21 @@ module snabb-l2vpn-v1 {
       container bridge {
         description
           "The configuration for the bridge module associated with the VPLS to
-             which all pseudowires and attachment circuits are
-             connected.  The bridge module will not be created if the
-             VPLS only contains a single pseusowire and a single
-             attachment circuit.  In that case, the pseudowire is
-             connected directly to the attachment circuit.
+           which all pseudowires and attachment circuits are
+           connected.  The bridge module will not be created if the
+           VPLS only contains a single pseusowire and a single
+           attachment circuit.  In that case, the pseudowire is
+           connected directly to the attachment circuit.
 
-             As a mechanism for loop prevention, the bridge enforces a
-             split-horizon policy on all ports to which a pseudowire
-             connects: packets arriving from a pseudowire are never
-             forwarded to any other pseudowire.  As a consequence, the
-             pseudowires that make up a VPLS are required to form a
-             full mesh.";
+           As a mechanism for loop prevention, the bridge enforces a
+           split-horizon policy on all ports to which a pseudowire
+           connects: packets arriving from a pseudowire are never
+           forwarded to any other pseudowire.  As a consequence, the
+           pseudowires that make up a VPLS are required to form a full
+           mesh.";
 
         choice type {
+          default learning;
           case flooding {
             leaf flooding {
               type empty;
@@ -2541,22 +2571,30 @@ l2vpn-config {
       name "A";
       endpoint {
         name "v4";
-        ipv4 "192.168.1.1";
+        address {
+          ipv4 "192.168.1.1";
+        }
       }
       endpoint {
         name "v6";
-        ipv6 "2001:db8:0:1::1";
+        address {
+          ipv6 "2001:db8:0:1::1";
+        }
       }
     }
     remote {
       name "B";
       endpoint {
         name "v4";
-        ipv4 "192.168.2.1";
+        address {
+          ipv4 "192.168.2.1";
+        }
       }
       endpoint {
         name "v6";
-        ipv6 "2001:db8:0:2::1";
+        address {
+          ipv6 "2001:db8:0:2::1";
+        }
       }
 
     }
@@ -2619,22 +2657,30 @@ l2vpn-config {
       name "B";
       endpoint {
         name "v4";
-        ipv4 "192.168.2.1";
+        address {
+          ipv4 "192.168.2.1";
+        }
       }
       endpoint {
         name "v6";
-        ipv6 "2001:db8:0:2::1";
+        address {
+          ipv6 "2001:db8:0:2::1";
+        }
       }
     }
     remote {
       name "A";
       endpoint {
         name "v4";
-        ipv4 "192.168.1.1";
+        address {
+          ipv4 "192.168.1.1";
+        }
       }
       endpoint {
         name "v6";
-        ipv6 "2001:db8:0:1::1";
+        address {
+          ipv6 "2001:db8:0:1::1";
+        }
       }
 
     }
@@ -2813,6 +2859,91 @@ secrets {
   }
 }
 
+```
+
+### NAT traversal
+
+If IPsec is not enabled, a transport works if either or both endpoints
+are located behind a NAT, as long as a all private and public
+addresses (i.e. those on the inside and the outside of either NAT) are
+fixed.  The configuration is straight forward: if the local endpoint
+is NATted, the address to specify in the endpoint configuration is the
+inside (private) address.  If the remote endpoint is NATted, the
+address to specify in the endpoint configuration is the outside
+(public) address.
+
+If IPsec is enabled, the basic configuration remains the same.
+However, the interaction with the IKE daemon becomes a little more
+complicated.  The reason for this is that both endpoints are used as
+traffic selectors and as such are transmitted to the IKE peer during
+the negotiation of a child SA. A NATted endpoint therefore sends its
+inside address to the remote peer, which, however, only knows the
+outside address.  The result is that the SA is rejected because no
+matching traffic selectors can be found.
+
+The solution for IKE is simple: if the remote endpoint is behind a
+NAT, the remote traffic selector (`remote_ts`) must be set to the
+inside address of the remote endpoint.
+
+Let's assume that in the example above, endpoint `A` is behind a NAT
+with `192.168.1.1` being the outside address and `192.0.1.1` the inside
+address.  Then, the traffic selectors for `A` would be set to
+
+```
+children {
+  vplsv4 {
+    esp_proposals = aes128gcm128-x25519-esn
+    local_ts = 192.0.1.1/32
+    remote_ts = 192.168.1.2/32
+    mode = tunnel
+  }
+}
+```
+
+and for `B`
+
+```
+children {
+  vplsv4 {
+    esp_proposals = aes128gcm128-x25519-esn
+    local_ts = 192.168.1.2/32
+    remote_ts = 192.0.1.1/32
+    mode = tunnel
+  }
+}
+```
+
+But this alone is not sufficient, because the traffic selectors are
+also used to match security associtations between the IKE process and
+the `l2vpn` program.  Here, a conflict arises, because the
+packet-forwarding code must send the packets to the outside (public)
+address of the NATted peer.
+
+To solve this problem, one of the endpoints needs to know both, the
+inside and outside addresses for the NATted endpoint.  The inside
+address is used to form the same source/destination pair used by IKE
+and the outside address is used as the destination in outgoing
+packets.
+
+This implementation choses the peer of the NATted endpoint to perform
+this function.  To this end, the YANG schema includes an additional
+element called `addressNATInside` in the `endpoint` container (see the
+[complete YANG schema](#yang-schema) for the exact definition).  The
+relevant configuration on `B` will then look as follows
+
+```
+peers {
+  remote {
+    name "A";
+    endpoint {
+      name "v4";
+      address {
+        ipv4 "192.168.1.1";
+      }
+      address-NAT-inside "192.0.1.1";
+    }
+  }
+}
 ```
 
 #### Initiation, re-keying

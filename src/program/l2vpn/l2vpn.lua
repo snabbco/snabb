@@ -662,7 +662,8 @@ function parse_config (main_config)
                                      aead = ipsec.encryption_algorithm,
                                      auditing = true,
                                      local_address = transport.local_address,
-                                     remote_address = transport.remote_address })
+                                     remote_address = transport.remote_address_nat or
+                                        transport.remote_address })
             data_plane:connect_duplex(dispatch:socket('tp_'..index),
                                       ipsec:socket('encapsulated'))
             socket = ipsec:socket('decapsulated')
@@ -741,10 +742,21 @@ function parse_config (main_config)
          local afi, addr = singleton(ep.address)
          check2(afi == transport.address_family, "address family mismatch for "..
                    "endpoint %s of peer %s", t.endpoint, t.peer)
-         return ntop(afi, addr)
+
+         -- Special handling for remote peers behind a NAT.  This is
+         -- only relevant for IPv4 and if IPsec is enabled for the
+         -- transport
+         local nat_inside
+         if (type == "remote" and afi == "ipv4"
+             and ep.address_NAT_inside) then
+            nat_inside = ntop(afi, ep.address_NAT_inside)
+         end
+
+         return ntop(afi, addr), nat_inside
       end
 
-      local lcl_addr, rmt_addr = address('local'), address('remote')
+      local lcl_addr, _  = address('local')
+      local rmt_addr, rmt_addr_nat = address('remote')
       sd_pair = src_dst_pair(transport.address_family, lcl_addr, rmt_addr)
       check(not sd_pairs[sd_pair], "endpoints already defined in "..
                "transport %s", sd_pairs[sd_pair])
@@ -754,6 +766,7 @@ function parse_config (main_config)
          afi = transport.address_family,
          local_address = lcl_addr,
          remote_address = rmt_addr,
+         remote_address_nat = rmt_addr_nat,
          vc_ids = {},
          tunnels = {},
          ipsec = transport.ipsec or { enable = false }
@@ -811,6 +824,9 @@ function parse_config (main_config)
          print("      AFI: "..afi)
          print("      Local address: "..transport.local_address)
          print("      Remote address: "..transport.remote_address)
+         if transport.remote_address_nat then
+            print("      Remote NAT inside address: "..transport.remote_address_nat)
+         end
          print("      VC ID: "..pw.vc_id)
 
          -- YANG BUG: the peers container should be mandatory, because

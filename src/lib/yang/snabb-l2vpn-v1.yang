@@ -347,6 +347,24 @@ module snabb-l2vpn-v1 {
               }
             }
           }
+
+          leaf address-NAT-inside {
+            type inet:ipv4-address;
+            description
+              "If IPsec is not enabled, a transport works behind a NAT as long as the
+               internal and external addresses remain fixed.  The IPv4
+               address of a remote peer behind a NAT is always its
+               external address.  However, if IPsec is enabled for the
+               transport and the remote peer is behind a NAT, the key
+               exchange process through IKE must be aware of the NAT
+               because the endpoint address is transmitted in the IKE
+               payload as traffic selector.  While the IKE daemon is
+               not tied to this schema, the traffic selector is also
+               used locally to match a security association (SA)
+               negotiated with IKE to the corresponding SA in the data
+               plane.  The purpose of this element is to pass this
+               information to the IPsec handler.";
+          }
         }
       }
 
