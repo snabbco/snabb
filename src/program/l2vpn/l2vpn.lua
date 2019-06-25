@@ -285,7 +285,8 @@ function parse_intf(state, name, config)
    assert(config.driver, 'Missing mandatory container "driver"')
    local drv_c = config.driver
    local drv_config = l2vpn_lib.eval(drv_c.config, " in driver configuration")
-   local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
+   local driver_helper = assert(driver_helpers[drv_c.path.."."..drv_c.name],
+                                "unsupported driver: "..drv_c.path.."."..drv_c.name)
 
    if type(drv_config) == "table" then
       if (drv_config.pciaddr) then
