@@ -42,6 +42,7 @@ local manager_config_spec = {
    schema_name = {required=true},
    worker_default_scheduling = {default={}},
    worker_opts = {default={}},
+   exit_after_worker_dies = {default=false},
    default_schema = {},
    log_level = {default=default_log_level},
    rpc_trace_file = {},
@@ -101,9 +102,11 @@ function new_manager (conf)
    ret.peers = {}
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
+   ret.worker_ids = {}
    ret.worker_default_scheduling = conf.worker_default_scheduling
    ret.worker_opts = conf.worker_opts
    ret.workers = {}
+   ret.exit_after_worker_dies = conf.exit_after_worker_dies
    ret.state_change_listeners = {}
 
    if conf.rpc_trace_file then
@@ -179,6 +182,7 @@ function Manager:set_initial_configuration (configuration)
    -- Iterate over workers starting the workers and queuing up actions.
    for id, worker_app_graph in pairs(worker_app_graphs) do
       self:start_worker_for_graph(id, worker_app_graph)
+      table.insert(self.worker_ids, id)
    end
 end
 
@@ -744,6 +748,21 @@ function Manager:handle_alarm (worker, alarm)
    end
 end
 
+function Manager:check_workers ()
+   if not self.exit_after_worker_dies then return end
+   for _, id in ipairs(self.worker_ids) do
+      local worker = self.workers[id]
+      local infop = S.waitid("pid", worker.pid, "nohang, exited")
+      local alive = infop and infop.code == 0 or false
+      local status = infop and infop.status
+      if not alive then
+         print(string.format("Child %d has died (status %s), exiting",
+                             worker.pid, status or "<not available>"))
+         os.exit(1)
+      end
+   end
+end
+
 function Manager:stop ()
    for _,peer in ipairs(self.peers) do peer.fd:close() end
    self.peers = {}
@@ -780,6 +799,7 @@ function Manager:main (duration)
    while now < stop do
       next_time = now + self.period
       if timer.ticks then timer.run_to_time(now * 1e9) end
+      self:check_workers()
       self:remove_stale_workers()
       self:handle_calls_from_peers()
       self:send_messages_to_workers()
