@@ -301,7 +301,7 @@ function Reassembler:handle_fragment(fragment)
       -- Prevent a buffer overflow.  The relevant RFC allows hosts to
       -- silently discard reassemblies above a certain rather small
       -- size, smaller than this.
-      return self:reassembly_error()
+      return self:reassembly_error(entry)
    end
    ffi.copy(reassembly.packet.data + dst_offset, fragment.data + skip_headers,
             frag_size)
