@@ -1264,7 +1264,8 @@ function run (parameters)
            jit_opts = jit_config.option,
            jit_dump = jit_config.dump and jit_config.dump.enable and
               jit_config.dump
-        }
+        },
+        exit_after_worker_dies = true
    })
 
    manager:main(5)
