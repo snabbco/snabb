@@ -247,6 +247,10 @@ local function join (chars, ...)
    return table.concat({...}, chars)
 end
 
+local function join_ (...)
+   return join('_', ...)
+end
+
 local function src_dst_pair (af, src, dst)
    local af = af_classes[af]
    local function maybe_convert(addr)
@@ -340,7 +344,7 @@ function parse_intf(state, name, config)
             if mtype == "pcap" then
                local file
                if mirror.name then
-                  file = mirror.name.."_"..dir
+                  file = join_(mirror.name,dir)
                else
                   file = '/tmp/'..string.gsub(intf.name, "/", "-")
                      .."_"..dir..".pcap"
@@ -353,12 +357,12 @@ function parse_intf(state, name, config)
             elseif mtype == "tap" then
                local tap_name
                if mirror.name then
-                  tap_name = mirror.name.."_"..dir
+                  tap_name = join_(mirror.name, dir)
                else
                   tap_name = string.gsub(intf.name, "/", "-")
-                  tap_name = string.sub(tap_name, 0, const.IFNAMSIZ-3).."_"..dir
+                  tap_name = join_(string.sub(tap_name, 0, const.IFNAMSIZ-3), dir)
                end
-               local mirror = App:new(data_plane, 'tap_'..intf.nname..'_'..dir,
+               local mirror = App:new(data_plane, join_('tap', intf.nname, dir),
                                       Tap, { name = tap_name, mtu = config.mtu})
                mirror_socket = mirror:socket('input', 'output')
                local sink = App:new(data_plane, 'sink_'..intf.nname..'_tap_'..dir,
@@ -368,7 +372,7 @@ function parse_intf(state, name, config)
             else
                error("Illegal mirror type: "..mtype)
             end
-            local tee = App:new(data_plane, 'tee_'..intf.nname..'_'..dir, Tee)
+            local tee = App:new(data_plane, join_('tee', intf.nname, dir), Tee)
             data_plane:connect(tee:socket('mirror'), mirror_socket)
             if dir == "rx" then
                data_plane:connect(intf_socket, tee:socket('input'))
@@ -621,7 +625,7 @@ function parse_config (main_config)
       local dispatch = dispatchers[afi][uplink]
       if not dispatch then
          dispatch = App:new(data_plane,
-                            'disp_'..normalize_name(uplink).."_"..afi,
+                            join_('disp', normalize_name(uplink), afi),
                             require("program.l2vpn.dispatch").dispatch,
                             { afi = afi, links = {} })
          data_plane:connect_duplex(dispatch:socket('south'),
@@ -661,7 +665,7 @@ function parse_config (main_config)
          if ipsec.enable then
             local esp_module = afi == "ipv4" and "Transport4_IKE" or
                "Transport6_IKE"
-            local ipsec = App:new(data_plane, 'ipsec_'..afi.."_"..index,
+            local ipsec = App:new(data_plane, join_('ipsec', afi, index),
                                   require("apps.ipsec.esp")[esp_module],
                                   {
                                      aead = ipsec.encryption_algorithm,
@@ -687,7 +691,7 @@ function parse_config (main_config)
 
       local tunnel = transport.tunnels[type]
       if not tunnel then
-         tunnel = App:new(data_plane, type.."_"..transport.index,
+         tunnel = App:new(data_plane, join_(type, transport.index),
                           tunnel_class,
                           { ancillary_data = {
                                remote_addr = af:ntop(remote_addr),
@@ -783,7 +787,7 @@ function parse_config (main_config)
    local local_addresses = { ipv4 = {}, ipv6 = {} }
    for vpls_config_name, vpls in pairs(main_config.vpls) do
       -- Make the name of the VPLS unique among all l2vpn instances
-      local vpls_name = join('_', main_config.instance_name, vpls_config_name)
+      local vpls_name = join_(main_config.instance_name, vpls_config_name)
       local function assert_vpls (cond, msg)
          assert(cond, "VPLS "..vpls_name..": "..msg)
       end
@@ -895,7 +899,7 @@ function parse_config (main_config)
                    tunnel_type, tunnel_config)
          local cc_app
          if cc_socket then
-            local qname = join('_', vpls_name, name)
+            local qname = join_(vpls_name, name)
             cc_app = App:new(ctrl_plane, 'cc_'..qname,
                              require("program.l2vpn.control_channel").control_channel,
                              {
@@ -924,7 +928,7 @@ function parse_config (main_config)
             data_plane:connect(cc_socket, data_ilink_tx:socket('input'))
          end
          table.insert(bridge_group.pws,
-                      { name = vpls_name..'_'..name,
+                      { name = join_(vpls_name, name),
                         socket = socket,
                         cc_app = cc_app,
                         cc_socket = cc_socket })
@@ -1022,7 +1026,7 @@ function parse_config (main_config)
          for afi, state in pairs(intf.l3) do
             local socket = state.socket_out
             if socket and not socket.connected_out then
-               local sink = App:new(data_plane, 'sink_'..intf.nname..'_'..afi,
+               local sink = App:new(data_plane, join_('sink', intf.nname, afi),
                                     Sink, {})
                data_plane:connect_duplex(state.socket_out, sink:socket('input'))
             end
