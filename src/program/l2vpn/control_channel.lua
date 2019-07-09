@@ -163,6 +163,9 @@ control_channel = {
       --   Logger module name
       --   shmem file
       name = { required = true },
+      -- Name of the VPLS to which this PW belongs. Used to generate
+      -- the index in the vplsPwBindTable/cvplsPwBindTable
+      vpls_name = { required = true },
       -- Description of the associated VPLS, same for
       -- all pseudowires
       description = { required = true },
@@ -351,6 +354,18 @@ function control_channel:new (conf)
    -- configured to accumulate the counters for each PW and serve this
    -- sum to SNMP clients for a request of this scalar object.
    mib:register('pwPerfTotalErrorPackets', 'Counter32', 10)
+   --
+   mib:register('_X_vplsName', 'OctetStr', conf.vpls_name)
+   mib:register('vplsPwBindConfigType', 'Integer32', 1) -- manual
+   mib:register('vplsPwBindType', 'Integer32', 1) -- mesh
+   mib:register('vplsPwBindRowStatus', 'Integer32', 1) -- active
+   mib:register('vplsPwBindStorageType', 'Integer32', 2) -- volatile
+
+   -- CISCO-VPLS-GENERIC_MIB
+   mib:register('cvplsPwBindConfigType', 'Integer32', 1) -- manual
+   mib:register('cvplsPwBindType', 'Integer32', 1) -- mesh
+   mib:register('cvplsPwBindRowStatus', 'Integer32', 1) -- active
+   mib:register('cvplsPwBindStorageType', 'Integer32', 2) -- volatile
 
    --
    -- CISCO-IETF-PW-MIB

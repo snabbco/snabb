@@ -2516,6 +2516,16 @@ The L2VPN framework supports the following SNMP MIBs for monitoring:
    * `pwEnetStdMIB` (1.3.6.1.2.1.180)
       * `pwEnetObjects` (1.3.6.1.2.1.180.1)
          * `pwEnetTable` (1.3.6.1.2.1.180.1.1)
+   * `vplsGenericMIB` (.1.3.6.1.2.1.10.274)
+      * `vplsObjects` (.1.3.6.1.2.1.10.274.1)
+         * `vplsConfigTable` (.1.3.6.1.2.1.10.274.1.2)
+         * `vplsStatusTable` (.1.3.6.1.2.1.10.274.1.3)
+         * `vplsPwBindTable` (.1.3.6.1.2.1.10.274.1.4)
+   * `cvplsGenericMIB` (.1.3.6.1.4.1.9.10.138)
+      * `cvplsObjects` (.1.3.6.1.4.1.9.10.138.1)
+         * `cvplsConfigTable` (.1.3.6.1.4.1.9.10.138.1.2)
+         * `cvplsStatusTable` (.1.3.6.1.4.1.9.10.138.1.3)
+         * `cvplsPwBindTable` (.1.3.6.1.4.1.9.10.138.1.4)
 
 #### Interface MIBs
 

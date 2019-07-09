@@ -96,6 +96,7 @@ local reass_ipv4 = require("apps.ipv4.reassemble").Reassembler
 local Receiver = require("apps.interlink.receiver").Receiver
 local Transmitter = require("apps.interlink.transmitter").Transmitter
 local l2vpn_lib = require("program.l2vpn.lib")
+local ipc_mib = require("lib.ipc.shmem.mib")
 
 local tlen = l2vpn_lib.tlen
 local singleton = l2vpn_lib.singleton
@@ -241,6 +242,10 @@ af_classes = {
    ipv4 = ipv4,
    ipv6 = ipv6,
 }
+
+local function join (chars, ...)
+   return table.concat({...}, chars)
+end
 
 local function src_dst_pair (af, src, dst)
    local af = af_classes[af]
@@ -776,7 +781,9 @@ function parse_config (main_config)
 
    local bridge_groups = {}
    local local_addresses = { ipv4 = {}, ipv6 = {} }
-   for vpls_name, vpls in pairs(main_config.vpls) do
+   for vpls_config_name, vpls in pairs(main_config.vpls) do
+      -- Make the name of the VPLS unique among all l2vpn instances
+      local vpls_name = join('_', main_config.instance_name, vpls_config_name)
       local function assert_vpls (cond, msg)
          assert(cond, "VPLS "..vpls_name..": "..msg)
       end
@@ -786,6 +793,48 @@ function parse_config (main_config)
                   .." ("..(vpls.description or "<no description>")..")")
          goto vpls_skip
       end
+
+      -- Create vplsGenericMIB, RFC7257 and the pre-standard Cisco MIB
+      -- cvplsGenericMIB
+      shm.mkdir('snmp')
+      local mib = ipc_mib:new({ directory = shm.root..'/snmp',
+                                filename = vpls_name })
+      -- vplsConfigIndex is derived from vplsConfigName
+      mib:register('vplsConfigName', 'OctetStr', vpls_name)
+      mib:register('vplsConfigDescr', 'OctetStr', vpls.description or
+                      { type = 'OctetStr', length = 0 })
+      mib:register('vplsConfigAdminStatus', 'Integer32', 1) -- up
+      mib:register('vplsConfigMacLearning', 'Integer32', 1) -- true
+      mib:register('vplsConfigDiscardUnknonwnDest', 'Integer32', 2) -- false
+      mib:register('vplsConfigMacAging', 'Integer32', 1) -- true
+      mib:register('vplsConfigFwdFullHighWatermark', 'Unsigned32', 100)
+      mib:register('vplsConfigFwdFullLowWatermark', 'Unsigned32', 90)
+      mib:register('vplsConfigRowStatus', 'Integer32', 1) -- active
+      mib:register('vplsConfigMtu', 'Unsigned32', vpls.mtu)
+      mib:register('vplsConfigVpnId', { type = 'OctetStr', length = 0})
+      mib:register('vplsConfigStorageType', 'Integer32', 2) -- volatile
+      mib:register('vplsConfigSignalingType', 'Integer32', 3) -- none
+      -- FIXME: Maybe this should be set depending on the status of
+      -- PWs and ACs
+      mib:register('vplsStatusOperStatus', 'Integer32', 1) -- up
+
+      mib:register('cvplsConfigName', 'OctetStr', vpls_name)
+      mib:register('cvplsConfigDescr', 'OctetStr', vpls.description or
+                      { type = 'OctetStr', length = 0 })
+      mib:register('cvplsConfigAdminStatus', 'Integer32', 1) -- up
+      mib:register('cvplsConfigMacLearning', 'Integer32', 1) -- true
+      mib:register('cvplsConfigDiscardUnknonwnDest', 'Integer32', 2) -- false
+      mib:register('cvplsConfigMacAging', 'Integer32', 1) -- true
+      mib:register('cvplsConfigFwdFullHighWatermark', 'Unsigned32', 100)
+      mib:register('cvplsConfigFwdFullLowWatermark', 'Unsigned32', 90)
+      mib:register('cvplsConfigRowStatus', 'Integer32', 1) -- active
+      mib:register('cvplsConfigMtu', 'Unsigned32', vpls.mtu)
+      mib:register('cvplsConfigVpnId', { type = 'OctetStr', length = 0})
+      mib:register('cvplsConfigStorageType', 'Integer32', 2) -- volatile
+      mib:register('cvplsConfigServiceType', 'Integer32', 2) -- ethernet
+      mib:register('cvplsStatusOperStatus', 'Integer32', 1) -- up
+      mib:register('cvplsStatusNotifEnable', 'Integer32', 0) -- false
+      mib:register('cvplsNotificationMaxRate', 'Unsigned32', 0)
 
       print("Creating VPLS instance "..vpls_name
             .." ("..(vpls.description or "<no description>")..")")
@@ -811,8 +860,12 @@ function parse_config (main_config)
       bridge_groups[vpls_name] = bridge_group
 
       print("  Creating pseudowires")
-      assert(tlen(vpls.pseudowire) > 0,
+      local npws = tlen(vpls.pseudowire)
+      assert( npws > 0,
              "At least one pseudowire required")
+      mib:register('vplsStatusPeerCount', 'Counter32', npws)
+      mib:register('cvplsStatusPeerCount', 'Counter32', npws)
+
       for name, pw in pairs(vpls.pseudowire) do
          print("    "..name)
          local transport = assert(transports[pw.transport],
@@ -842,7 +895,7 @@ function parse_config (main_config)
                    tunnel_type, tunnel_config)
          local cc_app
          if cc_socket then
-            local qname = main_config.instance_name..'_'..vpls_name..'_'..name
+            local qname = join('_', vpls_name, name)
             cc_app = App:new(ctrl_plane, 'cc_'..qname,
                              require("program.l2vpn.control_channel").control_channel,
                              {
@@ -850,6 +903,7 @@ function parse_config (main_config)
                                 heartbeat = cc.heartbeat,
                                 dead_factor = cc.dead_factor,
                                 name = qname,
+                                vpls_name = vpls_name,
                                 description = vpls.description or '',
                                 mtu = vpls.mtu,
                                 vc_id = pw.vc_id,
