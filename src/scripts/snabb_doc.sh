@@ -60,7 +60,10 @@ function fetch_pr_head {
 
 function ensure_docs_cloned {
     [ -d $docdir ] || \
-        git clone https://$GITHUB_CREDENTIALS@github.com/$DOCREPO.git $docdir
+        git clone https://$GITHUB_CREDENTIALS@github.com/$DOCREPO.git $docdir \
+            && (cd $docdir
+                   git config user.email "snabb_doc.service@$(hostname)"
+                   git config user.name "Snabb Doc")
     mkdir -p $docdir/{sha1,tag}
 }
 
