@@ -116,11 +116,13 @@ init
 ensure_docs_cloned || exit 1
 fetch_pull_requests && clone_upstream || exit 1
 
-# Build manual for current tag unless it already exists
-if [ ! -f $(tag_out $(current_tag)) ]; then
-    build_doc $(current_tag) $(tag_out $(current_tag)) \
-        && cp $(tag_out $(current_tag)) $(index_out)
-fi
+# Build manual for current tag(s) unless it already exists
+for tag in $(current_tag); do
+    if [ ! -f $(tag_out $tag) ]; then
+        build_doc $tag $(tag_out $tag) \
+            && cp $(tag_out $tag) $(index_out)
+    fi
+done
 
 # Build manual for open PRs and link it as status
 for id in $(pull_request_ids); do
