@@ -178,8 +178,15 @@ Ingress packets dropped due to wrong local IPv6 endpoint address.
 
 ## Fragmenter (apps.ipv6.fragment)
 
-The `Fragmenter` app that will fragment any IPv6 packets larger than a
-configured maximum transmission unit (MTU).
+The `Fragmenter` app will fragment any IPv6 packets larger than a
+configured maximum transmission unit (MTU) or the dynamically
+discovered MTU on the network path (PMTU) towards a specific
+destination, depending on the setting of the **pmtud** configuration
+option.
+
+If path MTU discovery (PMTUD) is disabled, the app expects to receive
+packets on its `input` link and sends (possibly fragmented) packets to
+its `output` link
 
     DIAGRAM: IPv6Fragmenter
                    +-----------+
@@ -188,15 +195,77 @@ configured maximum transmission unit (MTU).
                    |           |
                    +-----------+
 
+If PMTUD is enabled, the app also expects to process packets in the
+reverse direction in order to be able to intercept and interpret ICMP
+packets of type 2, code 0. Those packets, known as "Packet Too Big"
+(PTB) messages, contain reports from nodes on the path towards a
+particular destination, which indicate that a previously sent packet
+could not be forwarded due to a MTU bottleneck.  The message contains
+the MTU in question as well as at least the header of the original
+packet that triggered the PTB message.  The `Fragmenter` app extracts
+the destination address from the original packet and stores the MTU in
+a per-destination cache as the PMTU for that address.
+
+Apart from checking the integrity of the ICMP message, the app can
+optionally also verify whether the message is actually intended for
+consumption by this instance of the `Fragmenter` app.  For that
+purpose, the app can be configured with an exhaustive list of IPv6
+addresses that are designated to be local to the system.  When a PTB
+message is received, it is checked whether the destination address of
+the ICMP message as well as the source address of the embedded
+original packet are contained in this list.  The message is discarded
+if this condition is not met.  No such checking is performed if the
+list is empty.
+
+When the `Fragmenter` receives a packet on the `input` link, it first
+consults the per-destination cache.  In case of a hit, the PMTU from
+the cache takes precedence over the statically configured MTU.
+
+A PMTU is removed from the cache after a configurable timeout to allow
+the system to discover a larger PMTU, e.g. after a change in network
+topology.
+
+With PMTUD enabled, the app has two additional links, called `north`
+and `south`
+
+
+    DIAGRAM: IPv6Fragmenter_PMTUD
+                   +-----------+
+                   |           |
+    input     ---->*Fragmenter *---->   output
+    north     <----*           *<----   south
+                   |           |
+                   +-----------+
+
+All packets received on the `south` link which are not ICMP packets of
+type 2, code 0 are passed on unmodified on the `north` link.
+
 ### Configuration
 
 The `Fragmenter` app accepts a table as its configuration argument. The
-following key is defined:
+following keys are defined:
 
 — Key **mtu**
 
 *Required*.  The maximum transmission unit, in bytes, not including the
 Ethernet header.
+
+— Key **pmtud**
+
+*Optional*.  If set to `true`, dynamic path MTU discovery (PMTUD) is
+enabled.  The default is `false`.
+
+— Key **pmtu_timeout**
+
+*Optional*.  The amount of time in seconds after which a PMTU is
+ removed from the cache.  The default is 600.  This key is ignored
+ unless **pmtud** is `true`.
+
+— Key **pmtu_local_addresses**
+
+*Optional*. A table of IPv6 addresses in human readable representation
+for which the app will accept PTB messages.  The default is an empty
+table, which disables the check for local addresses.
 
 ## ICMP Echo responder (apps.ipv6.echo)
 
