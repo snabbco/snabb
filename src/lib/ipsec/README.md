@@ -2,9 +2,11 @@
 
 The `lib.ipsec.esp` module contains two classes `encrypt` and `decrypt` which
 implement packet encryption and decryption with IPsec ESP in both tunnel and
-transport modes. Currently, the only supported cipher is AES-GCM cipher with
-128‑bit keys, 4 bytes of salt, and a 12 byte authentication code. These classes
-do not implement any key exchange protocol.
+transport modes. Currently, the only supported cipher is AES-GCM with 128‑bit
+keys, 4 bytes of salt, and a 16 byte authentication code. These classes do not
+implement any key exchange protocol.
+
+Note: the classes in this module do not reject IP fragments of any sort.
 
 References:
 
@@ -20,8 +22,8 @@ References:
 Returns a new encryption/decryption context respectively. *Config* must a
 be a table with the following keys:
 
-* `mode` - Encryption mode (string). The only accepted value is
-  `"aes-gcm-128-12"`.
+* `aead` - AEAD identifier (string). The only accepted value is
+  `"aes-gcm-16-icv"` (AES-GCM with a 16 byte ICV).
 * `spi` - A 32 bit integer denoting the “Security Parameters Index” as
   specified in RFC 4303.
 * `key` - Hexadecimal string of 32 digits (two digits for each byte, most
@@ -40,7 +42,8 @@ be a table with the following keys:
   default is 8. (`decrypt` only.)
 * `auditing` - *Optional.* A boolean value indicating whether to enable or
   disable “Auditing” as specified in RFC 4303. The default is `nil` (no
-  auditing). (`decrypt` only.)
+  auditing). (`decrypt` only. Note: source address, destination address and
+  flow ID are only logged when using `decapsulate_transport6`.)
 
 #### Tunnel mode
 
