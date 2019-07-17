@@ -167,13 +167,6 @@ are `flush`, which tells Snabb to re-optimize the code; `warn`, which
 simply prints a warning and raises an alarm; and `off`, which does
 nothing.
 
-— **-j** *arg*
-
-Enable profiling in the data-plane.  Useful when you are trying to
-isolate a performance problem.  It is thought that this will be reworked
-when Snabb switches to RaptorJIT, so we leave this somewhat complicated
-option undocumented at present :)
-
 #### Reconfiguration
 
 The manager of a ptree-based Snabb network function also listens to

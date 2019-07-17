@@ -6,9 +6,9 @@ local ipv4 = require("lib.protocol.ipv4")
 local rangemap = require("apps.lwaftr.rangemap")
 local ctable = require("lib.ctable")
 local cltable = require('lib.cltable')
+local mem = require('lib.stream.mem')
 local util = require('lib.yang.util')
 local yang = require('lib.yang.yang')
-local stream = require('lib.yang.stream')
 local binding_table = require("apps.lwaftr.binding_table")
 local Parser = require("program.lwaftr.migrate_configuration.conf_parser").Parser
 local data = require('lib.yang.data')
@@ -264,9 +264,8 @@ local function parse_binding_table(parser)
             softwires = softwires }
 end
 
-function load_binding_table(file)
-   local source = stream.open_input_byte_stream(file)
-   return parse_binding_table(Parser.new(source:as_text_stream()))
+function load_binding_table(filename)
+   return parse_binding_table(Parser.new(filename))
 end
 
 
@@ -274,15 +273,8 @@ local function config_to_string(schema, conf)
    if type(schema) == "string" then
       schema = yang.load_schema_by_name(schema)
    end
-   -- To keep memory usage as low as possible write it out to a temp file.
-   local memfile = util.string_io_file()
-   yang.print_config_for_schema(schema, conf, memfile)
-   conf = memfile:flush()
-
-   -- Do best to remove things manually which take a lot of memory
-   memfile:clear()
-   memfile = nil
-   return conf
+   return mem.call_with_output_string(
+      yang.print_config_for_schema, schema, conf)
 end
 
 
@@ -471,7 +463,8 @@ local function multiprocess_migration(src, conf_file)
    -- Extract the grammar, load the config and find the key
    local hybridgmr = data.config_grammar_from_schema(hybridscm)
    local instgmr = hybridgmr.members["softwire-config"].members.instance
-   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
+   local conf = yang.load_config_for_schema(
+      hybridscm, mem.open_input_string(src, conf_file))
    local queue_key = ffi.typeof(instgmr.values.queue.key_ctype)
    local global_external_if = conf.softwire_config.external_interface
    local global_internal_if = conf.softwire_config.internal_interface
@@ -554,7 +547,8 @@ local function v2_migration(src, conf_file)
    -- Remove the mandatory requirement on softwire.br-address for the migration
    binding_table.body["softwire"].body["br-address"].mandatory = false
 
-   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
+   local conf = yang.load_config_for_schema(
+      hybridscm, mem.open_input_string(src, conf_file))
 
    -- Remove the br-address leaf-list and add it onto the softwire.
    conf = remove_address_list(conf)
@@ -584,8 +578,8 @@ end
 
 local function migrate_3_0_1bis(conf_file, src)
    return increment_br(
-      yang.load_config_for_schema_by_name('snabb-softwire-v1', src, conf_file)
-   )
+      yang.load_config_for_schema_by_name(
+         'snabb-softwire-v1', mem.open_input_string(src, conf_file)))
 end
 
 local function migrate_3_2_0(conf_file, src)

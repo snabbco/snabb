@@ -9,6 +9,8 @@ local ffi = require("ffi")
 local bit = require("bit")
 local ethernet = require("lib.protocol.ethernet")
 
+local ipv4_pton, ipv4_ntop = util.ipv4_pton, util.ipv4_ntop
+
 types = {}
 
 local function integer_type(ctype)
@@ -96,7 +98,14 @@ function types.identityref.tostring(val)
 end
 
 types['instance-identifier'] = unimplemented('instance-identifier')
-types.leafref = unimplemented('leafref')
+
+types.leafref = {}
+function types.leafref.parse(str, what)
+   return assert(str, 'missing value for '..what)
+end
+function types.leafref.tostring(val)
+   return val
+end
 
 types.string = {}
 function types.string.parse(str, what)
@@ -118,8 +127,8 @@ types.union = unimplemented('union')
 
 types['ipv4-address'] = {
    ctype = 'uint32_t',
-   parse = function(str, what) return util.ipv4_pton(str) end,
-   tostring = function(val) return util.ipv4_ntop(val) end
+   parse = function(str, what) return ipv4_pton(str) end,
+   tostring = function(val) return ipv4_ntop(val) end
 }
 
 types['legacy-ipv4-address'] = {
@@ -141,19 +150,19 @@ types['mac-address'] = {
 }
 
 types['ipv4-prefix'] = {
-   ctype = 'struct { uint8_t prefix[4]; uint8_t len; }',
+   ctype = 'struct { uint32_t prefix; uint8_t len; }',
    parse = function(str, what)
       local prefix, len = str:match('^([^/]+)/(.*)$')
-      return { ipv4_pton(prefix), util.tointeger(len, 1, 32) }
+      return { prefix=ipv4_pton(prefix), len=util.tointeger(len, nil, 1, 32) }
    end,
-   tostring = function(val) return ipv4_ntop(val[1])..'/'..tostring(val[2]) end
+   tostring = function(val) return ipv4_ntop(val.prefix)..'/'..tostring(val.len) end
 }
 
 types['ipv6-prefix'] = {
    ctype = 'struct { uint8_t prefix[16]; uint8_t len; }',
    parse = function(str, what)
       local prefix, len = str:match('^([^/]+)/(.*)$')
-      return { assert(ipv6:pton(prefix)), util.tointeger(len, 1, 128) }
+      return { assert(ipv6:pton(prefix)), util.tointeger(len, nil, 1, 128) }
    end,
    tostring = function(val) return ipv6:ntop(val[1])..'/'..tostring(val[2]) end
 }
@@ -166,4 +175,8 @@ function selftest()
    assert(types['int8'].parse('0') == 0)
    assert(types['int8'].parse('127') == 127)
    assert(not pcall(types['int8'].parse, '128'))
+   local ip = types['ipv4-prefix'].parse('10.0.0.1/8')
+   assert(types['ipv4-prefix'].tostring(ip) == '10.0.0.1/8')
+   local ip = types['ipv6-prefix'].parse('fc00::1/64')
+   assert(types['ipv6-prefix'].tostring(ip) == 'fc00::1/64')
 end

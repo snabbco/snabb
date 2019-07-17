@@ -18,55 +18,6 @@
 #include "lj_vm.h"
 #include "lj_strfmt.h"
 
-/*
-** LuaJIT can either use internal or external frame unwinding:
-**
-** - Internal frame unwinding (INT) is free-standing and doesn't require
-**   any OS or library support.
-**
-** - External frame unwinding (EXT) uses the system-provided unwind handler.
-**
-** Pros and Cons:
-**
-** - EXT requires unwind tables for *all* functions on the C stack between
-**   the pcall/catch and the error/throw. This is the default on x64,
-**   but needs to be manually enabled on x86/PPC for non-C++ code.
-**
-** - INT is faster when actually throwing errors (but this happens rarely).
-**   Setting up error handlers is zero-cost in any case.
-**
-** - EXT provides full interoperability with C++ exceptions. You can throw
-**   Lua errors or C++ exceptions through a mix of Lua frames and C++ frames.
-**   C++ destructors are called as needed. C++ exceptions caught by pcall
-**   are converted to the string "C++ exception". Lua errors can be caught
-**   with catch (...) in C++.
-**
-** - INT has only limited support for automatically catching C++ exceptions
-**   on POSIX systems using DWARF2 stack unwinding. Other systems may use
-**   the wrapper function feature. Lua errors thrown through C++ frames
-**   cannot be caught by C++ code and C++ destructors are not run.
-**
-** EXT is the default on x64 systems and on Windows, INT is the default on all
-** other systems.
-**
-** EXT can be manually enabled on POSIX systems using GCC and DWARF2 stack
-** unwinding with -DLUAJIT_UNWIND_EXTERNAL. *All* C code must be compiled
-** with -funwind-tables (or -fexceptions). This includes LuaJIT itself (set
-** TARGET_CFLAGS), all of your C/Lua binding code, all loadable C modules
-** and all C libraries that have callbacks which may be used to call back
-** into Lua. C++ code must *not* be compiled with -fno-exceptions.
-**
-** EXT is mandatory on WIN64 since the calling convention has an abundance
-** of callee-saved registers (rbx, rbp, rsi, rdi, r12-r15, xmm6-xmm15).
-** The POSIX/x64 interpreter only saves r12/r13 for INT (e.g. PS4).
-*/
-
-#if defined(__GNUC__) && (LJ_TARGET_X64 || defined(LUAJIT_UNWIND_EXTERNAL)) && !LJ_NO_UNWIND
-#define LJ_UNWIND_EXT	1
-#elif LJ_TARGET_WINDOWS
-#define LJ_UNWIND_EXT	1
-#endif
-
 /* -- Error messages ------------------------------------------------------ */
 
 /* Error message strings. */
@@ -115,23 +66,10 @@ static void *err_unwind(lua_State *L, void *stopcf, int errcode)
       break;
     case FRAME_C:  /* C frame. */
     unwind_c:
-#if LJ_UNWIND_EXT
-      if (errcode) {
-	L->base = frame_prevd(frame) + 1;
-	L->cframe = cframe_prev(cf);
-	unwindstack(L, frame - LJ_FR2);
-      } else if (cf != stopcf) {
-	cf = cframe_prev(cf);
-	frame = frame_prevd(frame);
-	break;
-      }
-      return NULL;  /* Continue unwinding. */
-#else
       UNUSED(stopcf);
       cf = cframe_prev(cf);
       frame = frame_prevd(frame);
       break;
-#endif
     case FRAME_CP:  /* Protected C frame. */
       if (cframe_canyield(cf)) {  /* Resume? */
 	if (errcode) {
@@ -181,349 +119,15 @@ static void *err_unwind(lua_State *L, void *stopcf, int errcode)
   return L;  /* Anything non-NULL will do. */
 }
 
-/* -- External frame unwinding -------------------------------------------- */
-
-#if defined(__GNUC__) && !LJ_NO_UNWIND && !LJ_ABI_WIN
-
-/*
-** We have to use our own definitions instead of the mandatory (!) unwind.h,
-** since various OS, distros and compilers mess up the header installation.
-*/
-
-typedef struct _Unwind_Context _Unwind_Context;
-
-#define _URC_OK			0
-#define _URC_FATAL_PHASE1_ERROR	3
-#define _URC_HANDLER_FOUND	6
-#define _URC_INSTALL_CONTEXT	7
-#define _URC_CONTINUE_UNWIND	8
-#define _URC_FAILURE		9
-
-#define LJ_UEXCLASS		0x4c55414a49543200ULL	/* LUAJIT2\0 */
-#define LJ_UEXCLASS_MAKE(c)	(LJ_UEXCLASS | (uint64_t)(c))
-#define LJ_UEXCLASS_CHECK(cl)	(((cl) ^ LJ_UEXCLASS) <= 0xff)
-#define LJ_UEXCLASS_ERRCODE(cl)	((int)((cl) & 0xff))
-
-#if !LJ_TARGET_ARM
-
-typedef struct _Unwind_Exception
-{
-  uint64_t exclass;
-  void (*excleanup)(int, struct _Unwind_Exception *);
-  uintptr_t p1, p2;
-} __attribute__((__aligned__)) _Unwind_Exception;
-
-extern uintptr_t _Unwind_GetCFA(_Unwind_Context *);
-extern void _Unwind_SetGR(_Unwind_Context *, int, uintptr_t);
-extern void _Unwind_SetIP(_Unwind_Context *, uintptr_t);
-extern void _Unwind_DeleteException(_Unwind_Exception *);
-extern int _Unwind_RaiseException(_Unwind_Exception *);
-
-#define _UA_SEARCH_PHASE	1
-#define _UA_CLEANUP_PHASE	2
-#define _UA_HANDLER_FRAME	4
-#define _UA_FORCE_UNWIND	8
-
-/* DWARF2 personality handler referenced from interpreter .eh_frame. */
-LJ_FUNCA int lj_err_unwind_dwarf(int version, int actions,
-  uint64_t uexclass, _Unwind_Exception *uex, _Unwind_Context *ctx)
-{
-  void *cf;
-  lua_State *L;
-  if (version != 1)
-    return _URC_FATAL_PHASE1_ERROR;
-  UNUSED(uexclass);
-  cf = (void *)_Unwind_GetCFA(ctx);
-  L = cframe_L(cf);
-  if ((actions & _UA_SEARCH_PHASE)) {
-#if LJ_UNWIND_EXT
-    if (err_unwind(L, cf, 0) == NULL)
-      return _URC_CONTINUE_UNWIND;
-#endif
-    if (!LJ_UEXCLASS_CHECK(uexclass)) {
-      setstrV(L, L->top++, lj_err_str(L, LJ_ERR_ERRCPP));
-    }
-    return _URC_HANDLER_FOUND;
-  }
-  if ((actions & _UA_CLEANUP_PHASE)) {
-    int errcode;
-    if (LJ_UEXCLASS_CHECK(uexclass)) {
-      errcode = LJ_UEXCLASS_ERRCODE(uexclass);
-    } else {
-      if ((actions & _UA_HANDLER_FRAME))
-	_Unwind_DeleteException(uex);
-      errcode = LUA_ERRRUN;
-    }
-#if LJ_UNWIND_EXT
-    cf = err_unwind(L, cf, errcode);
-    if ((actions & _UA_FORCE_UNWIND)) {
-      return _URC_CONTINUE_UNWIND;
-    } else if (cf) {
-      _Unwind_SetGR(ctx, LJ_TARGET_EHRETREG, errcode);
-      _Unwind_SetIP(ctx, (uintptr_t)(cframe_unwind_ff(cf) ?
-				     lj_vm_unwind_ff_eh :
-				     lj_vm_unwind_c_eh));
-      return _URC_INSTALL_CONTEXT;
-    }
-#if LJ_TARGET_X86ORX64
-    else if ((actions & _UA_HANDLER_FRAME)) {
-      /* Workaround for ancient libgcc bug. Still present in RHEL 5.5. :-/
-      ** Real fix: http://gcc.gnu.org/viewcvs/trunk/gcc/unwind-dw2.c?r1=121165&r2=124837&pathrev=153877&diff_format=h
-      */
-      _Unwind_SetGR(ctx, LJ_TARGET_EHRETREG, errcode);
-      _Unwind_SetIP(ctx, (uintptr_t)lj_vm_unwind_rethrow);
-      return _URC_INSTALL_CONTEXT;
-    }
-#endif
-#else
-    /* This is not the proper way to escape from the unwinder. We get away with
-    ** it on non-x64 because the interpreter restores all callee-saved regs.
-    */
-    lj_err_throw(L, errcode);
-#endif
-  }
-  return _URC_CONTINUE_UNWIND;
-}
-
-#if LJ_UNWIND_EXT
-#if LJ_TARGET_OSX || defined(__OpenBSD__)
-/* Sorry, no thread safety for OSX. Complain to Apple, not me. */
-static _Unwind_Exception static_uex;
-#else
-static __thread _Unwind_Exception static_uex;
-#endif
-
-/* Raise DWARF2 exception. */
-static void err_raise_ext(int errcode)
-{
-  static_uex.exclass = LJ_UEXCLASS_MAKE(errcode);
-  static_uex.excleanup = NULL;
-  _Unwind_RaiseException(&static_uex);
-}
-#endif
-
-#else /* LJ_TARGET_ARM */
-
-#define _US_VIRTUAL_UNWIND_FRAME	0
-#define _US_UNWIND_FRAME_STARTING	1
-#define _US_ACTION_MASK			3
-#define _US_FORCE_UNWIND		8
-
-typedef struct _Unwind_Control_Block _Unwind_Control_Block;
-
-struct _Unwind_Control_Block {
-  uint64_t exclass;
-  uint32_t misc[20];
-};
-
-extern int _Unwind_RaiseException(_Unwind_Control_Block *);
-extern int __gnu_unwind_frame(_Unwind_Control_Block *, _Unwind_Context *);
-extern int _Unwind_VRS_Set(_Unwind_Context *, int, uint32_t, int, void *);
-extern int _Unwind_VRS_Get(_Unwind_Context *, int, uint32_t, int, void *);
-
-static inline uint32_t _Unwind_GetGR(_Unwind_Context *ctx, int r)
-{
-  uint32_t v;
-  _Unwind_VRS_Get(ctx, 0, r, 0, &v);
-  return v;
-}
-
-static inline void _Unwind_SetGR(_Unwind_Context *ctx, int r, uint32_t v)
-{
-  _Unwind_VRS_Set(ctx, 0, r, 0, &v);
-}
-
-extern void lj_vm_unwind_ext(void);
-
-/* ARM unwinder personality handler referenced from interpreter .ARM.extab. */
-LJ_FUNCA int lj_err_unwind_arm(int state, _Unwind_Control_Block *ucb,
-			       _Unwind_Context *ctx)
-{
-  void *cf = (void *)_Unwind_GetGR(ctx, 13);
-  lua_State *L = cframe_L(cf);
-  int errcode;
-
-  switch ((state & _US_ACTION_MASK)) {
-  case _US_VIRTUAL_UNWIND_FRAME:
-    if ((state & _US_FORCE_UNWIND)) break;
-    return _URC_HANDLER_FOUND;
-  case _US_UNWIND_FRAME_STARTING:
-    if (LJ_UEXCLASS_CHECK(ucb->exclass)) {
-      errcode = LJ_UEXCLASS_ERRCODE(ucb->exclass);
-    } else {
-      errcode = LUA_ERRRUN;
-      setstrV(L, L->top++, lj_err_str(L, LJ_ERR_ERRCPP));
-    }
-    cf = err_unwind(L, cf, errcode);
-    if ((state & _US_FORCE_UNWIND) || cf == NULL) break;
-    _Unwind_SetGR(ctx, 15, (uint32_t)lj_vm_unwind_ext);
-    _Unwind_SetGR(ctx, 0, (uint32_t)ucb);
-    _Unwind_SetGR(ctx, 1, (uint32_t)errcode);
-    _Unwind_SetGR(ctx, 2, cframe_unwind_ff(cf) ?
-			    (uint32_t)lj_vm_unwind_ff_eh :
-			    (uint32_t)lj_vm_unwind_c_eh);
-    return _URC_INSTALL_CONTEXT;
-  default:
-    return _URC_FAILURE;
-  }
-  if (__gnu_unwind_frame(ucb, ctx) != _URC_OK)
-    return _URC_FAILURE;
-  return _URC_CONTINUE_UNWIND;
-}
-
-#if LJ_UNWIND_EXT
-static __thread _Unwind_Control_Block static_uex;
-
-static void err_raise_ext(int errcode)
-{
-  memset(&static_uex, 0, sizeof(static_uex));
-  static_uex.exclass = LJ_UEXCLASS_MAKE(errcode);
-  _Unwind_RaiseException(&static_uex);
-}
-#endif
-
-#endif /* LJ_TARGET_ARM */
-
-#elif LJ_ABI_WIN
-
-/*
-** Someone in Redmond owes me several days of my life. A lot of this is
-** undocumented or just plain wrong on MSDN. Some of it can be gathered
-** from 3rd party docs or must be found by trial-and-error. They really
-** don't want you to write your own language-specific exception handler
-** or to interact gracefully with MSVC. :-(
-**
-** Apparently MSVC doesn't call C++ destructors for foreign exceptions
-** unless you compile your C++ code with /EHa. Unfortunately this means
-** catch (...) also catches things like access violations. The use of
-** _set_se_translator doesn't really help, because it requires /EHa, too.
-*/
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-#if LJ_TARGET_X64
-/* Taken from: http://www.nynaeve.net/?p=99 */
-typedef struct UndocumentedDispatcherContext {
-  ULONG64 ControlPc;
-  ULONG64 ImageBase;
-  PRUNTIME_FUNCTION FunctionEntry;
-  ULONG64 EstablisherFrame;
-  ULONG64 TargetIp;
-  PCONTEXT ContextRecord;
-  void (*LanguageHandler)(void);
-  PVOID HandlerData;
-  PUNWIND_HISTORY_TABLE HistoryTable;
-  ULONG ScopeIndex;
-  ULONG Fill0;
-} UndocumentedDispatcherContext;
-#else
-typedef void *UndocumentedDispatcherContext;
-#endif
-
-/* Another wild guess. */
-extern void __DestructExceptionObject(EXCEPTION_RECORD *rec, int nothrow);
-
-#if LJ_TARGET_X64 && defined(MINGW_SDK_INIT)
-/* Workaround for broken MinGW64 declaration. */
-VOID RtlUnwindEx_FIXED(PVOID,PVOID,PVOID,PVOID,PVOID,PVOID) asm("RtlUnwindEx");
-#define RtlUnwindEx RtlUnwindEx_FIXED
-#endif
-
-#define LJ_MSVC_EXCODE		((DWORD)0xe06d7363)
-#define LJ_GCC_EXCODE		((DWORD)0x20474343)
-
-#define LJ_EXCODE		((DWORD)0xe24c4a00)
-#define LJ_EXCODE_MAKE(c)	(LJ_EXCODE | (DWORD)(c))
-#define LJ_EXCODE_CHECK(cl)	(((cl) ^ LJ_EXCODE) <= 0xff)
-#define LJ_EXCODE_ERRCODE(cl)	((int)((cl) & 0xff))
-
-/* Windows exception handler for interpreter frame. */
-LJ_FUNCA int lj_err_unwind_win(EXCEPTION_RECORD *rec,
-  void *f, CONTEXT *ctx, UndocumentedDispatcherContext *dispatch)
-{
-#if LJ_TARGET_X64
-  void *cf = f;
-#else
-  void *cf = (char *)f - CFRAME_OFS_SEH;
-#endif
-  lua_State *L = cframe_L(cf);
-  int errcode = LJ_EXCODE_CHECK(rec->ExceptionCode) ?
-		LJ_EXCODE_ERRCODE(rec->ExceptionCode) : LUA_ERRRUN;
-  if ((rec->ExceptionFlags & 6)) {  /* EH_UNWINDING|EH_EXIT_UNWIND */
-    /* Unwind internal frames. */
-    err_unwind(L, cf, errcode);
-  } else {
-    void *cf2 = err_unwind(L, cf, 0);
-    if (cf2) {  /* We catch it, so start unwinding the upper frames. */
-      if (rec->ExceptionCode == LJ_MSVC_EXCODE ||
-	  rec->ExceptionCode == LJ_GCC_EXCODE) {
-#if LJ_TARGET_WINDOWS
-	__DestructExceptionObject(rec, 1);
-#endif
-	setstrV(L, L->top++, lj_err_str(L, LJ_ERR_ERRCPP));
-      } else if (!LJ_EXCODE_CHECK(rec->ExceptionCode)) {
-	/* Don't catch access violations etc. */
-	return 1;  /* ExceptionContinueSearch */
-      }
-#if LJ_TARGET_X64
-      /* Unwind the stack and call all handlers for all lower C frames
-      ** (including ourselves) again with EH_UNWINDING set. Then set
-      ** rsp = cf, rax = errcode and jump to the specified target.
-      */
-      RtlUnwindEx(cf, (void *)((cframe_unwind_ff(cf2) && errcode != LUA_YIELD) ?
-			       lj_vm_unwind_ff_eh :
-			       lj_vm_unwind_c_eh),
-		  rec, (void *)(uintptr_t)errcode, ctx, dispatch->HistoryTable);
-      /* RtlUnwindEx should never return. */
-#else
-      UNUSED(ctx);
-      UNUSED(dispatch);
-      /* Call all handlers for all lower C frames (including ourselves) again
-      ** with EH_UNWINDING set. Then call the specified function, passing cf
-      ** and errcode.
-      */
-      lj_vm_rtlunwind(cf, (void *)rec,
-	(cframe_unwind_ff(cf2) && errcode != LUA_YIELD) ?
-	(void *)lj_vm_unwind_ff : (void *)lj_vm_unwind_c, errcode);
-      /* lj_vm_rtlunwind does not return. */
-#endif
-    }
-  }
-  return 1;  /* ExceptionContinueSearch */
-}
-
-/* Raise Windows exception. */
-static void err_raise_ext(int errcode)
-{
-  RaiseException(LJ_EXCODE_MAKE(errcode), 1 /* EH_NONCONTINUABLE */, 0, NULL);
-}
-
-#endif
-
 /* -- Error handling ------------------------------------------------------ */
 
 /* Throw error. Find catch frame, unwind stack and continue. */
-LJ_NOINLINE void LJ_FASTCALL lj_err_throw(lua_State *L, int errcode)
+LJ_NOINLINE void lj_err_throw(lua_State *L, int errcode)
 {
   global_State *g = G(L);
   lj_trace_abort(g);
   setmref(g->jit_base, NULL);
-  L->status = 0;
-#if LJ_UNWIND_EXT
-  err_raise_ext(errcode);
-  /*
-  ** A return from this function signals a corrupt C stack that cannot be
-  ** unwound. We have no choice but to call the panic function and exit.
-  **
-  ** Usually this is caused by a C function without unwind information.
-  ** This should never happen on x64, but may happen if you've manually
-  ** enabled LUAJIT_UNWIND_EXTERNAL and forgot to recompile *every*
-  ** non-C++ file with -funwind-tables.
-  */
-  if (G(L)->panic)
-    G(L)->panic(L);
-#else
+  L->status = LUA_OK;
   {
     void *cf = err_unwind(L, NULL, errcode);
     if (cframe_unwind_ff(cf))
@@ -531,7 +135,6 @@ LJ_NOINLINE void LJ_FASTCALL lj_err_throw(lua_State *L, int errcode)
     else
       lj_vm_unwind_c(cframe_raw(cf), errcode);
   }
-#endif
   exit(EXIT_FAILURE);
 }
 
@@ -712,7 +315,6 @@ LJ_NOINLINE void lj_err_callermsg(lua_State *L, const char *msg)
       frame = NULL;
     } else {
       pframe = frame_prevd(frame);
-#if LJ_HASFFI
       /* Remove frame for FFI metamethods. */
       if (frame_func(frame)->c.ffid >= FF_ffi_meta___index &&
 	  frame_func(frame)->c.ffid <= FF_ffi_meta___tostring) {
@@ -720,7 +322,6 @@ LJ_NOINLINE void lj_err_callermsg(lua_State *L, const char *msg)
 	L->top = frame;
 	setcframe_pc(cframe_raw(L->cframe), frame_contpc(frame));
       }
-#endif
     }
   }
   lj_debug_addloc(L, msg, pframe, frame);
