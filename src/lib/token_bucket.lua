@@ -48,15 +48,6 @@ function token_bucket:get ()
    return self._rate, self._burst_size
 end
 
--- For backward compatibility only
-function token_bucket:rate (rate)
-   local old_rate = self._rate
-   if rate ~= nil then
-      self:set(rate, self._burst_size)
-   end
-   return old_rate
-end
-
 function token_bucket:can_take (n)
    local n = n or 1
    local tokens = self._tokens

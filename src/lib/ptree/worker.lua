@@ -9,9 +9,10 @@ local counter      = require("core.counter")
 local histogram    = require('core.histogram')
 local lib          = require('core.lib')
 local timer        = require('core.timer')
+local alarms       = require("lib.yang.alarms")
 local channel      = require("lib.ptree.channel")
 local action_codec = require("lib.ptree.action_codec")
-local alarm_codec  = require("lib.ptree.alarm_codec")
+local ptree_alarms = require("lib.ptree.alarms")
 
 local Worker = {}
 
@@ -30,8 +31,10 @@ function new_worker (conf)
    ret.duration = conf.duration or 1/0
    ret.no_report = conf.no_report
    ret.channel = channel.create('config-worker-channel', 1e6)
-   ret.alarms_channel = alarm_codec.get_channel()
+   alarms.install_alarm_handler(ptree_alarms:alarm_handler())
    ret.pending_actions = {}
+
+   require("jit.opt").start('sizemcode=256', 'maxmcode=2048')
 
    ret.breathe = engine.breathe
    if conf.measure_latency then
@@ -92,8 +95,16 @@ function Worker:handle_actions_from_manager()
 end
 
 function Worker:main ()
+   local vmprofile = require("jit.vmprofile")
    local stop = engine.now() + self.duration
    local next_time = engine.now()
+
+   -- Setup vmprofile.
+   engine.setvmprofile("engine")
+   vmprofile.start()
+
+   if not engine.auditlog_enabled then engine.enable_auditlog() end
+
    repeat
       self.breathe()
       if next_time < engine.now() then

@@ -9,7 +9,6 @@
 #include "lj_obj.h"
 #include "lj_ctype.h"
 
-#if LJ_HASFFI
 
 /* C parser limits. */
 #define CPARSE_MAX_BUF		32768	/* Max. token buffer size. */
@@ -60,6 +59,5 @@ typedef struct CPState {
 
 LJ_FUNC int lj_cparse(CPState *cp);
 
-#endif
 
 #endif

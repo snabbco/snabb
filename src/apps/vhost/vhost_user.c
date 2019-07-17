@@ -33,7 +33,7 @@ int vhost_user_connect(const char *path)
     }
 
     un.sun_family = AF_UNIX;
-    strncpy(un.sun_path, path, sizeof(un.sun_path));
+    strncpy(un.sun_path, path, sizeof(un.sun_path)-1);
 
     if (connect(sock, (struct sockaddr *) &un, sizeof(un)) == -1) {
         close(sock);
@@ -54,7 +54,7 @@ int vhost_user_listen(const char *path)
     }
 
     un.sun_family = AF_UNIX;
-    strncpy(un.sun_path, path, sizeof(un.sun_path));
+    strncpy(un.sun_path, path, sizeof(un.sun_path)-1);
     unlink(un.sun_path);
     if (bind(sock, (struct sockaddr *) &un, sizeof(un)) == -1) {
         close(sock);

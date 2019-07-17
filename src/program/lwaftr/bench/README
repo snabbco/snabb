@@ -21,9 +21,6 @@ Usage: bench CONF IPV4-IN.PCAP IPV6-IN.PCAP
                              as the identifier. This must be unique amongst
                              other snabb processes.
   --cpu CPUSET               Run dataplane processes on the given CPUs
-  -jv, -jv=FILE              Print out when traces are recorded
-  -jp, -jp=MODE,FILE         Profile the system by method
-  -jtprof                    Profile the system by trace
 
 
 Run the lwAFTR with input from IPV4-IN.PCAP and IPV6-IN.PCAP. The bench

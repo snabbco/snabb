@@ -54,3 +54,6 @@ Usage:
 
   snabbmark ctable
     Benchmark insertion and lookup for the "ctable" data structure.
+
+  snabbmark checksum
+    Benchmark checksum computation implementations in C and DynASM.

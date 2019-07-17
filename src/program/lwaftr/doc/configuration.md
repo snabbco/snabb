@@ -11,7 +11,7 @@ Here's an example:
 
 ```
 softwire-config {
-  instances {
+  instance {
     device "00:05.0"
     queue {
       id 0;

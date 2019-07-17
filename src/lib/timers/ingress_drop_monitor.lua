@@ -40,18 +40,13 @@ function new(args)
       end
    end
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='ingress-packet-drop'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description="Ingress packet drops exceeds threshold",
-      }
-   }
-   ret.ingress_packet_drop_alarm = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='ingress-packet-drop'}] = {
-         perceived_severity='major',
-      }
-   }
+   alarms.add_to_inventory(
+      {alarm_type_id='ingress-packet-drop'},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description="Ingress packet drops exceeds threshold"})
+   ret.ingress_packet_drop_alarm = alarms.declare_alarm(
+      {resource=tostring(S.getpid()),alarm_type_id='ingress-packet-drop'},
+      {perceived_severity='major'})
 
    return setmetatable(ret, {__index=IngressDropMonitor})
 end

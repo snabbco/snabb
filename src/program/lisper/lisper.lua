@@ -800,6 +800,7 @@ function run(args)
    if not os.getenv'LISP_PERFTEST' then
       engine.main({report = {showlinks=true}})
    else
+      -- FIXME: Port to RaptorJIT.
       local jdump = require("jit.dump")
       local traceprof = require("lib.traceprof.traceprof")
       jdump.start("+rs", "tracedump.txt")

@@ -131,17 +131,6 @@ function bench (pciaddr, confpath, sockpath, npackets)
          packets = input.rxpackets
          bytes = input.rxbytes
          start = C.get_monotonic_time()
-         if os.getenv("NFV_PROF") then
-            require("jit.p").start(os.getenv("NFV_PROF"), os.getenv("NFV_PROF_FILE"))
-         else
-            print("No LuaJIT profiling enabled ($NFV_PROF unset).")
-         end
-         if os.getenv("NFV_DUMP") then
-            require("jit.dump").start(os.getenv("NFV_DUMP"), os.getenv("NFV_DUMP_FILE"))
-            main.dumping = true
-         else
-            print("No LuaJIT dump enabled ($NFV_DUMP unset).")
-         end
       end
       return input.rxpackets - packets >= npackets
    end
@@ -160,6 +149,5 @@ function bench (pciaddr, confpath, sockpath, npackets)
    print(("Processed %.1f million packets in %.2f seconds (%d bytes; %.2f Gbps)"):format(packets / 1e6, runtime, bytes, bytes * 8.0 / 1e9 / runtime))
    print(("Made %s breaths: %.2f packets per breath; %.2fus per breath"):format(lib.comma_value(breaths), packets / breaths, runtime / breaths * 1e6))
    print(("Rate(Mpps):\t%.3f"):format(packets / runtime / 1e6))
-   require("jit.p").stop()
 end
 
