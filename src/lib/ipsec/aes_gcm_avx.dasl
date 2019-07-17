@@ -123,30 +123,9 @@ end
 
 local function initial_blocks(Dst, num_initial_blocks, t, ctr, t_key, operation, nrounds)
   local i = 8 - num_initial_blocks
-  | mov r10, arg6
-  | mov r12, arg7
-  | mov r11, r12
-
-  | vpxor xmm(i), xmm(i), xmm(i)
-  |1:
-  | vmovd xmm(t[1]), dword [r10]
-  | vpslldq xmm(t[1]), xmm(t[1]), 12
-  | vpsrldq xmm(i), xmm(i), 4
-  | vpxor xmm(i), xmm(i), xmm(t[1])
-  | add r10, 4
-  | sub r12, 4
-  | jg <1
-  | cmp r11, 16
-  | je >3
-  | mov r12, 16
-  |2:
-  | vpsrldq xmm(i), xmm(i), 4
-  | sub r12, 4
-  | cmp r12, r11
-  | jg <2
-  |3:
-
+  | vmovdqu xmm(i), [arg6]
   | vpshufb xmm(i), xmm(i), [->shuf_mask]
+
   | xor r11, r11
   | mov rax, arg5
   | vmovdqu xmm(ctr), [rax]
@@ -491,6 +470,54 @@ local function keyexp256(Dst)
   | ret
 end
 
+local function aad_prehash(Dst)
+   prologue(Dst)
+   | vmovdqu xmm2, [arg1 + 16*15]
+   | mov r10, arg3
+   | mov r12, arg4
+
+   | vpxor xmm0, xmm0, xmm0
+
+   |1:
+   | cmp r12, 16
+   | jng >2
+   | vmovdqu xmm1, [r10]
+   | vpshufb xmm1, xmm1, [->shuf_mask]
+   | vpxor xmm0, xmm0, xmm1
+   ghash_mul(Dst, 0, 2, 13, 14, 15)
+   | add r10, 16
+   | sub r12, 16
+   | jmp <1
+
+   |2:
+   | mov r11, r12
+   | vpxor xmm1, xmm1, xmm1
+   |1:
+   | vmovd xmm3, dword [r10]
+   | vpslldq xmm3, xmm3, 12
+   | vpsrldq xmm1, xmm1, 4
+   | vpxor xmm1, xmm1, xmm3
+   | add r10, 4
+   | sub r12, 4
+   | jg <1
+   | cmp r11, 16
+   | je >3
+   | mov r12, 16
+   |2:
+   | vpsrldq xmm1, xmm1, 4
+   | sub r12, 4
+   | cmp r12, r11
+   | jg <2
+   |3:
+   | vpshufb xmm1, xmm1, [->shuf_mask]
+
+   | vpxor xmm0, xmm0, xmm1
+
+   | vpshufb xmm0, xmm0, [->shuf_mask] -- undone by initial_blocks
+   | vmovdqu [arg2], xmm0
+   epilogue(Dst)
+end
+
 local function auth16_equal(Dst)
    | mov rax, [arg1]
    | mov rdx, [arg1 + 8]
@@ -539,6 +566,9 @@ local function generator(Dst)
   |.align 16
   |->auth16_equal:
   || auth16_equal(Dst)
+  |.align 16
+  |->aad_prehash:
+  || aad_prehash(Dst)
 
   -- Data
   |.align 64
@@ -573,8 +603,15 @@ end
 -- 
 -- Then your gcm_data state is ready for use with aesni_gcm_enc_128_avx_gen4,
 -- aesni_gcm_dec_128_avx_gen4, aesni_gcm_enc_256_avx_gen4, and
--- aesni_gcm_dec_256_avx_gen4.
--- Make sure to check the resulting authentication tags! (auth16_equal)
+-- aesni_gcm_dec_256_avx_gen4 and aad_prehash.
+--
+-- If your AAD is <= 16 bytes you can pad it to 16 bytes with zero bits and
+-- pass it to aesni_gcm_enc_avx_gen4 and aesni_gcm_dec_avx_gen4 as is. However,
+-- if your AAD exceeds 16 bytes you need to pre-hash it using aad_prehash and
+-- use the resulting 16 byte output.
+--
+-- Make sure to check the resulting authentication tags, i.e. using
+-- auth16_equal!
 --
 -- Arguments to aes_keyexp_128_enc:
 --  1) uint8_t  key[16]
@@ -592,15 +629,21 @@ end
 --  1) gcm_data *state       (aligned to 16 bytes)
 --  2) uint8_t  hash_subkey[16]
 --
+-- Arguments to aad_prehash:
+--  1) gcm_data *state      (aligned to 16 bytes)
+--  2) uint8_t  out[16]
+--  3) uint8_t  aad[aadlen] (AAD material)
+--  4) uint64_t aadlen      (a multiple of 4)
+--
 -- Arguments to aesni_gcm_enc_128_avx_gen4, aesni_gcm_dec_128_avx_gen4,
 -- aesni_gcm_enc_256_avx_gen4, aesni_gcm_dec_256_avx_gen4:
 --  1) gcm_data *state      (aligned to 16 bytes)
 --  2) uint8_t  out[len]
 --  3) uint8_t  in[len]     (can be the same as out, i.e. "in-place")
 --  4) uint64_t len
---  5) uint8_t  iv[16]      (96 bit IV, 4 byte padding, aligned to 16 bytes)
---  6) uint8_t  aad[addlen]
---  7) uint64_t aadlen      (multiple of 4 and <= 16)
+--  5) uint8_t  iv[16]      (96 bit IV, padded with bytes 0001, aligned to 16 bytes)
+--  6) uint8_t  aad[16]     (16 bytes, output of aad_prehash if aadlen > 16)
+--  7) uint64_t aadlen      (a multiple of 4)
 --  8) uint8_t  tag[taglen]
 --  9) uint64_t taglen      (should be 16 for all intents and purposes)
 --
@@ -614,11 +657,12 @@ local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
 generator(Dst)
 local mcode, size = Dst:build()
 local entry = dasm.globals(globals, globalnames)
-local fn_t = ffi.typeof("void(*)(gcm_data*, uint8_t*, const uint8_t*, uint64_t, uint8_t*, const uint8_t*, uint64_t, uint8_t*, uint64_t)")
+local fn_t = ffi.typeof("void(*)(gcm_data*, uint8_t*, const uint8_t*, uint64_t, const uint8_t*, const uint8_t*, uint64_t, uint8_t*, uint64_t)")
 return setmetatable({
   aes_keyexp_128_enc_avx = ffi.cast("void(*)(const uint8_t*, gcm_data*)", entry.aes_keyexp_128_enc_avx),
   aes_keyexp_256_enc_avx = ffi.cast("void(*)(const uint8_t*, gcm_data*)", entry.aes_keyexp_256_enc_avx),
   aesni_gcm_precomp_avx_gen4 = ffi.cast("void(*)(gcm_data*, const uint8_t*)", entry.aesni_gcm_precomp_avx_gen4),
+  aad_prehash = ffi.cast("void(*)(gcm_data*, uint8_t[16], const uint8_t*, uint64_t)", entry.aad_prehash),
   aesni_gcm_enc_128_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_enc_128_avx_gen4),
   aesni_gcm_enc_256_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_enc_256_avx_gen4),
   aesni_gcm_dec_128_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_dec_128_avx_gen4),

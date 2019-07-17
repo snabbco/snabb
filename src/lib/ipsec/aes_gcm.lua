@@ -321,6 +321,78 @@ function selftest ()
       assert(C.memcmp(c + length, o + length, gcm.AUTH_SIZE) == 0,
              "Authentication failed.")
    end
+   -- Test extended AAD. Test vectors from NIST.
+   local test = {
+      { key = "2fb45e5b8f993a2bfebc4b15b533e0b4",
+        iv = "5b05755f984d2b90f94b8027",
+        aad = "e85491b2202caf1d7dce03b97e09331c32473941",
+        plaintext = "",
+        ciphertext = "",
+        tag = "c75b7832b2a2d9bd827412b6ef5769db" },
+      { key = "77be63708971c4e240d1cb79e8d77feb",
+        iv = "e0e00f19fed7ba0136a797f3",
+        aad = "7a43ec1d9c0a5a78a0b16533a6213cab",
+        plaintext = "",
+        ciphertext = "",
+        tag = "209fcc8d3675ed938e9c7166709dd946" },
+      { key = "c939cc13397c1d37de6ae0e1cb7c423c",
+        iv = "b3d8cc017cbb89b39e0f67e2",
+        plaintext = "c3b3c41f113a31b73d9a5cd432103069",
+        aad = "24825602bd12a984e0092d3e448eda5f",
+        ciphertext = "93fe7d9e9bfd10348a5606e5cafa7354",
+        tag = "0032a1dc85f1c9786925a2e71d8272dd" },
+      { key = "feffe9928665731c6d6a8f9467308308",
+        plaintext = "d9313225f88406e5a55909c5aff5269a"..
+                    "86a7a9531534f7da2e4c303d8a318a72"..
+                    "1c3c0c95956809532fcf0e2449a6b525"..
+                    "b16aedf5aa0de657ba637b39",
+        aad = "feedfacedeadbeeffeedfacedeadbeefabaddad2",
+        iv = "cafebabefacedbaddecaf888",
+        ciphertext = "42831ec2217774244b7221b784d0d49c"..
+                     "e3aa212f2c02a4e035c17e2329aca12e"..
+                     "21d514b25466931c7d8f6a5aac84aa05"..
+                     "1ba30b396a0aac973d58e091",
+        tag = "5bc94fbc3221a5db94fae95ae7121a47" },
+      { key = "5b9604fe14eadba931b0ccf34843dab9",
+        iv = "921d2507fa8007b7bd067d34",
+        aad = "00112233445566778899aabbccddeeff",
+        plaintext = "001d0c231287c1182784554ca3a21908",
+        ciphertext = "49d8b9783e911913d87094d1f63cc765",
+        tag = "1e348ba07cca2cf04c618cb4d43a5b92" }
+   }
+   for i, t in ipairs(test) do      
+      print("Generic test vector:", i)
+      local gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
+      ASM.aes_keyexp_128_enc_avx(lib.hexundump(t.key, #t.key/2), gcm_data)
+      local hash_subkey = ffi.new("uint8_t[16]")
+      ASM.aesni_encrypt_128_single_block(gcm_data, hash_subkey)
+      ASM.aesni_gcm_precomp_avx_gen4(gcm_data, hash_subkey)
+      local aad = ffi.new("uint8_t[16]")
+      local buf = ffi.new("uint8_t[?]", #t.plaintext/2)
+      local iv = ffi.new("uint8_t[16] __attribute__((aligned(16)))",
+                         {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1})
+      local tag = ffi.new("uint8_t[16]")
+      ASM.aad_prehash(gcm_data, aad, lib.hexundump(t.aad, #t.aad/2), #t.aad/2)
+      ffi.copy(iv, lib.hexundump(t.iv, #t.iv/2))
+      ASM.aesni_gcm_enc_128_avx_gen4(
+         gcm_data,
+         buf, lib.hexundump(t.plaintext, #t.plaintext/2), #t.plaintext/2,
+         iv, aad, #t.aad/2, tag, 16
+      )
+      print("ctext", lib.hexdump(ffi.string(buf, ffi.sizeof(buf))))
+      print("tag", lib.hexdump(ffi.string(tag, 16)))
+      assert(ffi.string(buf, ffi.sizeof(buf)) == lib.hexundump(t.ciphertext, #t.ciphertext/2))
+      assert(ffi.string(tag, 16) == lib.hexundump(t.tag, #t.tag/2))
+      ASM.aesni_gcm_dec_128_avx_gen4(
+         gcm_data,
+         buf, buf, ffi.sizeof(buf),
+         iv, aad, #t.aad/2, tag, 16
+      )
+      print("ptext", lib.hexdump(ffi.string(buf, ffi.sizeof(buf))))
+      print("tag", lib.hexdump(ffi.string(tag, 16)))
+      assert(ffi.string(buf, ffi.sizeof(buf)) == lib.hexundump(t.plaintext, #t.plaintext/2))
+      assert(ffi.string(tag, 16) == lib.hexundump(t.tag, #t.tag/2))
+   end
    -- Microbenchmarks.
    local pmu = require("lib.pmu")
    local has_pmu_counters, err = pmu.is_available()
