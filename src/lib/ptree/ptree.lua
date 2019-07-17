@@ -151,6 +151,7 @@ function Manager:state_change_event(event, ...)
 end
 
 function Manager:set_initial_configuration (configuration)
+   path_data.consistency_checker_from_schema_by_name(self.schema_name, true)(configuration)
    self.current_configuration = configuration
    self.current_in_place_dependencies = {}
 

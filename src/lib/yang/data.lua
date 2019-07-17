@@ -14,7 +14,7 @@ local lib = require('core.lib')
 local regexp = require("lib.xsd_regexp")
 
 function normalize_id(id)
-   return id:gsub('[^%w_]', '_')
+   return (id:gsub('[^%w_]', '_'))
 end
 
 -- Helper for parsing C type declarations.
@@ -223,7 +223,8 @@ function data_grammar_from_schema(schema, is_config)
       return {type='table', keys=keys, values=values,
               string_key=table_string_key(keys),
               key_ctype=struct_ctype(keys),
-              value_ctype=struct_ctype(values)}
+              value_ctype=struct_ctype(values),
+              unique = node.unique}
    end
    function handlers.leaf(node, for_key)
       if node.config ~= is_config and not for_key then return end
