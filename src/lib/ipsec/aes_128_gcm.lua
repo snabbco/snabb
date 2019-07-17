@@ -81,14 +81,11 @@ local aes_128_gcm = {}
 
 function aes_128_gcm:new (spi, key, salt)
    assert(spi, "Need SPI.")
-   -- We only support 128-bit keys.
-   assert(key and #key == 32, "Need 16 bytes of key material.")
-   assert(salt and #salt == 8, "Need 4 bytes of salt.")
    local o = {}
    o.key = ffi.new("uint8_t[16]")
-   ffi.copy(o.key, lib.hexundump(key, 16), 16)
+   ffi.copy(o.key, lib.hexundump(key, 16, "Need 16 bytes of key material."), 16)
    o.IV_SIZE = 8
-   o.iv = iv:new(lib.hexundump(salt, 4))
+   o.iv = iv:new(lib.hexundump(salt, 4, "Need 4 bytes of salt."))
    -- “Implementations MUST support a full-length 16-octet ICV”
    o.AUTH_SIZE = 16
    o.auth_buf = ffi.new("uint8_t[?]", o.AUTH_SIZE)
