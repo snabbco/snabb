@@ -31,7 +31,7 @@ local function make_worker(pci, rxq, rxc)
                    wait_for_link = true })
       config.link(c, "nic.output -> sink.input")
       engine.configure(c)
-      engine.main({ duration = 2 })
+      engine.main()
       ]], pci, rxq, rxc)
 
    worker.start("worker"..rxq, code)
