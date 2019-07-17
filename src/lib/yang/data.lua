@@ -184,8 +184,12 @@ function data_grammar_from_schema(schema, is_config)
    function handlers.choice(node)
       local choices = {}
       for choice, n in pairs(node.body) do
-         local members = visit_body(n)
-         if not is_empty(members) then choices[choice] = members end
+         if n.kind == 'case' then
+            local members = visit_body(n)
+            if not is_empty(members) then choices[choice] = members end
+         else
+            choices[choice] = { [choice] = visit(n) }
+         end
       end
       if is_empty(choices) then return end
       return {type="choice", default=node.default, mandatory=node.mandatory,
@@ -496,6 +500,9 @@ function choice_parser(keyword, choices, members, default, mandatory)
       -- using different leaves from different case statements.
       local chosen
 
+      -- keep track of initialzed members
+      local inits = {}
+
       local function init() return {} end
       local function parse(P, out, k)
          if chosen and choice_map[k] ~= chosen then
@@ -503,12 +510,13 @@ function choice_parser(keyword, choices, members, default, mandatory)
          else
             chosen = choice_map[k]
          end
-         return members[chosen][k].parse(P, members[chosen][k].init(), k)
+         inits[k] = inits[k] or members[chosen][k].init()
+         return members[chosen][k].parse(P, inits[k], k)
       end
 
       -- This holds a copy of all the nodes so we know when we've hit the last one.
       local function finish(out, k)
-         if out ~= nil then return out end
+         if out ~= nil then return members[chosen][k].finish(out) end
          if mandatory and chosen == nil then error("missing choice value: "..keyword) end
          if default and default == choice_map[k] then
             return members[default][k].finish()
@@ -654,23 +662,40 @@ function data_parser_from_grammar(production)
    function top_parsers.struct(production)
       local struct_t = production.ctype and typeof(production.ctype)
       local members = visitn(production.members)
+      local keys = {}
+      for k,v in pairs(members) do table.insert(keys, k) end
       return function(stream)
          local P = parser_mod.Parser.new(stream)
          local ret = {}
-         for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
+         local expanded_members = {}
+         for _,k in ipairs(keys) do
+            if members[k].represents then
+               -- Choice fields don't include the name of the choice block in the data. They
+               -- need to be able to provide the parser for the leaves it represents.
+               local member_parser = members[k].stateful_parser()
+               for _, node in pairs(members[k].represents()) do
+                  -- Choice fields need to keep state around as they're called multiple times
+                  -- and need to do some validation to comply with spec.
+                  expanded_members[node] = member_parser
+               end
+            else
+               ret[normalize_id(k)] = members[k].init()
+               expanded_members[k] = members[k]
+            end
+         end
          while true do
             P:skip_whitespace()
             if P:is_eof() then break end
             local k = P:parse_identifier()
             if k == '' then P:error("Expected a keyword") end
-            local sub = members[k]
+            local sub = expanded_members[k]
             if not sub then P:error('unrecognized parameter: '..k) end
             local id = normalize_id(k)
             ret[id] = sub.parse(P, ret[id], k)
          end
-         for k,sub in pairs(members) do
+         for k,sub in pairs(expanded_members) do
             local id = normalize_id(k)
-            ret[id] = sub.finish(ret[id])
+            ret[id] = sub.finish(ret[id], k)
          end
          if struct_t then return struct_t(ret) else return ret end
       end
@@ -1874,6 +1899,54 @@ function selftest()
       }
    ]])
    assert(success == false)
+
+   -- Test top-level choice with list member.
+   local choice_schema = schema.load_schema([[module toplevel-choice-schema {
+      namespace "urn:ietf:params:xml:ns:yang:toplevel-choice-schema";
+      prefix "test";
+
+      choice test {
+        case this {
+          leaf foo { type string; }
+          leaf bar { type string; }
+        }
+        case that {
+          leaf baz { type uint32; }
+          list qu-x { key id; leaf id { type string; } leaf v { type string; } }
+        }
+      }
+   }]])
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
+      foo "hello";
+      bar "world";
+   ]])
+   assert(choice_data.foo == "hello")
+   assert(choice_data.bar == "world")
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
+      baz 1;
+      qu-x { id "me"; v "hey"; }
+      qu-x { id "you"; v "hi"; }
+   ]])
+   assert(choice_data.baz == 1)
+   assert(choice_data.qu_x.me.v == "hey")
+   assert(choice_data.qu_x.you.v == "hi")
+
+   -- Test choice with case short form.
+   local choice_schema = schema.load_schema([[module shortform-choice-schema {
+      namespace "urn:ietf:params:xml:ns:yang:shortform-choice-schema";
+      prefix "test";
+
+      choice test {
+        default foo;
+        leaf foo { type string; default "something"; }
+        leaf bar { type string; }
+      }
+   }]])
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string "")
+   assert(choice_data.foo == "something")
 
    -- Test range / length restrictions.
    local range_length_schema = schema.load_schema([[module range-length-schema {
