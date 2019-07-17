@@ -29,7 +29,7 @@ local seq_no_t = require("lib.ipsec.seq_no_t")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
-local logger = lib.logger_new({ rate = 32, module = 'esp' })
+local logger = require("lib.logger").new({ rate = 32, module = 'esp' })
 
 require("lib.ipsec.track_seq_no_h")
 local window_t = ffi.typeof("uint8_t[?]")

@@ -68,10 +68,6 @@ luajit \-e "local x=0; for i=1,1e9 do x=x+i end; print(x)"
 Calculates the sum of the numbers from 1 to 1000000000.
 .br
 And finishes in a reasonable amount of time, too.
-.TP
-luajit \-jv \-e "for i=1,10 do for j=1,10 do for k=1,100 do end end end"
-
-Runs some nested loops and shows the resulting traces.
 .SH COPYRIGHT
 .PP
 \fBLuaJIT\fR is Copyright \(co 2005-2017 Mike Pall.

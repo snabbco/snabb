@@ -82,6 +82,7 @@ local bridge_base = require("apps.bridge.base").bridge
 local mac_table = require("apps.bridge.mac_table")
 require("apps.bridge.learning_h")
 local ethernet = require("lib.protocol.ethernet")
+local logger = require("lib.logger")
 
 local empty, receive, transmit = link.empty, link.receive, link.transmit
 local clone = packet.clone
@@ -179,7 +180,7 @@ function bridge:new (arg)
    alloc_pft(o)
    -- Box to store a pointer to a MAC address in memory
    o._mac = ffi.new("uint8_t *[1]")
-   o._logger = lib.logger_new({ module = "bridge" })
+   o._logger = logger.new({ module = "bridge" })
    return o
 end
 

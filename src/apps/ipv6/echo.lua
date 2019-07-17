@@ -112,6 +112,9 @@ function ICMPEcho:respond_to_echo_request(pkt)
    out_h.ether.dhost, out_h.ether.shost = h.ether.shost, h.ether.dhost
    out_h.ipv6.src_ip, out_h.ipv6.dst_ip = h.ipv6.dst_ip, h.ipv6.src_ip
 
+   -- Set hop limit.
+   out_h.ipv6.hop_limit = 64
+
    -- Change ICMP message type.
    icmp = ffi.cast(icmp_header_ptr_t, out_h.ipv6.payload)
    icmp.type = icmpv6_echo_reply

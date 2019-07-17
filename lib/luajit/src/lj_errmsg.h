@@ -57,9 +57,6 @@ ERRDEF(NOENV,	"no calling environment")
 ERRDEF(CYIELD,	"attempt to yield across C-call boundary")
 ERRDEF(BADLU,	"bad light userdata pointer")
 ERRDEF(NOGCMM,	"bad action while in __gc metamethod")
-#if LJ_TARGET_WINDOWS
-ERRDEF(BADFPU,	"bad FPU precision (use D3DCREATE_FPU_PRESERVE with DirectX)")
-#endif
 
 /* Standard library function errors. */
 ERRDEF(ASSERT,	"assertion failed!")
@@ -99,19 +96,10 @@ ERRDEF(STRCAPU,	"unfinished capture")
 ERRDEF(STRFMT,	"invalid option " LUA_QS " to " LUA_QL("format"))
 ERRDEF(STRGSRV,	"invalid replacement value (a %s)")
 ERRDEF(BADMODN,	"name conflict for module " LUA_QS)
-#if LJ_HASJIT
 ERRDEF(JITPROT,	"runtime code generation failed, restricted kernel?")
-#if LJ_TARGET_X86ORX64
 ERRDEF(NOJIT,	"JIT compiler disabled, CPU does not support SSE2")
-#else
-ERRDEF(NOJIT,	"JIT compiler disabled")
-#endif
-#elif defined(LJ_ARCH_NOJIT)
-ERRDEF(NOJIT,	"no JIT compiler for this architecture (yet)")
-#else
-ERRDEF(NOJIT,	"JIT compiler permanently disabled by build option")
-#endif
 ERRDEF(JITOPT,	"unknown or malformed optimization flag " LUA_QS)
+ERRDEF(AUDITLOG,"auditlog could not be opened (already open?)")
 
 /* Lexer/parser errors. */
 ERRDEF(XMODE,	"attempt to load chunk with wrong mode")
@@ -150,7 +138,6 @@ ERRDEF(XGSCOPE,	"<goto %s> jumps into the scope of local " LUA_QS)
 ERRDEF(BCFMT,	"cannot load incompatible bytecode")
 ERRDEF(BCBAD,	"cannot load malformed bytecode")
 
-#if LJ_HASFFI
 /* FFI errors. */
 ERRDEF(FFI_INVTYPE,	"invalid C type")
 ERRDEF(FFI_INVSIZE,	"size of C type is unknown or too large")
@@ -174,14 +161,9 @@ ERRDEF(FFI_BADMM,	LUA_QS " has no " LUA_QS " metamethod")
 ERRDEF(FFI_WRCONST,	"attempt to write to constant location")
 ERRDEF(FFI_NODECL,	"missing declaration for symbol " LUA_QS)
 ERRDEF(FFI_BADCBACK,	"bad callback")
-#if LJ_OS_NOJIT
-ERRDEF(FFI_CBACKOV,	"no support for callbacks on this OS")
-#else
 ERRDEF(FFI_CBACKOV,	"too many callbacks")
-#endif
 ERRDEF(FFI_NYIPACKBIT,	"NYI: packed bit fields")
 ERRDEF(FFI_NYICALL,	"NYI: cannot call this C function (yet)")
-#endif
 
 #undef ERRDEF
 

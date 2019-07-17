@@ -37,6 +37,7 @@ local filter = require("lib.pcap.filter")
 local pcap = require("apps.pcap.pcap")
 local cc = require("program.l2vpn.control_channel")
 local ipc_mib = require("lib.ipc.shmem.mib")
+local logger = require("lib.logger")
 
 pseudowire = subClass(nil)
 pseudowire._name = "Pseudowire"
@@ -229,7 +230,7 @@ function pseudowire:new (conf_in)
    o._conf = conf
    local bpf_program
 
-   o._logger = lib.logger_new({ module = o._name.." ("..o._conf.name..")" })
+   o._logger = logger.new({ module = o._name.." ("..o._conf.name..")" })
    -- Construct templates for the entire encapsulation chain
 
    -- Ethernet header

@@ -63,7 +63,7 @@ function run (args)
       main.exit(0)
    end
 
-   local sizes = { 64, 64, 64, 64, 64, 64, 64, 594, 594, 594, 1500 }
+   local sizes = { 64, 64, 64, 64, 64, 64, 64, 594, 594, 594, 1464 }
    function opt.S (arg)
       sizes = {}
       for size in string.gmatch(arg, "%d+") do

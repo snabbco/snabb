@@ -29,10 +29,11 @@
 module(..., package.seeall)
 
 local lib = require('core.lib')
+local mem = require('lib.stream.mem')
 
 Parser = {}
-function Parser.new(str, filename)
-   local ret = {pos=1, str=str, filename=filename, line=1, column=0, line_pos=1}
+function Parser.new(stream)
+   local ret = {pos=0, str='', stream=stream, line=1, column=0, name=stream:filename()}
    ret = setmetatable(ret, {__index = Parser})
    ret.peek_char = ret:read_char()
    return ret
@@ -44,17 +45,22 @@ function Parser:loc()
 end
 
 function Parser:error(msg, ...)
-   print(self.str:match("[^\n]*", self.line_pos))
+   print(self.str:match("[^\n]*"))
    print(string.rep(" ", self.column).."^")
-   error(('%s: error: '..msg):format(self:loc(), ...))
+   print(('%s: error: '..msg):format(self:loc(), ...))
+   -- use an empty error to avoid printing stack trace
+   error()
 end
 
 function Parser:read_char()
-   if self.pos <= #self.str then
-      local ret = self.str:sub(self.pos,self.pos)
-      self.pos = self.pos + 1
-      return ret
+   if self.pos == #self.str then
+      local str = self.stream:read_line('keep')
+      if str == nil then return nil end -- EOF.
+      self.str, self.pos = str, 0
    end
+   assert(self.pos < #self.str)
+   self.pos = self.pos + 1
+   return self.str:sub(self.pos,self.pos)
 end
 
 function Parser:peek() return self.peek_char end
@@ -63,7 +69,6 @@ function Parser:is_eof() return not self:peek() end
 function Parser:next()
    local chr = self.peek_char
    if chr == '\n' then
-      self.line_pos = self.pos + 1
       self.column = 0
       self.line = self.line + 1
    elseif chr == "\t" then
@@ -76,12 +81,9 @@ function Parser:next()
    return chr
 end
 
+-- Only peeks on same line.
 function Parser:peek_n(n)
-   local end_index = self.pos + n - 1
-   if end_index < #self.str then
-      return self:peek() .. self.str:sub(self.pos, (end_index - 1))
-   end
-   return self:peek() .. self.str:sub(self.pos)
+   return self.str:sub(self.pos, math.min(self.pos + n - 1, #self.str))
 end
 
 function Parser:check(expected)
@@ -295,7 +297,7 @@ function Parser:parse_statement()
 end
 
 function parse_string(str, filename)
-   local parser = Parser.new(str, filename)
+   local parser = Parser.new(mem.open_input_string(str, filename))
    parser:skip_whitespace()
    local str = parser:parse_string()
    parser:skip_whitespace()
@@ -304,7 +306,7 @@ function parse_string(str, filename)
 end
 
 function parse_strings(str, filename)
-   local parser = Parser.new(str, filename)
+   local parser = Parser.new(mem.open_input_string(str, filename))
    local ret = {}
    parser:skip_whitespace()
    while not parser:is_eof() do
@@ -315,7 +317,7 @@ function parse_strings(str, filename)
 end
 
 function parse_statement_lists(str, filename)
-   local parser = Parser.new(str, filename)
+   local parser = Parser.new(mem.open_input_string(str, filename))
    local ret = {}
    parser:skip_whitespace()
    while not parser:is_eof() do
@@ -327,16 +329,9 @@ function parse_statement_lists(str, filename)
    return ret
 end
 
-function parse(str, filename)
-   local parser = Parser.new(str, filename)
+function parse(stream)
+   local parser = Parser.new(stream)
    return parser:parse_module()
-end
-
-function parse_file(filename)
-   local file_in = assert(io.open(filename))
-   local contents = file_in:read("*a")
-   file_in:close()
-   return parse(contents, filename)
 end
 
 function selftest()
@@ -357,7 +352,7 @@ function selftest()
    end
 
    local function test_string(src, exp)
-      local parser = Parser.new(src)
+      local parser = Parser.new(mem.open_input_string(src))
       parser:skip_whitespace()
       assert_equal(strip_locs(parser:parse_string()), exp)
    end
@@ -384,7 +379,7 @@ function selftest()
 
 
    local function test_module(src, exp)
-      local result = strip_locs(parse(src))
+      local result = strip_locs(parse(mem.open_input_string(src)))
       if not lib.equal(result, exp) then
          pp(result)
          pp(exp)
@@ -428,8 +423,8 @@ function selftest()
    argument="port", statements={{keyword="type"}}}})
    test_module('description hello/world;', {{keyword="description",
    argument="hello/world"}})
-   parse(require('lib.yang.ietf_inet_types_yang'))
-   parse(require('lib.yang.ietf_yang_types_yang'))
-   parse(require('lib.yang.ietf_softwire_common_yang'))
-   parse(require('lib.yang.ietf_softwire_br_yang'))
+   parse(mem.open_input_string(require('lib.yang.ietf_inet_types_yang')))
+   parse(mem.open_input_string(require('lib.yang.ietf_yang_types_yang')))
+   parse(mem.open_input_string(require('lib.yang.ietf_softwire_common_yang')))
+   parse(mem.open_input_string(require('lib.yang.ietf_softwire_br_yang')))
 end

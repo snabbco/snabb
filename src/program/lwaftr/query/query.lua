@@ -1,5 +1,6 @@
 module(..., package.seeall)
 
+local S = require("syscall")
 local engine = require("core.app")
 local counter = require("core.counter")
 local lib = require("core.lib")
@@ -9,7 +10,6 @@ local schema = require("lib.yang.schema")
 local state = require("lib.yang.state")
 local counters = require("program.lwaftr.counters")
 local lwutil = require("apps.lwaftr.lwutil")
-local top = require("program.top.top")
 local ps = require("program.ps.ps")
 
 local keys, fatal = lwutil.keys, lwutil.fatal
@@ -102,6 +102,38 @@ local function pid_to_parent(pid)
    return pid
 end
 
+local function select_snabb_instance (pid)
+   local function compute_snabb_instances()
+      -- Produces set of snabb instances, excluding this one.
+      local pids = {}
+      local my_pid = S.getpid()
+      for _, name in ipairs(shm.children("/")) do
+         -- This could fail as the name could be for example "by-name"
+         local p = tonumber(name)
+         if p and p ~= my_pid then table.insert(pids, name) end
+      end
+      return pids
+   end
+
+   local instances = compute_snabb_instances()
+
+   if pid then
+      pid = tostring(pid)
+      -- Try to use given pid
+      for _, instance in ipairs(instances) do
+         if instance == pid then return pid end
+      end
+      print("No such Snabb instance: "..pid)
+   elseif #instances == 1 then return instances[1]
+   elseif #instances <= 0 then print("No Snabb instance found.")
+   else
+      print("Multiple Snabb instances found. Select one:")
+      for _, instance in ipairs(instances) do print(instance) end
+   end
+   main.exit(1)
+end
+
+
 function run (raw_args)
    local opts, arg1, arg2 = parse_args(raw_args)
    local pid, counter_name
@@ -133,10 +165,6 @@ function run (raw_args)
          end
       end
    end
-   if not pid then
-      top.select_snabb_instance(pid)
-      -- The following is not reached when there are multiple instances.
-      fatal("Please manually specify a pid, or a name with -n name")
-   end
+   if not pid then pid = select_snabb_instance() end
    print_counters(pid, counter_name)
 end

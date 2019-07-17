@@ -131,9 +131,34 @@ function convert_path(grammar, path)
    return ret
 end
 
-function parse_path(path)
+function parse_path (path)
+   local depth = 0
+   local t, token = {}, ''
+   local function insert_token ()
+      table.insert(t, token)
+      token = ''
+   end
+   for i=1,#path do
+      local c = path:sub(i, i)
+      if depth == 0 and c == '/' then
+         if #token > 0 then
+            insert_token()
+         end
+      else
+         token = token..c
+         if c == '[' then depth = depth + 1 end
+         if c == ']' then
+            depth = depth - 1
+            if depth == 0 and path:sub(i+1, i+1) ~= '[' then
+               insert_token()
+            end
+         end
+      end
+   end
+   insert_token()
+
    local ret = {}
-   for element in path:split("/") do
+   for _, element in ipairs(t) do
       if element ~= '' then table.insert(ret, extract_parts(element)) end
    end
    return ret
@@ -195,6 +220,10 @@ function selftest()
    assert(normalize_path('//foo[c=1][b=2]//bar//') == '/foo[b=2][c=1]/bar')
 
    assert(extract_parts('//foo[b=1]'))
+
+   parse_path('/alarms/alarm-list/alarm'..
+              '[resource=alarms/alarm-list/alarm/related-alarm/resource]'..
+              '[alarm-type-id=/alarms/alarm-list/alarm/related-alarm/alarm-type-id]')
 
    print("selftest: ok")
 end

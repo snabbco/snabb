@@ -1,5 +1,5 @@
 Usage:
-    monitor IPV4_ADDRESS [PID]
+    monitor IPV4_ADDRESS PID
 
 Options:
 
@@ -23,5 +23,4 @@ IPV4_ADDRESS can take two special values:
 - 'none', which is equivalent to '0.0.0.0'.
 - 'all', which is equivalent to '255.255.255.255'.
 
-PID value is used to retrieve the lwAFTR instance.  If PID is not set, the
-most recent active lwAFTR instance for which 'v4v6_mirror' is defined is used.
+PID value is used to retrieve the lwAFTR instance.
