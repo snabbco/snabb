@@ -121,13 +121,15 @@ root     16115  0.0  0.0 133856  2936 pts/2    S+   22:39   0:00
 
 #### SnabbVMX decapsulation path works but not encapsulation
 
-`Description`: `snabbvmx top` reports that the running SnabbVMX instance is able
-to decapsulate packets, but not to encapsulate them.
+`Description`: `snabb top` reports that the running SnabbVMX instance is
+able to decapsulate packets, but not to encapsulate them.
 
 ```
-lwaftr (rx/tx/txdrop in Mpps)            rx      tx    rxGb    txGb    txdrop
-lwaftr_v6                              1.53       0    4.80       0    0.000022
-lwaftr_v4                                 0    1.53       0    4.31    0
+  lwaftr:
+    in-ipv4-packets: 1,531,201,100 PPS
+    in-ipv6-packets: 0 PPS
+    out-ipv4-packets: 0 PPS
+    out-ipv6-packets: 1,531,201,100 PPS
 ```
 
 `Solution`: If the decapsulation path works, then the lwAFTR is able to

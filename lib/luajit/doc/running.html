@@ -63,8 +63,6 @@ td.param_default {
 <a href="ext_jit.html">jit.* Library</a>
 </li><li>
 <a href="ext_c_api.html">Lua/C API</a>
-</li><li>
-<a href="ext_profiler.html">Profiler</a>
 </li></ul>
 </li><li>
 <a href="status.html">Status</a>
@@ -162,14 +160,10 @@ luajit -b test.lua test.obj                 # Generate object file
 # Link test.obj with your application and load it with require("test")
 </pre>
 
-<h3 id="opt_j"><tt>-j cmd[=arg[,arg...]]</tt></h3>
+<h3 id="opt_j"><tt>-j cmd</tt></h3>
 <p>
-This option performs a LuaJIT control command or activates one of the
-loadable extension modules. The command is first looked up in the
-<tt>jit.*</tt> library. If no matching function is found, a module
-named <tt>jit.&lt;cmd&gt;</tt> is loaded and the <tt>start()</tt>
-function of the module is called with the specified arguments (if
-any). The space between <tt>-j</tt> and <tt>cmd</tt> is optional.
+This option performs a LuaJIT control command from the <tt>jit.*</tt>
+library.
 </p>
 <p>
 Here are the available LuaJIT control commands:
@@ -178,20 +172,7 @@ Here are the available LuaJIT control commands:
 <li id="j_on"><tt>-jon</tt> &mdash; Turns the JIT compiler on (default).</li>
 <li id="j_off"><tt>-joff</tt> &mdash; Turns the JIT compiler off (only use the interpreter).</li>
 <li id="j_flush"><tt>-jflush</tt> &mdash; Flushes the whole cache of compiled code.</li>
-<li id="j_v"><tt>-jv</tt> &mdash; Shows verbose information about the progress of the JIT compiler.</li>
-<li id="j_dump"><tt>-jdump</tt> &mdash; Dumps the code and structures used in various compiler stages.</li>
-<li id="j_p"><tt>-jp</tt> &mdash; Start the <a href="ext_profiler.html">integrated profiler</a>.</li>
 </ul>
-<p>
-The <tt>-jv</tt> and <tt>-jdump</tt> commands are extension modules
-written in Lua. They are mainly used for debugging the JIT compiler
-itself. For a description of their options and output format, please
-read the comment block at the start of their source.
-They can be found in the <tt>lib</tt> directory of the source
-distribution or installed under the <tt>jit</tt> directory. By default
-this is <tt>/usr/local/share/luajit-2.0.4/jit</tt> on POSIX
-systems.
-</p>
 
 <h3 id="opt_O"><tt>-O[level]</tt><br>
 <tt>-O[+]flag</tt>&nbsp;&nbsp;&nbsp;<tt>-O-flag</tt><br>

@@ -163,19 +163,14 @@ function Reassembler:new(conf)
    o.scratch_reassembly = params.value_type()
    o.next_counter_update = -1
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='incoming-ipv4-fragments'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Incoming IPv4 fragments over N fragments/s',
-      }
-   }
-   local incoming_fragments_alarm = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='incoming-ipv4-fragments'}] = {
-         perceived_severity='warning',
-         alarm_text='More than 10,000 IPv4 fragments per second',
-      }
-   }
+   alarms.add_to_inventory(
+      {alarm_type_id='incoming-ipv4-fragments'},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description='Incoming IPv4 fragments over N fragments/s'})
+   local incoming_fragments_alarm = alarms.declare_alarm(
+      {resource=tostring(S.getpid()),alarm_type_id='incoming-ipv4-fragments'},
+      {perceived_severity='warning',
+       alarm_text='More than 10,000 IPv4 fragments per second'})
    o.incoming_ipv4_fragments_alarm = CounterAlarm.new(incoming_fragments_alarm,
       1, 1e4, o, "in-ipv4-frag-needs-reassembly")
 

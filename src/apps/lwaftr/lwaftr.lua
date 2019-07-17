@@ -217,12 +217,12 @@ local function prepend_ethernet_header(pkt, ether_type)
    return pkt
 end
 
-local function write_ipv6_header(ptr, src, dst, tc, next_header, payload_length)
+local function write_ipv6_header(ptr, src, dst, tc, flow_label, next_header, payload_length)
    local h = ffi.cast(ipv6_header_ptr_t, ptr)
    h.v_tc_fl = 0
    lib.bitfield(32, h, 'v_tc_fl', 0, 4, 6)   -- IPv6 Version
    lib.bitfield(32, h, 'v_tc_fl', 4, 8, tc)  -- Traffic class
-   lib.bitfield(32, h, 'v_tc_fl', 12, 20, 0) -- Flow label
+   lib.bitfield(32, h, 'v_tc_fl', 12, 20, flow_label) -- Flow label
    h.payload_length = htons(payload_length)
    h.next_header = next_header
    h.hop_limit = constants.default_ttl
@@ -414,7 +414,7 @@ LwAftr.shm = {
    ["out-ipv4-bytes"]                                  = {counter},
    ["out-ipv4-packets"]                                = {counter},
    ["out-ipv6-bytes"]                                  = {counter},
-   ["out-ipv6-packets"]                                = {counter}
+   ["out-ipv6-packets"]                                = {counter},
 }
 
 function LwAftr:new(conf)
@@ -432,38 +432,28 @@ function LwAftr:new(conf)
    o.icmpv6_error_count = 0
    o.icmpv6_error_rate_limit_start = 0
 
-   alarms.add_to_inventory {
-     [{alarm_type_id='bad-ipv4-softwires-matches'}] = {
-       resource=tostring(S.getpid()),
-       has_clear=true,
+   alarms.add_to_inventory(
+      {alarm_type_id='bad-ipv4-softwires-matches'},
+      {resource=tostring(S.getpid()), has_clear=true,
        description="lwAFTR's bad matching softwires due to not found destination "..
-         "address for IPv4 packets",
-     }
-   }
-   alarms.add_to_inventory {
-     [{alarm_type_id='bad-ipv6-softwires-matches'}] = {
-       resource=tostring(S.getpid()),
-       has_clear=true,
+          "address for IPv4 packets"})
+   alarms.add_to_inventory(
+      {alarm_type_id='bad-ipv6-softwires-matches'},
+      {resource=tostring(S.getpid()), has_clear=true,
        description="lwAFTR's bad matching softwires due to not found source"..
-         "address for IPv6 packets",
-     }
-   }
-   local bad_ipv4_softwire_matches = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()), alarm_type_id='bad-ipv4-softwires-matches'}] = {
-         perceived_severity = 'major',
-         alarm_text = "lwAFTR's bad softwires matches due to non matching destination"..
-            "address for incoming packets (IPv4) has reached over 100,000 softwires "..
-            "binding-table.  Please review your lwAFTR's configuration binding-table."
-      },
-   }
-   local bad_ipv6_softwire_matches = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()), alarm_type_id='bad-ipv6-softwires-matches'}] = {
-         perceived_severity = 'major',
-         alarm_text = "lwAFTR's bad softwires matches due to non matching source "..
-            "address for outgoing packets (IPv6) has reached over 100,000 softwires "..
-            "binding-table.  Please review your lwAFTR's configuration binding-table."
-      },
-   }
+          "address for IPv6 packets"})
+   local bad_ipv4_softwire_matches = alarms.declare_alarm(
+      {resource=tostring(S.getpid()), alarm_type_id='bad-ipv4-softwires-matches'},
+      {perceived_severity = 'major',
+       alarm_text = "lwAFTR's bad softwires matches due to non matching destination"..
+         "address for incoming packets (IPv4) has reached over 100,000 softwires "..
+         "binding-table.  Please review your lwAFTR's configuration binding-table."})
+   local bad_ipv6_softwire_matches = alarms.declare_alarm(
+      {resource=tostring(S.getpid()), alarm_type_id='bad-ipv6-softwires-matches'},
+      {perceived_severity = 'major',
+       alarm_text = "lwAFTR's bad softwires matches due to non matching source "..
+         "address for outgoing packets (IPv6) has reached over 100,000 softwires "..
+         "binding-table.  Please review your lwAFTR's configuration binding-table."})
    o.bad_ipv4_softwire_matches_alarm = CounterAlarm.new(bad_ipv4_softwire_matches,
       5, 1e5, o, 'drop-no-dest-softwire-ipv4-packets')
    o.bad_ipv6_softwire_matches_alarm = CounterAlarm.new(bad_ipv6_softwire_matches,
@@ -750,6 +740,7 @@ function LwAftr:encapsulate_and_transmit(pkt, ipv6_dst, ipv6_src, pkt_src_link)
    local payload_length = get_ethernet_payload_length(pkt)
    local l3_header = get_ethernet_payload(pkt)
    local traffic_class = get_ipv4_dscp_and_ecn(l3_header)
+   local flow_label = self.conf.internal_interface.flow_label
    -- Note that this may invalidate any pointer into pkt.data.  Be warned!
    pkt = packet.shiftright(pkt, ipv6_header_size)
    write_ethernet_header(pkt, n_ethertype_ipv6)
@@ -757,7 +748,7 @@ function LwAftr:encapsulate_and_transmit(pkt, ipv6_dst, ipv6_src, pkt_src_link)
    l3_header = get_ethernet_payload(pkt)
 
    write_ipv6_header(l3_header, ipv6_src, ipv6_dst, traffic_class,
-                     proto_ipv4, payload_length)
+                     flow_label, proto_ipv4, payload_length)
 
    if debug then
       print("encapsulated packet:")

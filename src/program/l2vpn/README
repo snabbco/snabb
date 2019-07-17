@@ -16,15 +16,4 @@ according to the configuration supplied in the CONFIG file.
   -l FILE,   --logfile FILE  Set FILE as the default destination for all
                              output of the Snabb logging facility
   -d,        --debug         Enable additional debugging checks.
-  -j CMD,    --jit CMD       Control LuaJIT behavior. Available commands:
-                               -jv=FILE, --jit v=FILE
-                                 Write verbose JIT trace output to FILE.
-                               -jdump=OPTS[,FILE] --jit dump=OPTS[,FILE]
-                                 Output JIT traces, optionally to a file.
-                               -jp=OPTS[,FILE] --jit p=OPTS[,FILE]
-                                 Profile execution with low-overhead sampling.
-                               -jopt=OPT
-                                 Sets JIT option OPT.
-                             See luajit documentation for more information:
-                               http://luajit.org/running.html
   -h,        --help          Print this usage message.

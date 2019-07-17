@@ -25,16 +25,16 @@ local enabled = nil
 -- available on the running CPU.
 local function scan_available_counters ()
    if defs then return defs end
+   defs = {}
    for i, set in ipairs(pmu_cpu) do
       local cpu, version, kind, list = unpack(set)
       -- XXX Only supporting "core" counters at present i.e. the
       -- counters built into the CPU core.
       if cpu == pmu_x86.cpu_model and kind == 'core' then
-         defs = defs or {}
+         defs = defs
          for k, v in pairs(list) do defs[k] = v end
       end
    end
-   defs = defs or false
 end
 
 -- Return an array containing the CPUs that we have affinity with.
@@ -53,17 +53,13 @@ function is_available ()
    if #cpu_set() ~= 1 then
       return false, "single core cpu affinity required" 
    end
-   if not S.stat("/dev/cpu/0/msr") then
-      print("[pmu: /sbin/modprobe msr]")
-      os.execute("/sbin/modprobe msr")
-      if not S.stat("/dev/cpu/0/msr") then
-         return false, "requires /dev/cpu/*/msr (Linux 'msr' module)"
-      end
+   if not pmu_x86.enable_msr() then
+      return false, "requires /dev/cpu/*/msr (Linux 'msr' module)"
+   end
+   if not (pmu_x86.ncounters > 0) then
+      return false, "CPU not supported: " .. pmu_x86.cpu_model
    end
    scan_available_counters()
-   if not defs then
-      return false, "CPU not recognized: " .. pmu_x86.cpu_model
-   end
    return true
 end
 
@@ -113,38 +109,25 @@ function setup (patterns)
             table.insert(set, event) 
          end
       end
-      table.sort(set)
    end
+   -- Allow selecting events by raw code
+   for _, pattern in pairs(patterns or {}) do
+      if pattern:match("^0x") then
+         table.insert(set, pattern) 
+      end
+   end
+   table.sort(set)
    local ndropped = math.max(0, #set - pmu_x86.ngeneral)
    while (#set - pmu_x86.ngeneral) > 0 do table.remove(set) end
    local cpu = cpu_set()[1]
-   -- All available counters are globally enabled
-   -- (IA32_PERF_GLOBAL_CTRL).
-   writemsr(cpu, 0x38f,
-            bit.bor(bit.lshift(0x3ULL, 32),
-                    bit.lshift(1ULL, pmu_x86.ngeneral) - 1))
-   -- Enable all fixed-function counters (IA32_FIXED_CTR_CTRL)
-   writemsr(cpu, 0x38d, 0x333)
+   local used
+   enabled, used = pmu_x86.init_events(cpu, #set)
    for n = 0, #set-1 do
-      local code = defs[set[n+1]]
-      local USR = bit.lshift(1, 16)
-      local EN = bit.lshift(1, 22)
-      writemsr(cpu, 0x186+n, bit.bor(0x10000, USR, EN, code))
+      local code = defs[set[n+1]] or tonumber(set[n+1])
+      pmu_x86.enable_event(cpu, n+used, code)
    end
-   enabled = {"instructions", "cycles", "ref_cycles"}
    for i = 1, #set do table.insert(enabled, set[i]) end
    return ndropped
-end
-
-function writemsr (cpu, msr, value)
-   local msrfile = ("/dev/cpu/%d/msr"):format(cpu)
-   if not S.stat(msrfile) then
-      error("Cannot open "..msrfile.." (consider 'modprobe msr')")
-   end
-   local fd = assert(S.open(msrfile, "rdwr"))
-   assert(fd:lseek(msr, "set"))
-   assert(fd:write(ffi.new("uint64_t[1]", value), 8))
-   fd:close()
 end
 
 -- API function (see above)
@@ -153,7 +136,7 @@ function report (tab, aux)
    local data = {}
    for k,v in pairs(tab) do  table.insert(data, {k=k,v=v})  end
    -- Sort fixed-purpose counters to come first in definite order
-   local fixed = {cycles='0', ref_cycles='1', instructions='2'}
+   local fixed = {cycles='0000', ref_cycles='0001', instructions='0002'}
    table.sort(data, function(x,y)
                        return (fixed[x.k] or x.k) < (fixed[y.k] or y.k)
                     end)
@@ -239,7 +222,7 @@ function selftest ()
       print('', k, v)
       n = n + 1
    end
-   assert(n == 3)
+   assert(n >= 2)
    print("selftest ok")
 end
 

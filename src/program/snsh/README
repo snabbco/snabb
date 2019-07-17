@@ -10,15 +10,6 @@ Execute SCRIPT if specified and then exit.
   -p PROG,   --program PROG  Run the program PROG instead of snsh.
   -t MODULE, --test MODULE   Test (selftest) the Lua module MODULE.
   -d,        --debug         Enable additional debugging checks.
-  -j CMD,    --jit CMD       Control LuaJIT behavior. Available commands:
-                               -jv=FILE, --jit v=FILE
-                                 Write verbose JIT trace output to FILE.
-                               -jdump=OPTS[,FILE] --jit dump=OPTS[,FILE]
-                                 Output JIT traces, optionally to a file.
-                               -jp=OPTS[,FILE] --jit p=OPTS[,FILE]
-                                 Profile execution with low-overhead sampling.
-                             See luajit documentation for more information:
-                               http://luajit.org/running.html
   -P PATH,   --package-path PATH
                              Use PATH as the Lua 'package.path'.
   -q=repl,   --sigquit=repl  Enter the REPL on SIGQUIT (Control-\).

@@ -1,81 +1,59 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
-local S = require("syscall")
-local ffi = require("ffi")
+-- A slightly-less-limited json library that should handle all JSON syntax.
+-- Tables are encoded to a JSON array if all their keys are valid integers.
+-- Number syntax checking is weak, and relies on Lua's tonumber() implementation
+-- NOTE: Integer-indexed sparse tables are encoded as lists as well! Be careful.
 
--- A very limited json library that only does objects of strings,
--- designed to integrate well with poll(2) loops.
-
-function buffered_input(fd)
-   local buf_size = 4096
-   local buf = ffi.new('uint8_t[?]', buf_size)
-   local buf_end = 0
-   local pos = 0
-   local ret = {}
-   local eof = false
-   local function fill()
-      assert(pos == buf_end)
-      if eof then return 0 end
-      pos = 0
-      buf_end = assert(fd:read(buf, buf_size))
-      assert(0 <= buf_end and buf_end <= buf_size)
-      if buf_end == 0 then eof = true end
-      return buf_end
-   end
-   function ret:avail() return buf_end - pos end
-   function ret:getfd() return fd:getfd() end
-   function ret:eof() return eof end
-   function ret:peek()
-      if pos == buf_end and fill() == 0 then return nil end
-      return string.char(buf[pos])
-   end
-   function ret:discard()
-      assert(pos < buf_end)
-      pos = pos + 1
-   end
-   return ret
-end
-
-local whitespace_pat = '[ \n\r\t]'
-
-function drop_buffered_whitespace(input)
-   while input:avail() > 0 and input:peek():match(whitespace_pat) do
-      input:discard()
-   end
-end
+-- nil is represented by identity as an empty table 
+local NIL = {}
+local constants = {
+   ["true"]  = true, 
+   ["false"] = false, 
+   ["null"]  = NIL 
+}
 
 local function take_while(input, pat)
    local out = {}
-   while input:peek() and input:peek():match(pat) do
-      table.insert(out, input:peek())
-      input:discard()
+   while input:peek_char() and input:peek_char():match(pat) do
+      table.insert(out, input:read_char())
    end
    return table.concat(out)
 end
 
+local function drop_while(input, pat)
+   take_while(input, pat)
+end
+
+local function skip_whitespace(input)
+   local whitespace_pat = '[ \n\r\t]'
+   drop_while(input, whitespace_pat)
+end
+
+local function peek(input, ch)
+   return input:peek_char() == ch
+end
+
 local function check(input, ch)
-   if input:peek() ~= ch then return false end
-   input:discard()
+   if not peek(input, ch) then return false end
+   input:read_char()
    return true
 end
 
-local function consume(input, ch)
-   if not check(input, ch) then
-      if input:eof() then error('unexpected EOF') end
-      error('expected '..ch..', got '..input:peek())
-   end
+local function consume(input, expected)
+   local ch = input:read_char()
+   if ch == expected then return end
+   if ch == nil then error('unexpected EOF') end
+   error('expected '..expected..', got '..ch)
 end
 
 local function consume_pat(input, pat)
-   local ch = input:peek()
+   local ch = input:read_char()
+   if ch:match(pat) then return ch end
    if ch == nil then error('unexpected EOF') end
-   if not ch:match(pat) then error('unexpected character '..ch) end
-   input:discard()
-   return ch
+   error('unexpected character '..ch)
 end
-
-function skip_whitespace(input) take_while(input, whitespace_pat) end
 
 -- Pattern describing characters that can appear literally in a JSON
 -- string.
@@ -123,20 +101,48 @@ local function read_json_string(input)
    return table.concat(parts)
 end
 
-function read_json_object(input)
+local function read_json_array(input)
+   consume(input, "[")
+   skip_whitespace(input)
+   local ret = {}
+   if not check(input, "]") then
+      repeat
+         skip_whitespace(input)
+         local v = read_json(input)
+         skip_whitespace(input)
+         table.insert(ret, v)
+      until not check(input, ",")
+      skip_whitespace(input)
+      consume(input, "]")
+   end
+   return ret
+end
+
+local function read_json_scalar(input)
+   skip_whitespace(input)
+   local v = take_while(input, '[0-9%-%+%.trueEfalsn]')
+   skip_whitespace(input)
+   if constants[v] ~= nil then
+      return constants[v]
+   end
+   local num = tonumber(v)
+   if num then return num end
+   error('unparseable json number or boolean: '..v)
+end
+
+local function read_json_object(input)
    consume(input, "{")
    skip_whitespace(input)
    local ret = {}
    if not check(input, "}") then
       repeat
          skip_whitespace(input)
-         local k = read_json_string(input)
+         local k = read_json_string(input) -- JSON keys must be strings
          if ret[k] then error('duplicate key: '..k) end
          skip_whitespace(input)
          consume(input, ":")
          skip_whitespace(input)
-         local v = read_json_string(input)
-         ret[k] = v
+         ret[k] = read_json(input)
          skip_whitespace(input)
       until not check(input, ",")
       skip_whitespace(input)
@@ -145,29 +151,38 @@ function read_json_object(input)
    return ret
 end
 
-function buffered_output()
-   local ret = { buf = {} }
-   function ret:write(str) table.insert(self.buf, str) end
-   function ret:flush(fd)
-      local str = table.concat(self.buf)
-      if fd == nil then return str end
-      local bytes = ffi.cast('const char*', str)
-      local written = 0
-      while written < #str do
-         local wrote = assert(fd:write(bytes + written, #str - written))
-         written = written + wrote
-      end
+function read_json(input)
+   skip_whitespace(input)
+   -- Return nil on EOF once whitespace has been ignored
+   if input:peek_byte() == nil then return nil end
+   if peek(input, "{") then
+      return read_json_object(input) 
+   elseif peek(input, "[") then
+      return read_json_array(input)
+   elseif peek(input, '"') then
+      return read_json_string(input)
+   else
+      return read_json_scalar(input)
    end
-   return ret
+   error('unparseable json, starting: '..tostring(input:peek_byte()))
+end
+
+
+local function write_json_null(output)
+   return output:write_chars('null')
+end
+
+local function write_json_scalar(output, var)
+   return output:write_chars(tostring(var))
 end
 
 local function write_json_string(output, str)
-   output:write('"')
+   output:write_chars('"')
    local pos = 1
    while pos <= #str do
       local head = str:match('^('..literal_string_chars_pat..'+)', pos)
       if head then
-         output:write(head)
+         output:write_chars(head)
          pos = pos + #head
       else
          head = str:sub(pos, pos)
@@ -178,60 +193,106 @@ local function write_json_string(output, str)
          if not escaped then
             escaped = string.format("u00%.2x", head:byte(1))
          end
-         output:write('\\'..escaped)
+         output:write_chars('\\'..escaped)
          pos = pos + 1
       end
    end
-   output:write('"')
+   output:write_chars('"')
 end
 
-function write_json_object(output, obj)
-   output:write('{')
+local function write_json_object(output, obj)
+   output:write_chars('{')
    local comma = false
    for k,v in pairs(obj) do
-      if comma then output:write(',') else comma = true end
-      write_json_string(output, k)
-      output:write(':')
-      write_json_string(output, v)
+      if comma then output:write_chars(',') else comma = true end
+      write_json_string(output, k) -- JSON keys must be strings
+      output:write_chars(':')
+      write_json(output, v)
    end
-   output:write('}')
+   output:write_chars('}')
 end
+
+local function write_json_array(output, obj)
+   output:write_chars('[')
+   for i,v in ipairs(obj) do
+      if i > 1 then output:write_chars(',') end
+      write_json(output, v)
+   end
+   output:write_chars(']')
+end
+
+function write_json(output, var)
+   local tp = type(var)
+   -- nil is represented and compared by identity as 
+   -- an empty table. This must be checked before 
+   -- other table instances.
+   if var == NIL then
+      return write_json_null(output)
+   elseif tp == 'table' then
+      for k, v in pairs(var) do
+         if not (type(k) == 'number' and math.floor(k) == k and 1 <= k) then
+            return write_json_object(output, var)
+         end
+      end
+      return write_json_array(output, var)
+   elseif tp == 'string' then
+      return write_json_string(output, var)
+   elseif tp == 'boolean' or tp == 'number' then
+      return write_json_scalar(output, var)
+   end
+   return error('unable to serialize value of unknown type: '..tp)
+end
+
 
 function selftest ()
    print('selftest: lib.ptree.json')
    local equal = require('core.lib').equal
+   local tmpfile = require('lib.stream.mem').tmpfile
    local function test_json(str, obj)
-      local tmp = os.tmpname()
-      local f = io.open(tmp, 'w')
-      f:write(str)
-      f:write(" ") -- whitespace sentinel on the end.
-      f:close()
+      local tmp = tmpfile()
+      tmp:write(str)
+      tmp:write(" ") -- whitespace sentinel on the end.
       for i = 1,2 do
-         local fd = S.open(tmp, 'rdonly')
-         local input = buffered_input(fd)
-         local parsed = read_json_object(input)
+         tmp:seek('set', 0)
+         local parsed = read_json(tmp)
          assert(equal(parsed, obj))
-         assert(not input:eof())
-         assert(check(input, " "))
-         assert(not input:peek())
-         assert(input:eof())
-         fd:close()
+         assert(read_json(tmp) == nil)
+         assert(tmp:read_char() == nil)
 
-         local fd = assert(S.open(tmp, 'wronly, trunc'))
-         local output = buffered_output()
-         write_json_object(output, parsed)
-         output:write(' ') -- sentinel
-         output:flush(fd)
-         fd:close()
+         tmp = tmpfile()
+         write_json(tmp, parsed)
+         tmp:write(' ') -- sentinel
       end
-      os.remove(tmp)
    end
+
+   -- Basic objects, lists, constants and numbers
    test_json('{}', {})
+   test_json('[]', {})
+   test_json('"foobar"', 'foobar')
+   test_json('true', true)
+   test_json('false', false)
+   test_json('null', NIL)
+   test_json('9.45', 9.45)
+
+   -- Objects and lists with members
    test_json('{"foo":"bar"}', {foo='bar'})
    test_json('{"foo":"bar","baz":"qux"}', {foo='bar', baz='qux'})
+   test_json('["foo","bar","baz","qux"]', {'foo','bar','baz','qux'})
+
+   -- Leading, trailing spaces and unicode
    test_json('{ "foo" : "bar" , "baz" : "qux" }',
              {foo='bar', baz='qux'})
    test_json('{ "fo\\u000ao" : "ba\\r " , "baz" : "qux" }',
              {['fo\no']='ba\r ', baz='qux'})
+   
+   -- Nested lists and objects
+   test_json('{"foo":"bar","baz":["foo","bar","baz"]}', {foo='bar', baz={"foo","bar","baz"}})
+   test_json('{"foo":"bar","baz":{"foo":1,"bar":2,"baz":[3,4,5]}}', {foo='bar', baz={foo=1, bar=2, baz={3,4,5}}})
+   test_json('{"foo":"bar","baz":["foo","bar",{"one": "waldo","two": "fred", "three": ["grault","wtf"]}]}', 
+      {foo='bar', baz={"foo","bar",{one="waldo", two="fred", three={"grault","wtf"}}}})
+
+   -- Numbers and constants
+   test_json('{"foo":1, "bar": 3, "baz": true, "fix": false, "neh": null}', {foo=1, bar=3, baz=true, fix=false, neh=NIL})
+   test_json('{"foo": -1, "bar": +1, "baz": -1E5, "fix": -0.9545e-1}', {foo=-1, bar=1, baz=-1e5, fix=-0.9545e-1})
    print('selftest: ok')
 end

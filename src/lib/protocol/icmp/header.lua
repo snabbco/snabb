@@ -16,7 +16,8 @@ local icmp = subClass(header)
 -- Class variables
 icmp._name = "icmp"
 icmp._ulp = {
-   class_map = { [135] = "lib.protocol.icmp.nd.ns",
+   class_map = { [2]   = "lib.protocol.icmp.ptb",
+                 [135] = "lib.protocol.icmp.nd.ns",
                  [136] = "lib.protocol.icmp.nd.na" },
    method    = "type" }
 icmp:init(

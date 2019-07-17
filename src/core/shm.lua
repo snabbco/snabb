@@ -63,8 +63,7 @@ end
 
 function alias (name, target)
    mkdir(lib.dirname(resolve(name)))
-   assert(S.symlink(root.."/"..resolve(target), root.."/"..resolve(name)),
-          "shm alias failed")
+   assert(S.symlink(root.."/"..resolve(target), root.."/"..resolve(name)))
 end
 
 function resolve (name)
@@ -72,6 +71,10 @@ function resolve (name)
    local result = p
    if q ~= '/' then result = tostring(S.getpid()).."/"..result end
    return result
+end
+
+function path (name)
+   return root..'/'..resolve(name)
 end
 
 -- Make the named subdirectory in the shm folder.
@@ -158,7 +161,7 @@ function open_frame (path)
       local module = types[type]
       if module then
          assert(frame[name] == nil, "shm: duplicate name: "..name)
-         frame[name] = module.open(frame.path..file)
+         frame[name] = module.open(frame.path..file, 'readonly')
          frame.specs[name] = {module}
       end
    end

@@ -317,6 +317,43 @@ byPciID = {
 -- order to interchangeably use NIC drivers.
 driver = Intel
 
+local function shared_counter(srcdir, targetdir)
+   local mod = { type = "counter" }
+   local function dirsplit(name)
+      return name:match("^(.*)/([^/]+)$")
+   end
+   local function source(name)
+      if name:match('/') then
+         local head, tail = dirsplit(name)
+         return head..'/'..srcdir..'/'..tail
+      else
+         return srcdir..'/'..name
+      end
+   end
+   local function target(name)
+      if name:match('/') then
+         local head, tail = dirsplit(name)
+         return targetdir..'/'..tail
+      else
+         return targetdir..'/'..name
+      end
+   end
+   function mod.create(name)
+      shm.alias(source(name), target(name))
+      local status, c
+      local function read_shared_counter ()
+         if not c then status, c = pcall(counter.open, target(name)) end
+         if not status then return 0ULL end
+         return counter.read(c)
+      end
+      return read_shared_counter
+   end
+   function mod.delete(name)
+      S.unlink(shm.resolve(source(name)))
+   end
+   return mod
+end
+
 function Intel:new (conf)
    local self = {
       r = {},
@@ -377,75 +414,102 @@ function Intel:new (conf)
    self:set_txstats()
    self:set_tx_rate()
 
-   -- Initialize per app statistics
-   self.shm = {
-      mtu    = {counter, self.mtu},
-      txdrop = {counter}
-   }
-
    -- Figure out if we are supposed to collect device statistics
    self.run_stats = conf.run_stats or (self.master and conf.master_stats)
-
-   -- Expose per-device statistics from master
    if self.run_stats then
       local frame = {
-         dtime     = {counter, C.get_unix_time()},
          -- Keep a copy of the mtu here to have all
          -- data available in a single shm frame
          mtu       = {counter, self.mtu},
+         type      = {counter, 0x1000}, -- ethernetCsmacd
+         macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
          speed     = {counter},
          status    = {counter, 2}, -- Link down
-         type      = {counter, 0x1000}, -- ethernetCsmacd
          promisc   = {counter},
-         macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
          rxbytes   = {counter},
          rxpackets = {counter},
          rxmcast   = {counter},
          rxbcast   = {counter},
          rxdrop    = {counter},
          rxerrors  = {counter},
+         rxdmapackets = {counter},
          txbytes   = {counter},
          txpackets = {counter},
          txmcast   = {counter},
          txbcast   = {counter},
          txdrop    = {counter},
          txerrors  = {counter},
-         rxdmapackets = {counter}
       }
       self:init_queue_stats(frame)
-      self.stats = shm.create_frame("pci/"..self.pciaddress, frame)
+      self.stats = shm.create_frame(self.shm_root.."stats", frame)
       self.sync_timer = lib.throttle(0.01)
    end
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='ingress-bandwith'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Ingress bandwith exceeds N Gbps',
-      }
+   -- Expose per-device statistics from master
+   local shared_counter = shared_counter(
+      'pci/'..self.pciaddress, self.shm_root..'stats')
+   self.shm = {
+      dtime     = {counter, C.get_unix_time()},
+      -- Keep a copy of the mtu here to have all
+      -- data available in a single shm frame
+      mtu       = {counter, self.mtu},
+      type      = {counter, 0x1000}, -- ethernetCsmacd
+      macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
+      speed     = {shared_counter},
+      status    = {shared_counter},
+      promisc   = {shared_counter}
    }
-   local ingress_bandwith = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='ingress-bandwith'}] = {
-         perceived_severity='major',
-         alarm_text='Ingress bandwith exceeds 1e9 bytes/s which can cause packet drops.'
-      }
-   }
+   if self.rxq then
+      self.shm.rxcounter = {counter, self.rxcounter}
+      self.shm.rxbytes   = {shared_counter}
+      self.shm.rxpackets = {shared_counter}
+      self.shm.rxmcast   = {shared_counter}
+      self.shm.rxbcast   = {shared_counter}
+      self.shm.rxdrop    = {shared_counter}
+      self.shm.rxerrors  = {shared_counter}
+      self.shm.rxdmapackets = {shared_counter}
+      if self.rxcounter then
+         for _,k in pairs { 'drops', 'packets', 'bytes' } do
+            local name = "q" .. self.rxcounter .. "_rx" .. k
+            self.shm[name] = {shared_counter}
+         end
+      end
+   end
+   if self.txq then
+      self.shm.txcounter = {counter, self.txcounter}
+      self.shm.txbytes   = {shared_counter}
+      self.shm.txpackets = {shared_counter}
+      self.shm.txmcast   = {shared_counter}
+      self.shm.txbcast   = {shared_counter}
+      self.shm.txdrop    = {shared_counter}
+      self.shm.txerrors  = {shared_counter}
+      if self.txcounter then
+         for _,k in pairs { 'packets', 'bytes' } do
+            local name = "q" .. self.txcounter .. "_tx" .. k
+            self.shm[name] = {shared_counter}
+         end
+      end
+   end
+
+   alarms.add_to_inventory(
+      {alarm_type_id='ingress-bandwith'},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description='Ingress bandwith exceeds N Gbps'})
+   local ingress_bandwith = alarms.declare_alarm(
+      {resource=tostring(S.getpid()),alarm_type_id='ingress-bandwith'},
+      {perceived_severity='major',
+       alarm_text='Ingress bandwith exceeds 1e9 bytes/s which can cause packet drops.'})
    self.ingress_bandwith_alarm = CallbackAlarm.new(ingress_bandwith,
       1, 1e9, function() return self:rxbytes() end)
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='ingress-packet-rate'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Ingress packet-rate exceeds N Gbps',
-      }
-   }
-   local ingress_packet_rate = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='ingress-packet-rate'}] = {
-         perceived_severity='major',
-         alarm_text='Ingress packet-rate exceeds 2MPPS which can cause packet drops.'
-      }
-   }
+   alarms.add_to_inventory(
+      {alarm_type_id='ingress-packet-rate'},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description='Ingress packet-rate exceeds N Gbps'})
+   local ingress_packet_rate = alarms.declare_alarm(
+      {resource=tostring(S.getpid()),alarm_type_id='ingress-packet-rate'},
+      {perceived_severity='major',
+       alarm_text='Ingress packet-rate exceeds 2MPPS which can cause packet drops.'})
    self.ingress_packet_rate_alarm = CallbackAlarm.new(ingress_packet_rate,
       1, 2e6, function() return self:rxpackets() end)
 
@@ -545,6 +609,8 @@ function Intel:init_rx_q ()
    end
    self:unlock_sw_sem()
 end
+
+txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
 function Intel:init_tx_q ()                               -- 4.5.10
    if not self.txq then return end
    assert((self.txq >=0) and (self.txq < self.max_q),
@@ -554,7 +620,6 @@ function Intel:init_tx_q ()                               -- 4.5.10
    self.txqueue = ffi.new("struct packet *[?]", self.ndesc)
 
    -- 7.2.2.3
-   local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
    local txdesc_ring_t = ffi.typeof("$[$]", txdesc_t, self.ndesc)
    self.txdesc = ffi.cast(ffi.typeof("$&", txdesc_ring_t),
    memory.dma_alloc(ffi.sizeof(txdesc_ring_t)))
@@ -662,9 +727,9 @@ function Intel:push ()
    -- same code as in pull, but we only call it in case the rxq
    -- is disabled for this app
    if self.rxq and self.output.output then return end
-   if self.run_stats and self.sync_timer() then
-      self:sync_stats()
-   end
+
+   -- Sync device statistics.
+   if self.run_stats and self.sync_timer() then self:sync_stats() end
 end
 
 function Intel:pull ()
@@ -689,10 +754,8 @@ function Intel:pull ()
    -- This avoids RDT == RDH when every descriptor is available.
    self.r.RDT(band(self.rdt - 1, self.ndesc-1))
 
-   -- Sync device statistics if we are master.
-   if self.run_stats and self.sync_timer() then
-      self:sync_stats()
-   end
+   -- Sync device statistics.
+   if self.run_stats and self.sync_timer() then self:sync_stats() end
 end
 
 function Intel:unlock_sw_sem()
@@ -1202,24 +1265,22 @@ end
 
 function Intel1g:get_rxstats ()
    assert(self.rxq, "cannot retrieve rxstats without rxq")
-   local frame = shm.open_frame("pci/"..self.pciaddress)
-   local rxc   = self.rxq
+   local rxc = self.rxq
    return {
       counter_id = rxc,
-      packets = counter.read(frame["q"..rxc.."_rxpackets"]),
-      dropped = counter.read(frame["q"..rxc.."_rxdrops"]),
-      bytes = counter.read(frame["q"..rxc.."_rxbytes"])
+      packets = self.shm["q"..rxc.."_rxpackets"](),
+      dropped = self.shm["q"..rxc.."_rxdrops"](),
+      bytes = self.shm["q"..rxc.."_rxbytes"]()
    }
 end
 
 function Intel1g:get_txstats ()
    assert(self.txq, "cannot retrieve rxstats without txq")
-   local frame = shm.open_frame("pci/"..self.pciaddress)
-   local txc   = self.txq
+   local txc = self.txq
    return {
       counter_id = txc,
-      packets = counter.read(frame["q"..txc.."_txpackets"]),
-      bytes = counter.read(frame["q"..txc.."_txbytes"])
+      packets = self.shm["q"..txc.."_txpackets"](),
+      bytes = self.shm["q"..txc.."_txbytes"]()
    }
 end
 
@@ -1291,13 +1352,14 @@ function Intel82599:init_queue_stats (frame)
    local perqregs = {
       rxdrops = "QPRDC",
       rxpackets = "QPRC",
-      txpackets = "QPTC",
       rxbytes = "QBRC64",
       txbytes = "QBTC64",
+      txpackets = "QPTC",
    }
    self.queue_stats = {}
    for i=0,15 do
       for k,v in pairs(perqregs) do
+         local v = perqregs[k]
          local name = "q" .. i .. "_" .. k
          table.insert(self.queue_stats, name)
          table.insert(self.queue_stats, self.r[v][i])
@@ -1650,24 +1712,22 @@ end
 -- is in control of the counter registers (and clears them on read)
 function Intel82599:get_rxstats ()
    assert(self.rxcounter and self.rxq, "cannot retrieve rxstats")
-   local frame = shm.open_frame("pci/"..self.pciaddress)
-   local rxc   = self.rxcounter
+   local rxc = self.rxcounter
    return {
       counter_id = rxc,
-      packets = counter.read(frame["q"..rxc.."_rxpackets"]),
-      dropped = counter.read(frame["q"..rxc.."_rxdrops"]),
-      bytes = counter.read(frame["q"..rxc.."_rxbytes"])
+      packets = self.shm["q"..rxc.."_rxpackets"](),
+      dropped = self.shm["q"..rxc.."_rxdrops"](),
+      bytes = self.shm["q"..rxc.."_rxbytes"]()
    }
 end
 
 function Intel82599:get_txstats ()
    assert(self.txcounter and self.txq, "cannot retrieve txstats")
-   local frame = shm.open_frame("pci/"..self.pciaddress)
-   local txc   = self.txcounter
+   local txc = self.txcounter
    return {
       counter_id = txc,
-      packets = counter.read(frame["q"..txc.."_txpackets"]),
-      bytes = counter.read(frame["q"..txc.."_txbytes"])
+      packets = self.shm["q"..txc.."_txpackets"](),
+      bytes = self.shm["q"..txc.."_txbytes"]()
    }
 end
 
