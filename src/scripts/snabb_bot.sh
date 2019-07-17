@@ -172,15 +172,14 @@ BEGIN {
 
 function check_test_suite {
     echo "Checking test suite:"
-    if ! dock_make test_ci; then
+    dock_make test | tee make-test.log
+    echo
+    echo "Errors during tests:"
+    for log in $(grep ERROR make-test.log | awk '{print $2}'); do
+        echo $log:
+        cat src/$log
         echo
-        echo "ERROR during tests:"
-        for log in src/testlog/*; do
-            echo $log:
-            cat $log
-            echo
-        done
-    fi
+    done
     echo
 }
 
