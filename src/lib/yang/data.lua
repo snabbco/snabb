@@ -1214,8 +1214,8 @@ function influxdb_printer_from_grammar(production, print_default, root)
                print_value(entry.value, file, path, key)
             end
          end
-      elseif production.string_key then
-         local id = normalize_id(production.string_key)
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
          return function(data, file, path)
             path = path or ''
             for key, value in pairs(data) do
