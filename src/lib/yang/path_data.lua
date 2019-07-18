@@ -562,6 +562,7 @@ function uniqueness_checker_from_grammar(grammar)
       elseif grammar.type == 'table' then
          -- visit values
          for name, value in pairs(grammar.values) do
+            local pairs = grammar.key_ctype and cltable.pairs or pairs
             for k, datum in pairs(data) do
                visit_unique_and_check(value, datum[name])
             end
@@ -616,6 +617,7 @@ function minmax_elements_checker_from_grammar(grammar)
       elseif grammar.type == 'table' then
          -- visit values
          for name, value in pairs(grammar.values) do
+            local pairs = grammar.key_ctype and cltable.pairs or pairs
             for k, datum in pairs(data) do
                visit_minmax_and_check(value, datum[name], name)
             end
