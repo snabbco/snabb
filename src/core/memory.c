@@ -73,7 +73,7 @@ static void memory_sigsegv_handler(int sig, siginfo_t *si, void *uc)
   }
   // Map the memory at the expected address
   if (mmap((void *)(page | TAG), st.st_size, PROT_READ|PROT_WRITE,
-           MAP_SHARED|MAP_FIXED|MAP_HUGETLB, fd, 0) == MAP_FAILED) {
+           MAP_SHARED|MAP_FIXED, fd, 0) == MAP_FAILED) {
     goto punt;
   }
   close(fd);
