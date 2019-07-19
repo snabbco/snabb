@@ -314,7 +314,19 @@ local function adder_for_grammar(grammar, path)
    elseif grammar.type == 'table' then
       -- Invariant: either all entries in the new subconfig are added,
       -- or none are.
-      if grammar.key_ctype and grammar.value_ctype then
+      if grammar.string_key
+      or (grammar.key_ctype and not grammar.value_ctype) then
+         -- cltable or string-keyed table.
+         local pairs = grammar.key_ctype and cltable.pairs or pairs
+         return function(config, subconfig)
+            local tab = getter(config)
+            for k,_ in pairs(subconfig) do
+               if tab[k] ~= nil then error('already-existing entry') end
+            end
+            for k,v in pairs(subconfig) do tab[k] = v end
+            return config
+         end
+      elseif grammar.key_ctype and grammar.value_ctype then
          -- ctable.
          return function(config, subconfig)
             local ctab = getter(config)
@@ -326,17 +338,6 @@ local function adder_for_grammar(grammar, path)
             for entry in subconfig:iterate() do
                ctab:add(entry.key, entry.value)
             end
-            return config
-         end
-      elseif grammar.string_key or grammar.key_ctype then
-         -- cltable or string-keyed table.
-         local pairs = grammar.key_ctype and cltable.pairs or pairs
-         return function(config, subconfig)
-            local tab = getter(config)
-            for k,_ in pairs(subconfig) do
-               if tab[k] ~= nil then error('already-existing entry') end
-            end
-            for k,v in pairs(subconfig) do tab[k] = v end
             return config
          end
       else
@@ -531,6 +532,25 @@ function leafref_checker_from_grammar(grammar)
    end   
 end
 
+local function pairs_from_grammar(grammar)
+   if grammar.string_key then
+      return pairs
+   elseif grammar.key_ctype and grammar.value_ctype then
+      return function (ctable)
+         local ctable_next, ctable_max, ctable_entry = ctable:iterate()
+         return function()
+            ctable_entry = ctable_next(ctable_max, ctable_entry)
+            if not ctable_entry then return end
+            return ctable_entry.key, ctable_entry.value
+         end
+      end
+   elseif grammar.key_ctype then
+      return cltable.pairs
+   else
+      return pairs
+   end
+end
+
 function uniqueness_checker_from_grammar(grammar)
    -- Generate checker for table
    local function unique_assertion(leaves, grammar)
@@ -538,7 +558,7 @@ function uniqueness_checker_from_grammar(grammar)
       for leaf in leaves:split(" +") do
          table.insert(unique_leaves, normalize_id(leaf))
       end
-      local pairs = grammar.key_ctype and cltable.pairs or pairs
+      local pairs = pairs_from_grammar(grammar)
       return function (tab)
          -- Sad quadratic loop, again
          for k1, v1 in pairs(tab) do
@@ -560,11 +580,11 @@ function uniqueness_checker_from_grammar(grammar)
    local function visit_unique_and_check(grammar, data)
       if not data then return
       elseif grammar.type == 'table' then
+         local pairs = pairs_from_grammar(grammar)
          -- visit values
-         for name, value in pairs(grammar.values) do
-            local pairs = grammar.key_ctype and cltable.pairs or pairs
+         for name, value in _G.pairs(grammar.values) do
             for k, datum in pairs(data) do
-               visit_unique_and_check(value, datum[name])
+               visit_unique_and_check(value, datum[normalize_id(name)])
             end
          end
          -- check unique rescrictions
@@ -574,7 +594,7 @@ function uniqueness_checker_from_grammar(grammar)
       elseif grammar.type == 'struct' then
          -- visit members
          for name, member in pairs(grammar.members) do
-            visit_unique_and_check(member, data[name])
+            visit_unique_and_check(member, data[normalize_id(name)])
          end
       end
    end
@@ -587,10 +607,10 @@ function minmax_elements_checker_from_grammar(grammar)
    -- Generate checker for table (list, leaf-list)
    local function minmax_assertion(grammar, name)
       name = name or ""
-      local pairs = grammar.key_ctype and cltable.pairs or pairs
       if not (grammar.min_elements or grammar.max_elements) then
          return function () end
       end
+      local pairs = pairs_from_grammar(grammar)
       return function (tab)
          local n = 0
          for k1, v1 in pairs(tab) do
@@ -616,10 +636,10 @@ function minmax_elements_checker_from_grammar(grammar)
          minmax_assertion(grammar, name)(data)
       elseif grammar.type == 'table' then
          -- visit values
-         for name, value in pairs(grammar.values) do
-            local pairs = grammar.key_ctype and cltable.pairs or pairs
+         local pairs = pairs_from_grammar(grammar)
+         for name, value in _G.pairs(grammar.values) do
             for k, datum in pairs(data) do
-               visit_minmax_and_check(value, datum[name], name)
+               visit_minmax_and_check(value, datum[normalize_id(name)], name)
             end
          end
          -- check min/max elements restrictions
@@ -627,7 +647,7 @@ function minmax_elements_checker_from_grammar(grammar)
       elseif grammar.type == 'struct' then
          -- visit members
          for name, member in pairs(grammar.members) do
-            visit_minmax_and_check(member, data[name], name)
+            visit_minmax_and_check(member, data[normalize_id(name)], name)
          end
       end
    end
