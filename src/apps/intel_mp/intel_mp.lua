@@ -393,13 +393,26 @@ function Intel:new (conf)
    self.max_q = byid.max_q
 
    -- Setup device access
-   self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
+   self.fd = pci.open_pci_resource_unlocked(self.pciaddress, 0)
    self.master = self.fd:flock("ex, nb")
+   if self.master then
+      -- Master unbinds device, enables PCI bus master, and *then* memory maps
+      -- the device, loads registers, initializes it before sharing the lock.
+      pci.unbind_device_from_linux(self.pciaddress)
+      pci.set_bus_master(self.pciaddress, true)
+      pci.disable_bus_master_cleanup(self.pciaddress)
+      self.base = pci.map_pci_memory(self.fd)
+      self:load_registers(byid.registers)
+      self:init()
+      self.fd:flock("sh")
+   else
+      -- Other processes wait for the shared lock before memory mapping the and
+      -- loading registers.
+      self.fd:flock("sh")
+      self.base = pci.map_pci_memory(self.fd)
+      self:load_registers(byid.registers)
+   end
 
-   self:load_registers(byid.registers)
-
-   self:init()
-   self.fd:flock("sh")
    self:check_vmdq()
    -- this needs to happen before register loading for rxq/txq
    -- because it determines the queue numbers
@@ -1181,10 +1194,7 @@ function Intel1g:unlock_fw_sem()
    self.r.SWSM:clr(bits { SWESMBI = 1 })
 end
 function Intel1g:init ()
-   if not self.master then return end
-   pci.unbind_device_from_linux(self.pciaddress)
-   pci.set_bus_master(self.pciaddress, true)
-   pci.disable_bus_master_cleanup(self.pciaddress)
+   assert(self.master, "must be master")
 
    -- 4.5.3  Initialization Sequence
    self:disable_interrupts()
@@ -1372,10 +1382,7 @@ end
 vmdq_enabled_t = ffi.typeof("struct { uint8_t enabled; }")
 
 function Intel82599:init ()
-   if not self.master then return end
-   pci.unbind_device_from_linux(self.pciaddress)
-   pci.set_bus_master(self.pciaddress, true)
-   pci.disable_bus_master_cleanup(self.pciaddress)
+   assert(self.master, "must be master")
 
    -- The 82599 devices sometimes just don't come up, especially when
    -- there is traffic already on the link.  If 2s have passed and the

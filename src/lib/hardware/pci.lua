@@ -144,11 +144,10 @@ end
 --   Pointer for memory-mapped access.
 --   File descriptor for the open sysfs resource file.
 
+function open_pci_resource_locked(device,n) return open_pci_resource(device, n, true) end
+function open_pci_resource_unlocked(device,n) return open_pci_resource(device, n, false) end
 
-function map_pci_memory_locked(device,n) return map_pci_memory (device, n, true) end
-function map_pci_memory_unlocked(device,n) return map_pci_memory (device, n, false) end
-
-function map_pci_memory (device, n, lock)
+function open_pci_resource (device, n, lock)
    assert(lock == true or lock == false, "Explicit lock status required")
    root_check()
    local filepath = path(device).."/resource"..n
@@ -157,9 +156,13 @@ function map_pci_memory (device, n, lock)
    if lock then
      assert(f:flock("ex, nb"), "failed to lock " .. filepath)
    end
+   return f
+end
+
+function map_pci_memory (f)
    local st = assert(f:stat())
    local mem = assert(f:mmap(nil, st.size, "read, write", "shared", 0))
-   return ffi.cast("uint32_t *", mem), f
+   return ffi.cast("uint32_t *", mem)
 end
 
 function close_pci_resource (fd, base)
