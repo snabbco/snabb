@@ -18,6 +18,13 @@ one must:
 
 The correct ordering of these steps is absolutely critical.
 
+Users of `lib.hardware.pci` can rely on steps 6/7 being performed automatically
+in the event unorderly shutdown. However, to ensure that bus mastering for the
+PCI device in use is not disabled due to another worker’s shutdown (see
+`core.worker`) they must keep a `flock(2)` on resource 0. This can be achieved
+either implicitly via `pci.open_pci_resource_locked` or by manual calls to
+`flock(2)`.
+
 
 — Variable **pci.devices**
 

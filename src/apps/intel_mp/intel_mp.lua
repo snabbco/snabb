@@ -400,7 +400,6 @@ function Intel:new (conf)
       -- the device, loads registers, initializes it before sharing the lock.
       pci.unbind_device_from_linux(self.pciaddress)
       pci.set_bus_master(self.pciaddress, true)
-      pci.disable_bus_master_cleanup(self.pciaddress)
       self.base = pci.map_pci_memory(self.fd)
       self:load_registers(byid.registers)
       self:init()

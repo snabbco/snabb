@@ -1016,6 +1016,7 @@ Groups of Snabb processes each have the following special properties:
   mastering (DMA) is disabled upon termination before any DMA memory
   is returned to the kernel. This prevents "dangling" DMA requests
   from corrupting memory that has been freed and reused.
+  See [lib.hardware.pci](#pci-lib.hardware.pci) for details.
 
 The `core.worker` API functions are available in the main process only:
 

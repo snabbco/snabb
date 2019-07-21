@@ -191,12 +191,6 @@ function set_bus_master (device, enable)
    f:close()
 end
 
--- For devices used by some Snabb apps, PCI bus mastering should
--- outlive the life of the process.
-function disable_bus_master_cleanup (device)
-   shm.unlink('group/dma/pci/'..canonical(device))
-end
-
 -- Shutdown DMA to prevent "dangling" requests for PCI devices opened
 -- by pid (or other processes in its process group).
 --
@@ -205,7 +199,11 @@ end
 function shutdown (pid)
    local dma = shm.children("/"..pid.."/group/dma/pci")
    for _, device in ipairs(dma) do
-      set_bus_master(device, false)
+      -- Only disable bus mastering if we are able to get an exclusive lock on
+      -- resource 0 (i.e., no process left using the device.)
+      if pcall(open_pci_resource_locked(device, 0)) then
+         set_bus_master(device, false)
+      end
    end
 end
 
