@@ -14,6 +14,10 @@ if [ -z "$SNABB_TELNET0" ]; then
 fi
 
 echo "Probing a Linux guest through ESP in transport mode..."
-apps/ipsec/test-linux-compat.sh transport
+apps/ipsec/test-linux-compat.sh transport aes-gcm-16-icv
 echo "Probing a Linux guest through ESP in tunnel mode..."
-apps/ipsec/test-linux-compat.sh tunnel
+apps/ipsec/test-linux-compat.sh tunnel aes-gcm-16-icv
+echo "Probing a Linux guest through ESP in transport mode (AES 256)..."
+apps/ipsec/test-linux-compat.sh transport aes-256-gcm-16-icv
+echo "Probing a Linux guest through ESP in tunnel mode (AES 256)..."
+apps/ipsec/test-linux-compat.sh tunnel aes-256-gcm-16-icv
