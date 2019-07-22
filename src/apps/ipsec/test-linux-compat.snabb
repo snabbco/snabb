@@ -17,24 +17,25 @@ local ffi = require("ffi")
 
 -- this is supposed to be run from a selftest shell script
 -- which hopefully can figure out most arguments on its own.
-if not (#main.parameters == 12 ) then
-   print("need 12 arguments: mode srcmac srcip dstip srcport dstport spi txkey txsalt rxkey rxsalt payload") -- XXX usage
+if not (#main.parameters == 13 ) then
+   print("need 13 arguments: mode srcmac srcip dstip srcport dstport spi txkey txsalt rxkey rxsalt payload") -- XXX usage
    main.exit(1)
 end
 
 local args = {
    mode = main.parameters[1],
-   srcmac = main.parameters[2],
-   srcip = main.parameters[3],
-   dstip = main.parameters[4],
-   srcport = main.parameters[5],
-   dstport = main.parameters[6],
-   spi = main.parameters[7],
-   txkey = main.parameters[8],
-   txsalt = main.parameters[9],
-   rxkey = main.parameters[10],
-   rxsalt = main.parameters[11],
-   payload = main.parameters[12],
+   aead = main.parameters[2],
+   srcmac = main.parameters[3],
+   srcip = main.parameters[4],
+   dstip = main.parameters[5],
+   srcport = main.parameters[6],
+   dstport = main.parameters[7],
+   spi = main.parameters[8],
+   txkey = main.parameters[9],
+   txsalt = main.parameters[10],
+   rxkey = main.parameters[11],
+   rxsalt = main.parameters[12],
+   payload = main.parameters[13],
 }
 
 local UDPing = {
@@ -125,6 +126,7 @@ local c = config.new()
 config.app(c, "udping", UDPing)
 
 local espconf = {
+   aead = args.aead,
    self_ip = (args.mode == "tunnel" and args.srcip) or nil,
    nexthop_ip = (args.mode == "tunnel" and args.dstip) or nil,
    spi = args.spi,
