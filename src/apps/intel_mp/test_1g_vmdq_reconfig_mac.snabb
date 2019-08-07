@@ -1,0 +1,80 @@
+#!../../snabb snsh
+
+-- Snabb test script for checking that the MAC & VLAN indices
+-- are selected correctly after an intel_mp instance is shut
+-- down and restarted with a different config.
+--
+-- This test exists to test the bug that was fixed in commit
+--   721f10bb0c3e076f79c54086fefd554851ac9679
+
+local basic_apps = require("apps.basic.basic_apps")
+local intel      = require("apps.intel_mp.intel_mp")
+local pcap       = require("apps.pcap.pcap")
+local lib        = require("core.lib")
+
+local pciaddr0 = lib.getenv("SNABB_PCI_INTEL1G0")
+
+local c = config.new()
+
+-- first add two apps in order with different MACs and VLANs
+config.app(c, "nicp0", intel.Intel,
+           { pciaddr = pciaddr0,
+             vmdq = true,
+             poolnum = 0,
+             rxq = 0, txq = 0,
+             vlan = 42,
+             macaddr = "00:11:22:33:44:55" })
+config.app(c, "source", basic_apps.Source)
+
+config.link(c, "source.out0 -> nicp0.input")
+
+engine.configure(c)
+engine.main({ duration = 0.1 })
+
+config.app(c, "nicp1", intel.Intel,
+           { pciaddr = pciaddr0,
+             vmdq = true,
+             poolnum = 1,
+             rxq = 0, txq = 0,
+             vlan = 43,
+             macaddr = "55:44:33:22:11:00" })
+config.link(c, "source.out1 -> nicp1.input")
+
+engine.configure(c)
+engine.main({ duration = 0.1 })
+
+-- then shut down the first one and start a new one on the same
+-- pool as nicp1
+local c = config.new()
+
+config.app(c, "nicp1", intel.Intel,
+           { pciaddr = pciaddr0,
+             vmdq = true,
+             poolnum = 1,
+             rxq = 0, txq = 0,
+             vlan = 43,
+             macaddr = "55:44:33:22:11:00" })
+config.app(c, "source", basic_apps.Source)
+config.link(c, "source.out1 -> nicp1.input")
+
+config.app(c, "nicp2", intel.Intel,
+           { pciaddr = pciaddr0,
+             vmdq = true,
+             poolnum = 1,
+             rxq = 0, txq = 0,
+             vlan = 43,
+             macaddr = "55:44:33:22:11:00" })
+config.link(c, "source.out2 -> nicp2.input")
+
+engine.configure(c)
+engine.main({ duration = 0.1 })
+
+-- MAC addresses are never disabled by intel_mp (or intel10g)
+-- so both stay enabled.
+-- TODO: this is issue #1205 (https://github.com/snabbco/snabb/issues/1205)
+--       and these checks may need to change when that is resolved
+assert(engine.app_table.nicp1.r.RAH[1]:bits(31, 1) == 1)
+assert(engine.app_table.nicp2.r.RAH[2]:bits(31, 1) == 1)
+-- only the second VLAN register should be enabled
+assert(engine.app_table.nicp1.r.VLVF[0]:bits(31, 1) == 0)
+assert(engine.app_table.nicp2.r.VLVF[1]:bits(31, 1) == 1)

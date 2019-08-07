@@ -1,0 +1,46 @@
+#!../../snabb snsh
+
+-- Snabb test script multicast delivery VMDq mode
+
+local basic_apps = require("apps.basic.basic_apps")
+local intel      = require("apps.intel_mp.intel_mp")
+local pcap       = require("apps.pcap.pcap")
+local lib        = require("core.lib")
+
+local pciaddr0 = lib.getenv("SNABB_PCI_INTEL0")
+local pciaddr1 = lib.getenv("SNABB_PCI_INTEL1")
+
+local c = config.new()
+
+-- send packets on nic0
+config.app(c, "nic0", intel.Intel,
+           { pciaddr = pciaddr0,
+             txq = 0,
+             wait_for_link = true })
+
+-- nic1 with a VMDq queue (that should receive multicast packets)
+config.app(c, "nic1", intel.Intel,
+           { pciaddr = pciaddr1,
+             vmdq = true,
+             macaddr = "90:72:82:78:c9:7a",
+             wait_for_link = true })
+
+config.app(c, "pcap", pcap.PcapReader, "broadcast.pcap")
+config.app(c, 'sink', basic_apps.Sink)
+
+config.link(c, "pcap.output -> nic0.input")
+config.link(c, "nic1.output -> sink.input")
+
+local retries = 10
+repeat
+   -- This test is flaky on my hardware, apparently because sometimes the first
+   -- so-many packets are not delivered. This works around that. - Max
+   engine.configure(config.new())
+   engine.configure(c)
+   engine.main({ duration = 1 })
+   retries = retries - 1
+until link.stats(engine.app_table.sink.input.input).rxpackets > 0
+   or retries == 0
+
+assert(link.stats(engine.app_table.sink.input.input).rxpackets == 40,
+       "failed to receive mcast packets")
