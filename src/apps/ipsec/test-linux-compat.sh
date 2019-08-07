@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 MODE=$1
+AEAD=$2
 
 SPI=2953575118
 
@@ -9,10 +10,20 @@ DST=fc00:feed:face:dead::2
 
 TKEY=d4d61fec2861b3b806d0654eeea02ede
 TSALT=df3ddb99
-TKS=$TKEY$TSALT
-
 RKEY=c4d61fec2861b3b806d0654eeea02ede
 RSALT=cf3ddb99
+if [ $AEAD = "aes-gcm-16-icv" ]; then
+    # Do nothing.
+    :
+elif [ $AEAD = "aes-256-gcm-16-icv" ]; then
+    # Need 256 bit keys.
+    TKEY=$TKEY$TKEY
+    RKEY=$RKEY$RKEY
+else
+    echo "Unsupported AEAD: $AEAD"
+    exit 1
+fi
+TKS=$TKEY$TSALT
 RKS=$RKEY$RSALT
 
 SPORT=60122
@@ -25,7 +36,7 @@ fi
 qemu soft esp.sock $SNABB_TELNET0
 
 apps/ipsec/test-linux-compat.snabb \
-   $MODE ${MAC}01 $SRC $DST $SPORT $DPORT $SPI $TKEY $TSALT $RKEY $RSALT ping &
+   $MODE $AEAD ${MAC}01 $SRC $DST $SPORT $DPORT $SPI $TKEY $TSALT $RKEY $RSALT ping &
 snabb_pid=$!
 
 wait_vm_up $SNABB_TELNET0
