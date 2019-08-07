@@ -816,9 +816,12 @@ end
 
 Returns hexadecimal string for bytes in *string*.
 
-— Function **lib.hexundump** *hexstring*
+— Function **lib.hexundump** *hexstring*, *n*, *error* 
 
-Returns byte string for *hexstring*.
+Returns string of *n* bytes for *hexstring*. Throws an error if less than *n*
+hex-encoded bytes could be parsed unless *error* is `false`.
+
+*Error* is optional and can be the error message to throw.
 
 — Function **lib.comma_value** *n*
 
