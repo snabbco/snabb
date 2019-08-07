@@ -178,7 +178,11 @@ printer_for_schema_by_name = util.memoize(printer_for_schema_by_name)
 
 local function parser_for_grammar(grammar, path)
    local getter, subgrammar = resolver(grammar, path)
-   return data.data_parser_from_grammar(subgrammar)
+   return function (production)
+      local data = data.data_parser_from_grammar(subgrammar)(production)
+      consistency_checker_from_grammar(subgrammar)(data)
+      return data
+   end
 end
 
 local function parser_for_schema(schema, path)
@@ -310,7 +314,19 @@ local function adder_for_grammar(grammar, path)
    elseif grammar.type == 'table' then
       -- Invariant: either all entries in the new subconfig are added,
       -- or none are.
-      if grammar.key_ctype and grammar.value_ctype then
+      if grammar.string_key
+      or (grammar.key_ctype and not grammar.value_ctype) then
+         -- cltable or string-keyed table.
+         local pairs = grammar.key_ctype and cltable.pairs or pairs
+         return function(config, subconfig)
+            local tab = getter(config)
+            for k,_ in pairs(subconfig) do
+               if tab[k] ~= nil then error('already-existing entry') end
+            end
+            for k,v in pairs(subconfig) do tab[k] = v end
+            return config
+         end
+      elseif grammar.key_ctype and grammar.value_ctype then
          -- ctable.
          return function(config, subconfig)
             local ctab = getter(config)
@@ -447,7 +463,7 @@ function remover_for_schema_by_name (schema_name, path)
 end
 remover_for_schema_by_name = util.memoize(remover_for_schema_by_name)
 
-function consistency_checker_from_grammar(grammar)
+function leafref_checker_from_grammar(grammar)
    -- Converts a relative path to an absolute path.
    -- TODO: Consider moving it to /lib/yang/path.lua.
    local function to_absolute_path (path, node_path)
@@ -524,6 +540,138 @@ function consistency_checker_from_grammar(grammar)
                ("Broken leafref integrity in '%s' when referencing '%s'"):format(
                 path, leafref))
       end
+   end
+end
+
+local function pairs_from_grammar(grammar)
+   if grammar.string_key then
+      return pairs
+   elseif grammar.key_ctype and grammar.value_ctype then
+      return function (ctable)
+         local ctable_next, ctable_max, ctable_entry = ctable:iterate()
+         return function()
+            ctable_entry = ctable_next(ctable_max, ctable_entry)
+            if not ctable_entry then return end
+            return ctable_entry.key, ctable_entry.value
+         end
+      end
+   elseif grammar.key_ctype then
+      return cltable.pairs
+   else
+      return pairs
+   end
+end
+
+function uniqueness_checker_from_grammar(grammar)
+   -- Generate checker for table
+   local function unique_assertion(leaves, grammar)
+      local unique_leaves = {}
+      for leaf in leaves:split(" +") do
+         table.insert(unique_leaves, normalize_id(leaf))
+      end
+      local pairs = pairs_from_grammar(grammar)
+      return function (tab)
+         -- Sad quadratic loop, again
+         for k1, v1 in pairs(tab) do
+            for k2, v2 in pairs(tab) do
+               if k1 == k2 then break end
+               local collision = true
+               for _, leaf in ipairs(unique_leaves) do
+                  if not lib.equal(v1[leaf], v2[leaf]) then
+                     collision = false
+                     break
+                  end
+               end
+               assert(not collision, "Not unique: "..leaves)
+            end
+         end
+      end
+   end
+   -- Visit tables with unique constraints in grammar and apply checker
+   local function visit_unique_and_check(grammar, data)
+      if not data then return
+      elseif grammar.type == 'table' then
+         local pairs = pairs_from_grammar(grammar)
+         -- visit values
+         for name, value in _G.pairs(grammar.values) do
+            for k, datum in pairs(data) do
+               visit_unique_and_check(value, datum[normalize_id(name)])
+            end
+         end
+         -- check unique rescrictions
+         for _, leaves in ipairs(grammar.unique) do
+            unique_assertion(leaves, grammar)(data)
+         end
+      elseif grammar.type == 'struct' then
+         -- visit members
+         for name, member in pairs(grammar.members) do
+            visit_unique_and_check(member, data[normalize_id(name)])
+         end
+      end
+   end
+   return function (data)
+      visit_unique_and_check(grammar, data)
+   end
+end
+
+function minmax_elements_checker_from_grammar(grammar)
+   -- Generate checker for table (list, leaf-list)
+   local function minmax_assertion(grammar, name)
+      name = name or ""
+      if not (grammar.min_elements or grammar.max_elements) then
+         return function () end
+      end
+      local pairs = pairs_from_grammar(grammar)
+      return function (tab)
+         local n = 0
+         for k1, v1 in pairs(tab) do
+            n = n + 1
+         end
+         if grammar.min_elements then
+            assert(n >= grammar.min_elements,
+                   name..": requires at least "..
+                      grammar.min_elements.." element(s)")
+         end
+         if grammar.max_elements then
+            assert(n <= grammar.max_elements,
+                   name..": must not have more than "..
+                      grammar.max_elements.." element(s)")
+         end
+      end
+   end
+   -- Visit tables with unique constraints in grammar and apply checker
+   local function visit_minmax_and_check(grammar, data, name)
+      if not data then return
+      elseif grammar.type == 'array' then
+         -- check min/max elements restrictions
+         minmax_assertion(grammar, name)(data)
+      elseif grammar.type == 'table' then
+         -- visit values
+         local pairs = pairs_from_grammar(grammar)
+         for name, value in _G.pairs(grammar.values) do
+            for k, datum in pairs(data) do
+               visit_minmax_and_check(value, datum[normalize_id(name)], name)
+            end
+         end
+         -- check min/max elements restrictions
+         minmax_assertion(grammar, name)(data)
+      elseif grammar.type == 'struct' then
+         -- visit members
+         for name, member in pairs(grammar.members) do
+            visit_minmax_and_check(member, data[normalize_id(name)], name)
+         end
+      end
+   end
+   return function (data)
+      visit_minmax_and_check(grammar, data)
+   end
+end
+
+function consistency_checker_from_grammar(grammar)
+   return function (data)
+      leafref_checker_from_grammar(grammar)(data)
+      uniqueness_checker_from_grammar(grammar)(data)
+      minmax_elements_checker_from_grammar(grammar)(data)
    end
 end
 
@@ -691,6 +839,168 @@ function selftest()
    setter_for_grammar(grammar, "/softwire-config/instance[device=test]/"..
                                "queue[id=0]/external-interface/ip 208.118.235.148")
    remover_for_grammar(grammar, "/softwire-config/instance[device=test]/")
+
+   -- Test unique restrictions:
+   local unique_schema = schema.load_schema([[module unique-schema {
+      namespace "urn:ietf:params:xml:ns:yang:unique-schema";
+      prefix "test";
+
+      list unique_test {
+        key "testkey"; unique "testleaf testleaf2";
+        leaf testkey { type string; mandatory true; }
+        leaf testleaf { type string; mandatory true; }
+        leaf testleaf2 { type string; mandatory true; }
+      }
+   }]])
+   local checker = consistency_checker_from_schema(unique_schema, true)
+
+   -- Test unique validation (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(unique_schema,
+                                  mem.open_input_string [[
+                                     unique_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                       testleaf2 "baz";
+                                     }
+                                     unique_test {
+                                       testkey "foo2";
+                                       testleaf "bar";
+                                       testleaf2 "baz";
+                                     }
+   ]]))
+   assert(not success)
+
+   -- Test unique validation (should succeed)
+   checker(data.load_config_for_schema(unique_schema,
+                                       mem.open_input_string [[
+                                          unique_test {
+                                            testkey "foo";
+                                            testleaf "bar";
+                                            testleaf2 "baz";
+                                          }
+                                          unique_test {
+                                            testkey "foo2";
+                                            testleaf "bar2";
+                                            testleaf2 "baz";
+                                          }
+   ]]))
+
+   -- Test min-elements and max-elements restrictions:
+   local minmax_schema = schema.load_schema([[module minmax-schema {
+      namespace "urn:ietf:params:xml:ns:yang:minmax-schema";
+      prefix "test";
+
+      list minmax_list_test {
+        key "testkey"; min-elements 1; max-elements 2;
+        leaf testkey { type string; mandatory true; }
+        leaf testleaf { type string; mandatory true; }
+      }
+
+      leaf-list minmax_leaflist_test {
+        type string; min-elements 1; max-elements 3;
+      }
+   }]])
+   local checker = consistency_checker_from_schema(minmax_schema, true)
+
+   -- Test minmax validation (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(minmax_schema,
+                                  mem.open_input_string [[
+                                     minmax_leaflist_test "baz";
+   ]]))
+   assert(not success)
+   print(result)
+
+   -- Test minmax validation (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(minmax_schema,
+                                  mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+   ]]))
+   assert(not success)
+   print(result)
+
+   -- Test minmax validation (should succeed)
+   checker(data.load_config_for_schema(minmax_schema,
+                                       mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+   ]]))
+
+   -- Test minmax validation (should succeed)
+   checker(data.load_config_for_schema(minmax_schema,
+                                       mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_list_test {
+                                       testkey "foo2";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+   ]]))
+
+   -- Test minmax validation (should succeed)
+   checker(data.load_config_for_schema(minmax_schema,
+                                       mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+   ]]))
+
+   -- Test minmax validation (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(minmax_schema,
+                                  mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_list_test {
+                                       testkey "foo2";
+                                       testleaf "bar";
+                                     }
+                                     minmax_list_test {
+                                       testkey "foo3";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+   ]]))
+   assert(not success)
+   print(result)
+
+   -- Test minmax validation (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(minmax_schema,
+                                  mem.open_input_string [[
+                                     minmax_list_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                     }
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+                                     minmax_leaflist_test "baz";
+   ]]))
+   assert(not success)
+   print(result)
 
    print("selftest: ok")
 end
