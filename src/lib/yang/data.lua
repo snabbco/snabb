@@ -12,6 +12,7 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 local lib = require('core.lib')
 local regexp = require("lib.xsd_regexp")
+local lib = require("core.lib")
 
 function normalize_id(id)
    return id:gsub('[^%w_]', '_')
@@ -111,18 +112,30 @@ function typeof(name)
    return type_cache[name]
 end
 
--- If a "list" node has one key that is string-valued, we will represent
--- instances of that node as normal Lua tables where the key is the
--- table key and the value does not contain the key.
-local function table_string_key(keys)
-   local string_key = nil
-   for k,v in pairs(keys) do
-      if v.type ~= 'scalar' then return nil end
-      if v.argument_type.primitive_type ~= 'string' then return nil end
-      if string_key ~= nil then return nil end
-      string_key = k
+-- If a "list" node has a single key that is string-valued or representable as
+-- a Lua number, we will represent instances of that node as normal Lua tables
+-- where the key is the table key and the value does not contain the key.
+local function table_native_key(keys)
+   local native_number_types =
+      lib.set('int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32')
+   local function representable_as_native(v)
+      return v.type == 'scalar' and
+             (v.argument_type.primitive_type == 'string' or
+              native_number_types[v.argument_type.primitive_type])
    end
-   return string_key
+   local native_key = nil
+   for k,v in pairs(keys) do
+      if native_key ~= nil then
+         -- Bail out if the list has multiple keys, native or otherwise.
+         return nil
+      elseif representable_as_native(v) then
+         -- Select the first native key, if any.
+         native_key = k
+      else
+         return nil
+      end
+   end
+   return native_key
 end
 
 -- We need to properly support unions.  It's a big FIXME!  As an
@@ -221,7 +234,7 @@ function data_grammar_from_schema(schema, is_config)
       end
       if is_empty(values) and node.config ~= is_config then return end
       return {type='table', keys=keys, values=values,
-              string_key=table_string_key(keys),
+              native_key=table_native_key(keys),
               key_ctype=struct_ctype(keys),
               value_ctype=struct_ctype(values)}
    end
@@ -538,13 +551,13 @@ local function ctable_builder(key_t, value_t)
    return builder
 end
 
-local function string_keyed_table_builder(string_key)
+local function native_keyed_table_builder(native_key)
    local res = {}
    local builder = {}
    function builder:add(key, value)
-      local str = assert(key[string_key])
-      assert(res[str] == nil, 'duplicate key: '..str)
-      res[str] = value
+      local k = assert(key[native_key])
+      assert(res[k] == nil, 'duplicate key: '..k)
+      res[k] = value
    end
    function builder:finish() return res end
    return builder
@@ -569,7 +582,7 @@ local function ltable_builder()
    return builder
 end
 
-local function table_parser(keyword, keys, values, string_key, key_ctype,
+local function table_parser(keyword, keys, values, native_key, key_ctype,
                             value_ctype)
    local members = {}
    for k,v in pairs(keys) do members[k] = v end
@@ -580,8 +593,8 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
    local init
    if key_t and value_t then
       function init() return ctable_builder(key_t, value_t) end
-   elseif string_key then
-      function init() return string_keyed_table_builder(string_key) end
+   elseif native_key then
+      function init() return native_keyed_table_builder(native_key) end
    elseif key_t then
       function init() return cltable_builder(key_t) end
    else
@@ -635,7 +648,7 @@ function data_parser_from_grammar(production)
    end
    function handlers.table(keyword, production)
       local keys, values = visitn(production.keys), visitn(production.values)
-      return table_parser(keyword, keys, values, production.string_key,
+      return table_parser(keyword, keys, values, production.native_key,
                           production.key_ctype, production.value_ctype)
    end
    function handlers.scalar(keyword, production)
@@ -933,8 +946,8 @@ function xpath_printer_from_grammar(production, print_default, root)
                print_value(entry.value, file, path)
             end
          end
-      elseif production.string_key then
-         local id = normalize_id(production.string_key)
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
          return function(data, file, path)
             path = path or ''
             for key, value in pairs(data) do
@@ -1201,8 +1214,8 @@ function influxdb_printer_from_grammar(production, print_default, root)
                print_value(entry.value, file, path, key)
             end
          end
-      elseif production.string_key then
-         local id = normalize_id(production.string_key)
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
          return function(data, file, path)
             path = path or ''
             for key, value in pairs(data) do
@@ -1402,8 +1415,8 @@ function data_printer_from_grammar(production, print_default)
                file:write(indent..'}\n')
             end
          end
-      elseif production.string_key then
-         local id = normalize_id(production.string_key)
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
          return function(data, file, indent)
             for key, value in pairs(data) do
                if keyword then print_keyword(keyword, file, indent) end
@@ -1882,6 +1895,28 @@ function selftest()
       }
    ]])
    assert(success == false)
+
+   -- Check native number key.
+   local native_number_key_schema = schema.load_schema([[module native-number-key {
+      namespace "urn:ietf:params:xml:ns:yang:native-number-key";
+      prefix "test";
+
+      list number {
+         key "number";
+         leaf number { type uint32; }
+         leaf name { type string; }
+      }
+   }]])
+
+   local native_number_key_data = load_config_for_schema(
+      native_number_key_schema,
+      mem.open_input_string [[
+         number {
+            number 1;
+            name "Number one!";
+         }
+   ]])
+   assert(native_number_key_data.number[1].name == "Number one!")
 
    -- Test range / length restrictions.
    local range_length_schema = schema.load_schema([[module range-length-schema {

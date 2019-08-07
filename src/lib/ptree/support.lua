@@ -49,7 +49,7 @@ local function add_child_objects(accum, grammar, config)
       if grammar.key_ctype and grammar.value_ctype then return end
       local child_grammar = {type="struct", members=grammar.values,
                              ctype=grammar.value_ctype}
-      if grammar.key_ctype then
+      if grammar.key_ctype and not grammar.native_key then
          for k, v in cltable.pairs(config) do visit_child(child_grammar, v) end
       else
          for k, v in pairs(config) do visit_child(child_grammar, v) end
@@ -70,9 +70,8 @@ local function add_child_objects(accum, grammar, config)
    return visit(grammar, config)
 end
 
-local function compute_objects_maybe_updated_in_place (schema_name, config,
+local function compute_objects_maybe_updated_in_place (schema, config,
                                                        changed_path)
-   local schema = yang.load_schema_by_name(schema_name)
    local grammar = data.config_grammar_from_schema(schema)
    local objs = {}
    local getter, subgrammar
@@ -143,7 +142,7 @@ end
 local function compute_apps_to_restart_after_configuration_update (
       schema_name, configuration, verb, changed_path, in_place_dependencies, arg)
    local maybe_updated = compute_objects_maybe_updated_in_place(
-      schema_name, configuration, changed_path)
+      yang.load_schema_by_name(schema_name), configuration, changed_path)
    local needs_restart = {}
    for _,place in ipairs(maybe_updated) do
       for _, id in ipairs(in_place_dependencies[place] or {}) do
@@ -229,4 +228,39 @@ function load_schema_config_support(schema_name)
    local success, support_mod = pcall(require, mod_name)
    if success then return support_mod.get_config_support() end
    return generic_schema_config_support
+end
+
+function selftest()
+   local mem = require("lib.stream.mem")
+
+   local test_schema = yang.load_schema [[
+module snabb-pf-v1 {
+  namespace snabb:pf-v1;
+  prefix pf-v1;
+
+  list foo {
+    key "id";
+
+    leaf id {
+      type uint8;
+    }
+    leaf data {
+      type string;
+    }
+  }
+}
+   ]]
+   local data = yang.load_config_for_schema(test_schema,
+                                       mem.open_input_string [[
+foo {
+  id 1;
+  data "bar"; 
+}
+foo {
+  id 2;
+  data "baz"; 
+}
+   ]])
+
+   compute_objects_maybe_updated_in_place(test_schema, data, "/")
 end
