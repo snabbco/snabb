@@ -419,40 +419,26 @@ function Intel:new (conf)
    self.max_q = byid.max_q
 
    -- Setup device access
-   self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
+   self.fd = pci.open_pci_resource_unlocked(self.pciaddress, 0)
    self.master = self.fd:flock("ex, nb")
-
    if self.master then
-      -- set shm to indicate whether the NIC is in VMDq mode
-      local vmdq_shm = shm.create(self.shm_root .. "vmdq_enabled",
-                                  vmdq_enabled_t)
-      vmdq_shm.enabled = self.vmdq
-      shm.unmap(vmdq_shm)
-      if self.vmdq then
-         -- create shared memory for tracking VMDq pools
-         local vmdq_shm = shm.create(self.shm_root .. "vmdq_pools",
-                                     vmdq_pools_t)
-         -- explicitly initialize to 0 since we can't rely on cleanup
-         for i=0, 63 do vmdq_shm.pools[i] = 0 end
-         shm.unmap(vmdq_shm)
-         -- set VMDq pooling method for all instances on this NIC
-         local mode_shm = shm.create(self.shm_root .. "vmdq_queuing_mode",
-                                     vmdq_queuing_mode_t)
-         if self.vmdq_queuing_mode == "rss-32-4" then
-            mode_shm.mode = 0
-         elseif self.vmdq_queuing_mode == "rss-64-2" then
-            mode_shm.mode = 1
-         else
-            error("Invalid VMDq queuing mode")
-         end
-         shm.unmap(mode_shm)
-      end
+      -- Master unbinds device, enables PCI bus master, and *then* memory maps
+      -- the device, loads registers, initializes it before sharing the lock.
+      pci.unbind_device_from_linux(self.pciaddress)
+      pci.set_bus_master(self.pciaddress, true)
+      self.base = pci.map_pci_memory(self.fd)
+      self:load_registers(byid.registers)
+      self:init()
+      self:init_vmdq()
+      self.fd:flock("sh")
+   else
+      -- Other processes wait for the shared lock before memory mapping the and
+      -- loading registers.
+      self.fd:flock("sh")
+      self.base = pci.map_pci_memory(self.fd)
+      self:load_registers(byid.registers)
    end
 
-   self:load_registers(byid.registers)
-
-   self:init()
-   self.fd:flock("sh")
    self:check_vmdq()
    -- this needs to happen before register loading for rxq/txq
    -- because it determines the queue numbers
@@ -581,6 +567,36 @@ function Intel:wait_linkup (timeout)
       if self:link_status() then return true end
    end
    return false
+end
+
+-- Initialze SHM control structures tracking VMDq configuration.
+function Intel:init_vmdq ()
+   assert(self.master, "must be master")
+
+   -- set shm to indicate whether the NIC is in VMDq mode
+   local vmdq_shm = shm.create(self.shm_root .. "vmdq_enabled",
+                               vmdq_enabled_t)
+   vmdq_shm.enabled = self.vmdq
+   shm.unmap(vmdq_shm)
+   if self.vmdq then
+      -- create shared memory for tracking VMDq pools
+      local vmdq_shm = shm.create(self.shm_root .. "vmdq_pools",
+                                  vmdq_pools_t)
+      -- explicitly initialize to 0 since we can't rely on cleanup
+      for i=0, 63 do vmdq_shm.pools[i] = 0 end
+      shm.unmap(vmdq_shm)
+      -- set VMDq pooling method for all instances on this NIC
+      local mode_shm = shm.create(self.shm_root .. "vmdq_queuing_mode",
+                                  vmdq_queuing_mode_t)
+      if self.vmdq_queuing_mode == "rss-32-4" then
+         mode_shm.mode = 0
+      elseif self.vmdq_queuing_mode == "rss-64-2" then
+         mode_shm.mode = 1
+      else
+         error("Invalid VMDq queuing mode")
+      end
+      shm.unmap(mode_shm)
+   end
 end
 
 -- Implements various status checks related to VMDq configuration.
@@ -1170,10 +1186,7 @@ function Intel1g:unlock_fw_sem()
    self.r.SWSM:clr(bits { SWESMBI = 1 })
 end
 function Intel1g:init ()
-   if not self.master then return end
-   pci.unbind_device_from_linux(self.pciaddress)
-   pci.set_bus_master(self.pciaddress, true)
-   pci.disable_bus_master_cleanup(self.pciaddress)
+   assert(self.master, "must be master")
 
    -- 4.5.3  Initialization Sequence
    self:disable_interrupts()
@@ -1546,10 +1559,7 @@ function Intel82599:init_queue_stats (frame)
 end
 
 function Intel82599:init ()
-   if not self.master then return end
-   pci.unbind_device_from_linux(self.pciaddress)
-   pci.set_bus_master(self.pciaddress, true)
-   pci.disable_bus_master_cleanup(self.pciaddress)
+   assert(self.master, "must be master")
 
    -- The 82599 devices sometimes just don't come up, especially when
    -- there is traffic already on the link.  If 2s have passed and the
