@@ -314,7 +314,7 @@ local function adder_for_grammar(grammar, path)
    elseif grammar.type == 'table' then
       -- Invariant: either all entries in the new subconfig are added,
       -- or none are.
-      if grammar.string_key
+      if grammar.native_key
       or (grammar.key_ctype and not grammar.value_ctype) then
          -- cltable or string-keyed table.
          local pairs = grammar.key_ctype and cltable.pairs or pairs
@@ -544,7 +544,7 @@ function leafref_checker_from_grammar(grammar)
 end
 
 local function pairs_from_grammar(grammar)
-   if grammar.string_key then
+   if grammar.native_key then
       return pairs
    elseif grammar.key_ctype and grammar.value_ctype then
       return function (ctable)
