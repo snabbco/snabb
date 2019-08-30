@@ -13,7 +13,11 @@ OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
 PFLUASRC = $(shell cd ../lib/pflua/src && \
 	         find . -regex '[^\#]*\.lua' -printf '%P ')
-CSRC   = $(shell find . -regex '[^\#]*\.c' -printf '%P ')
+ifdef LINUX_SOURCE_DIR
+	CSRC   = $(shell find . -regex '[^\#]*\.c' -printf '%P ')
+else
+	CSRC   = $(shell find . -regex '[^\#]*\.c' | egrep -v 'xdpsock' | tr '\n' ' ')
+endif
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 PFLUAASM = $(shell cd ../lib/pflua/src && \
@@ -40,6 +44,11 @@ EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
 LUAJIT_A := ../lib/luajit/src/raptorjit.a
 
+XDPSRCDIR = apps/socket/xdp
+XDPOBJDIR = obj/apps/socket/xdp
+CLANG = clang
+LLC = llc
+
 # TESTMODS expands to:
 #   core.memory core.lib ...
 # for each module that has a top-level selftest () function.
@@ -59,10 +68,28 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) 
 	$(Q) ../generate-version-lua.sh > obj/version.lua.gen
 	$(E) "LUA       obj/version.lua"
 	$(Q) raptorjit -bg -n core.version obj/version.lua.gen obj/version_lua.o
+ifdef LINUX_SOURCE_DIR
+	$(E) "GEN       obj/apps/socket/xdp/xdpsock_kern.o"
+	$(Q) $(CLANG) -c $(XDPSRCDIR)/xdpsock_kern.c \
+		-D__KERNEL__ -D__BPF_TRACING__ \
+		-I ${LINUX_SOURCE_DIR}/tools/include \
+		-I ${LINUX_SOURCE_DIR}/tools/testing/selftests/bpf \
+		-Wno-unused-value -Wno-pointer-sign -Wno-compare-distinct-pointer-types \
+		-Wno-gnu-variable-sized-type-not-at-end -Wno-address-of-packed-member \
+		-Wno-tautological-compare -Wno-unknown-warning-option \
+		-O2 -emit-llvm -c -o - | $(LLC) -march=bpf -filetype=obj -o $(XDPOBJDIR)/xdpsock_kern.o
+endif
 	$(E) "LINK      $@"
+ifdef LINUX_SOURCE_DIR
+	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
+	    obj/version_lua.o \
+	    -lrt -lc -ldl -lm -lpthread -lelf \
+	    ${LINUX_SOURCE_DIR}/tools/lib/bpf/libbpf.a
+else
 	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    obj/version_lua.o \
 	    -lrt -lc -ldl -lm -lpthread
+endif
 	@echo -n "BINARY    "
 	@ls -sh snabb
 
@@ -133,7 +160,20 @@ $(PFLUAOBJ): obj/%_lua.o: ../lib/pflua/src/%.lua Makefile
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
+ifndef LINUX_SOURCE_DIR
 	$(Q) $(CC) $(DEBUG) -O3 -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+else
+	$(Q) $(CC) $(DEBUG) -O3 -Wl,-E \
+		-I ../lib/luajit/src \
+		-I . \
+		-I ${LINUX_SOURCE_DIR}/tools/lib \
+		-I ${LINUX_SOURCE_DIR}/tools/include \
+		-I ${LINUX_SOURCE_DIR}/tools/testing/selftests/bpf \
+		-I ${LINUX_SOURCE_DIR}/usr/include \
+		-include $(CURDIR)/../gcc-preinclude.h \
+		-c -Wall -Wno-unused-variable -Werror \
+		-o $@ $<
+endif
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"

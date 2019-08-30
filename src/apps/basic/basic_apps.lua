@@ -27,6 +27,11 @@ function Source:pull ()
    end
 end
 
+function Source:set_packet (p)
+   self.size = p.length
+   self.packet = p
+end
+
 function Source:stop ()
    packet.free(self.packet)
 end
