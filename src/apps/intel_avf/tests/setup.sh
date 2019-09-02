@@ -35,10 +35,14 @@ function setup(){
 		local vfid=$( basename $( readlink -f $vfdir ) )
 		echo $vfid > $vfdir/driver/unbind
 		echo "export SNABB_AVF_PF${PFIDX}_VF${loop}=$vfid"
+                echo "export SNABB_AVF_PF${PFIDX}_SRC${loop}=$i"
+                echo "export SNABB_AVF_PF${PFIDX}_DST${loop}=$i"
 		loop=$(( loop + 1 ))
 	done
-	PFIDX=$(( VFIDX + 1 ))
+	PFIDX=$(( PFIDX + 1 ))
 }
 
-setup $SNABB_AVF_PF0 02:00:00:00:00:00 02:00:00:00:00:01 02:00:00:00:00:02 02:00:00:00:00:03
-setup $SNABB_AVF_PF1 02:00:00:00:00:10 02:00:00:00:00:11 02:00:00:00:00:12 02:00:00:00:00:13
+ADDR_PF0=(02:00:00:00:00:00 02:00:00:00:00:01)
+ADDR_PF1=(02:00:00:00:00:10 02:00:00:00:00:11)
+setup $SNABB_AVF_PF0 ${ADDR_PF0[*]}
+[ -z $SNABB_AVF_PF1 ] || setup $SNABB_AVF_PF1 ${ADDR_PF1[*]}

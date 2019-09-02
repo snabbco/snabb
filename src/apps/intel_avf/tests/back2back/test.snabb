@@ -1,9 +1,15 @@
 #!../../../../snabb snsh
 local vf0 = os.getenv("SNABB_AVF_PF0_VF0")
-local vf1 = os.getenv("SNABB_AVF_PF1_VF0")
+local vf1 = os.getenv("SNABB_AVF_PF1_VF0") or os.getenv("SNABB_AVF_PF0_VF1")
 
 assert(vf0 ~= nil, "SNABB_AVF_PF0_VF0 is nil")
 assert(vf1 ~= nil, "SNABB_AVF_PF1_VF0 is nil")
+
+local src = os.getenv("SNABB_AVF_PF0_SRC0")
+local dst = os.getenv("SNABB_AVF_PF1_DST0") or os.getenv("SNABB_AVF_PF0_DST1")
+
+assert(src ~= nil, "SNABB_AVF_SRC0 is nil")
+assert(dst ~= nil, "SNABB_AVF_DST1 is nil")
 
 -- 1001 is an important test case, descriptors are written back in sets of 4
 -- 1001, exercises the interrupt driven write back
@@ -17,8 +23,6 @@ local synth = require("apps.test.synth")
 local counter = require("core.counter")
 
 local c = config.new()
-local src="02:00:00:00:00:00"
-local dst="02:00:00:00:00:10"
 config.app(c, "synth", synth.Synth, {
        sizes = {64,128,192,256,384,512,1024},
        src=src,
