@@ -30,6 +30,7 @@ local lib        = require("core.lib")
 local shm        = require("core.shm")
 local yang       = require("lib.yang.yang")
 local alarms     = require("lib.yang.alarms")
+local memory_info = require("apps.lwaftr.memory_info")
 
 local alarm_notification = false
 
@@ -140,6 +141,9 @@ function lwaftr_app(c, conf)
                    alarm_type_qualifier='egress-v6'})
       prepend(postprocessing_apps_v6, "egress_filterv6")
    end
+
+   -- Add MemoryLog app.
+   config.app(c, "MemoryLog", memory_info.MemoryLog, {})
 
    -- Add a special hairpinning queue to the lwaftr app.
    config.link(c, "lwaftr.hairpin_out -> lwaftr.hairpin_in")
