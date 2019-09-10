@@ -2,44 +2,26 @@
 
 module(...,package.seeall)
 
-local rrd = require("lib.rrd")
-local shm = require("core.shm")
+local counter = require("core.counter")
 local lib = require("core.lib")
 
-MemoryLog = {
+MemoryCounter = {
    config = {
-      rrd_name = {default="memory_log.rrd"},
-      pdp_interval = {default=1}, -- 1 second
-      archive_duration = {default=5*60*60} -- 5 hours
+      update_interval = {default=1}, -- 1 second
+   },
+   shm = {
+      bytes_in_use = {counter}
    }
 }
 
-function MemoryLog:new (conf)
+function MemoryCounter:new (conf)
    local self = {}
-   self.pdp_timer = lib.throttle(conf.pdp_interval)
-   self.rrd = rrd.create_shm(conf.rrd_name, {
-      base_interval = ("%ds"):format(conf.pdp_interval),
-      sources = {
-         {
-            name = 'kbytes-in-use',
-            type = 'gauge',
-            interval = ("%ds"):format(conf.pdp_interval*2),
-            min = 0.0
-         }
-      },
-      archives = {
-         {
-            cf = 'last',
-            duration = ("%ds"):format(conf.archive_duration),
-            interval = ("%ds"):format(conf.pdp_interval)
-         }
-      }
-   })
-   return setmetatable(self, {__index=MemoryLog})
+   self.pdp_timer = lib.throttle(conf.update_interval)
+   return setmetatable(self, {__index=MemoryCounter})
 end
 
-function MemoryLog:pull ()
+function MemoryCounter:pull ()
    if self.pdp_timer() then
-      self.rrd:add{ ['kbytes-in-use'] = collectgarbage('count') }
+      counter.set(self.shm.bytes_in_use, math.floor(collectgarbage('count')*1024))
    end
 end

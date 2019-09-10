@@ -143,7 +143,7 @@ function lwaftr_app(c, conf)
    end
 
    -- Add MemoryLog app.
-   config.app(c, "MemoryLog", memory_info.MemoryLog, {})
+   config.app(c, "memory_monitor", memory_info.MemoryCounter)
 
    -- Add a special hairpinning queue to the lwaftr app.
    config.link(c, "lwaftr.hairpin_out -> lwaftr.hairpin_in")
