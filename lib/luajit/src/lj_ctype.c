@@ -5,7 +5,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASFFI
 
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -15,6 +14,7 @@
 #include "lj_ctype.h"
 #include "lj_ccallback.h"
 #include "lj_buf.h"
+#include "lj_auditlog.h"
 
 /* -- C type definitions -------------------------------------------------- */
 
@@ -218,6 +218,7 @@ void lj_ctype_addname(CTState *cts, CType *ct, CTypeID id)
   uint32_t h = ct_hashname(gcref(ct->name));
   ct->next = cts->hash[h];
   cts->hash[h] = (CTypeID1)id;
+  lj_auditlog_new_ctypeid(id, strdata(gco2str(gcref(ct->name))));
 }
 
 /* Get a C type by name, matching the type mask. */
@@ -446,6 +447,7 @@ static void ctype_repr(CTRepr *ctr, CTypeID id)
   for (;;) {
     CTInfo info = ct->info;
     CTSize size = ct->size;
+    CType *newct;
     switch (ctype_type(info)) {
     case CT_NUM:
       if ((info & CTF_BOOL)) {
@@ -528,10 +530,20 @@ static void ctype_repr(CTRepr *ctr, CTypeID id)
       ctype_appc(ctr, ')');
       break;
     default:
-      lua_assert(0);
-      break;
+      ctr->ok = 0;
+      return;
     }
-    ct = ctype_get(ctr->cts, ctype_cid(info));
+    if (ctype_cid(info) == 0) {
+      ctr->ok = 0;
+      return;
+    }
+    newct = ctype_get(ctr->cts, ctype_cid(info));
+    /* Detect ctypes that are not OK due to looping. */
+    if (newct == ct) {
+      ctr->ok = 0;
+      return;
+    }
+    ct = newct;
   }
 }
 
@@ -599,6 +611,7 @@ CTState *lj_ctype_init(lua_State *L)
   cts->tab = ct;
   cts->sizetab = CTTYPETAB_MIN;
   cts->top = CTTYPEINFO_NUM;
+  cts->log = cts->top;
   cts->L = NULL;
   cts->g = G(L);
   for (id = 0; id < CTTYPEINFO_NUM; id++, ct++) {
@@ -622,6 +635,18 @@ CTState *lj_ctype_init(lua_State *L)
   return cts;
 }
 
+/* Log all new ctypes. */
+void lj_ctype_log(lua_State *L)
+{
+  global_State *g = G(L);
+  CTState *cts = ctype_ctsG(g);
+  while (cts && cts->log < cts->top) {
+    int id = cts->log++;
+    GCstr *name = lj_ctype_repr(L, id, NULL);
+    lj_auditlog_new_ctypeid(id, strdata(name));
+  }
+}
+
 /* Free C type table and state. */
 void lj_ctype_freestate(global_State *g)
 {
@@ -634,4 +659,3 @@ void lj_ctype_freestate(global_State *g)
   }
 }
 
-#endif
