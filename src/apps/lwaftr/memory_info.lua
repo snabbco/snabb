@@ -2,26 +2,29 @@
 
 module(...,package.seeall)
 
-local counter = require("core.counter")
+local gauge = require("lib.gauge")
 local lib = require("core.lib")
 
-MemoryCounter = {
+-- MemoryGauge: an app that does nothing except expose a gauge to reflect the
+-- current memory use of the executing process.
+
+MemoryGauge = {
    config = {
       update_interval = {default=1}, -- 1 second
    },
    shm = {
-      bytes_in_use = {counter}
+      kbytes_in_use = {gauge}
    }
 }
 
-function MemoryCounter:new (conf)
+function MemoryGauge:new (conf)
    local self = {}
    self.pdp_timer = lib.throttle(conf.update_interval)
-   return setmetatable(self, {__index=MemoryCounter})
+   return setmetatable(self, {__index=MemoryGauge})
 end
 
-function MemoryCounter:pull ()
+function MemoryGauge:pull ()
    if self.pdp_timer() then
-      counter.set(self.shm.bytes_in_use, math.floor(collectgarbage('count')*1024))
+      gauge.set(self.shm.kbytes_in_use, collectgarbage('count'))
    end
 end
