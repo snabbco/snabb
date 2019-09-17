@@ -11,7 +11,8 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 local data = require('lib.yang.data')
 local state = require('lib.yang.state')
-local ipv4_ntop = require('lib.yang.util').ipv4_ntop
+local yang_util = require('lib.yang.util')
+local ipv4_ntop = yang_util.ipv4_ntop
 local yang = require('lib.yang.yang')
 local path_mod = require('lib.yang.path')
 local path_data = require('lib.yang.path_data')
@@ -100,12 +101,19 @@ local function remove_softwire_entry_actions(app_graph, path)
    return {{'call_app_method_with_blob', args}, {'commit', {}}}
 end
 
+-- Configuration discontinuity-time: this is set on startup and whenever the
+-- configuration changes.
+local discontinuity_time = os.time()
+
 local function compute_config_actions(old_graph, new_graph, to_restart,
                                       verb, path, arg)
    -- If the binding cable changes, remove our cached version.
    if path ~= nil and path:match("^/softwire%-config/binding%-table") then
       binding_table_instance = nil
    end
+
+   -- Set discontinuity-time.
+   discontinuity_time = os.time()
 
    if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       if to_restart == false then
