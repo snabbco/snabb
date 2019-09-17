@@ -1158,7 +1158,7 @@ function selftest()
    -- capabilities, for now, assuming tests are run independently from
    -- programs.
    local caps = get_default_capabilities()
-   local new_caps = { ['ietf-softwire-br'] = {feature={'binding'}} }
+   local new_caps = { ['ietf-softwire-br'] = {feature={'binding-mode'}} }
    for mod_name, mod_caps in pairs(new_caps) do
       if not caps[mod_name] then caps[mod_name] = {feature={}} end
       for _,feature in ipairs(mod_caps.feature) do
@@ -1174,7 +1174,7 @@ function selftest()
    local br = load_schema_by_name('ietf-softwire-br')
    local binding = br.body['br-instances'].body['br-type'].body['binding']
    assert(binding)
-   local bt = binding.body['binding'].body['br-instance'].body['binding-table']
+   local bt = binding.body['binding'].body['bind-instance'].body['binding-table']
    assert(bt)
    local ps = bt.body['binding-entry'].body['port-set']
    assert(ps)

@@ -180,24 +180,24 @@ local function cltable_for_grammar(grammar)
    return cltable.new({key_type=key_t}), key_t
 end
 
-local ietf_br_instance_grammar
-local function get_ietf_br_instance_grammar()
-   if not ietf_br_instance_grammar then
+local ietf_bind_instance_grammar
+local function get_ietf_bind_instance_grammar()
+   if not ietf_bind_instance_grammar then
       local schema = yang.load_schema_by_name('ietf-softwire-br')
       local grammar = data.config_grammar_from_schema(schema)
       grammar = assert(grammar.members['br-instances'])
       grammar = assert(grammar.members['br-type'])
       grammar = assert(grammar.choices['binding'].binding)
-      grammar = assert(grammar.members['br-instance'])
-      ietf_br_instance_grammar = grammar
+      grammar = assert(grammar.members['bind-instance'])
+      ietf_bind_instance_grammar = grammar
    end
-   return ietf_br_instance_grammar
+   return ietf_bind_instance_grammar
 end
 
 local ietf_softwire_grammar
 local function get_ietf_softwire_grammar()
    if not ietf_softwire_grammar then
-      local grammar = get_ietf_br_instance_grammar()
+      local grammar = get_ietf_bind_instance_grammar()
       grammar = assert(grammar.values['binding-table'])
       grammar = assert(grammar.members['binding-entry'])
       ietf_softwire_grammar = grammar
@@ -272,37 +272,20 @@ end
 
 local function ietf_softwire_br_translator ()
    local ret = {}
-   local instance_id_map = {}
    local cached_config
-   local function instance_id_by_device(device)
-      local last
-      for id, pciaddr in ipairs(instance_id_map) do
-	 if pciaddr == device then return id end
-	 last = id
-      end
-      if last == nil then
-	 last = 1
-      else
-	 last = last + 1
-      end
-      instance_id_map[last] = device
-      return last
-   end
    function ret.get_config(native_config)
       if cached_config ~= nil then return cached_config end
       local int = native_config.softwire_config.internal_interface
       local int_err = int.error_rate_limiting
       local ext = native_config.softwire_config.external_interface
-      local br_instance, br_instance_key_t =
-         cltable_for_grammar(get_ietf_br_instance_grammar())
+      local bind_instance = {}
       for device, instance in pairs(native_config.softwire_config.instance) do
-	 br_instance[br_instance_key_t({id=instance_id_by_device(device)})] = {
-	    name = native_config.softwire_config.name,
+	 bind_instance[device] = {
 	    tunnel_payload_mtu = int.mtu,
 	    tunnel_path_mru = ext.mtu,
-	    -- FIXME: There's no equivalent of softwire-num-threshold in
-            -- snabb-softwire-v1.
-	    softwire_num_threshold = 0xffffffff,
+	    -- FIXME: There's no equivalent of softwire-num-max in
+            -- snabb-softwire-v2.
+	    softwire_num_max = 0xffffffff,
             enable_hairpinning = int.hairpinning,
 	    binding_table = {
 	       binding_entry = ietf_binding_table_from_native(
@@ -315,46 +298,47 @@ local function ietf_softwire_br_translator ()
                },
                icmpv6_errors = {
                   generate_icmpv6_errors = int.generate_icmp_errors,
-                  icmpv6_errors_rate =
-                     math.floor(int_err.packets / int_err.period)
+                  icmpv6_rate = math.floor(int_err.packets / int_err.period)
                }
             }
 	 }
       end
       cached_config = {
          br_instances = {
-            binding = { br_instance = br_instance }
+            binding = { bind_instance = bind_instance }
          }
       }
       return cached_config
    end
    function ret.get_state(native_state)
-      -- Even though this is a different br-instance node, it is a
-      -- cltable with the same key type, so just re-use the key here.
-      local br_instance, br_instance_key_t =
-         cltable_for_grammar(get_ietf_br_instance_grammar())
+      local bind_instance = {}
       for device, instance in pairs(native_state.softwire_config.instance) do
          local c = instance.softwire_state
-	 br_instance[br_instance_key_t({id=instance_id_by_device(device)})] = {
+	 bind_instance[device] = {
             traffic_stat = {
-               sent_ipv4_packet = c.out_ipv4_packets,
-               sent_ipv4_byte = c.out_ipv4_bytes,
-               sent_ipv6_packet = c.out_ipv6_packets,
-               sent_ipv6_byte = c.out_ipv6_bytes,
-               rcvd_ipv4_packet = c.in_ipv4_packets,
-               rcvd_ipv4_byte = c.in_ipv4_bytes,
-               rcvd_ipv6_packet = c.in_ipv6_packets,
-               rcvd_ipv6_byte = c.in_ipv6_bytes,
-               dropped_ipv4_packet = c.drop_all_ipv4_iface_packets,
-               dropped_ipv4_byte = c.drop_all_ipv4_iface_bytes,
-               dropped_ipv6_packet = c.drop_all_ipv6_iface_packets,
-               dropped_ipv6_byte = c.drop_all_ipv6_iface_bytes,
+               discontinuity_time = c.discontinuity_time,
+               sent_ipv4_packets = c.out_ipv4_packets,
+               sent_ipv4_bytes = c.out_ipv4_bytes,
+               sent_ipv6_packets = c.out_ipv6_packets,
+               sent_ipv6_bytes = c.out_ipv6_bytes,
+               rcvd_ipv4_packets = c.in_ipv4_packets,
+               rcvd_ipv4_bytes = c.in_ipv4_bytes,
+               rcvd_ipv6_packets = c.in_ipv6_packets,
+               rcvd_ipv6_bytes = c.in_ipv6_bytes,
+               dropped_ipv4_packets = c.drop_all_ipv4_iface_packets,
+               dropped_ipv4_bytes = c.drop_all_ipv4_iface_bytes,
+               dropped_ipv6_packets = c.drop_all_ipv6_iface_packets,
+               dropped_ipv6_bytes = c.drop_all_ipv6_iface_bytes,
                dropped_ipv4_fragments = 0, -- FIXME
                dropped_ipv4_bytes = 0, -- FIXME
                ipv6_fragments_reassembled = c.in_ipv6_frag_reassembled,
                ipv6_fragments_bytes_reassembled = 0, -- FIXME
-               out_icmpv4_error_packets = c.out_icmpv4_error_packets,
-               out_icmpv6_error_packets = c.out_icmpv6_error_packets,
+               out_icmpv4_error_packets = c.out_icmpv4_packets,
+               out_icmpv4_error_bytes = c.out_icmpv4_bytes,
+               out_icmpv6_error_packets = c.out_icmpv6_packets,
+               out_icmpv6_error_bytes = c.out_icmpv6_bytes,
+               dropped_icmpv4_packets = c.drop_in_by_policy_icmpv4_packets,
+               dropped_icmpv4_bytes = c.drop_in_by_policy_icmpv4_bytes,
                hairpin_ipv4_bytes = c.hairpin_ipv4_bytes,
                hairpin_ipv4_packets = c.hairpin_ipv4_packets,
                active_softwire_num = 0, -- FIXME
@@ -363,7 +347,7 @@ local function ietf_softwire_br_translator ()
       end
       return {
          br_instances = {
-            binding = { br_instance = br_instance }
+            binding = { bind_instance = bind_instance }
          }
       }
    end
@@ -376,16 +360,16 @@ local function ietf_softwire_br_translator ()
    end
    function ret.set_config(native_config, path_str, arg)
       path = path_mod.parse_path(path_str)
-      local br_instance_paths = {'br-instances', 'binding', 'br-instance'}
+      local bind_instance_paths = {'br-instances', 'binding', 'bind-instance'}
       local bt_paths = {'binding-table', 'binding-entry'}
 
       -- Can't actually set the instance itself.
-      if #path <= #br_instance_paths then
+      if #path <= #bind_instance_paths then
          error("Unspported path: "..path_str)
       end
 
-      -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru, softwire-num-threshold).
-      if #path > #br_instance_paths then
+      -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru, softwire-num-max).
+      if #path > #bind_instance_paths then
          local maybe_leaf = path[#path].name
          local path_tails = {
             ['tunnel-payload-mtu'] = 'internal-interface/mtu',
@@ -401,7 +385,7 @@ local function ietf_softwire_br_translator ()
             return {{'set', {schema='snabb-softwire-v2',
                              path='/softwire-config/'..path_tail,
                              config=tostring(arg)}}}
-         elseif maybe_leaf == 'icmpv6-errors-rate' then
+         elseif maybe_leaf == 'icmpv6-rate' then
             local head = '/softwire-config/internal-interface/error-rate-limiting'
             return {
                {'set', {schema='snabb-softwire-v2', path=head..'/packets',
@@ -415,22 +399,25 @@ local function ietf_softwire_br_translator ()
 
       -- Two kinds of updates: setting the whole binding table, or
       -- updating one entry.
-      if sets_whole_table(path, #br_instance_paths + #bt_paths) then
+      if sets_whole_table(path, #bind_instance_paths + #bt_paths) then
          -- Setting the whole binding table.
-         if sets_whole_table(path, #br_instance_paths) then
-            for i=#path+1,#br_instance_paths do
-               arg = arg[data.normalize_id(br_instance_paths[i])]
+         if sets_whole_table(path, #bind_instance_paths) then
+            for i=#path+1,#bind_instance_paths do
+               arg = arg[data.normalize_id(bind_instance_paths[i])]
             end
             local instance
-            for k,v in cltable.pairs(arg) do
+            for name,v in pairs(arg) do
                if instance then error('multiple instances in config') end
-               if k.id ~= 1 then error('instance id not 1: '..tostring(k.id)) end
+               if name ~= native_config.softwire_config.name then
+                  error(("instance name does not match this instance (%s): %s")
+                        :format(native_config.softwire_config.name, name))
+               end
                instance = v
             end
             if not instance then error('no instances in config') end
             arg = instance
          end
-         for i=math.max(#path-#br_instance_paths,0)+1,#bt_paths do
+         for i=math.max(#path-#bind_instance_paths,0)+1,#bt_paths do
             arg = arg[data.normalize_id(bt_paths[i])]
          end
          local bt = native_binding_table_from_ietf(arg)
@@ -441,7 +428,7 @@ local function ietf_softwire_br_translator ()
          -- An update to an existing entry.  First, get the existing entry.
          local config = ret.get_config(native_config)
          local entry_path = path_str
-         local entry_path_len = #br_instance_paths + #bt_paths
+         local entry_path_len = #bind_instance_paths + #bt_paths
          for i=entry_path_len+1, #path do
             entry_path = dirname(entry_path)
          end
@@ -514,7 +501,7 @@ local function ietf_softwire_br_translator ()
       end
    end
    function ret.add_config(native_config, path_str, data)
-      local binding_entry_path = {'br-instances', 'binding', 'br-instance',
+      local binding_entry_path = {'br-instances', 'binding', 'bind-instance',
                                   'binding-table', 'binding-entry'}
       local path = path_mod.parse_path(path_str)
 
@@ -562,29 +549,19 @@ local function ietf_softwire_br_translator ()
    function ret.remove_config(native_config, path_str)
       local path = path_mod.parse_path(path_str)
       local ietf_binding_table_path = {'softwire-config', 'binding', 'br',
-         'br-instances', 'br-instance', 'binding-table'}
+         'br-instances', 'bind-instance', 'binding-table'}
       local ietf_instance_path = {'softwire-config', 'binding', 'br',
-         'br-instances', 'br-instance'}
+         'br-instances', 'bind-instance'}
 
       if #path == #ietf_instance_path then
          -- Remove appropriate instance
-         local ietf_instance_id = tonumber(assert(path[5].query).id)
+         local ietf_instance_name = assert(path[5].query).name
          local instance_path = "/softwire-config/instance"
-
-         -- If it's not been populated in instance_id_map this is meaningless
-         -- and dangerous as they have no mapping from snabb's "device".
          local function q(device) return
             string.format("[device=%s]", device)
          end
-         local device = instance_id_map[ietf_instance_id]
-         if device then
-            return {{'remove', {schema='snabb-softwire-v2',
-                                path=instance_path..q(device)}}}
-         else
-            error(string.format(
-               "Could not find '%s' in ietf instance mapping", ietf_instance_id
-            ))
-         end
+         return {{'remove', {schema='snabb-softwire-v2',
+                             path=instance_path..q(ietf_instance_name)}}}
       elseif #path == #ietf_binding_table_path then
          local softwire_path = '/softwire-config/binding-table/softwire'
          if path:sub(-1) ~= ']' then error('unsupported path: '..path_str) end
@@ -606,12 +583,12 @@ local function ietf_softwire_br_translator ()
       -- if we have one).  Otherwise throw away our cached config; we'll
       -- re-make it next time.
       if cached_config == nil then return end
-      local br_instance = cached_config.br_instances.binding.br_instance
+      local bind_instance = cached_config.br_instances.binding.bind_instance
       if (verb == 'remove' and
           path:match('^/softwire%-config/binding%-table/softwire')) then
          -- Remove a softwire.
          local value = snabb_softwire_getter(path)(native_config)
-         for _,instance in cltable.pairs(br_instance) do
+         for _,instance in pairs(bind_instance) do
             local grammar = get_ietf_softwire_grammar()
             local key = path_data.prepare_table_lookup(
                grammar.keys, grammar.key_ctype, {['binding-ipv6info']='::'})
@@ -624,13 +601,13 @@ local function ietf_softwire_br_translator ()
          local bt = native_config.softwire_config.binding_table
          for k,v in cltable.pairs(
             ietf_binding_table_from_native({softwire = data})) do
-            for _,instance in cltable.pairs(br_instance) do
+            for _,instance in pairs(bind_instance) do
                instance.binding_table.binding_entry[k] = v
             end
          end
       elseif (verb == 'set' and path == "/softwire-config/name") then
 	 local br = cached_config.softwire_config.binding.br
-	 for _, instance in cltable.pairs(br_instance) do
+	 for _, instance in pairs(bind_instance) do
 	    instance.name = data
 	 end
       else
@@ -692,6 +669,9 @@ local function process_states(states)
    for _, inst_config in ipairs(states) do
       local name, instance = next(inst_config.softwire_config.instance)
       unified.softwire_config.instance[name] = instance
+
+      unified.softwire_state.discontinuity_time =
+         yang_util.format_date_as_iso_8601(discontinuity_time)
 
       for name, value in pairs(instance.softwire_state) do
          unified.softwire_state[name] = total_counter(

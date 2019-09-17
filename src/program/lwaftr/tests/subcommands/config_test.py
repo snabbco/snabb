@@ -113,7 +113,7 @@ class TestConfigGet(BaseTestCase):
             DAEMON_PROC_NAME,
             # Implicit string concatenation, do not add commas.
             '/br-instances/binding/'
-            'br-instance[id=1]/binding-table/binding-entry'
+            'bind-instance[name=test]/binding-table/binding-entry'
             '[binding-ipv6info=127:22:33:44:55:66:77:128]/binding-ipv4-addr',
         ))
         output = self.run_cmd(cmd_args)
@@ -284,6 +284,9 @@ class TestConfigMultiproc(BaseTestCase):
                 continue
             [cname, cvalue] = line.split(" ")
             cname = os.path.basename(cname)
+            if cname == "discontinuity-time":
+                cvalue = str(cvalue)
+                continue
             cvalue = int(cvalue)
 
             if line.startswith("/softwire-config"):
@@ -501,7 +504,7 @@ class TestConfigMisc(BaseTestCase):
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
             '/br-instances/binding/'
-            'br-instance[id=1]/binding-table/binding-entry'
+            'bind-instance[name=test]/binding-table/binding-entry'
             '[binding-ipv6info=::1]/binding-ipv4-addr',
         ))
         output = self.run_cmd(get_args)
@@ -515,7 +518,7 @@ class TestConfigMisc(BaseTestCase):
         get_args.extend((
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
-            '/br-instances/binding/br-instance[id=1]/'
+            '/br-instances/binding/bind-instance[name=test]/'
             'binding-table/binding-entry[binding-ipv6info=::1]/port-set/psid',
         ))
         output = self.run_cmd(get_args)
