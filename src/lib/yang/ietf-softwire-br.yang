@@ -219,6 +219,15 @@ module ietf-softwire-br {
       "RFC7599: Mapping of Address and Port using Translation (MAP-T)";
   }
 
+  /* XXX - if-feature can be a boolean logic expression in YANG 1.1
+     https://tools.ietf.org/html/rfc7950#section-7.20.2
+   *
+   * This is not yet implemented in lib.yang yet, and since we do not support
+   * map-e or map-t this is a shortcut patch to make it accept this model.
+   */
+  feature "map-e or map-t" {
+  }
+
   container br-instances {
     description
       "BR instances enabled in a network element.";
