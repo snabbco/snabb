@@ -241,19 +241,21 @@ local function native_binding_table_from_ietf(ietf)
    local _, softwire_grammar =
       snabb_softwire_getter('/softwire-config/binding-table/softwire')
    local softwire_key_t = data.typeof(softwire_grammar.key_ctype)
-   local softwire = cltable.new({key_type=softwire_key_t})
+   local softwire_value_t = data.typeof(softwire_grammar.value_ctype)
+   local softwire = ctable.new({key_type=softwire_key_t,
+                                value_type=softwire_value_t})
    for k,v in cltable.pairs(ietf) do
       local softwire_key =
          softwire_key_t({ipv4=v.binding_ipv4_addr, psid=v.port_set.psid})
-      local softwire_value = {
+      local softwire_value = softwire_value_t({
          br_address=v.br_ipv6_addr,
          b4_ipv6=k.binding_ipv6info,
          port_set={
             psid_length=v.port_set.psid_len,
             reserved_ports_bit_count=v.port_set.psid_offset
          }
-      }
-      cltable.set(softwire, softwire_key, softwire_value)
+      })
+      softwire:add(softwire_key, softwire_value)
    end
    return {softwire=softwire}
 end
@@ -369,7 +371,8 @@ local function ietf_softwire_br_translator ()
       end
 
       -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru, softwire-num-max).
-      if #path > #bind_instance_paths then
+      if #path > #bind_instance_paths
+      and #path < #bind_instance_paths+#bt_paths then
          local maybe_leaf = path[#path].name
          local path_tails = {
             ['tunnel-payload-mtu'] = 'internal-interface/mtu',
@@ -408,9 +411,9 @@ local function ietf_softwire_br_translator ()
             local instance
             for name,v in pairs(arg) do
                if instance then error('multiple instances in config') end
-               if name ~= native_config.softwire_config.name then
-                  error(("instance name does not match this instance (%s): %s")
-                        :format(native_config.softwire_config.name, name))
+               if not native_config.softwire_config.instance[name] then
+                  error(("instance name does not this instance: %s")
+                        :format(name))
                end
                instance = v
             end
@@ -521,7 +524,7 @@ local function ietf_softwire_br_translator ()
          local key, value = entry.key, entry.value
          if old_bt.softwire:lookup_ptr(key) ~= nil then
             error('softwire already present in table: '..
-                     inet_ntop(key.ipv4)..'/'..key.psid)
+                     ipv4_ntop(key.ipv4)..'/'..key.psid)
          end
          local config_str = string.format([[{
             ipv4 %s;
