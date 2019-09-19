@@ -314,9 +314,10 @@ local function ietf_softwire_br_translator ()
       local int = native_config.softwire_config.internal_interface
       local int_err = int.error_rate_limiting
       local ext = native_config.softwire_config.external_interface
+      local ext_err = ext.error_rate_limiting
       local instance = {
-         tunnel_payload_mtu = int.mtu,
-         tunnel_path_mru = ext.mtu,
+         softwire_payload_mtu = int.mtu,
+         softwire_path_mru = ext.mtu,
          -- FIXME: There's no equivalent of softwire-num-max in
          -- snabb-softwire-v2.
          softwire_num_max = 0xffffffff,
@@ -328,7 +329,8 @@ local function ietf_softwire_br_translator ()
          icmp_policy = {
             icmpv4_errors = {
                allow_incoming_icmpv4 = ext.allow_incoming_icmp,
-               generate_icmpv4_errors = ext.generate_icmp_errors
+               generate_icmpv4_errors = ext.generate_icmp_errors,
+               icmpv4_rate = math.floor(ext_err.packets / ext_err.period)
             },
             icmpv6_errors = {
                generate_icmpv6_errors = int.generate_icmp_errors,
@@ -347,7 +349,8 @@ local function ietf_softwire_br_translator ()
       }
       return cached_config
    end
-   function ret.get_state(native_state)
+   function ret.get_state(native_state, native_config)
+      local c = native_state.softwire_state
       local traffic_stat = {
          discontinuity_time = c.discontinuity_time,
          sent_ipv4_packets = c.out_ipv4_packets,
@@ -402,24 +405,56 @@ local function ietf_softwire_br_translator ()
                path[#bind_instance_path].query.name)
       end
 
-      -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru, softwire-num-max).
+      -- Handle special br attributes (softwire-payload-mtu,
+      -- softwire-path-mru, ..., icmp-policy).
       if #path == #bind_instance_path+1 and
          path_match(path, bind_instance_path)
       then
          local leaf = path[#path].name
          local path_tails = {
-            ['tunnel-payload-mtu'] = 'internal-interface/mtu',
-            ['tunnel-path-mtu'] = 'external-interface/mtu',
+            ['softwire-payload-mtu'] = 'internal-interface/mtu',
+            ['softwire-path-mru'] = 'external-interface/mtu',
             ['name'] = 'name',
-            ['enable-hairpinning'] = 'internal-interface/hairpinning',
-            ['allow-incoming-icmpv4'] = 'external-interface/allow-incoming-icmp',
-            ['generate-icmpv4-errors'] = 'external-interface/generate-icmp-errors',
-            ['generate-icmpv6-errors'] = 'internal-interface/generate-icmp-errors'
+            ['enable-hairpinning'] = 'internal-interface/hairpinning'
          }
          local path_tail = path_tails[leaf]
          if path_tail then
             return {{'set', {schema='snabb-softwire-v2',
                              path='/softwire-config/'..path_tail,
+                             config=tostring(arg)}}}
+         else
+            error('unrecognized leaf: '..leaf)
+         end
+      elseif #path == #bind_instance_path+3 and
+         path_match(path, bind_instance_path, {'icmp-policy', 'icmpv4-errors'})
+      then
+         local leaf = path[#path].name
+         local path_tails = {
+            ['allow-incoming-icmpv4'] = 'external-interface/allow-incoming-icmp',
+            ['generate-icmpv4-errors'] = 'external-interface/generate-icmp-errors',
+         }
+         local path_tail = path_tails[leaf]
+         if path_tail then
+            return {{'set', {schema='snabb-softwire-v2',
+                             path='/softwire-config/'..path_tail,
+                             config=tostring(arg)}}}
+         elseif leaf == 'icmpv4-rate' then
+            local head = '/softwire-config/external-interface/error-rate-limiting'
+            return {
+               {'set', {schema='snabb-softwire-v2', path=head..'/packets',
+                        config=tostring(arg * 2)}},
+               {'set', {schema='snabb-softwire-v2', path=head..'/period',
+                        config='2'}}}
+         else
+            error('unrecognized leaf: '..leaf)
+         end
+      elseif #path == #bind_instance_path+3 and
+         path_match(path, bind_instance_path, {'icmp-policy', 'icmpv6-errors'})
+      then
+         local leaf = path[#path].name
+         if leaf == 'generate-icmpv6-errors' then
+            return {{'set', {schema='snabb-softwire-v2',
+                             path='/softwire-config/internal-interface/generate-icmp-errors',
                              config=tostring(arg)}}}
          elseif leaf == 'icmpv6-rate' then
             local head = '/softwire-config/internal-interface/error-rate-limiting'
@@ -594,10 +629,12 @@ local function ietf_softwire_br_translator ()
                   instance_name(native_config),
                   path[#bind_instance_path].query.name)
          end
+         if not path_has_query(path, #path) then
+            error('unsupported path: '..path_str)
+         end
          local softwire_path = '/softwire-config/binding-table/softwire'
-         if path:sub(-1) ~= ']' then error('unsupported path: '..path_str) end
          local config = ret.get_config(native_config)
-         local entry = ietf_softwire_getter(path_str)(config)
+         local entry = ietf_softwire_br_getter(path_str)(config)
          local function q(ipv4, psid)
             return string.format('[ipv4=%s][psid=%s]', ipv4_ntop(ipv4), psid)
          end
