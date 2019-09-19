@@ -400,9 +400,9 @@ local function ietf_softwire_br_translator ()
          not path_has_query(path, #bind_instance_path,
                             {name=instance_name(native_config)})
       then
-         error("Instance name does not match this instance (%s): %s",
-               instance_name(native_config),
-               path[#bind_instance_path].query.name)
+         error(("Instance name does not match this instance (%s): %s")
+               :format(instance_name(native_config),
+                       path[#bind_instance_path].query.name))
       end
 
       -- Handle special br attributes (softwire-payload-mtu,
@@ -572,9 +572,9 @@ local function ietf_softwire_br_translator ()
       end
       if not path_has_query(path, #bind_instance_path,
                             {name=instance_name(native_config)}) then
-         error("Instance name does not match this instance (%s): %s",
-               instance_name(native_config),
-               path[#bind_instance_path].query.name)
+         error(("Instance name does not match this instance (%s): %s")
+               :format(instance_name(native_config),
+                       path[#bind_instance_path].query.name))
       end
       local config = ret.get_config(native_config)
       local ietf_bt = ietf_softwire_br_getter(path_str)(config)
@@ -624,9 +624,9 @@ local function ietf_softwire_br_translator ()
       then
          if not path_has_query(path, #bind_instance_path,
                                {name=instance_name(native_config)}) then
-            error("Instance name does not match this instance (%s): %s",
-                  instance_name(native_config),
-                  path[#bind_instance_path].query.name)
+            error(("Instance name does not match this instance (%s): %s")
+                  :format(instance_name(native_config),
+                          path[#bind_instance_path].query.name))
          end
          if not path_has_query(path, #path) then
             error('unsupported path: '..path_str)
