@@ -113,7 +113,7 @@ class TestConfigGet(BaseTestCase):
             DAEMON_PROC_NAME,
             # Implicit string concatenation, do not add commas.
             '/br-instances/binding/'
-            'bind-instance[name=test]/binding-table/binding-entry'
+            'bind-instance[name=config-test-daemon]/binding-table/binding-entry'
             '[binding-ipv6info=127:22:33:44:55:66:77:128]/binding-ipv4-addr',
         ))
         output = self.run_cmd(cmd_args)
@@ -429,7 +429,7 @@ class TestConfigMisc(BaseTestCase):
         add_args.extend((
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
-            '/br-instances/binding/bind-instance[name=test]/'
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
             'binding-table/binding-entry',
             '{ binding-ipv6info ::123; binding-ipv4-addr 8.8.8.8;'
             'br-ipv6-addr 2001:db8::; port-set { psid 8; psid-len 15; }}',
@@ -439,7 +439,7 @@ class TestConfigMisc(BaseTestCase):
         get_args[3] = '--schema=ietf-softwire-br'
         get_args.extend((
             DAEMON_PROC_NAME,
-            '/br-instances/binding/bind-instance[name=test]/'
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
             'binding-table/binding-entry[binding-ipv6info=::123]/port-set/psid',
         ))
         output = self.run_cmd(get_args)
@@ -483,6 +483,8 @@ class TestConfigMisc(BaseTestCase):
         # Verify we cannot find it anymore.
         self.run_cmd(get_args)
         # run_cmd checks the exit code and fails the test if it is not zero.
+
+    #XXX - def test_remove_ietf(self):
 
     def test_set(self):
         """
@@ -529,7 +531,7 @@ class TestConfigMisc(BaseTestCase):
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
             '/br-instances/binding/'
-            'bind-instance[name=test]/binding-table/binding-entry'
+            'bind-instance[name=config-test-daemon]/binding-table/binding-entry'
             '[binding-ipv6info=::1]/binding-ipv4-addr',
         ))
         output = self.run_cmd(get_args)
@@ -543,7 +545,7 @@ class TestConfigMisc(BaseTestCase):
         get_args.extend((
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
-            '/br-instances/binding/bind-instance[name=test]/'
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
             'binding-table/binding-entry[binding-ipv6info=::1]/port-set/psid',
         ))
         output = self.run_cmd(get_args)
@@ -559,7 +561,7 @@ class TestConfigMisc(BaseTestCase):
         set_args.extend((
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
-            '/br-instances/binding/bind-instance[name=test]/'
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
             'binding-table/binding-entry',
             '{ binding-ipv6info ::124; binding-ipv4-addr 8.8.8.8;'
             'br-ipv6-addr 2001:db8::; port-set { psid 8; psid-len 15; }}',
@@ -570,7 +572,7 @@ class TestConfigMisc(BaseTestCase):
         set_args.extend((
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
-            '/br-instances/binding/bind-instance[name=test]/'
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
             'binding-table/binding-entry[binding-ipv6info=::124]/'
             'binding-ipv4-addr',
             '9.9.9.9',
@@ -585,6 +587,7 @@ class TestConfigMisc(BaseTestCase):
         self.assertEqual(
             output.strip(), b'::124',
             '\n'.join(('OUTPUT', str(output, ENC))))
+        # XXX - test Handle special br attributes
 
 
 if __name__ == '__main__':
