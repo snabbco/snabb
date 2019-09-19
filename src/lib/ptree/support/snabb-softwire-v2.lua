@@ -471,7 +471,6 @@ local function ietf_softwire_br_translator ()
       -- Two kinds of updates: setting the whole binding table, or
       -- updating one entry.
       if path_match(path, bind_instance_path, binding_entry_path) then
-         print("whole")
          -- Setting the whole binding table.
          if #path == #bind_instance_path + #binding_entry_path and
             not path_has_query(path, #path)
@@ -739,14 +738,6 @@ function selftest ()
    local path = path_mod.parse_path(
       "/br-instances/binding/bind-instance[name=test]/binding-table/binding-entry"
    )
-   print("path")
-   for i,c in pairs(path) do
-      print(i)
-      print(c.name)
-      for k,v in pairs(c.query) do
-         print(k, v)
-      end
-   end
    assert(#path == #bind_instance_path + #binding_entry_path)
    assert(path_match(path, bind_instance_path, binding_entry_path))
    assert(path_match(path, bind_instance_path))
