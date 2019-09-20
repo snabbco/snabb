@@ -795,8 +795,6 @@ function resolve(schema, features)
          end
       end
       for _,feature in ipairs(pop_prop(node, 'if_features') or {}) do
-         -- XXX - feature can be a boolean logic expression in YANG 1.1
-         -- https://tools.ietf.org/html/rfc7950#section-7.20.2
          local feature_node = lookup_lazy(env, 'features', feature)
          if node.kind == 'feature' then
             -- This is a feature that depends on a feature.  These we
