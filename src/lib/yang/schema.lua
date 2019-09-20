@@ -647,24 +647,13 @@ local if_feature_expr_parser = (function ()
    local match, capture, combine = maxpc.import()
    local refs = {}
    local function ref (s) return function (...) return refs[s](...) end end
-   local di = 0
-   local function d(n, p)
-      return function (...)
-         print((' '):rep(di)..n)
-         di = di + 3
-         local res = {p(...)}
-         di = di - 3
-         print((' '):rep(di)..(res[1] and 'match' or 'fail'))
-         return unpack(res)
-      end
-   end
    local function wsp_lf()
       return combine._or(match.equal(' '), match.equal('\t'),
                          match.equal('\n'), match.equal('\r'))
    end
-   local function sep()      return d('sep', combine.some(wsp_lf())) end
-   local function optsep()   return d('optsep',combine.any(wsp_lf()))  end
-   local function keyword(s) return d(s, match.string(s))        end
+   local function sep()      return combine.some(wsp_lf()) end
+   local function optsep()   return combine.any(wsp_lf())  end
+   local function keyword(s) return match.string(s)        end
    local function identifier()
       -- [a-zA-Z_][a-zA-Z0-9_-.:]+
       local alpha_ = match.satisfies(function (x)
@@ -674,9 +663,9 @@ local if_feature_expr_parser = (function ()
       local digit_punct = match.satisfies(function (x)
             return ("0123456789-."):find(x, 1, true)
       end)
-      return d('identifier', capture.subseq(
+      return capture.subseq(
          match.seq(alpha_, combine.any(combine._or(alpha_, digit_punct)))
-      ))
+      )
    end
    local function identifier_ref()
       local idref = capture.seq(
@@ -686,28 +675,26 @@ local if_feature_expr_parser = (function ()
       local function ast_idref (mod_or_id, _, id)
          return {'feature', id or mod_or_id, id and mod_or_id or nil}
       end
-      return d('identifier_ref',
-               capture.unpack(idref, ast_idref))
+      return capture.unpack(idref, ast_idref)
    end
    local function if_feature_not()
       local not_feature = capture.seq(
          keyword'not', sep(), ref'if_feature_factor'
       )
       local function ast_not (_, _, fact) return {'not', fact} end
-      return d('if_feature_not',
-               capture.unpack(not_feature, ast_not))
+      return capture.unpack(not_feature, ast_not)
    end
    local function if_feature_subexpr()
       local subexpr = capture.seq(
          match.equal("("), optsep(), ref'if_feature_expr', optsep(), match.equal(")")
       )
       local function ast_subexpr (_, _, expr) return {'subexpr', expr} end
-      return d('if_feature_subexpr',
-               capture.unpack(subexpr, ast_subexpr))
+      return capture.unpack(subexpr, ast_subexpr)
    end
    local function if_feature_factor ()
-      return d('if_feature_factor',
-               combine._or(if_feature_not(), if_feature_subexpr(), identifier_ref()))
+      return combine._or(
+         if_feature_not(), if_feature_subexpr(), identifier_ref()
+      )
    end
    refs.if_feature_factor = if_feature_factor()
    local function if_feature_and()
@@ -715,12 +702,10 @@ local if_feature_expr_parser = (function ()
          if_feature_factor(), sep(), keyword'and', sep(), ref'if_feature_term'
       )
       local function ast_and (a, _, _, _, b) return {'and', a, b} end
-      return d('if_feature_and',
-               capture.unpack(and_feature, ast_and))
+      return capture.unpack(and_feature, ast_and)
    end
    local function if_feature_term()
-      return d('if_feature_term',
-               combine._or(if_feature_and(), if_feature_factor()))
+      return combine._or(if_feature_and(), if_feature_factor())
    end
    refs.if_feature_term = if_feature_term()
    local function if_feature_or()
@@ -728,12 +713,10 @@ local if_feature_expr_parser = (function ()
          if_feature_term(), sep(), keyword'or', sep(), ref'if_feature_expr'
       )
       local function ast_or (a, _, _, _, b) return {'or', a, b} end
-      return d('if_feature_or',
-               capture.unpack(or_feature, ast_or))
+      return capture.unpack(or_feature, ast_or)
    end
    local function if_feature_expr()
-      return d('if_feature_expr',
-               combine._or(if_feature_or(), if_feature_term()))
+      return combine._or(if_feature_or(), if_feature_term())
    end
    refs.if_feature_expr = if_feature_expr()
    return refs.if_feature_expr
