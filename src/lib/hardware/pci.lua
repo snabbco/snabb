@@ -18,6 +18,7 @@ devices = {}
 --- Each entry is a "device info" table with these attributes:
 ---
 --- * `pciaddress` e.g. `"0000:83:00.1"`
+--- * `numa_node` numa node device is attached to, or -1 if no numa
 --- * `vendor` id hex string e.g. `"0x8086"` for Intel.
 --- * `device` id hex string e.g. `"0x10fb"` for 82599 chip.
 --- * `interface` name of Linux interface using this device e.g. `"eth0"`.
@@ -40,6 +41,7 @@ function device_info (pciaddress)
    local p = path(pciaddress)
    assert(S.stat(p), ("No such device: %s"):format(pciaddress))
    info.pciaddress = canonical(pciaddress)
+   info.numa_node = lib.firstline(p.."/numa_node")
    info.vendor = lib.firstline(p.."/vendor")
    info.device = lib.firstline(p.."/device")
    info.model = which_model(info.vendor, info.device)
@@ -243,8 +245,8 @@ end
 
 function print_device_summary ()
    local attrs = {"pciaddress", "model", "interface", "status",
-                  "driver", "usable"}
-   local fmt = "%-11s %-18s %-10s %-7s %-20s %s"
+                  "driver", "usable", "numa_node"}
+   local fmt = "%-11s %-18s %-10s %-7s %-20s %-7s %s"
    print(fmt:format(unpack(attrs)))
    for _,info in ipairs(devices) do
       local values = {}
