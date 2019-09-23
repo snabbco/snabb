@@ -614,7 +614,8 @@ function Manager:foreign_rpc_get_state (schema_name, path, format,
                                        print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
-   local foreign_state = translate.get_state(self:get_native_state())
+   local foreign_state = translate.get_state(self:get_native_state(),
+                                             self.current_configuration)
    local printer = path_data.printer_for_schema_by_name(
       schema_name, path, false, format, print_default)
    return { state = call_with_output_string(printer, foreign_state) }

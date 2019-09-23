@@ -35,7 +35,7 @@ local memory_info = require("apps.lwaftr.memory_info")
 local alarm_notification = false
 
 local capabilities = {
-   ['ietf-softwire-br']={feature={'binding'}},
+   ['ietf-softwire-br']={feature={'binding-mode'}},
    ['ietf-alarms']={feature={'operator-actions', 'alarm-shelving', 'alarm-history'}},
 }
 require('lib.yang.schema').set_default_capabilities(capabilities)
