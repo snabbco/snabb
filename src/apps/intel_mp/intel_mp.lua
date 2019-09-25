@@ -1338,7 +1338,11 @@ function Intel82599:promisc ()
    return band(self.r.FCTRL(), lshift(1, 9)) ~= 0ULL
 end
 function Intel82599:rxbytes  () return self.r.GORC64()   end
-function Intel82599:rxdrop   () return self.r.MNGPDC() + self.r.FCOERPDC() end
+function Intel82599:rxdrop   ()
+   local rxdrop = self.r.MNGPDC() + self.r.FCOERPDC()
+   for i=0,15 do rxdrop = rxdrop + self.r.QPRDC[i]() end
+   return rxdrop
+end
 function Intel82599:rxerrors ()
    return self.r.CRCERRS() + self.r.ILLERRC() + self.r.ERRBC() +
       self.r.RUC() + self.r.RFC() + self.r.ROC() + self.r.RJC()
