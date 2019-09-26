@@ -182,11 +182,12 @@ function run (args)
             fill = row.min.rel
          end
          if row.average then
-            out:write(("-"):rep(math.max(0, row.average.rel-fill-1)))
+            local bar = (row.min and row.max) and "-" or " "
+            out:write(bar:rep(math.max(0, row.average.rel-fill-1)))
             out:write(("a"):rep(math.min(1, row.average.rel-fill)))
             fill = row.average.rel
          elseif row.last then
-            local bar = row.max and "-" or " "
+            local bar = (row.min and row.max) and "-" or " "
             out:write(bar:rep(math.max(0, row.last.rel-fill-1)))
             out:write(("l"):rep(math.min(1, row.last.rel-fill)))
             fill = row.last.rel
