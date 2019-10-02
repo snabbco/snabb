@@ -719,7 +719,7 @@ function Intel:push ()
    self.tdh = self.r.TDH()	-- possible race condition, 7.2.2.4, check DD
    --C.full_memory_barrier()
    while cursor ~= self.tdh do
-      if self.txqueue[cursor] then
+      if self.txqueue[cursor] ~= nil then -- Non-null pointer?
          packet.free(self.txqueue[cursor])
          self.txqueue[cursor] = nil
       end
