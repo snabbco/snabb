@@ -430,11 +430,6 @@ function CTable:remove(key, missing_allowed)
    return true
 end
 
-local function generate_multi_hash(self, width)
-   return self.make_multi_hash_fn(width)
-end
-generate_multi_hash = memoize(generate_multi_hash)
-
 local function generate_binary_search(entries_per_lookup, entry_type)
    return binary_search.gen(entries_per_lookup, entry_type)
 end
@@ -471,7 +466,7 @@ function CTable:make_lookup_streamer(width)
    -- specialized for this table and this width.
    local entry_size = ffi.sizeof(self.entry_type)
    res.multi_copy = multi_copy.gen(width, res.entries_per_lookup * entry_size)
-   res.multi_hash = generate_multi_hash(self, width)
+   res.multi_hash = self.make_multi_hash_fn(width)
    res.binary_search = generate_binary_search(res.entries_per_lookup, self.entry_type)
 
    return setmetatable(res, { __index = LookupStreamer })
