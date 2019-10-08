@@ -57,8 +57,8 @@ function IngressDropMonitor:sample ()
    sum[0] = 0
    for i = 1, #app_array do
       local app = app_array[i]
-      if app.rxdrop and not app.dead then
-         sum[0] = sum[0] + app:rxdrop()
+      if app.get_rxstats and not app.dead then
+         sum[0] = sum[0] + app:get_rxstats().dropped
       end
    end
    if self.counter then
