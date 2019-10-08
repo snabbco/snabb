@@ -430,11 +430,6 @@ function CTable:remove(key, missing_allowed)
    return true
 end
 
-local function generate_multi_copy(width, size)
-   return multi_copy.gen(width, size)
-end
-generate_multi_copy = memoize(generate_multi_copy)
-
 local function generate_multi_hash(self, width)
    return self.make_multi_hash_fn(width)
 end
@@ -475,7 +470,7 @@ function CTable:make_lookup_streamer(width)
    -- Compile multi-copy and binary-search procedures that are
    -- specialized for this table and this width.
    local entry_size = ffi.sizeof(self.entry_type)
-   res.multi_copy = generate_multi_copy(width, res.entries_per_lookup * entry_size)
+   res.multi_copy = multi_copy.gen(width, res.entries_per_lookup * entry_size)
    res.multi_hash = generate_multi_hash(self, width)
    res.binary_search = generate_binary_search(res.entries_per_lookup, self.entry_type)
 
