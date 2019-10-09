@@ -2,6 +2,7 @@
 -- COPYING.
 module(..., package.seeall)
 
+local S = require("syscall")
 local ffi = require("ffi")
 local lib = require("core.lib")
 local shm = require("core.shm")
@@ -474,10 +475,14 @@ end
 function data_copier_from_grammar(production)
    local compile = data_compiler_from_grammar(data_emitter(production), '')
    return function(data)
-      local basename = 'copy-'..lib.random_printable_string(160)
-      local tmp = shm.root..'/'..shm.resolve(basename)
-      compile(data, tmp)
-      return function() return load_compiled_data_file(tmp).data end
+      return function()
+         local basename = 'copy-'..lib.random_printable_string(160)
+         local tmp = shm.root..'/'..shm.resolve(basename)
+         compile(data, tmp)
+         local copy = load_compiled_data_file(tmp).data
+         S.unlink(tmp)
+         return copy
+      end
    end
 end
 

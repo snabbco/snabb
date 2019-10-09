@@ -35,6 +35,7 @@ local function assemble (name, prototype, generator)
    return ffi.cast(prototype, mcode)
 end
 
+local gencache = {} -- Cache for generated variants (reuse if possible.)
 function gen(count, entry_type)
    local function gen_binary_search(Dst)
       if count == 1 then
@@ -80,9 +81,19 @@ function gen(count, entry_type)
       | mov rax, rdi
       | ret
    end
-   return assemble("binary_search_"..count,
-                   ffi.typeof("$*(*)($*, uint32_t)", entry_type, entry_type),
-                   gen_binary_search)
+   -- Assemble binary search variant and cache it unless it has not been
+   -- previously generated.
+   if not gencache[entry_type] then
+      gencache[entry_type] = {}
+   end
+   if not gencache[entry_type][count] then
+      gencache[entry_type][count] =
+         assemble("binary_search_"..count,
+                  ffi.typeof("$*(*)($*, uint32_t)", entry_type, entry_type),
+                  gen_binary_search)
+   end
+   -- Return (now) cached routine.
+   return gencache[entry_type][count]
 end
 
 function selftest ()
