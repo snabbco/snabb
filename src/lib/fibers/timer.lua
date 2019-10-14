@@ -129,8 +129,8 @@ local function tick_outer(inner, outer)
       local ent = pop_node(head)
       local idx = math.floor((ent.time - outer.now) * inner.rate)
       -- Because of floating-point imprecision it's possible to get an
-      -- index that is too large by 1.
-      idx = math.min(idx, WHEEL_SLOTS-1)
+      -- index that falls just outside [0,WHEEL_SLOTS-1].
+      idx = math.max(math.min(idx, WHEEL_SLOTS-1), 0)
       push_node(ent, inner.slots[idx])
    end
    outer.cur = band(outer.cur + 1, SLOT_INDEX_MASK)
