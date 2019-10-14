@@ -347,11 +347,11 @@ function Manager:monitor_worker_counters(id)
    local events = inotify.recursive_directory_inventory_events(dir, cancel)
    for ev in events.get, events do
       if has_suffix(ev.name, '.counter') then
-         local islink = S.lstat(ev.name).islnk
+         local stat = S.lstat(ev.name)
          local name = strip_prefix(ev.name, dir..'/')
          local qualified_name = '/'..pid..'/'..name
          local counters = self.counters[name]
-         if blacklisted(name) or islink then
+         if blacklisted(name) or not stat or stat.islnk then
             -- Pass.
          elseif ev.kind == 'creat' then
             if not counters then
