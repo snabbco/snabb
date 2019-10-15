@@ -207,18 +207,35 @@ end
 
 local function ietf_binding_table_from_native(bt)
    local ret, key_t = cltable_for_grammar(get_ietf_softwire_grammar())
+   local warn_lossy = false
    for softwire in bt.softwire:iterate() do
       local k = key_t({ binding_ipv6info = softwire.value.b4_ipv6 })
-      local v = {
-         binding_ipv4_addr = softwire.key.ipv4,
-         port_set = {
-            psid_offset = softwire.value.port_set.reserved_ports_bit_count,
-            psid_len = softwire.value.port_set.psid_length,
-            psid = softwire.key.psid
-         },
-         br_ipv6_addr = softwire.value.br_address,
-      }
-      ret[k] = v
+      if ret[k] ~= nil then
+         -- If two entries in the native softwire table have the same key in
+         -- the ietf-softwire-br schema, we omit the duplicate entry and print
+         -- a load warning to inform the user of this issue.
+         warn_lossy = warn_lossy or ret[k]
+      else
+         local v = {
+            binding_ipv4_addr = softwire.key.ipv4,
+            port_set = {
+               psid_offset = softwire.value.port_set.reserved_ports_bit_count,
+               psid_len = softwire.value.port_set.psid_length,
+               psid = softwire.key.psid
+            },
+            br_ipv6_addr = softwire.value.br_address,
+         }
+         ret[k] = v
+      end
+   end
+   if warn_lossy then
+      io.stderr:write(
+         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"..
+         "WARNING: the native configuration has softwires with non-unique\n"..
+         "values for b4-ipv6. The binding-table returned through the\n"..
+         "ietf-softwire-br schema is incomplete!\n"..
+         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"
+      )
    end
    return ret
 end

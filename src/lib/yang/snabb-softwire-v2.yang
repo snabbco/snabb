@@ -771,7 +771,6 @@ module snabb-softwire-v2 {
 
       list softwire {
         key "ipv4 psid";
-        unique "b4-ipv6";
 
         leaf ipv4 {
           type inet:ipv4-address;
