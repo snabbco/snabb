@@ -19,29 +19,17 @@ local path_data = require('lib.yang.path_data')
 local generic = require('lib.ptree.support').generic_schema_config_support
 local binding_table = require("apps.lwaftr.binding_table")
 
-local binding_table_instance
-local function get_binding_table_instance(conf)
-   if binding_table_instance == nil then
-      binding_table_instance = binding_table.load(conf)
-   end
-   return binding_table_instance
-end
-
 -- Packs snabb-softwire-v2 softwire entry into softwire and PSID blob
 --
 -- The data plane stores a separate table of psid maps and softwires. It
 -- requires that we give it a blob it can quickly add. These look rather
 -- similar to snabb-softwire-v1 structures however it maintains the br-address
 -- on the softwire so are subtly different.
-local function pack_softwire(app_graph, entry)
+local function pack_softwire(app_graph, bt, entry)
    assert(app_graph.apps['lwaftr'])
    assert(entry.value.port_set, "Softwire lacks port-set definition")
    local key, value = entry.key, entry.value
    
-   -- Get the binding table
-   local bt_conf = app_graph.apps.lwaftr.arg.softwire_config.binding_table
-   bt = get_binding_table_instance(bt_conf)
-
    local softwire_t = bt.softwires.entry_type()
    psid_map_t = bt.psid_map.entry_type()
 
@@ -61,13 +49,10 @@ local function pack_softwire(app_graph, entry)
    return packed_softwire, packed_psid_map
 end
 
-local function add_softwire_entry_actions(app_graph, entries)
-   assert(app_graph.apps['lwaftr'])
-   local bt_conf = app_graph.apps.lwaftr.arg.softwire_config.binding_table
-   local bt = get_binding_table_instance(bt_conf)
+local function add_softwire_entry_actions(app_graph, bt, entries)
    local ret = {}
    for entry in entries:iterate() do
-      local psoftwire, ppsid = pack_softwire(app_graph, entry)
+      local psoftwire, ppsid = pack_softwire(app_graph, bt, entry)
       assert(bt:is_managed_ipv4_address(psoftwire.key.ipv4))
 
       local softwire_args = {'lwaftr', 'add_softwire_entry', psoftwire}
@@ -101,23 +86,20 @@ local function remove_softwire_entry_actions(app_graph, path)
    return {{'call_app_method_with_blob', args}, {'commit', {}}}
 end
 
--- Configuration discontinuity-time: this is set on startup and whenever the
--- configuration changes.
-local discontinuity_time = os.time()
-
-local function compute_config_actions(old_graph, new_graph, to_restart,
+local function compute_config_actions(get_binding_table_instance,
+                                      old_graph, new_graph, to_restart,
                                       verb, path, arg)
    -- If the binding cable changes, remove our cached version.
    if path ~= nil and path:match("^/softwire%-config/binding%-table") then
       binding_table_instance = nil
    end
 
-   -- Set discontinuity-time.
-   discontinuity_time = os.time()
-
    if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       if to_restart == false then
-	 return add_softwire_entry_actions(new_graph, arg)
+         assert(new_graph.apps['lwaftr'])
+         local bt_conf = app_graph.apps.lwaftr.arg.softwire_config.binding_table
+         local bt = get_binding_table_instance(bt_conf)
+	 return add_softwire_entry_actions(new_graph, bt, arg)
       end
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
@@ -143,6 +125,7 @@ local function update_mutable_objects_embedded_in_app_initargs(
 end
 
 local function compute_apps_to_restart_after_configuration_update(
+      get_binding_table_instance,
       schema_name, configuration, verb, path, in_place_dependencies, arg)
    if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       -- We need to check if the softwire defines a new port-set, if so we need to
@@ -701,7 +684,7 @@ local function compute_state_reader(schema_name)
    end
 end
 
-local function process_states(states)
+local function process_states(discontinuity_time, states)
    -- We need to create a summation of all the states as well as adding all the
    -- instance specific state data to create a total in software-state.
 
@@ -736,14 +719,38 @@ end
 
 
 function get_config_support()
+   -- Binding table instance cache.
+   local binding_table_instance
+   local function get_binding_table_instance(conf)
+      if binding_table_instance == nil then
+         binding_table_instance = binding_table.load(conf)
+      end
+      return binding_table_instance
+   end
+   -- Configuration discontinuity-time: this is set on startup and whenever the
+   -- configuration changes.
+   local discontinuity_time = os.time()
+   -- Wrap some stateless support functions with isolated, stateful effects.
+   local function compute_config_actions1 (...)
+      -- Set discontinuity-time.
+      discontinuity_time = os.time()
+      return compute_config_actions(get_binding_table_instance, ...)
+   end
+   local function compute_apps_to_restart_after_configuration_update1 (...)
+      return compute_apps_to_restart_after_configuration_update(
+         get_binding_table_instance, ...)
+   end
+   local function process_states1 (...)
+      return process_states(discontinuity_time, ...)
+   end
    return {
-      compute_config_actions = compute_config_actions,
+      compute_config_actions = compute_config_actions1,
       update_mutable_objects_embedded_in_app_initargs =
          update_mutable_objects_embedded_in_app_initargs,
       compute_apps_to_restart_after_configuration_update =
-         compute_apps_to_restart_after_configuration_update,
+         compute_apps_to_restart_after_configuration_update1,
       compute_state_reader = compute_state_reader,
-      process_states = process_states,
+      process_states = process_states1,
       configuration_for_worker = configuration_for_worker,
       translators = { ['ietf-softwire-br'] = ietf_softwire_br_translator () }
    }
