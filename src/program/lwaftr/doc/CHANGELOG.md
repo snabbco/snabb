@@ -31,7 +31,8 @@
    drops occured in the past.  See
    https://github.com/Igalia/snabb/pull/1225 for details.
 
- * Incorporate changes from the upstream Snabb 2019.06 "Deltadromeus"
+ * Incorporate changes from the upstream [Snabb 2019.06
+   "Deltadromeus"](https://github.com/snabbco/snabb/releases/tag/v2019.01)
    release.  This finally includes a switch over to RaptorJIT, which
    adds a number of on-line diagnostic tools that can be useful for
    troubleshooting performance problems in production.
