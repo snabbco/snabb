@@ -427,6 +427,7 @@ local sip_hash_config = {
    size={required=true}, stride={}, key={default=false},
    c={default=2}, d={default=4}, as_specified={default=false}, width={default=1}
 }
+local sip_hash_cache = {} -- Cache for generated variants (reuse if possible.)
 local function make_sip_hash(assembler, opts)
    function siphash(asm)
       -- Arguments:
@@ -513,8 +514,33 @@ local function make_sip_hash(assembler, opts)
 
    opts = lib.parse(opts, sip_hash_config)
    if not opts.stride then opts.stride = opts.size end
+   -- Assemble siphash variant and cache it unless it has not been
+   -- previously generated.
+   sip_hash_cache[assembler] = sip_hash_cache[assembler] or {}
+   for conf, cached in pairs(sip_hash_cache[assembler]) do
+      if lib.equal(conf, opts) then return cached end
+   end
    local asm = assembler(opts.stride)
-   return asm:assemble("siphash_"..opts.c.."_"..opts.d, siphash)
+   local sip_hash = asm:assemble("siphash_"..opts.c.."_"..opts.d, siphash)
+   sip_hash_cache[assembler][opts] = sip_hash
+   return sip_hash
+end
+
+-- Immediate value x86-64 backend for the SipHash implementation.
+local function ImmX86_64()
+   local asm = X86_64()
+   function asm.load_u64_and_advance(dst)
+      asm.copy_argument(dst, 1)
+   end
+   function asm.finish(name, Dst)
+      return finish(name.."_u64",
+                    ffi.typeof("uint32_t (*)(uint64_t)"),
+                    Dst)
+   end
+   asm.load_u32_and_advance = error
+   asm.load_u16_and_advance = error
+   asm.load_u8_and_advance = error
+   return asm
 end
 
 -- A special implementation to hash immediate values; requires our
@@ -523,21 +549,6 @@ function make_u64_hash(opts)
    local opts = lib.deepcopy(opts)
    opts.size = 8
    assert(not opts.as_specified)
-   local function ImmX86_64()
-      local asm = X86_64()
-      function asm.load_u64_and_advance(dst)
-         asm.copy_argument(dst, 1)
-      end
-      function asm.finish(name, Dst)
-         return finish(name.."_u64",
-                       ffi.typeof("uint32_t (*)(uint64_t)"),
-                       Dst)
-      end
-      asm.load_u32_and_advance = error
-      asm.load_u16_and_advance = error
-      asm.load_u8_and_advance = error
-      return asm
-   end
    return make_sip_hash(ImmX86_64, opts)
 end
 
