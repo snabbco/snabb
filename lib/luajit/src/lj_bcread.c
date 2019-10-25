@@ -13,15 +13,14 @@
 #include "lj_str.h"
 #include "lj_tab.h"
 #include "lj_bc.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
 #include "lj_cdata.h"
 #include "lualib.h"
-#endif
 #include "lj_lex.h"
 #include "lj_bcdump.h"
 #include "lj_state.h"
 #include "lj_strfmt.h"
+#include "lj_auditlog.h"
 
 /* Reuse some lexer fields for our own purposes. */
 #define bcread_flags(ls)	ls->level
@@ -153,18 +152,12 @@ static uint32_t bcread_uleb128_33(LexState *ls)
 /* Read debug info of a prototype. */
 static void bcread_dbg(LexState *ls, GCproto *pt, MSize sizedbg)
 {
-  void *lineinfo = (void *)proto_lineinfo(pt);
-  bcread_block(ls, lineinfo, sizedbg);
+  uint32_t *lineinfo = (uint32_t*)proto_lineinfo(pt);
+  bcread_block(ls, (void*)lineinfo, sizedbg);
   /* Swap lineinfo if the endianess differs. */
-  if (bcread_swap(ls) && pt->numline >= 256) {
-    MSize i, n = pt->sizebc-1;
-    if (pt->numline < 65536) {
-      uint16_t *p = (uint16_t *)lineinfo;
-      for (i = 0; i < n; i++) p[i] = (uint16_t)((p[i] >> 8)|(p[i] << 8));
-    } else {
-      uint32_t *p = (uint32_t *)lineinfo;
-      for (i = 0; i < n; i++) p[i] = lj_bswap(p[i]);
-    }
+  if (bcread_swap(ls)) {
+    int i;
+    for (i = 0; i < pt->sizebc-1; i++) lineinfo[i] = lj_bswap(lineinfo[i]);
   }
 }
 
@@ -172,9 +165,7 @@ static void bcread_dbg(LexState *ls, GCproto *pt, MSize sizedbg)
 static const void *bcread_varinfo(GCproto *pt)
 {
   const uint8_t *p = proto_uvinfo(pt);
-  MSize n = pt->sizeuv;
-  if (n) while (*p++ || --n) ;
-  return p;
+  return p + pt->sizeuv;
 }
 
 /* Read a single constant key/value of a template table. */
@@ -233,7 +224,6 @@ static void bcread_kgc(LexState *ls, GCproto *pt, MSize sizekgc)
       setgcref(*kr, obj2gco(lj_str_new(ls->L, p, len)));
     } else if (tp == BCDUMP_KGC_TAB) {
       setgcref(*kr, obj2gco(bcread_ktab(ls)));
-#if LJ_HASFFI
     } else if (tp != BCDUMP_KGC_CHILD) {
       CTypeID id = tp == BCDUMP_KGC_COMPLEX ? CTID_COMPLEX_DOUBLE :
 		   tp == BCDUMP_KGC_I64 ? CTID_INT64 : CTID_UINT64;
@@ -247,7 +237,6 @@ static void bcread_kgc(LexState *ls, GCproto *pt, MSize sizekgc)
 	p[1].u32.lo = bcread_uleb128(ls);
 	p[1].u32.hi = bcread_uleb128(ls);
       }
-#endif
     } else {
       lua_State *L = ls->L;
       lua_assert(tp == BCDUMP_KGC_CHILD);
@@ -310,7 +299,7 @@ GCproto *lj_bcread_proto(LexState *ls)
 {
   GCproto *pt;
   MSize framesize, numparams, flags, sizeuv, sizekgc, sizekn, sizebc, sizept;
-  MSize ofsk, ofsuv, ofsdbg;
+  MSize ofsk, ofsuv, ofsdbg, ofsdeclname = 0;
   MSize sizedbg = 0;
   BCLine firstline = 0, numline = 0;
 
@@ -327,6 +316,7 @@ GCproto *lj_bcread_proto(LexState *ls)
     if (sizedbg) {
       firstline = bcread_uleb128(ls);
       numline = bcread_uleb128(ls);
+      ofsdeclname = bcread_uleb128(ls);
     }
   }
 
@@ -371,16 +361,19 @@ GCproto *lj_bcread_proto(LexState *ls)
   pt->firstline = firstline;
   pt->numline = numline;
   if (sizedbg) {
-    MSize sizeli = (sizebc-1) << (numline < 256 ? 0 : numline < 65536 ? 1 : 2);
+    MSize sizeli = (sizebc-1) * sizeof(BCLine);
     setmref(pt->lineinfo, (char *)pt + ofsdbg);
     setmref(pt->uvinfo, (char *)pt + ofsdbg + sizeli);
+    setmref(pt->declname, (char *)pt + ofsdbg + ofsdeclname);
     bcread_dbg(ls, pt, sizedbg);
     setmref(pt->varinfo, bcread_varinfo(pt));
   } else {
     setmref(pt->lineinfo, NULL);
     setmref(pt->uvinfo, NULL);
     setmref(pt->varinfo, NULL);
+    setmref(pt->declname, NULL);
   }
+  lj_auditlog_new_prototype(pt);
   return pt;
 }
 
@@ -396,16 +389,12 @@ static int bcread_header(LexState *ls)
   if ((flags & ~(BCDUMP_F_KNOWN)) != 0) return 0;
   if ((flags & BCDUMP_F_FR2) != LJ_FR2*BCDUMP_F_FR2) return 0;
   if ((flags & BCDUMP_F_FFI)) {
-#if LJ_HASFFI
     lua_State *L = ls->L;
     if (!ctype_ctsG(G(L))) {
       ptrdiff_t oldtop = savestack(L, L->top);
       luaopen_ffi(L);  /* Load FFI library on-demand. */
       L->top = restorestack(L, oldtop);
     }
-#else
-    return 0;
-#endif
   }
   if ((flags & BCDUMP_F_STRIP)) {
     ls->chunkname = lj_str_newz(ls->L, ls->chunkarg);

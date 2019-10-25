@@ -1,5 +1,5 @@
 ##############################################################################
-# LuaJIT Makefile. Requires GNU Make.
+# RaptorJIT Makefile. Requires GNU Make.
 #
 # Please read doc/install.html before changing any variables!
 #
@@ -10,8 +10,8 @@
 # Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
-MAJVER=  2
-MINVER=  1
+MAJVER=  1
+MINVER=  0
 RELVER=  0
 ABIVER=  5.1
 NODOTABIVER= 51
@@ -24,14 +24,6 @@ NODOTABIVER= 51
 # removing the '#' in front of them. Make sure you force a full recompile
 # with "make clean", followed by "make" if you change any options.
 #
-DEFAULT_CC = gcc
-#
-# LuaJIT builds as a native 32 or 64 bit binary by default.
-CC= $(DEFAULT_CC)
-#
-# Use this if you want to force a 32 bit build on a 64 bit multilib OS.
-#CC= $(DEFAULT_CC) -m32
-#
 # Since the assembler part does NOT maintain a frame pointer, it's pointless
 # to slow down the C part by not omitting it. Debugging, tracebacks and
 # unwinding are not affected -- the assembler part has frame unwind
@@ -42,18 +34,6 @@ CCOPT= -O2 -fomit-frame-pointer
 # Note: it's no longer recommended to use -O3 with GCC 4.x.
 # The I-Cache bloat usually outweighs the benefits from aggressive inlining.
 #
-# Target-specific compiler options:
-#
-# x86/x64 only: For GCC 4.2 or higher and if you don't intend to distribute
-# the binaries to a different machine you could also use: -march=native
-#
-CCOPT_x86= -march=i686 -msse -msse2 -mfpmath=sse
-CCOPT_x64=
-CCOPT_arm=
-CCOPT_arm64=
-CCOPT_ppc=
-CCOPT_mips=
-#
 CCDEBUG=
 # Uncomment the next line to generate debug information:
 #CCDEBUG= -g
@@ -61,24 +41,6 @@ CCDEBUG=
 CCWARN= -Wall
 # Uncomment the next line to enable more warnings:
 #CCWARN+= -Wextra -Wdeclaration-after-statement -Wredundant-decls -Wshadow -Wpointer-arith
-#
-##############################################################################
-
-##############################################################################
-################################  BUILD MODE  ################################
-##############################################################################
-# The default build mode is mixed mode on POSIX. On Windows this is the same
-# as dynamic mode.
-#
-# Mixed mode creates a static + dynamic library and a statically linked luajit.
-BUILDMODE= mixed
-#
-# Static mode creates a static library and a statically linked luajit.
-#BUILDMODE= static
-#
-# Dynamic mode creates a dynamic library and a dynamically linked luajit.
-# Note: this executable will only run when the library is installed!
-#BUILDMODE= dynamic
 #
 ##############################################################################
 
@@ -153,25 +115,6 @@ XCFLAGS=
 ##############################################################################
 
 ##############################################################################
-# Host system detection.
-##############################################################################
-
-ifeq (Windows,$(findstring Windows,$(OS))$(MSYSTEM)$(TERM))
-  HOST_SYS= Windows
-  HOST_RM= del
-else
-  HOST_SYS:= $(shell uname -s)
-  ifneq (,$(findstring MINGW,$(HOST_SYS)))
-    HOST_SYS= Windows
-    HOST_MSYS= mingw
-  endif
-  ifneq (,$(findstring CYGWIN,$(HOST_SYS)))
-    HOST_SYS= Windows
-    HOST_MSYS= cygwin
-  endif
-endif
-
-##############################################################################
 # Flags and options for host and target.
 ##############################################################################
 
@@ -192,9 +135,7 @@ LDOPTIONS= $(CCDEBUG) $(LDFLAGS)
 
 HOST_CC= $(CC)
 HOST_RM= rm -f
-# If left blank, minilua is built and used. You can supply an installed
-# copy of (plain) Lua 5.1 or 5.2, plus Lua BitOp. E.g. with: HOST_LUA=lua
-HOST_LUA=
+HOST_LUA=luajit
 
 HOST_XCFLAGS= -I.
 HOST_XLDFLAGS=
@@ -210,11 +151,10 @@ TARGET_STCC= $(STATIC_CC)
 TARGET_DYNCC= $(DYNAMIC_CC)
 TARGET_LD= $(CROSS)$(CC)
 TARGET_AR= $(CROSS)ar rcus 2>/dev/null
-TARGET_STRIP= $(CROSS)strip
 
 TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
-TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
-TARGET_DYLIBNAME= libluajit-$(ABIVER).$(MAJVER).dylib
+TARGET_SONAME= libraptorjit-$(ABIVER).so.$(MAJVER)
+TARGET_DYLIBNAME= libraptorjit-$(ABIVER).$(MAJVER).dylib
 TARGET_DYLIBPATH= $(TARGET_LIBPATH)/$(TARGET_DYLIBNAME)
 TARGET_DLLNAME= lua$(NODOTABIVER).dll
 TARGET_XSHLDFLAGS= -shared -fPIC -Wl,-soname,$(TARGET_SONAME)
@@ -232,52 +172,8 @@ TARGET_ASHLDFLAGS= $(LDOPTIONS) $(TARGET_XSHLDFLAGS) $(TARGET_FLAGS) $(TARGET_SH
 TARGET_ALIBS= $(TARGET_XLIBS) $(LIBS) $(TARGET_LIBS)
 
 TARGET_TESTARCH=$(shell $(TARGET_CC) $(TARGET_TCFLAGS) -E lj_arch.h -dM)
-ifneq (,$(findstring LJ_TARGET_X64 ,$(TARGET_TESTARCH)))
-  TARGET_LJARCH= x64
-else
-ifneq (,$(findstring LJ_TARGET_X86 ,$(TARGET_TESTARCH)))
-  TARGET_LJARCH= x86
-else
-ifneq (,$(findstring LJ_TARGET_ARM ,$(TARGET_TESTARCH)))
-  TARGET_LJARCH= arm
-else
-ifneq (,$(findstring LJ_TARGET_ARM64 ,$(TARGET_TESTARCH)))
-  TARGET_LJARCH= arm64
-else
-ifneq (,$(findstring LJ_TARGET_PPC ,$(TARGET_TESTARCH)))
-  ifneq (,$(findstring LJ_LE 1,$(TARGET_TESTARCH)))
-    TARGET_ARCH= -DLJ_ARCH_ENDIAN=LUAJIT_LE
-  else
-    TARGET_ARCH= -DLJ_ARCH_ENDIAN=LUAJIT_BE
-  endif
-  TARGET_LJARCH= ppc
-else
-ifneq (,$(findstring LJ_TARGET_MIPS ,$(TARGET_TESTARCH)))
-  ifneq (,$(findstring MIPSEL ,$(TARGET_TESTARCH)))
-    TARGET_ARCH= -D__MIPSEL__=1
-  endif
-  ifneq (,$(findstring LJ_TARGET_MIPS64 ,$(TARGET_TESTARCH)))
-    TARGET_LJARCH= mips64
-  else
-    TARGET_LJARCH= mips
-  endif
-else
-  $(error Unsupported target architecture)
-endif
-endif
-endif
-endif
-endif
-endif
+TARGET_LJARCH= x64
 
-ifneq (,$(findstring LJ_TARGET_PS3 1,$(TARGET_TESTARCH)))
-  TARGET_SYS= PS3
-  TARGET_ARCH+= -D__CELLOS_LV2__
-  TARGET_XCFLAGS+= -DLUAJIT_USE_SYSMALLOC
-  TARGET_XLIBS+= -lpthread
-endif
-
-TARGET_XCFLAGS+= $(CCOPT_$(TARGET_LJARCH))
 TARGET_ARCH+= $(patsubst %,-DLUAJIT_TARGET=LUAJIT_ARCH_%,$(TARGET_LJARCH))
 
 ifneq (,$(PREFIX))
@@ -299,164 +195,17 @@ endif
 # Target system detection.
 ##############################################################################
 
-TARGET_SYS?= $(HOST_SYS)
-ifeq (Windows,$(TARGET_SYS))
-  TARGET_STRIP+= --strip-unneeded
-  TARGET_XSHLDFLAGS= -shared
-  TARGET_DYNXLDOPTS=
-else
-ifeq (,$(shell $(TARGET_CC) -o /dev/null -c -x c /dev/null -fno-stack-protector 2>/dev/null || echo 1))
-  TARGET_XCFLAGS+= -fno-stack-protector
-endif
-ifeq (Darwin,$(TARGET_SYS))
-  ifeq (,$(MACOSX_DEPLOYMENT_TARGET))
-    export MACOSX_DEPLOYMENT_TARGET=10.4
-  endif
-  TARGET_STRIP+= -x
-  TARGET_XSHLDFLAGS= -dynamiclib -single_module -undefined dynamic_lookup -fPIC
-  TARGET_DYNXLDOPTS=
-  TARGET_XSHLDFLAGS+= -install_name $(TARGET_DYLIBPATH) -compatibility_version $(MAJVER).$(MINVER) -current_version $(MAJVER).$(MINVER).$(RELVER)
-  ifeq (x64,$(TARGET_LJARCH))
-    TARGET_XLDFLAGS+= -pagezero_size 10000 -image_base 100000000
-    TARGET_XSHLDFLAGS+= -image_base 7fff04c4a000
-  endif
-else
-ifeq (iOS,$(TARGET_SYS))
-  TARGET_STRIP+= -x
-  TARGET_XSHLDFLAGS= -dynamiclib -single_module -undefined dynamic_lookup -fPIC
-  TARGET_DYNXLDOPTS=
-  TARGET_XSHLDFLAGS+= -install_name $(TARGET_DYLIBPATH) -compatibility_version $(MAJVER).$(MINVER) -current_version $(MAJVER).$(MINVER).$(RELVER)
-  ifeq (arm64,$(TARGET_LJARCH))
-    TARGET_XCFLAGS+= -fno-omit-frame-pointer
-  endif
-else
-  ifneq (SunOS,$(TARGET_SYS))
-    ifneq (PS3,$(TARGET_SYS))
-      TARGET_XLDFLAGS+= -Wl,-E
-    endif
-  endif
-  ifeq (Linux,$(TARGET_SYS))
-    TARGET_XLIBS+= -ldl
-  endif
-  ifeq (GNU/kFreeBSD,$(TARGET_SYS))
-    TARGET_XLIBS+= -ldl
-  endif
-endif
-endif
-endif
-
-ifneq ($(HOST_SYS),$(TARGET_SYS))
-  ifeq (Windows,$(TARGET_SYS))
-    HOST_XCFLAGS+= -malign-double -DLUAJIT_OS=LUAJIT_OS_WINDOWS
-  else
-  ifeq (Linux,$(TARGET_SYS))
-    HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_LINUX
-  else
-  ifeq (Darwin,$(TARGET_SYS))
-    HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_OSX
-  else
-  ifeq (iOS,$(TARGET_SYS))
-    HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_OSX
-  else
-    HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_OTHER
-  endif
-  endif
-  endif
-  endif
-endif
-
-ifneq (,$(CCDEBUG))
-  TARGET_STRIP= @:
-endif
+TARGET_XCFLAGS+= -fno-stack-protector
+TARGET_XLIBS+= -ldl
+Host_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_LINUX
 
 ##############################################################################
 # Files and pathnames.
 ##############################################################################
 
-MINILUA_O= host/minilua.o
-MINILUA_LIBS= -lm
-MINILUA_T= host/minilua
-MINILUA_X= $(MINILUA_T)
-
-ifeq (,$(HOST_LUA))
-  HOST_LUA= $(MINILUA_X)
-  DASM_DEP= $(MINILUA_T)
-endif
-
 DASM_DIR= ../dynasm
 DASM= $(HOST_LUA) $(DASM_DIR)/dynasm.lua
-DASM_XFLAGS=
-DASM_AFLAGS=
-DASM_ARCH= $(TARGET_LJARCH)
-
-ifneq (,$(findstring LJ_LE 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D ENDIAN_LE
-else
-  DASM_AFLAGS+= -D ENDIAN_BE
-endif
-ifneq (,$(findstring LJ_ARCH_BITS 64,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D P64
-endif
-ifneq (,$(findstring LJ_HASJIT 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D JIT
-endif
-ifneq (,$(findstring LJ_HASFFI 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D FFI
-endif
-ifneq (,$(findstring LJ_DUALNUM 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D DUALNUM
-endif
-ifneq (,$(findstring LJ_ARCH_HASFPU 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D FPU
-  TARGET_ARCH+= -DLJ_ARCH_HASFPU=1
-else
-  TARGET_ARCH+= -DLJ_ARCH_HASFPU=0
-endif
-ifeq (,$(findstring LJ_ABI_SOFTFP 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D HFABI
-  TARGET_ARCH+= -DLJ_ABI_SOFTFP=0
-else
-  TARGET_ARCH+= -DLJ_ABI_SOFTFP=1
-endif
-ifneq (,$(findstring LJ_NO_UNWIND 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D NO_UNWIND
-  TARGET_ARCH+= -DLUAJIT_NO_UNWIND
-endif
-DASM_AFLAGS+= -D VER=$(subst LJ_ARCH_VERSION_,,$(filter LJ_ARCH_VERSION_%,$(subst LJ_ARCH_VERSION ,LJ_ARCH_VERSION_,$(TARGET_TESTARCH))))
-ifeq (Windows,$(TARGET_SYS))
-  DASM_AFLAGS+= -D WIN
-endif
-ifeq (x64,$(TARGET_LJARCH))
-  ifeq (,$(findstring LJ_FR2 1,$(TARGET_TESTARCH)))
-    DASM_ARCH= x86
-  endif
-else
-ifeq (arm,$(TARGET_LJARCH))
-  ifeq (iOS,$(TARGET_SYS))
-    DASM_AFLAGS+= -D IOS
-  endif
-else
-ifeq (ppc,$(TARGET_LJARCH))
-  ifneq (,$(findstring LJ_ARCH_SQRT 1,$(TARGET_TESTARCH)))
-    DASM_AFLAGS+= -D SQRT
-  endif
-  ifneq (,$(findstring LJ_ARCH_ROUND 1,$(TARGET_TESTARCH)))
-    DASM_AFLAGS+= -D ROUND
-  endif
-  ifneq (,$(findstring LJ_ARCH_PPC32ON64 1,$(TARGET_TESTARCH)))
-    DASM_AFLAGS+= -D GPR64
-  endif
-  ifeq (PS3,$(TARGET_SYS))
-    DASM_AFLAGS+= -D PPE -D TOC
-  endif
-  ifneq (,$(findstring LJ_ARCH_PPC64 ,$(TARGET_TESTARCH)))
-    DASM_ARCH= ppc64
-  endif
-endif
-endif
-endif
-
-DASM_FLAGS= $(DASM_XFLAGS) $(DASM_AFLAGS)
+DASM_ARCH= x64
 DASM_DASC= vm_$(DASM_ARCH).dasc
 
 BUILDVM_O= host/buildvm.o host/buildvm_asm.o host/buildvm_peobj.o \
@@ -464,8 +213,8 @@ BUILDVM_O= host/buildvm.o host/buildvm_asm.o host/buildvm_peobj.o \
 BUILDVM_T= host/buildvm
 BUILDVM_X= $(BUILDVM_T)
 
-HOST_O= $(MINILUA_O) $(BUILDVM_O)
-HOST_T= $(MINILUA_T) $(BUILDVM_T)
+HOST_O= $(BUILDVM_O)
+HOST_T= $(BUILDVM_T)
 
 LJVM_S= lj_vm.S
 LJVM_O= lj_vm.o
@@ -478,109 +227,43 @@ LJLIB_C= $(LJLIB_O:.o=.c)
 
 LJCORE_O= lj_gc.o lj_err.o lj_char.o lj_bc.o lj_obj.o lj_buf.o \
 	  lj_str.o lj_tab.o lj_func.o lj_udata.o lj_meta.o lj_debug.o \
-	  lj_state.o lj_dispatch.o lj_vmevent.o lj_vmmath.o lj_strscan.o \
-	  lj_strfmt.o lj_strfmt_num.o lj_api.o lj_profile.o \
+	  lj_state.o lj_dispatch.o lj_vmmath.o lj_strscan.o \
+	  lj_strfmt.o lj_strfmt_num.o lj_api.o lj_vmprofile.o \
 	  lj_lex.o lj_parse.o lj_bcread.o lj_bcwrite.o lj_load.o \
 	  lj_ir.o lj_opt_mem.o lj_opt_fold.o lj_opt_narrow.o \
 	  lj_opt_dce.o lj_opt_loop.o lj_opt_split.o lj_opt_sink.o \
 	  lj_mcode.o lj_snap.o lj_record.o lj_crecord.o lj_ffrecord.o \
-	  lj_asm.o lj_trace.o lj_gdbjit.o \
+	  lj_asm.o lj_trace.o lj_gdbjit.o lj_auditlog.o \
 	  lj_ctype.o lj_cdata.o lj_cconv.o lj_ccall.o lj_ccallback.o \
 	  lj_carith.o lj_clib.o lj_cparse.o \
 	  lj_lib.o lj_alloc.o lib_aux.o \
+	  lj_dwarf_dwo.o \
 	  $(LJLIB_O) lib_init.o
+
+DWARF_DWO= lj_dwarf.dwo
 
 LJVMCORE_O= $(LJVM_O) $(LJCORE_O)
 LJVMCORE_DYNO= $(LJVMCORE_O:.o=_dyn.o)
 
-LIB_VMDEF= jit/vmdef.lua
-LIB_VMDEFP= $(LIB_VMDEF)
-
-LUAJIT_O= luajit.o
-LUAJIT_A= libluajit.a
-LUAJIT_SO= libluajit.so
-LUAJIT_T= luajit
+LUAJIT_O= raptorjit.o
+LUAJIT_A= raptorjit.a
+LUAJIT_SO= libraptorjit.so
+LUAJIT_T= raptorjit
 
 ALL_T= $(LUAJIT_T) $(LUAJIT_A) $(LUAJIT_SO) $(HOST_T)
 ALL_HDRGEN= lj_bcdef.h lj_ffdef.h lj_libdef.h lj_recdef.h lj_folddef.h \
 	    host/buildvm_arch.h
-ALL_GEN= $(LJVM_S) $(ALL_HDRGEN) $(LIB_VMDEFP)
+ALL_GEN= $(LJVM_S) $(ALL_HDRGEN)
 WIN_RM= *.obj *.lib *.exp *.dll *.exe *.manifest *.pdb *.ilk
-ALL_RM= $(ALL_T) $(ALL_GEN) *.o host/*.o $(WIN_RM)
+ALL_RM= $(ALL_T) *.o host/*.o $(WIN_RM)
 
 ##############################################################################
 # Build mode handling.
 ##############################################################################
 
-# Mixed mode defaults.
 TARGET_O= $(LUAJIT_A)
 TARGET_T= $(LUAJIT_T) $(LUAJIT_SO)
-TARGET_DEP= $(LIB_VMDEF) $(LUAJIT_SO)
-
-ifeq (Windows,$(TARGET_SYS))
-  TARGET_DYNCC= $(STATIC_CC)
-  LJVM_MODE= peobj
-  LJVM_BOUT= $(LJVM_O)
-  LUAJIT_T= luajit.exe
-  ifeq (cygwin,$(HOST_MSYS))
-    LUAJIT_SO= cyg$(TARGET_DLLNAME)
-  else
-    LUAJIT_SO= $(TARGET_DLLNAME)
-  endif
-  # Mixed mode is not supported on Windows. And static mode doesn't work well.
-  # C modules cannot be loaded, because they bind to lua51.dll.
-  ifneq (static,$(BUILDMODE))
-    BUILDMODE= dynamic
-    TARGET_XCFLAGS+= -DLUA_BUILD_AS_DLL
-  endif
-endif
-ifeq (Darwin,$(TARGET_SYS))
-  LJVM_MODE= machasm
-endif
-ifeq (iOS,$(TARGET_SYS))
-  LJVM_MODE= machasm
-endif
-ifeq (SunOS,$(TARGET_SYS))
-  BUILDMODE= static
-endif
-ifeq (PS3,$(TARGET_SYS))
-  BUILDMODE= static
-endif
-
-ifeq (Windows,$(HOST_SYS))
-  MINILUA_T= host/minilua.exe
-  BUILDVM_T= host/buildvm.exe
-  ifeq (,$(HOST_MSYS))
-    MINILUA_X= host\minilua
-    BUILDVM_X= host\buildvm
-    ALL_RM:= $(subst /,\,$(ALL_RM))
-  endif
-endif
-
-ifeq (static,$(BUILDMODE))
-  TARGET_DYNCC= @:
-  TARGET_T= $(LUAJIT_T)
-  TARGET_DEP= $(LIB_VMDEF)
-else
-ifeq (dynamic,$(BUILDMODE))
-  ifneq (Windows,$(TARGET_SYS))
-    TARGET_CC= $(DYNAMIC_CC)
-  endif
-  TARGET_DYNCC= @:
-  LJVMCORE_DYNO= $(LJVMCORE_O)
-  TARGET_O= $(LUAJIT_SO)
-  TARGET_XLDFLAGS+= $(TARGET_DYNXLDOPTS)
-else
-ifeq (Darwin,$(TARGET_SYS))
-  TARGET_DYNCC= @:
-  LJVMCORE_DYNO= $(LJVMCORE_O)
-endif
-ifeq (iOS,$(TARGET_SYS))
-  TARGET_DYNCC= @:
-  LJVMCORE_DYNO= $(LJVMCORE_O)
-endif
-endif
-endif
+TARGET_DEP= $(LUAJIT_SO)
 
 Q= @
 E= @echo
@@ -591,14 +274,16 @@ E= @echo
 # Make targets.
 ##############################################################################
 
-default all:	$(TARGET_T)
-
-amalg:
-	@grep "^[+|]" ljamalg.c
-	$(MAKE) all "LJCORE_O=ljamalg.o"
+default all:	$(TARGET_T) $(DWARF_DWO)
 
 clean:
 	$(HOST_RM) $(ALL_RM)
+	$(HOST_RM) $(ALL_GEN)
+
+reusevm:
+	cd reusevm; \
+	cp -r * ../
+	@echo "Copied reference VM. Ready to build."
 
 libbc:
 	./$(LUAJIT_T) host/genlibbc.lua -o host/buildvm_libbc.h $(LJLIB_C)
@@ -618,19 +303,30 @@ depend:
 	  test -s $$file || $(HOST_RM) $$file; \
 	  done
 
-.PHONY: default all amalg clean libbc depend
+.PHONY: default all clean libbc depend reusevm
 
 ##############################################################################
 # Rules for generated files.
 ##############################################################################
 
-$(MINILUA_T): $(MINILUA_O)
-	$(E) "HOSTLINK  $@"
-	$(Q)$(HOST_CC) $(HOST_ALDFLAGS) -o $@ $(MINILUA_O) $(MINILUA_LIBS) $(HOST_ALIBS)
-
 host/buildvm_arch.h: $(DASM_DASC) $(DASM_DEP) $(DASM_DIR)/*.lua
+	@command -v $(DASM) 2>/dev/null || { \
+	  echo "Error: Missing dependency (luajit) for bootstrapping the VM."; \
+	  echo "";                                                             \
+	  echo "Here are your options to build RaptorJIT:";                    \
+	  echo "  make reusevm     # copy reference VM from reusevm/";          \
+	  echo "  (install luajit) # satisfy the dependency";                   \
+	  echo "  nix-build        # use nix to satisfy the dependencies";      \
+	  echo "";                                                             \
+	  echo "Warning:";                                                     \
+	  echo "  Only reusevm when running a pristine copy of RaptorJIT from";\
+	  echo "  a repository that keeps the reference VM up-to-date.";       \
+	  echo "  (Otherwise you might mix some stale code into your build.)"; \
+	  echo;                                                                \
+	  exit 1;                                                              \
+	}
 	$(E) "DYNASM    $@"
-	$(Q)$(DASM) $(DASM_FLAGS) -o $@ $(DASM_DASC)
+	$(Q)$(DASM) -o $@ $(DASM_DASC)
 
 host/buildvm.o: $(DASM_DIR)/dasm_*.h
 
@@ -658,10 +354,6 @@ lj_recdef.h: $(BUILDVM_T) $(LJLIB_C)
 	$(E) "BUILDVM   $@"
 	$(Q)$(BUILDVM_X) -m recdef -o $@ $(LJLIB_C)
 
-$(LIB_VMDEF): $(BUILDVM_T) $(LJLIB_C)
-	$(E) "BUILDVM   $@"
-	$(Q)$(BUILDVM_X) -m vmdef -o $(LIB_VMDEFP) $(LJLIB_C)
-
 lj_folddef.h: $(BUILDVM_T) lj_opt_fold.c
 	$(E) "BUILDVM   $@"
 	$(Q)$(BUILDVM_X) -m folddef -o $@ lj_opt_fold.c
@@ -682,11 +374,23 @@ lj_folddef.h: $(BUILDVM_T) lj_opt_fold.c
 
 $(LUAJIT_O):
 	$(E) "CC        $@"
-	$(Q)$(TARGET_STCC) $(TARGET_ACFLAGS) -c -o $@ $<
+	$(Q)$(TARGET_STCC) $(TARGET_ACFLAGS) -c -o $@ luajit.c
 
 $(HOST_O): %.o: %.c
 	$(E) "HOSTCC    $@"
 	$(Q)$(HOST_CC) $(HOST_ACFLAGS) -c -o $@ $<
+
+$(DWARF_DWO): $(ALL_HDRGEN)
+
+$(DWARF_DWO): %.dwo: %.c
+	$(E) "CC(debug) $@"
+	$(Q)$(TARGET_CC) -g3 -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
+
+# Embed DWARF debug information as binary data available to raptorjit.
+lj_dwarf_dwo.o lj_dwarf_dwo_dyn.o: $(DWARF_DWO)
+	$(E) "EMBED     $@"
+	$(Q)$(LD) -r -b binary -o $@ $<
+	$(Q)$(LD) -shared -b binary -o $(@:.o=_dyn.o) $<
 
 include Makefile.dep
 
@@ -702,12 +406,10 @@ $(LUAJIT_A): $(LJVMCORE_O)
 $(LUAJIT_SO): $(LJVMCORE_O)
 	$(E) "DYNLINK   $@"
 	$(Q)$(TARGET_LD) $(TARGET_ASHLDFLAGS) -o $@ $(LJVMCORE_DYNO) $(TARGET_ALIBS)
-	$(Q)$(TARGET_STRIP) $@
 
 $(LUAJIT_T): $(TARGET_O) $(LUAJIT_O) $(TARGET_DEP)
 	$(E) "LINK      $@"
 	$(Q)$(TARGET_LD) $(TARGET_ALDFLAGS) -o $@ $(LUAJIT_O) $(TARGET_O) $(TARGET_ALIBS)
-	$(Q)$(TARGET_STRIP) $@
-	$(E) "OK        Successfully built LuaJIT"
+	$(E) "OK        Successfully built RaptorJIT"
 
 ##############################################################################

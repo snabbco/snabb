@@ -445,6 +445,9 @@ function CTable:make_lookup_streamer(width)
       -- more entry.
       stream_entries = self.type(width * (self.max_displacement + 1) + 1)
    }
+   -- Pointer to first entry key (cache to avoid cdata allocation.)
+   local key_offset = 4 -- Skip past uint32_t hash.
+   res.keys = ffi.cast('uint8_t*', res.entries) + key_offset
    -- Give res.pointers sensible default values in case the first lookup
    -- doesn't fill the pointers vector.
    for i = 0, width-1 do res.pointers[i] = self.entries end
@@ -467,13 +470,13 @@ end
 function LookupStreamer:stream()
    local width = self.width
    local entries = self.entries
+   local keys = self.keys
    local pointers = self.pointers
    local stream_entries = self.stream_entries
    local entries_per_lookup = self.entries_per_lookup
    local equal_fn = self.equal_fn
 
-   local key_offset = 4 -- Skip past uint32_t hash.
-   self.multi_hash(ffi.cast('uint8_t*', entries) + key_offset, self.hashes)
+   self.multi_hash(self.keys, self.hashes)
 
    for i=0,width-1 do
       local hash = self.hashes[i]

@@ -8,7 +8,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_err.h"
 #include "lj_buf.h"
@@ -284,15 +283,7 @@ static void loop_unroll(LoopState *lps)
   /* LOOP separates the pre-roll from the loop body. */
   emitir_raw(IRTG(IR_LOOP, IRT_NIL), 0, 0);
 
-  /* Grow snapshot buffer and map for copy-substituted snapshots.
-  ** Need up to twice the number of snapshots minus #0 and loop snapshot.
-  ** Need up to twice the number of entries plus fallback substitutions
-  ** from the loop snapshot entries for each new snapshot.
-  ** Caveat: both calls may reallocate J->cur.snap and J->cur.snapmap!
-  */
   onsnap = J->cur.nsnap;
-  lj_snap_grow_buf(J, 2*onsnap-2);
-  lj_snap_grow_map(J, J->cur.nsnapmap*2+(onsnap-2)*J->cur.snap[onsnap-1].nent);
 
   /* The loop snapshot is used for fallback substitutions. */
   loopsnap = &J->cur.snap[onsnap-1];
@@ -446,4 +437,3 @@ int lj_opt_loop(jit_State *J)
 #undef emitir
 #undef emitir_raw
 
-#endif

@@ -118,6 +118,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
 local murmur = require("lib.hash.murmur")
+local logger = require("lib.logger")
 local band = require("bit").band
 require("apps.bridge.learning_h")
 
@@ -206,7 +207,7 @@ function mac_table:new (config)
    -- C.mac_table_insert()
    o._tables_C = ffi.new("hash_table_t *[2]")
    alloc_tables(o, o._buckets)
-   o._logger = lib.logger_new({ module = "mac_table" })
+   o._logger = logger.new({ module = "mac_table" })
    timer.activate(
       timer.new("mac_table_timeout",
                 function (t)

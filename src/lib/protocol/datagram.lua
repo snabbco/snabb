@@ -147,7 +147,8 @@ function datagram:push_raw (data, length)
       -- The memmove() would invalidate the data pointer of headers
       -- that have already been parsed.
       assert(self._parse.index == 0, "parse stack not empty")
-      self._packet[0] = packet.prepend(self._packet[0], data, length)
+      self._packet[0] = packet.prepend(self._packet[0],
+                                       ffi.cast("uint8_t *", data), length)
       self._parse.offset = self._parse.offset + length
    end
 end
@@ -294,7 +295,8 @@ end
 -- non-nil, the memory region at the given address and size is
 -- appended to the packet's payload first.
 function datagram:payload (mem, size)
-   if mem then packet.append(self._packet[0], mem, size) end
+   if mem then packet.append(self._packet[0],
+                             ffi.cast("uint8_t *", mem), size) end
    return self._packet[0].data + self._parse.offset,
           self._packet[0].length - self._parse.offset
 end

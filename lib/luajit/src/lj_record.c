@@ -8,21 +8,15 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_err.h"
 #include "lj_str.h"
 #include "lj_tab.h"
 #include "lj_meta.h"
 #include "lj_frame.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
-#endif
 #include "lj_bc.h"
 #include "lj_ff.h"
-#if LJ_HASPROFILE
-#include "lj_debug.h"
-#endif
 #include "lj_ir.h"
 #include "lj_jit.h"
 #include "lj_ircall.h"
@@ -87,9 +81,9 @@ static void rec_check_slots(jit_State *J)
   BCReg s, nslots = J->baseslot + J->maxslot;
   int32_t depth = 0;
   cTValue *base = J->L->base - J->baseslot;
-  lua_assert(J->baseslot >= 1+LJ_FR2 && J->baseslot < LJ_MAX_JSLOTS);
+  lua_assert(J->baseslot >= 1+LJ_FR2);
   lua_assert(J->baseslot == 1+LJ_FR2 || (J->slot[J->baseslot-1] & TREF_FRAME));
-  lua_assert(nslots < LJ_MAX_JSLOTS);
+  lua_assert(nslots <= LJ_MAX_JSLOTS);
   for (s = 0; s < nslots; s++) {
     TRef tr = J->slot[s];
     if (tr) {
@@ -103,31 +97,23 @@ static void rec_check_slots(jit_State *J)
       }
       if (s == 0) {
 	lua_assert(tref_isfunc(tr));
-#if LJ_FR2
       } else if (s == 1) {
 	lua_assert((tr & ~TREF_FRAME) == 0);
-#endif
       } else if ((tr & TREF_FRAME)) {
 	GCfunc *fn = gco2func(frame_gc(tv));
 	BCReg delta = (BCReg)(tv - frame_prev(tv));
-#if LJ_FR2
 	if (ref)
 	  lua_assert(ir_knum(ir)->u64 == tv->u64);
 	tr = J->slot[s-1];
 	ir = IR(tref_ref(tr));
-#endif
 	lua_assert(tref_isfunc(tr));
 	if (tref_isk(tr)) lua_assert(fn == ir_kfunc(ir));
 	lua_assert(s > delta + LJ_FR2 ? (J->slot[s-delta] & TREF_FRAME)
 				      : (s == delta + LJ_FR2));
 	depth++;
       } else if ((tr & TREF_CONT)) {
-#if LJ_FR2
 	if (ref)
 	  lua_assert(ir_knum(ir)->u64 == tv->u64);
-#else
-	lua_assert(ir_kptr(ir) == gcrefp(tv->gcr, void));
-#endif
 	lua_assert((J->slot[s+1+LJ_FR2] & TREF_FRAME));
 	depth++;
       } else {
@@ -219,8 +205,6 @@ TRef lj_record_constify(jit_State *J, cTValue *o)
 {
   if (tvisgcv(o))
     return lj_ir_kgc(J, gcV(o), itype2irt(o));
-  else if (tvisint(o))
-    return lj_ir_kint(J, intV(o));
   else if (tvisnum(o))
     return lj_ir_knumint(J, numV(o));
   else if (tvisbool(o))
@@ -242,7 +226,6 @@ typedef enum {
 static void canonicalize_slots(jit_State *J)
 {
   BCReg s;
-  if (LJ_DUALNUM) return;
   for (s = J->baseslot+J->maxslot-1; s >= 1; s--) {
     TRef tr = J->slot[s];
     if (tref_isinteger(tr)) {
@@ -310,7 +293,7 @@ static TRef find_kinit(jit_State *J, const BCIns *endpc, BCReg slot, IRType t)
 	  cTValue *tv = proto_knumtv(J->pt, bc_d(ins));
 	  if (t == IRT_INT) {
 	    int32_t k = numberVint(tv);
-	    if (tvisint(tv) || numV(tv) == (lua_Number)k)  /* -0 is ok here. */
+	    if (numV(tv) == (lua_Number)k)  /* -0 is ok here. */
 	      return lj_ir_kint(J, k);
 	    return 0;  /* Type mismatch. */
 	  } else {
@@ -327,7 +310,7 @@ static TRef find_kinit(jit_State *J, const BCIns *endpc, BCReg slot, IRType t)
 /* Load and optionally convert a FORI argument from a slot. */
 static TRef fori_load(jit_State *J, BCReg slot, IRType t, int mode)
 {
-  int conv = (tvisint(&J->L->base[slot]) != (t==IRT_INT)) ? IRSLOAD_CONVERT : 0;
+  int conv = (0 != (t==IRT_INT)) ? IRSLOAD_CONVERT : 0;
   return sloadt(J, (int32_t)slot,
 		t + (((mode & IRSLOAD_TYPECHECK) ||
 		      (conv && t == IRT_INT && !(mode >> 16))) ?
@@ -353,7 +336,7 @@ static TRef fori_arg(jit_State *J, const BCIns *fori, BCReg slot,
 */
 static int rec_for_direction(cTValue *o)
 {
-  return (tvisint(o) ? intV(o) : (int32_t)o->u32.hi) >= 0;
+  return ((int32_t)o->u32.hi) >= 0;
 }
 
 /* Simulate the runtime behavior of the FOR loop iterator. */
@@ -421,12 +404,11 @@ static void rec_for_loop(jit_State *J, const BCIns *fori, ScEvEntry *scev,
   cTValue *tv = &J->L->base[ra];
   TRef idx = J->base[ra+FORL_IDX];
   IRType t = idx ? tref_type(idx) :
-	     (init || LJ_DUALNUM) ? lj_opt_narrow_forl(J, tv) : IRT_NUM;
-  int mode = IRSLOAD_INHERIT +
-    ((!LJ_DUALNUM || tvisint(tv) == (t == IRT_INT)) ? IRSLOAD_READONLY : 0);
+	     init ? lj_opt_narrow_forl(J, tv) : IRT_NUM;
+  int mode = IRSLOAD_INHERIT + IRSLOAD_READONLY;
   TRef stop = fori_arg(J, fori, ra+FORL_STOP, t, mode);
   TRef step = fori_arg(J, fori, ra+FORL_STEP, t, mode);
-  int tc, dir = rec_for_direction(&tv[FORL_STEP]);
+  int dir = rec_for_direction(&tv[FORL_STEP]);
   lua_assert(bc_op(*fori) == BC_FORI || bc_op(*fori) == BC_JFORI);
   scev->t.irt = t;
   scev->dir = dir;
@@ -434,17 +416,9 @@ static void rec_for_loop(jit_State *J, const BCIns *fori, ScEvEntry *scev,
   scev->step = tref_ref(step);
   rec_for_check(J, t, dir, stop, step, init);
   scev->start = tref_ref(find_kinit(J, fori, ra+FORL_IDX, IRT_INT));
-  tc = (LJ_DUALNUM &&
-	!(scev->start && irref_isk(scev->stop) && irref_isk(scev->step) &&
-	  tvisint(&tv[FORL_IDX]) == (t == IRT_INT))) ?
-	IRSLOAD_TYPECHECK : 0;
-  if (tc) {
-    J->base[ra+FORL_STOP] = stop;
-    J->base[ra+FORL_STEP] = step;
-  }
   if (!idx)
     idx = fori_load(J, ra+FORL_IDX, t,
-		    IRSLOAD_INHERIT + tc + (J->scev.start << 16));
+		    IRSLOAD_INHERIT + (J->scev.start << 16));
   if (!init)
     J->base[ra+FORL_IDX] = idx = emitir(IRT(IR_ADD, t), idx, step);
   J->base[ra+FORL_EXT] = idx;
@@ -479,8 +453,7 @@ static LoopEvent rec_for(jit_State *J, const BCIns *fori, int isforl)
   } else {  /* Handle FORI/JFORI opcodes. */
     BCReg i;
     lj_meta_for(J->L, tv);
-    t = (LJ_DUALNUM || tref_isint(tr[FORL_IDX])) ? lj_opt_narrow_forl(J, tv) :
-						   IRT_NUM;
+    t = (tref_isint(tr[FORL_IDX])) ? lj_opt_narrow_forl(J, tv) : IRT_NUM;
     for (i = FORL_IDX; i <= FORL_STEP; i++) {
       if (!tr[i]) sload(J, ra+i);
       lua_assert(tref_isnumber_str(tr[i]));
@@ -595,7 +568,8 @@ static void rec_loop_interp(jit_State *J, const BCIns *pc, LoopEvent ev)
 /* Handle the case when an already compiled loop op is hit. */
 static void rec_loop_jit(jit_State *J, TraceNo lnk, LoopEvent ev)
 {
-  if (J->parent == 0 && J->exitno == 0) {  /* Root trace hit an inner loop. */
+  /* Root trace hit an inner loop. */
+  if (J->parent == 0 && J->exitno == 0 && !innerloopleft(J, J->startpc)) {
     /* Better let the inner loop spawn a side trace back here. */
     lj_trace_err(J, LJ_TRERR_LINNER);
   } else if (ev != LOOPEV_LEAVE) {  /* Side trace enters a compiled loop. */
@@ -606,52 +580,6 @@ static void rec_loop_jit(jit_State *J, TraceNo lnk, LoopEvent ev)
       lj_record_stop(J, LJ_TRLINK_ROOT, lnk);  /* Link to the loop. */
   }  /* Side trace continues across a loop that's left or not entered. */
 }
-
-/* -- Record profiler hook checks ----------------------------------------- */
-
-#if LJ_HASPROFILE
-
-/* Need to insert profiler hook check? */
-static int rec_profile_need(jit_State *J, GCproto *pt, const BCIns *pc)
-{
-  GCproto *ppt;
-  lua_assert(J->prof_mode == 'f' || J->prof_mode == 'l');
-  if (!pt)
-    return 0;
-  ppt = J->prev_pt;
-  J->prev_pt = pt;
-  if (pt != ppt && ppt) {
-    J->prev_line = -1;
-    return 1;
-  }
-  if (J->prof_mode == 'l') {
-    BCLine line = lj_debug_line(pt, proto_bcpos(pt, pc));
-    BCLine pline = J->prev_line;
-    J->prev_line = line;
-    if (pline != line)
-      return 1;
-  }
-  return 0;
-}
-
-static void rec_profile_ins(jit_State *J, const BCIns *pc)
-{
-  if (J->prof_mode && rec_profile_need(J, J->pt, pc)) {
-    emitir(IRTG(IR_PROF, IRT_NIL), 0, 0);
-    lj_snap_add(J);
-  }
-}
-
-static void rec_profile_ret(jit_State *J)
-{
-  if (J->prof_mode == 'f') {
-    emitir(IRTG(IR_PROF, IRT_NIL), 0, 0);
-    J->prev_pt = NULL;
-    lj_snap_add(J);
-  }
-}
-
-#endif
 
 /* -- Record calls and returns -------------------------------------------- */
 
@@ -707,19 +635,13 @@ static void rec_call_setup(jit_State *J, BCReg func, ptrdiff_t nargs)
       lj_trace_err(J, LJ_TRERR_NOMM);
     for (i = ++nargs; i > LJ_FR2; i--)  /* Shift arguments up. */
       fbase[i+LJ_FR2] = fbase[i+LJ_FR2-1];
-#if LJ_FR2
     fbase[2] = fbase[0];
-#endif
     fbase[0] = ix.mobj;  /* Replace function. */
     functv = &ix.mobjv;
   }
   kfunc = rec_call_specialize(J, funcV(functv), fbase[0]);
-#if LJ_FR2
   fbase[0] = kfunc;
   fbase[1] = TREF_FRAME;
-#else
-  fbase[0] = kfunc | TREF_FRAME;
-#endif
   J->maxslot = (BCReg)nargs;
 }
 
@@ -731,6 +653,8 @@ void lj_record_call(jit_State *J, BCReg func, ptrdiff_t nargs)
   J->framedepth++;
   J->base += func+1+LJ_FR2;
   J->baseslot += func+1+LJ_FR2;
+  if (J->baseslot + J->maxslot >= LJ_MAX_JSLOTS)
+    lj_trace_err(J, LJ_TRERR_STACKOV);
 }
 
 /* Record tail call. */
@@ -924,12 +848,8 @@ void lj_record_ret(jit_State *J, BCReg rbase, ptrdiff_t gotresults)
 static BCReg rec_mm_prep(jit_State *J, ASMFunction cont)
 {
   BCReg s, top = cont == lj_cont_cat ? J->maxslot : curr_proto(J->L)->framesize;
-#if LJ_FR2
   J->base[top] = lj_ir_k64(J, IR_KNUM, u64ptr(contptr(cont)));
   J->base[top+1] = TREF_CONT;
-#else
-  J->base[top] = lj_ir_kptr(J, contptr(cont)) | TREF_CONT;
-#endif
   J->framedepth++;
   for (s = J->maxslot; s < top; s++)
     J->base[s] = 0;  /* Clear frame gap to avoid resurrecting previous refs. */
@@ -981,13 +901,9 @@ int lj_record_mm_lookup(jit_State *J, RecordIndex *ix, MMS mm)
     }
     /* The cdata metatable is treated as immutable. */
     if (LJ_HASFFI && tref_iscdata(ix->tab)) goto immutable_mt;
-#if LJ_GC64
     /* TODO: fix ARM32 asm_fload(), so we can use this for all archs. */
     ix->mt = mix.tab = lj_ir_ggfload(J, IRT_TAB,
       GG_OFS(g.gcroot[GCROOT_BASEMT+itypemap(&ix->tabv)]));
-#else
-    ix->mt = mix.tab = lj_ir_ktab(J, mt);
-#endif
     goto nocheck;
   }
   ix->mt = mt ? mix.tab : TREF_NIL;
@@ -1031,9 +947,7 @@ static TRef rec_mm_arith(jit_State *J, RecordIndex *ix, MMS mm)
   }
 ok:
   base[0] = ix->mobj;
-#if LJ_FR2
   base[1] = 0;
-#endif
   copyTV(J->L, basev+0, &ix->mobjv);
   lj_record_call(J, func, 2);
   return 0;  /* No result yet. */
@@ -1161,7 +1075,6 @@ static void rec_mm_comp(jit_State *J, RecordIndex *ix, int op)
   }
 }
 
-#if LJ_HASFFI
 /* Setup call to cdata comparison metamethod. */
 static void rec_mm_comp_cdata(jit_State *J, RecordIndex *ix, int op, MMS mm)
 {
@@ -1177,7 +1090,6 @@ static void rec_mm_comp_cdata(jit_State *J, RecordIndex *ix, int op, MMS mm)
   lj_record_mm_lookup(J, ix, mm);
   rec_mm_callcomp(J, ix, op);
 }
-#endif
 
 /* -- Indexed access ------------------------------------------------------ */
 
@@ -1299,7 +1211,7 @@ static TRef rec_idx_key(jit_State *J, RecordIndex *ix, IRRef *rbref,
   key = ix->key;
   if (tref_isnumber(key)) {
     int32_t k = numberVint(&ix->keyv);
-    if (!tvisint(&ix->keyv) && numV(&ix->keyv) != (lua_Number)k)
+    if (numV(&ix->keyv) != (lua_Number)k)
       k = LJ_MAX_ASIZE;
     if ((MSize)k < LJ_MAX_ASIZE) {  /* Potential array key? */
       TRef ikey = lj_opt_narrow_index(J, key);
@@ -1502,7 +1414,7 @@ TRef lj_record_idx(jit_State *J, RecordIndex *ix)
       keybarrier = 0;  /* Previous non-nil value kept the key alive. */
     }
     /* Convert int to number before storing. */
-    if (!LJ_DUALNUM && tref_isinteger(ix->val))
+    if (tref_isinteger(ix->val))
       ix->val = emitir(IRTN(IR_CONV), ix->val, IRCONV_NUM_INT);
     emitir(IRT(loadop+IRDELTA_L2S, tref_type(ix->val)), xref, ix->val);
     if (keybarrier || tref_isgcv(ix->val))
@@ -1550,7 +1462,6 @@ static int rec_upvalue_constify(jit_State *J, GCupval *uvp)
   if (uvp->immutable) {
     cTValue *o = uvval(uvp);
     /* Don't constify objects that may retain large amounts of memory. */
-#if LJ_HASFFI
     if (tviscdata(o)) {
       GCcdata *cd = cdataV(o);
       if (!cdataisv(cd) && !(cd->marked & LJ_GC_CDATA_FIN)) {
@@ -1560,9 +1471,6 @@ static int rec_upvalue_constify(jit_State *J, GCupval *uvp)
       }
       return 0;
     }
-#else
-    UNUSED(J);
-#endif
     if (!(tvistab(o) || tvisudata(o) || tvisthread(o)))
       return 1;
   }
@@ -1584,11 +1492,7 @@ static TRef rec_upvalue(jit_State *J, uint32_t uv, TRef val)
 	goto noconstify;
       kfunc = lj_ir_kfunc(J, J->fn);
       emitir(IRTG(IR_EQ, IRT_FUNC), fn, kfunc);
-#if LJ_FR2
       J->base[-2] = kfunc;
-#else
-      J->base[-1] = kfunc | TREF_FRAME;
-#endif
       fn = kfunc;
     }
     tr = lj_record_constify(J, uvval(uvp));
@@ -1633,7 +1537,7 @@ noconstify:
     return res;
   } else {  /* Upvalue store. */
     /* Convert int to number before storing. */
-    if (!LJ_DUALNUM && tref_isinteger(val))
+    if (tref_isinteger(val))
       val = emitir(IRTN(IR_CONV), val, IRCONV_NUM_INT);
     emitir(IRT(IR_USTORE, tref_type(val)), uref, val);
     if (needbarrier && tref_isgcv(val))
@@ -1704,9 +1608,7 @@ static void rec_func_vararg(jit_State *J)
   if (J->baseslot + vframe + pt->framesize >= LJ_MAX_JSLOTS)
     lj_trace_err(J, LJ_TRERR_STACKOV);
   J->base[vframe-1-LJ_FR2] = J->base[-1-LJ_FR2];  /* Copy function up. */
-#if LJ_FR2
   J->base[vframe-1] = TREF_FRAME;
-#endif
   /* Copy fixarg slots up and set their original slots to nil. */
   fixargs = pt->numparams < J->maxslot ? pt->numparams : J->maxslot;
   for (s = 0; s < fixargs; s++) {
@@ -1948,15 +1850,11 @@ static void rec_comp_fixup(jit_State *J, const BCIns *pc, int cond)
   const BCIns *npc = pc + 2 + (cond ? bc_j(jmpins) : 0);
   SnapShot *snap = &J->cur.snap[J->cur.nsnap-1];
   /* Set PC to opposite target to avoid re-recording the comp. in side trace. */
-#if LJ_FR2
   SnapEntry *flink = &J->cur.snapmap[snap->mapofs + snap->nent];
   uint64_t pcbase;
   memcpy(&pcbase, flink, sizeof(uint64_t));
   pcbase = (pcbase & 0xff) | (u64ptr(npc) << 8);
   memcpy(flink, &pcbase, sizeof(uint64_t));
-#else
-  J->cur.snapmap[snap->mapofs + snap->nent] = SNAP_MKPC(npc);
-#endif
   J->needsnap = 1;
   if (bc_a(jmpins) < J->maxslot) J->maxslot = bc_a(jmpins);
   lj_snap_shrink(J);  /* Shrink last snapshot if possible. */
@@ -1971,6 +1869,13 @@ void lj_record_ins(jit_State *J)
   BCIns ins;
   BCOp op;
   TRef ra, rb, rc;
+
+  if (J->nbclog < J->maxbclog) {
+    BCRecLog *log = &J->bclog[J->nbclog++];
+    log->pt = J->pt;
+    log->pos = J->pt ? proto_bcpos(J->pt, J->pc) : -1;
+    log->framedepth = J->framedepth;
+  }
 
   /* Perform post-processing action before recording the next instruction. */
   if (LJ_UNLIKELY(J->postproc != LJ_POST_NONE)) {
@@ -2044,9 +1949,6 @@ void lj_record_ins(jit_State *J)
   rec_check_ir(J);
 #endif
 
-#if LJ_HASPROFILE
-  rec_profile_ins(J, pc);
-#endif
 
   /* Keep a copy of the runtime values of var/num/str operands. */
 #define rav	(&ix.valv)
@@ -2076,8 +1978,7 @@ void lj_record_ins(jit_State *J)
     copyTV(J->L, rcv, &lbase[rc]); ix.key = rc = getslot(J, rc); break;
   case BCMpri: setpriV(rcv, ~rc); ix.key = rc = TREF_PRI(IRT_NIL+rc); break;
   case BCMnum: { cTValue *tv = proto_knumtv(J->pt, rc);
-    copyTV(J->L, rcv, tv); ix.key = rc = tvisint(tv) ? lj_ir_kint(J, intV(tv)) :
-    lj_ir_knumint(J, numV(tv)); } break;
+    copyTV(J->L, rcv, tv); ix.key = rc = lj_ir_knumint(J, numV(tv)); } break;
   case BCMstr: { GCstr *s = gco2str(proto_kgc(J->pt, ~(ptrdiff_t)rc));
     setstrV(J->L, rcv, s); ix.key = rc = lj_ir_kstr(J, s); } break;
   default: break;  /* Handled later. */
@@ -2088,12 +1989,10 @@ void lj_record_ins(jit_State *J)
   /* -- Comparison ops ---------------------------------------------------- */
 
   case BC_ISLT: case BC_ISGE: case BC_ISLE: case BC_ISGT:
-#if LJ_HASFFI
     if (tref_iscdata(ra) || tref_iscdata(rc)) {
       rec_mm_comp_cdata(J, &ix, op, ((int)op & 2) ? MM_le : MM_lt);
       break;
     }
-#endif
     /* Emit nothing for two numeric or string consts. */
     if (!(tref_isk2(ra,rc) && tref_isnumber_str(ra) && tref_isnumber_str(rc))) {
       IRType ta = tref_isinteger(ra) ? IRT_INT : tref_type(ra);
@@ -2140,12 +2039,10 @@ void lj_record_ins(jit_State *J)
   case BC_ISEQS: case BC_ISNES:
   case BC_ISEQN: case BC_ISNEN:
   case BC_ISEQP: case BC_ISNEP:
-#if LJ_HASFFI
     if (tref_iscdata(ra) || tref_iscdata(rc)) {
       rec_mm_comp_cdata(J, &ix, op, MM_eq);
       break;
     }
-#endif
     /* Emit nothing for two non-table, non-udata consts. */
     if (!(tref_isk2(ra, rc) && !(tref_istab(ra) || tref_isudata(ra)))) {
       int diff;
@@ -2171,9 +2068,7 @@ void lj_record_ins(jit_State *J)
 
   case BC_ISTYPE: case BC_ISNUM:
     /* These coercions need to correspond with lj_meta_istype(). */
-    if (LJ_DUALNUM && rc == ~LJ_TNUMX+1)
-      ra = lj_opt_narrow_toint(J, ra);
-    else if (rc == ~LJ_TNUMX+2)
+    if (rc == ~LJ_TNUMX+2)
       ra = lj_ir_tonum(J, ra);
     else if (rc == ~LJ_TSTR+1)
       ra = lj_ir_tostr(J, ra);
@@ -2255,11 +2150,7 @@ void lj_record_ins(jit_State *J)
   case BC_MOV:
     /* Clear gap of method call to avoid resurrecting previous refs. */
     if (ra > J->maxslot) {
-#if LJ_FR2
       memset(J->base + J->maxslot, 0, (ra - J->maxslot) * sizeof(TRef));
-#else
-      J->base[ra-1] = 0;
-#endif
     }
     break;
   case BC_KSTR: case BC_KNUM: case BC_KPRI:
@@ -2274,11 +2165,9 @@ void lj_record_ins(jit_State *J)
       J->base[ra++] = TREF_NIL;
     if (rc >= J->maxslot) J->maxslot = rc+1;
     break;
-#if LJ_HASFFI
   case BC_KCDATA:
     rc = lj_ir_kgc(J, proto_kgc(J->pt, ~(ptrdiff_t)rc), IRT_CDATA);
     break;
-#endif
 
   /* -- Upvalue and function ops ------------------------------------------ */
 
@@ -2369,9 +2258,6 @@ void lj_record_ins(jit_State *J)
     rc = (BCReg)(J->L->top - J->L->base) - ra + 1;
     /* fallthrough */
   case BC_RET: case BC_RET0: case BC_RET1:
-#if LJ_HASPROFILE
-    rec_profile_ret(J);
-#endif
     lj_record_ret(J, ra, (ptrdiff_t)rc-1);
     break;
 
@@ -2462,9 +2348,7 @@ void lj_record_ins(jit_State *J)
   if (bcmode_a(op) == BCMdst && rc) {
     J->base[ra] = rc;
     if (ra >= J->maxslot) {
-#if LJ_FR2
       if (ra > J->maxslot) J->base[ra-1] = 0;
-#endif
       J->maxslot = ra+1;
     }
   }
@@ -2565,6 +2449,8 @@ void lj_record_setup(jit_State *J)
   J->bc_min = NULL;  /* Means no limit. */
   J->bc_extent = ~(MSize)0;
 
+  J->nbclog = 0;
+
   /* Emit instructions for fixed references. Also triggers initial IR alloc. */
   emitir_raw(IRT(IR_BASE, IRT_PGC), J->parent, J->exitno);
   for (i = 0; i <= 2; i++) {
@@ -2617,10 +2503,6 @@ void lj_record_setup(jit_State *J)
     if (1 + J->pt->framesize >= LJ_MAX_JSLOTS)
       lj_trace_err(J, LJ_TRERR_STACKOV);
   }
-#if LJ_HASPROFILE
-  J->prev_pt = NULL;
-  J->prev_line = -1;
-#endif
 #ifdef LUAJIT_ENABLE_CHECKHOOK
   /* Regularly check for instruction/line hooks from compiled code and
   ** exit to the interpreter if the hooks are set.
@@ -2648,4 +2530,3 @@ void lj_record_setup(jit_State *J)
 #undef emitir_raw
 #undef emitir
 
-#endif

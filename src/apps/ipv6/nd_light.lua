@@ -47,6 +47,7 @@ local tlv = require("lib.protocol.icmp.nd.options.tlv")
 local filter = require("lib.pcap.filter")
 local timer = require("core.timer")
 local lib = require("core.lib")
+local logger = require("lib.logger")
 
 nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
@@ -236,7 +237,7 @@ function nd_light:new (arg)
       p = ffi.new("struct packet *[1]"),
       mem = ffi.new("uint8_t *[1]")
    }
-   o._logger = lib.logger_new({ module = 'nd_light' })
+   o._logger = logger.new({ module = 'nd_light' })
 
    return o
 end

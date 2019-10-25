@@ -11,6 +11,12 @@ local packet     = require("core.packet")
 local counter    = require("core.counter")
 local link       = require("core.link")
 local alarms     = require('lib.yang.alarms')
+local ctable     = require('lib.ctable')
+local datagram   = require('lib.protocol.datagram')
+local ethernet   = require('lib.protocol.ethernet')
+local ipv6_hdr   = require('lib.protocol.ipv6')
+local ptb        = require('lib.protocol.icmp.ptb')
+local tsc        = require('lib.tsc')
 local S          = require('syscall')
 
 local CounterAlarm = alarms.CounterAlarm
@@ -61,6 +67,7 @@ local fragment_flag_more_fragments = 0x1
 -- offset is non-zero, it is a fragment.
 local fragment_proto = 44
 
+local ipv6_header_ptr_t = ffi.typeof('$*', ipv6_header_t)
 local ether_ipv6_header_t = ffi.typeof(
    'struct { $ ether; $ ipv6; uint8_t payload[0]; } __attribute__((packed))',
    ether_header_t, ipv6_header_t)
@@ -79,12 +86,19 @@ end
 Fragmenter = {}
 Fragmenter.shm = {
    ["out-ipv6-frag"]      = {counter},
-   ["out-ipv6-frag-not"]  = {counter}
+   ["out-ipv6-frag-not"]  = {counter},
+   ["ipv6-pmtud-ptb-received"] = {counter},
+   ["ipv6-pmtud-ptb-valid"] = {counter},
+   ["ipv6-pmtud-ptb-invalid-csum"] = {counter},
+   ["ipv6-pmtud-ptb-invalid"] = {counter}
 }
 local fragmenter_config_params = {
    -- Maximum transmission unit, in bytes, not including the ethernet
    -- header.
-   mtu = { mandatory=true }
+   mtu = { mandatory=true },
+   pmtud = { default=false },
+   pmtu_timeout = { default = 600 },
+   pmtu_local_addresses = { default = {} },
 }
 
 deterministic_first_fragment_id = false
@@ -98,6 +112,51 @@ function Fragmenter:new(conf)
    assert(o.mtu >= 1280)
    o.next_fragment_id = deterministic_first_fragment_id or
       math.random(0, 0xffffffff)
+
+   if o.pmtud then
+      -- Path MTU Discovery is supported by listening to ICMP
+      -- Packet-Too-Big messages and recording path MTUs in a
+      -- per-destination cache.  Cache entries are removed after 10
+      -- minutes by default as recommended by RFC 1981 §5.3.
+      local max_occupy = 0.4
+      local initial_size = 128
+      local params = {
+         key_type = ffi.typeof("uint8_t [16]"),
+         value_type = ffi.typeof[[
+         struct {
+            uint16_t mtu;
+            uint64_t tstamp;
+         } __attribute((packed))]],
+         initial_size = initial_size,
+         max_occupancy_rate = max_occupy,
+         resize_callback = function(table, old_size)
+            if old_size > 0 then
+               require('jit').flush()
+            end
+         end,
+      }
+      o.dcache = ctable.new(params)
+      o.scratch_dcache_value = params.value_type()
+      o.tsc = tsc.new()
+      o.pmtu_timeout_ticks = o.tsc:tps() * o.pmtu_timeout
+      o.pmtu_timer = lib.throttle(o.pmtu_timeout/10)
+      o.dgram = datagram:new()
+      packet.free(o.dgram:packet())
+
+      -- List of local addresses for which to perform PMTUD.  PTB
+      -- messages not targeted at any of these addresses are ignored
+      o.pmtu_local_address_table = ctable.new(
+         {
+            key_type = ffi.typeof("uint8_t [16]"),
+            value_type = ffi.typeof("uint8_t"), -- dummy
+            initial_size = #o.pmtu_local_addresses,
+            max_occupancy_rate = 1,
+      })
+      for _, addr in ipairs(o.pmtu_local_addresses) do
+         o.pmtu_local_address_table:add(ipv6_hdr:pton(addr), 0)
+      end
+      o.ipv6_hdr = ipv6_hdr:new({})
+   end
 
    alarms.add_to_inventory(
       {alarm_type_id='outgoing-ipv6-fragments'},
@@ -129,14 +188,18 @@ function Fragmenter:unfragmentable_packet(p)
    -- TODO: Send an error packet.
 end
 
-function Fragmenter:fragment_and_transmit(in_h, in_pkt)
-   local mtu_with_l2 = self.mtu + ether_header_len
-   local total_payload_size = in_pkt.length - ether_ipv6_header_len
+function Fragmenter:fragment_and_transmit(in_next_header, in_pkt_box, mtu)
+   local mtu_with_l2 = mtu + ether_header_len
+   local total_payload_size = in_pkt_box[0].length - ether_ipv6_header_len
    local offset, id = 0, self:fresh_fragment_id()
 
+   -- Use explicit boxing to avoid garbage when passing the header and
+   -- packet pointers in case this loop gets compiled first.
    while offset < total_payload_size do
+      local in_pkt = in_pkt_box[0]
       local out_pkt = packet.allocate()
-      packet.append(out_pkt, in_pkt.data, ether_ipv6_header_len)
+      packet.append(out_pkt, ffi.cast("uint8_t *", in_pkt.data),
+                    ether_ipv6_header_len)
       local out_h = ffi.cast(ether_ipv6_header_ptr_t, out_pkt.data)
       local fragment_h = ffi.cast(fragment_header_ptr_t, out_h.ipv6.payload)
       out_pkt.length = out_pkt.length + fragment_header_len
@@ -148,12 +211,13 @@ function Fragmenter:fragment_and_transmit(in_h, in_pkt)
       else
          payload_size = total_payload_size - offset
       end
-      packet.append(out_pkt, in_pkt.data + ether_ipv6_header_len + offset,
+      packet.append(out_pkt, ffi.cast("uint8_t *", in_pkt.data +
+                                         ether_ipv6_header_len + offset),
                     payload_size)
 
       out_h.ipv6.next_header = fragment_proto
       out_h.ipv6.payload_length = htons(out_pkt.length - ether_ipv6_header_len)
-      fragment_h.next_header = in_h.ipv6.next_header
+      fragment_h.next_header = in_next_header
       fragment_h.reserved = 0
       fragment_h.id = htonl(id)
       fragment_h.fragment_offset_and_flags = htons(bit.bor(offset, flags))
@@ -163,9 +227,64 @@ function Fragmenter:fragment_and_transmit(in_h, in_pkt)
    end
 end
 
+function Fragmenter:process_ptb (pkt)
+   local dgram = self.dgram:new(pkt, ethernet)
+   dgram:parse_n(3)
+   local _, ipv6, icmp = unpack(dgram:stack())
+   local payload, length = dgram:payload()
+   if icmp:type() ~= 2 then return false end
+   local ptb = dgram:parse()
+   counter.add(self.shm["ipv6-pmtud-ptb-received"])
+
+   if (#self.pmtu_local_addresses > 0 and
+       not self.pmtu_local_address_table:lookup_ptr(ipv6:dst())) then
+      -- PTB not addressed to us
+      return false
+   end
+
+   if icmp:checksum_check(payload, length, ipv6) then
+      local mtu = ptb:mtu()
+      local payload, length = dgram:payload()
+      local orig_hdr = self.ipv6_hdr:new_from_mem(payload, length)
+      if (length >= ipv6_hdr:sizeof() and
+             (#self.pmtu_local_addresses == 0 or
+              self.pmtu_local_address_table:lookup_ptr(orig_hdr:src()))) then
+         counter.add(self.shm["ipv6-pmtud-ptb-valid"])
+         local value = self.scratch_dcache_value
+         value.mtu = mtu
+         value.tstamp = self.tsc:stamp()
+         self.dcache:add(orig_hdr:dst(), value, 'update_allowed')
+      else
+         counter.add(self.shm["ipv6-pmtud-ptb-invalid"])
+      end
+   else
+      counter.add(self.shm["ipv6-pmtud-ptb-invalid-csum"])
+   end
+   return true
+end
+
+-- The destination cache is expected to be fairly small so it should
+-- be ok to make a full scan.
+function Fragmenter:expire_pmtu ()
+   local now = self.tsc:stamp()
+   local cursor = 0
+   repeat
+      local entry
+      cursor, entry = self.dcache:next_entry(cursor, cursor + 1)
+      if entry then
+         if now - entry.value.tstamp > self.pmtu_timeout_ticks then
+            self.dcache:remove_ptr(entry)
+         else
+            cursor = cursor + 1
+         end
+      end
+   until cursor == 0
+end
+
+local pkt_box = ffi.new("struct packet *[1]")
 function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
-   local max_length = self.mtu + ether_header_len
+   local south, north = self.input.south, self.output.north
 
    self.outgoing_ipv6_fragments_alarm:check()
 
@@ -181,14 +300,62 @@ function Fragmenter:push ()
          -- IPv6 packet has invalid length; drop.  FIXME: Should add a
          -- counter here.
          packet.free(pkt)
-      elseif pkt.length <= max_length then
+      else
+         link.transmit(input, pkt)
+      end
+   end
+
+   for _ = 1, link.nreadable(input) do
+      local pkt = link.receive(input)
+      local mtu = self.mtu
+      if self.pmtud then
+         local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
+         local entry = self.dcache:lookup_ptr(h.ipv6.dst_ip)
+         if entry then
+            mtu = entry.value.mtu
+         end
+      end
+      -- FIXME: assumes that there is always room to store the MTU at
+      -- the end of the payload.
+      ffi.cast("uint16_t *", pkt.data + pkt.length)[0] = mtu
+      if pkt.length <= mtu + ether_header_len then
          -- No need to fragment; forward it on.
          counter.add(self.shm["out-ipv6-frag-not"])
          link.transmit(output, pkt)
       else
          -- Packet doesn't fit into MTU; need to fragment.
-         self:fragment_and_transmit(h, pkt)
-         packet.free(pkt)
+         link.transmit(input, pkt)
+      end
+   end
+
+   for _ = 1,  link.nreadable(input) do
+      local pkt  = link.receive(input)
+      local mtu = ffi.cast("uint16_t *", pkt.data + pkt.length)[0]
+      local next_header =
+         ffi.cast(ether_ipv6_header_ptr_t, pkt.data).ipv6.next_header
+      pkt_box[0] = pkt
+      self:fragment_and_transmit(next_header, pkt_box, mtu)
+      packet.free(pkt_box[0])
+   end
+
+   if self.pmtud then
+      for _ = 1, link.nreadable(south) do
+         local pkt = link.receive(south)
+         local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
+         if h.ipv6.next_header == 58 then -- ICMP6
+            if self:process_ptb(pkt) then
+               packet.free(pkt)
+            else
+               -- Packet was not addressed to us
+               link.transmit(north, pkt)
+            end
+         else
+            link.transmit(north, pkt)
+         end
+      end
+
+      if self.pmtu_timer() then
+         self:expire_pmtu()
       end
    end
 end
@@ -267,5 +434,6 @@ function selftest()
    link.free(input, 'fragment input')
    link.free(output, 'fragment output')
 
+   -- FIXME: add test case for PMTUD
    print("selftest: ok")
 end

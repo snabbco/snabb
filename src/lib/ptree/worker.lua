@@ -100,8 +100,16 @@ function Worker:handle_actions_from_manager()
 end
 
 function Worker:main ()
+   local vmprofile = require("jit.vmprofile")
    local stop = engine.now() + self.duration
    local next_time = engine.now()
+
+   -- Setup vmprofile.
+   engine.setvmprofile("engine")
+   vmprofile.start()
+
+   if not engine.auditlog_enabled then engine.enable_auditlog() end
+
    repeat
       self.breathe()
       if next_time < engine.now() then

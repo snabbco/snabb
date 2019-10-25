@@ -1,0 +1,128 @@
+// Config file for the 'unifdef' program to strip out unwanted source code.
+
+#define LJ_GC64 1
+#define LJ_HASFFI 1
+#define LJ_HASJIT 1
+#define LJ_NO_UNWIND 1
+#define LUAJIT_DISABLE_PROFILE 1
+#define LUAJIT_DISABLE_VMEVENT 1
+#define LUAJIT_ENABLE_GC64 1
+#define LUAJIT_ENABLE_JIT 1
+#undef LJ_HASPROFILE
+#undef LJ_UNWIND_EXT
+#undef LUAJIT_DISABLE_FFI
+#undef LUAJIT_DISABLE_JIT
+#undef LUAJIT_NOFFI
+#undef LUAJIT_USE_GDBJIT
+
+#define LJ_64 1
+#define LJ_ARCH_BITS 64
+#define LJ_ARCH_ENDIAN == LUAJIT_LE
+#define LJ_DUALNUM 0
+#define LJ_FR2 1
+#define LJ_NUMMODE LJ_NUMMODE_SINGLE_DUAL
+#define LJ_NUMMODE_DUAL		2
+#define LJ_NUMMODE_DUAL_SINGLE	3
+#define LJ_NUMMODE_SINGLE	0
+#define LJ_NUMMODE_SINGLE_DUAL	1
+#define LJ_TARGET_DLOPEN 1
+#define LJ_TARGET_GC64 1
+#define LJ_TARGET_LINUX 1
+#define LJ_TARGET_POSIX 1
+#define LJ_TARGET_X64 1
+#define LJ_TARGET_X86ORX64 1
+#define LUAJIT_ARCH_ARM		3
+#define LUAJIT_ARCH_ARM64	4
+#define LUAJIT_ARCH_MIPS	6
+#define LUAJIT_ARCH_MIPS32	6
+#define LUAJIT_ARCH_MIPS64	7
+#define LUAJIT_ARCH_PPC		5
+#define LUAJIT_ARCH_X64		2
+#define LUAJIT_ARCH_X86		1
+#define LUAJIT_ARCH_arm		3
+#define LUAJIT_ARCH_arm64	4
+#define LUAJIT_ARCH_mips	6
+#define LUAJIT_ARCH_mips32	6
+#define LUAJIT_ARCH_mips64	7
+#define LUAJIT_ARCH_ppc		5
+#define LUAJIT_ARCH_x64		2
+#define LUAJIT_ARCH_x86		1
+#define LUAJIT_LE 1
+#define LUAJIT_NUMMODE=1
+#define LUAJIT_OS LUAJIT_OS_LINUX
+#define LUAJIT_OS_LINUX 2
+#define LUAJIT_OS_WINDOWS 3
+#define LUAJIT_TARGET LUAJIT_ARCH_X64
+#define LUAJIT_TARGET_POSIX 1
+#define __linux__
+#undef JL_TARGET_PPC
+#undef LJ_32
+#undef LJ_ABI_EABI
+#undef LJ_ABI_SOFTFP
+#undef LJ_ABI_WIN
+#undef LJ_ALLOC_NTAVM
+#undef LJ_ALLOC_VIRTUALALLOC
+#undef LJ_ARCH_NOFFI
+#undef LJ_ARCH_PPC
+#undef LJ_BE
+#undef LJ_OS_NOJIT
+#undef LJ_SOFTFP
+#undef LJ_TARGET_ARM
+#undef LJ_TARGET_ARM64
+#undef LJ_TARGET_CONSOLE
+#undef LJ_TARGET_CYGWIN
+#undef LJ_TARGET_IOS
+#undef LJ_TARGET_MIPS
+#undef LJ_TARGET_MIPS64
+#undef LJ_TARGET_PPC
+#undef LJ_TARGET_PS3
+#undef LJ_TARGET_PS4
+#undef LJ_TARGET_PSVITA
+#undef LJ_TARGET_WINDOWS
+#undef LJ_TARGET_WINDOWS
+#undef LJ_TARGET_X86
+#undef LJ_TARGET_XBOX360
+#undef LJ_TARGET_XBOX360
+#undef LUAJIT_ARCH_MIPS32
+#undef LUAJIT_ARCH_X86
+#undef LUAJIT_BE
+#undef MINGW_SDK_INIT
+#undef _ARCH_PPCSQ
+#undef _ARCH_PWR4
+#undef _ARCH_PWR5
+#undef _ARCH_PWR5X
+#undef _ARCH_PWR6
+#undef _ARCH_PWR7
+#undef _DURANGO
+#undef _MIPSEL
+#undef _MSC_VER
+#undef _XBOX_VER
+#undef __ANDROID__
+#undef __ARM_ARCH_6T2__
+#undef __ARM_ARCH_6T2__
+#undef __ARM_ARCH_6Z__
+#undef __ARM_ARCH_6__
+#undef __ARM_ARCH_7A__
+#undef __ARM_ARCH_7R__
+#undef __ARM_ARCH_7S__
+#undef __ARM_ARCH_7VE__
+#undef __ARM_ARCH_7__
+#undef __ARM_ARCH_8A__
+#undef __ARM_ARCH____ARM_ARCH_8__
+#undef __ARM_ARH_6J__
+#undef __ARM_PCS_VFP
+#undef __CELLOS_LV2__
+#undef __FreeBSD__
+#undef __FreeBSD_kernel__
+#undef __MIPSEL
+#undef __MIPSEL__
+#undef __ORBIS__
+#undef __OpenBSD__
+#undef __arm__
+#undef __i386__
+#undef __mips_soft_float
+#undef __psp2__
+#undef __sun__
+#undef __symbian__
+#undef __symbian__
+#undef ljamalg_c

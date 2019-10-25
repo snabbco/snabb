@@ -118,7 +118,6 @@ function BTLookupQueue:get_lookup(n)
       local streamer = self.streamer
       local pkt, b4_ipv6, br_ipv6
       pkt = self.packet_queue[n]
-      self.packet_queue[n] = nil
       if not streamer:is_empty(n) then
          b4_ipv6 = streamer.entries[n].value.b4_ipv6
          br_ipv6 = streamer.entries[n].value.br_address

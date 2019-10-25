@@ -133,12 +133,14 @@ EEC         0x10010 -               RW EEPROM/Flash Control Register
 EIMC        0x00888 -               RW Extended Interrupt Mask Clear
 ERRBC       0x04008 -               RC Error Byte Count
 FCCFG       0x03D00 -               RW Flow Control Configuration
+FCOERPDC    0x0241C -               RC Rx Packets Dropped Count
 FCTRL       0x05080 -               RW Filter Control
 HLREG0      0x04240 -               RW MAC Core Control 0
 ILLERRC     0x04004 -               RC Illegal Byte Error Count
 LINKS       0x042A4 -               RO Link Status Register
 MAXFRS      0x04268 -               RW Max Frame Size
 MFLCN       0x04294 -               RW MAC Flow Control Register
+MNGPDC      0x040B8 -               RO Management Packets Dropped Count
 MRQC        0x0EC80 -               RW Multiple Receive Queues Command Register
 MTQC        0x08120 -               RW Multiple Transmit Queues Command Register
 PFVTCTL     0x051B0 -               RW PF Virtual Control Register
@@ -609,6 +611,8 @@ function Intel:init_rx_q ()
    end
    self:unlock_sw_sem()
 end
+
+txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
 function Intel:init_tx_q ()                               -- 4.5.10
    if not self.txq then return end
    assert((self.txq >=0) and (self.txq < self.max_q),
@@ -618,7 +622,6 @@ function Intel:init_tx_q ()                               -- 4.5.10
    self.txqueue = ffi.new("struct packet *[?]", self.ndesc)
 
    -- 7.2.2.3
-   local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
    local txdesc_ring_t = ffi.typeof("$[$]", txdesc_t, self.ndesc)
    self.txdesc = ffi.cast(ffi.typeof("$&", txdesc_ring_t),
    memory.dma_alloc(ffi.sizeof(txdesc_ring_t)))
@@ -1335,7 +1338,11 @@ function Intel82599:promisc ()
    return band(self.r.FCTRL(), lshift(1, 9)) ~= 0ULL
 end
 function Intel82599:rxbytes  () return self.r.GORC64()   end
-function Intel82599:rxdrop   () return self.r.QPRDC[0]() end
+function Intel82599:rxdrop   ()
+   local rxdrop = self.r.MNGPDC() + self.r.FCOERPDC()
+   for i=0,15 do rxdrop = rxdrop + self.r.QPRDC[i]() end
+   return rxdrop
+end
 function Intel82599:rxerrors ()
    return self.r.CRCERRS() + self.r.ILLERRC() + self.r.ERRBC() +
       self.r.RUC() + self.r.RFC() + self.r.ROC() + self.r.RJC()
