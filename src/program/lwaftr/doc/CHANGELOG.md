@@ -20,7 +20,8 @@
 
  * Update the `ieee-softwire` compatibility layer for the native
    `snabb-softwire-v2` Yang module, corresponding the latest changes in
-   the Internet Draft, `draft-ietf-softwire-yang-16`.
+   the Internet Draft,
+   [`draft-ietf-softwire-yang-16`](https://datatracker.ietf.org/doc/draft-ietf-softwire-yang/16/).
 
  * Add counters and historical data records for how much memory a lwAFTR
    process uses over time, for use in on-line and post-mortem system
