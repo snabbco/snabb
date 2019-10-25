@@ -113,7 +113,7 @@ class TestConfigGet(BaseTestCase):
             DAEMON_PROC_NAME,
             # Implicit string concatenation, do not add commas.
             '/br-instances/binding/'
-            'br-instance[id=1]/binding-table/binding-entry'
+            'bind-instance[name=config-test-daemon]/binding-table/binding-entry'
             '[binding-ipv6info=127:22:33:44:55:66:77:128]/binding-ipv4-addr',
         ))
         output = self.run_cmd(cmd_args)
@@ -284,6 +284,9 @@ class TestConfigMultiproc(BaseTestCase):
                 continue
             [cname, cvalue] = line.split(" ")
             cname = os.path.basename(cname)
+            if cname == "discontinuity-time":
+                cvalue = str(cvalue)
+                continue
             cvalue = int(cvalue)
 
             if line.startswith("/softwire-config"):
@@ -420,6 +423,31 @@ class TestConfigMisc(BaseTestCase):
             output.strip(), b'::2',
             '\n'.join(('OUTPUT', str(output, ENC))))
 
+    def test_add_ietf(self):
+        add_args = self.get_cmd_args('add')[:-1]
+        add_args[3] = '--schema=ietf-softwire-br'
+        add_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'binding-table/binding-entry',
+            '{ binding-ipv6info ::123; binding-ipv4-addr 8.8.8.8;'
+            'br-ipv6-addr 2001:db8::; port-set { psid 8; psid-len 15; }}',
+        ))
+        self.run_cmd(add_args)
+        get_args = self.get_cmd_args('get')[:-1]
+        get_args[3] = '--schema=ietf-softwire-br'
+        get_args.extend((
+            DAEMON_PROC_NAME,
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'binding-table/binding-entry[binding-ipv6info=::123]/port-set/psid',
+        ))
+        output = self.run_cmd(get_args)
+        # run_cmd checks the exit code and fails the test if it is not zero.
+        self.assertEqual(
+            output.strip(), b'8',
+            '\n'.join(('OUTPUT', str(output, ENC))))
+
     def test_get_state(self):
         get_state_args = self.get_cmd_args('get-state')
         # Select a few at random which should have non-zero results.
@@ -437,6 +465,20 @@ class TestConfigMisc(BaseTestCase):
         self.run_cmd(get_state_args)
         # run_cmd checks the exit code and fails the test if it is not zero.
 
+    def test_get_state_ietf(self):
+        get_args = self.get_cmd_args('get-state')[:-1]
+        get_args[3] = '--schema=ietf-softwire-br'
+        get_args.extend((
+            DAEMON_PROC_NAME,
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'traffic-stat/rcvd-ipv4-bytes',
+        ))
+        output = self.run_cmd(get_args)
+        # run_cmd checks the exit code and fails the test if it is not zero.
+        self.assertNotEqual(
+            output.strip(), b'0',
+            '\n'.join(('OUTPUT', str(output, ENC))))
+
     def test_remove(self):
         # Verify that the thing we want to remove actually exists.
         get_args = self.get_cmd_args('get')
@@ -450,11 +492,31 @@ class TestConfigMisc(BaseTestCase):
         # Remove it.
         remove_args = list(get_args)
         remove_args[2] = 'remove'
-        self.run_cmd(get_args)
+        self.run_cmd(remove_args)
         # run_cmd checks the exit code and fails the test if it is not zero.
         # Verify we cannot find it anymore.
+        self.run_cmd(get_args, 1)
+        # run_cmd checks the exit code and fails the test if it is not 1.
+
+    def test_remove_ietf(self):
+        # Verify that the thing we want to remove actually exists.
+        get_args = self.get_cmd_args('get')[:-1]
+        get_args[3] = '--schema=ietf-softwire-br'
+        get_args.extend((
+            DAEMON_PROC_NAME,
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'binding-table/binding-entry[binding-ipv6info=::123]',
+        ))
         self.run_cmd(get_args)
         # run_cmd checks the exit code and fails the test if it is not zero.
+        # Remove it.
+        remove_args = list(get_args)
+        remove_args[2] = 'remove'
+        self.run_cmd(remove_args)
+        # run_cmd checks the exit code and fails the test if it is not zero.
+        # Verify we cannot find it anymore.
+        self.run_cmd(get_args, 1)
+        # run_cmd checks the exit code and fails the test if it is not 1.x
 
     def test_set(self):
         """
@@ -501,7 +563,7 @@ class TestConfigMisc(BaseTestCase):
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
             '/br-instances/binding/'
-            'br-instance[id=1]/binding-table/binding-entry'
+            'bind-instance[name=config-test-daemon]/binding-table/binding-entry'
             '[binding-ipv6info=::1]/binding-ipv4-addr',
         ))
         output = self.run_cmd(get_args)
@@ -515,12 +577,176 @@ class TestConfigMisc(BaseTestCase):
         get_args.extend((
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
-            '/br-instances/binding/br-instance[id=1]/'
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
             'binding-table/binding-entry[binding-ipv6info=::1]/port-set/psid',
         ))
         output = self.run_cmd(get_args)
         self.assertEqual(output.strip(), bytes(test_psid, ENC),
             '\n'.join(('OUTPUT', str(output, ENC))))
+
+    def test_set_ietf(self):
+        """
+        Set binding table, update an entry, check for validity via get.
+        """
+        set_args = self.get_cmd_args('set')[:-1]
+        set_args[3] = '--schema=ietf-softwire-br'
+        set_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'binding-table/binding-entry',
+            '{ binding-ipv6info ::124; binding-ipv4-addr 8.8.8.8;'
+            'br-ipv6-addr 2001:db8::; port-set { psid 8; psid-len 15; }}',
+        ))
+        self.run_cmd(set_args)
+        set_args = self.get_cmd_args('set')[:-1]
+        set_args[3] = '--schema=ietf-softwire-br'
+        set_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'binding-table/binding-entry[binding-ipv6info=::124]/'
+            'binding-ipv4-addr',
+            '9.9.9.9',
+        ))
+        self.run_cmd(set_args)
+        get_args = self.get_cmd_args('get')
+        get_args.append(
+            '/softwire-config/binding-table/softwire[ipv4=9.9.9.9][psid=8]'
+            '/b4-ipv6')
+        output = self.run_cmd(get_args)
+        # run_cmd checks the exit code and fails the test if it is not zero.
+        self.assertEqual(
+            output.strip(), b'::124',
+            '\n'.join(('OUTPUT', str(output, ENC))))
+
+    def test_set_ietf_special(self):
+        """
+        Test handling of special br attributes.
+        """
+        set_args = self.get_cmd_args('set')[:-1]
+        set_args[3] = '--schema=ietf-softwire-br'
+        set_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'softwire-path-mru',
+            '542',
+        ))
+        self.run_cmd(set_args)
+        get_args = self.get_cmd_args('get')[:-1]
+        get_args[3] = '--schema=ietf-softwire-br'
+        get_args.extend((
+            DAEMON_PROC_NAME,
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'softwire-path-mru',
+        ))
+        output = self.run_cmd(get_args)
+        # run_cmd checks the exit code and fails the test if it is not zero.
+        self.assertEqual(
+            output.strip(), b'542',
+            '\n'.join(('OUTPUT', str(output, ENC))))
+        #####
+        set_args = self.get_cmd_args('set')[:-1]
+        set_args[3] = '--schema=ietf-softwire-br'
+        set_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'icmp-policy/icmpv6-errors/generate-icmpv6-errors',
+            'false',
+        ))
+        self.run_cmd(set_args)
+        get_args = self.get_cmd_args('get')[:-1]
+        get_args[3] = '--schema=ietf-softwire-br'
+        get_args.extend((
+            DAEMON_PROC_NAME,
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'icmp-policy/icmpv6-errors/generate-icmpv6-errors',
+        ))
+        output = self.run_cmd(get_args)
+        # run_cmd checks the exit code and fails the test if it is not zero.
+        self.assertEqual(
+            output.strip(), b'false',
+            '\n'.join(('OUTPUT', str(output, ENC))))
+        #####
+        set_args = self.get_cmd_args('set')[:-1]
+        set_args[3] = '--schema=ietf-softwire-br'
+        set_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'icmp-policy/icmpv4-errors/icmpv4-rate',
+            '1001',
+        ))
+        self.run_cmd(set_args)
+        get_args = self.get_cmd_args('get')[:-1]
+        get_args[3] = '--schema=ietf-softwire-br'
+        get_args.extend((
+            DAEMON_PROC_NAME,
+            '/br-instances/binding/bind-instance[name=config-test-daemon]/'
+            'icmp-policy/icmpv4-errors/icmpv4-rate',
+        ))
+        output = self.run_cmd(get_args)
+        # run_cmd checks the exit code and fails the test if it is not zero.
+        self.assertEqual(
+            output.strip(), b'1001',
+            '\n'.join(('OUTPUT', str(output, ENC))))
+
+    def test_wrong_instance_ietf(self):
+        # Check for failure when querying wrong instance
+        remove_args = self.get_cmd_args('remove')[:-1]
+        remove_args[3] = '--schema=ietf-softwire-br'
+        remove_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=nosuchinstance]'
+            'binding-table/binding-entry[binding-ipv6info=::123]',
+        ))
+        output = str(self.run_cmd(remove_args, 1), ENC)
+        self.assertRegex(output, 'name does not match',
+            '\n'.join(('OUTPUT', output)))
+        ####
+        set_args = self.get_cmd_args('set')[:-1]
+        set_args[3] = '--schema=ietf-softwire-br'
+        set_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=nosuchinstance]/'
+            'binding-table/binding-entry',
+            '{ binding-ipv6info ::124; binding-ipv4-addr 8.8.8.8;'
+            'br-ipv6-addr 2001:db8::; port-set { psid 8; psid-len 15; }}',
+        ))
+        output = str(self.run_cmd(set_args, 1), ENC)
+        self.assertRegex(output, 'name does not match',
+            '\n'.join(('OUTPUT', output)))
+        ####
+        set_args = self.get_cmd_args('set')[:-1]
+        set_args[3] = '--schema=ietf-softwire-br'
+        set_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=nosuchinstance]/'
+            'binding-table/binding-entry[binding-ipv6info=::124]/'
+            'binding-ipv4-addr',
+            '9.9.9.9',
+        ))
+        output = str(self.run_cmd(set_args, 1), ENC)
+        self.assertRegex(output, 'name does not match',
+            '\n'.join(('OUTPUT', output)))
+        ####
+        set_args = self.get_cmd_args('set')[:-1]
+        set_args[3] = '--schema=ietf-softwire-br'
+        set_args.extend((
+            DAEMON_PROC_NAME,
+            # Implicit string concatenation, no summing needed.
+            '/br-instances/binding/bind-instance[name=nosuchinstance]/'
+            'icmp-policy/icmpv4-errors/icmpv4-rate',
+            '1001',
+        ))
+        output = str(self.run_cmd(set_args, 1), ENC)
+        self.assertRegex(output, 'name does not match',
+            '\n'.join(('OUTPUT', output)))
 
 
 if __name__ == '__main__':
