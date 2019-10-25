@@ -19,7 +19,7 @@
    https://github.com/Igalia/snabb/pull/1228.
 
  * Update the `ieee-softwire` compatibility layer for the native
-   `snabb-softwire-v2' Yang module, corresponding the latest changes in
+   `snabb-softwire-v2` Yang module, corresponding the latest changes in
    the Internet Draft, `draft-ietf-softwire-yang-16`.
 
  * Add counters and historical data records for how much memory a lwAFTR
