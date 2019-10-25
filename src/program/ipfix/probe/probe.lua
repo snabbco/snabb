@@ -176,7 +176,7 @@ function run (args)
    local done
    if not duration then
       done = function ()
-         return engine.app_table.source.done
+         return engine.app_table["in"].done
       end
    end
 

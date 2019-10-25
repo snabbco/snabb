@@ -39,7 +39,7 @@ local function migrate_device_on_config(config, v4, v6)
    end
 
    if v6 then
-      for id, queue in cltable.pairs(instance.queue) do
+      for id, queue in pairs(instance.queue) do
          queue.external_interface.device = v6
       end
    end
