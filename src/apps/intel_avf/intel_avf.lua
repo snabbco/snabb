@@ -11,7 +11,7 @@ local macaddress  = require("lib.macaddress")
 local pci         = require("lib.hardware.pci")
 local register    = require("lib.hardware.register")
 local tophysical  = core.memory.virtual_to_physical
-local band        = bit.band
+local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
 local transmit, receive, empty = link.transmit, link.receive, link.empty
 local counter     = require("core.counter")
 
@@ -68,7 +68,7 @@ local rxdesc_t = ffi.typeof([[
          uint64_t status_err_type_len;
          uint64_t pad2;
          uint64_t pad3;
-      } __attribute__((packet)) write;
+      } __attribute__((packed)) write;
    }
 ]])
 local rxdesc_ptr_t = ffi.typeof("$ *", rxdesc_t)
@@ -415,7 +415,7 @@ function Intel_avf:pull()
    local pkts = 0
    while band(self.rxdesc[self.rx_tail].write.status_err_type_len, 0x01) == 1 and pkts < engine.pull_npackets do
       local p = self.rxqueue[self.rx_tail]
-      p.length = bit.rshift(self.rxdesc[self.rx_tail].write.status_err_type_len, 38)
+      p.length = rshift(self.rxdesc[self.rx_tail].write.status_err_type_len, 38)
       transmit(lo, p)
 
       local np = packet.allocate()
