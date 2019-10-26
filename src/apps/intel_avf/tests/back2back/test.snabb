@@ -26,7 +26,8 @@ local c = config.new()
 config.app(c, "synth", synth.Synth, {
        sizes = {64,128,192,256,384,512,1024},
        src=src,
-       dst=dst
+       dst=dst,
+       random_payload = true
 } )
 config.app(c, "tee", basic.Tee)
 config.app(c, "match", match.Match)
@@ -42,8 +43,9 @@ config.link(c, "nic1.output -> match.rx")
 config.link(c, "tee.output2 -> match.comparator")
 
 engine.configure(c)
-engine.main({ duration = 0.01, report = false })
-engine.main({duration = 3, report = false})
+engine.main({duration = 1, report = false})
+engine.report_links()
+engine.report_apps()
 
 function rx(l1, l2)
    return counter.read(engine.link_table[l1 .. " -> " .. l2].stats.rxpackets)
@@ -79,12 +81,16 @@ config.link(c, "synth.output -> nic0.input")
 config.link(c, "nic1.output -> sink.input")
 engine.configure(c)
 
+local tosend = 10 * 1000 * 1000
 while true do
 	local v = rx("synth.output", "nic0.input")
-	if v > 100 * 1000 * 1000 then
+	if v > tosend then
 		break
 	end
 	engine.main({ duration = 1, no_report = true })
 end
+engine.report_links()
+assert(rx("nic1.output", "sink.input") >= tosend,
+       "packets received do not match packets sent")
 engine.stop()
 main.exit(0)

@@ -1,4 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -e
 
 PFIDX=0
 function setup(){
@@ -26,11 +28,10 @@ function setup(){
 	local loop=0
 	for i in ${@:2}; do
 		local vfdir=$( readlink -f $pfdir/virtfn$loop )
-		local vfnic=$( ls $vfdir/net )
 
 		ip link set $nic vf $loop mac $i
 		ip link set $nic vf $loop spoofchk off
-		ip link set $nic vf $loop trust on
+		ip link set $nic vf $loop trust on || true
 
 		local vfid=$( basename $( readlink -f $vfdir ) )
 		echo $vfid > $vfdir/driver/unbind
