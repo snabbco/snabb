@@ -669,7 +669,8 @@ function Intel_avf:new(conf)
    -- FIXME
    -- I haven't worked out why the sleep is required but without it
    -- self_mbox_set_version hangs indefinitely
-   C.sleep(1)
+   --C.sleep(1)
+   -- See elaboration in Intel_avf:stop()
 
    -- setup the nic for real
    self:mbox_setup()
@@ -688,9 +689,16 @@ function Intel_avf:new(conf)
 end
 
 function Intel_avf:stop()
+   -- From "Appendix A Virtual Channel Protocol":
+   -- VF sends this request to PF with no parameters PF does NOT respond! VF
+   -- driver must delay then poll VFGEN_RSTAT register until reset completion
+   -- is indicated. The admin queue must be reinitialized after this operation.
    self:mbox_send(self.mbox.opcodes['VIRTCHNL_OP_RESET_VF'], 0)
-   self.r.VF_ARQLEN(0)
-   self.r.VF_ATQLEN(0)
+   -- As per the above we (the VF driver) must "delay". Sadly, the spec does
+   -- (as of this time / to my knowledge) not give further clues as to how to
+   -- detect that the delay is sufficient. One second turned out to be not
+   -- enough in some cases, two seconds has always worked so far.
+   C.usleep(2e6)
    self:wait_for_vfgen_rstat()
 end
 
