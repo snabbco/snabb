@@ -71,9 +71,11 @@ An array of numbers designating the packet payload sizes. The default is
 `{64}`.
 
 — Key **random_payload**
-Generate a random payload for each packet in `sizes`
+
+Generate a random payload for each packet in `sizes`.
 
 — Key **packet_id**
+
 Insert the packet number (32bit uint) directly after the ethertype. The packet
 number starts at 0 and is sequential on each output link.
 

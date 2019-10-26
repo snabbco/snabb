@@ -6,6 +6,7 @@ local ffi = require("ffi")
 local ethernet = require("lib.protocol.ethernet")
 local datagram = require("lib.protocol.datagram")
 local transmit, receive = link.transmit, link.receive
+local lib = require("core.lib")
 
 Synth = {
    config = {
@@ -24,15 +25,12 @@ function Synth:new (conf)
       local payload_size = size - ethernet:sizeof()
       assert(payload_size >= 0 and payload_size <= 1536,
              "Invalid payload size: "..payload_size)
-      local data = ffi.new("char[?]", payload_size)
+      local data
       if conf.random_payload then
-         -- dstmac + srcmac + type
-         local off = 6 + 6 + 2
-         ffi.fill(data, payload_size)
-         ffi.copy(data + off,
-            lib.random_bytes(payload_size - off), payload_size - off)
+         data = lib.random_bytes(payload_size)
+      else
+         data = ffi.new("char[?]", payload_size)
       end
-
       local dgram = datagram:new(packet.from_pointer(data, payload_size))
       local ether = ethernet:new({ src = ethernet:pton(conf.src),
 				   dst = ethernet:pton(conf.dst),
