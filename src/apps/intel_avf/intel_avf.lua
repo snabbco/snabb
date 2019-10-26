@@ -398,9 +398,11 @@ function Intel_avf:push ()
    self:reclaim_txdesc()
    while not empty(li) and self.tx_desc_free > 0 do
       local p = receive(li)
+      -- NB: need to extend size for 4 byte CRC (not clear from the spec.)
+      local size = lshift(4ULL+p.length, SIZE_SHIFT)
       self.txdesc[ self.tx_next ].address = tophysical(p.data)
       self.txqueue[ self.tx_next ] = p
-      self.txdesc[ self.tx_next ].cmd_type_offset_bsz = RS_EOP + p.length * 2^SIZE_SHIFT
+      self.txdesc[ self.tx_next ].cmd_type_offset_bsz = RS_EOP + size
       self.tx_next = self:ringnext(self.tx_next)
       self.tx_desc_free = self.tx_desc_free - 1
    end

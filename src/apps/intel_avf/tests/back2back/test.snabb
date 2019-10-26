@@ -24,7 +24,7 @@ local counter = require("core.counter")
 
 local c = config.new()
 config.app(c, "synth", synth.Synth, {
-       sizes = {64,128,192,256,384,512,1024},
+       sizes = {64,67,128,133,192,256,384,512,777,1024},
        src=src,
        dst=dst,
        random_payload = true
