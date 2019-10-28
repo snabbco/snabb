@@ -17,8 +17,8 @@
 # NICs: $PCI1 (required, CPU0), $PCI3 (CPU0), $PCI5 (CPU1), $PCI7 (CPIU1)
 
 if [ ! $SNABB_LWAFTR_CPU0 ]; then
-    echo ">> SNABB_LWAFTR_CPU0 not set, defaulting to 0"
-    SNABB_LWAFTR_CPU0=0
+    echo ">> SNABB_LWAFTR_CPU0 must be set"
+    exit 1
 fi
 
 if [ ! $SNABB_PCI0 ] || [ ! $SNABB_PCI1 ]; then
@@ -78,17 +78,10 @@ function run_benchmark {
     lwaftr_log=`mktemp -p $TMPDIR`
 
     # Only supply the CPU argument only if it's not already specified.
-    if [[ *"--cpu"* == "$lwaftr_args" ]]; then
-	$SNABB lwaftr run \
-               --name lwaftr-release-benchmarks \
-               --conf $dataset/$config $lwaftr_args > $lwaftr_log &
-	lwaftr_pid=$!
-    else
-	$SNABB lwaftr run --cpu $cpu \
-               --name lwaftr-release-benchmarks \
-               --conf $dataset/$config $lwaftr_args > $lwaftr_log &
-	lwaftr_pid=$!
-    fi
+    $SNABB lwaftr run \
+        --name lwaftr-release-benchmarks \
+        --conf $dataset/$config $lwaftr_args > $lwaftr_log &
+    lwaftr_pid=$!
 
     # wait briefly to let lwaftr start up
     sleep 1
@@ -146,14 +139,14 @@ done
 if [ ! $ON_A_STICK_ONLY ]; then
     run_benchmark "1 instance, 2 NIC interface" \
                   "lwaftr.conf" \
-                  "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2" \
+                  "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2 --cpu $SNABB_LWAFTR_CPU0" \
                   "--cpu $SNABB_LOADTEST_CPU0 \
 		   $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
                    $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3"
 
     run_benchmark "1 instance, 2 NIC interfaces (from config)" \
                   "lwaftr2.conf" \
-                  "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2" \
+                  "--v4 $SNABB_PCI0 --v6 $SNABB_PCI2 --cpu $SNABB_LWAFTR_CPU0" \
                   "--cpu $SNABB_LOADTEST_CPU0 \
 		   $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
                    $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3"
@@ -161,18 +154,18 @@ fi
 
 run_benchmark "1 instance, 1 NIC (on a stick)" \
               "lwaftr.conf" \
-              "--on-a-stick $SNABB_PCI0" \
+              "--on-a-stick $SNABB_PCI0 --cpu $SNABB_LWAFTR_CPU0" \
               "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1"
 
 run_benchmark "1 instance, 1 NIC (on-a-stick, from config file)" \
               "lwaftr3.conf" \
-              "" \
+              "--cpu $SNABB_LWAFTR_CPU0" \
               "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1"
 
 if [ ! $ONE_INSTANCE_ONLY ]; then
     run_benchmark "2 instances, 2 NICs (from config)" \
                   "lwaftr4.conf" \
-                  "" \
+                  "--cpu $SNABB_LWAFTR_CPU0,$SNABB_LWAFTR_CPU1" \
                   "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI1 \
                    $FROM_B4_PCAP NIC1 NIC0 $SNABB_PCI3" \
                   "--cpu $SNABB_LOADTEST_CPU1 $FROM_INET_PCAP NIC0 NIC1 $SNABB_PCI5 \
@@ -180,7 +173,7 @@ if [ ! $ONE_INSTANCE_ONLY ]; then
 
     run_benchmark "2 instances, 1 NIC (on a stick, from config)" \
                   "lwaftr5.conf" \
-                  "" \
+                  "--cpu $SNABB_LWAFTR_CPU0,$SNABB_LWAFTR_CPU1" \
                   "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
                   "--cpu $SNABB_LOADTEST_CPU1 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI5"
 fi
@@ -191,7 +184,7 @@ if [ ! $SNABB_LWAFTR_CPU1 ]; then
 else
     run_benchmark "1 instance, 1 NIC, 2 queues" \
                   "lwaftr6.conf" \
-                  "" \
+                  "--cpu $SNABB_LWAFTR_CPU0,$SNABB_LWAFTR_CPU1" \
                   "--cpu $SNABB_LOADTEST_CPU0 $FROM_INET_AND_B4_PCAP NIC0 NIC0 $SNABB_PCI1" \
                   "" \
                   "$SNABB_LWAFTR_CPU0,$SNABB_LWAFTR_CPU1"
