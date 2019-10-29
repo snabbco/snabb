@@ -43,6 +43,12 @@ config.link(c, "nic1.output -> match.rx")
 config.link(c, "tee.output2 -> match.comparator")
 
 engine.configure(c)
+
+local n0 = engine.app_table['nic0']
+local n1 = engine.app_table['nic1']
+n0:flush_stats()
+n1:flush_stats()
+
 engine.main({duration = 1, report = false})
 engine.report_links()
 engine.report_apps()
@@ -60,13 +66,13 @@ local s = rx("tee.output1", "nic0.input")
 local r = rx("nic1.output", "match.rx")
 assert_eq(s, r, "packets_sr_1")
 
-local n0 = engine.app_table['nic0']
-local n1 = engine.app_table['nic1']
-n0:mbox_sr_stats()
-n1:mbox_sr_stats()
+n0:flush_stats()
+n1:flush_stats()
+assert_eq(counter.read(n0.shm.txpackets), counter.read(n1.shm.rxpackets), "mxbox_sr_stats_1")
+assert_eq(counter.read(n0.shm.txpackets), packet_count, "mbox_sr_stats_2")
 
-assert_eq(counter.read(n0.shm.tx_unicast), counter.read(n1.shm.rx_unicast), "mxbox_sr_stats_1")
-assert_eq(counter.read(n0.shm.tx_unicast), packet_count, "mbox_sr_stats_2")
+local m = engine.app_table['match']
+assert(#m:errors() == 0, "Corrupt packets.")
 
 local c = config.new()
 config.app(c, "synth", synth.Synth, {

@@ -297,6 +297,7 @@ function Intel_avf:mbox_setup_rxq()
    self.r.VF_ARQH(0)
    self.r.VF_ARQT(self.mbox.q_len-1)
    self.mbox.next_recv_idx = 0
+   C.full_memory_barrier()
 
    -- set length and enable the queue
    self.r.VF_ARQLEN(bits({ ENABLE = 31 }) + self.mbox.q_len)
@@ -412,6 +413,10 @@ function Intel_avf:push ()
    end
    C.full_memory_barrier()
    self.r.tx_tail(band(self.tx_next, self.ring_buffer_size - 1))
+
+   if self.sync_stats_throttle() then
+      self:sync_stats()
+   end
 end
 
 function Intel_avf:pull()
@@ -434,6 +439,27 @@ function Intel_avf:pull()
    -- This avoids the queue being full / empty when HEAD=TAIL
    C.full_memory_barrier()
    self.r.rx_tail(band(self.rx_tail - 1, self.ring_buffer_size - 1))
+
+   if self.sync_stats_throttle() then
+      self:sync_stats()
+   end
+end
+
+function Intel_avf:sync_stats ()
+   if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_GET_STATS'] then
+      self:mbox_r_stats('async')
+   end
+   if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_RESET_VF'] then
+      self:mbox_s_stats()
+   end
+end
+
+function Intel_avf:flush_stats ()
+   if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_GET_STATS'] then
+      self:mbox_r_stats()
+   end
+   self:mbox_s_stats()
+   self:mbox_r_stats()
 end
 
 function Intel_avf:mbox_setup()
@@ -482,17 +508,24 @@ function Intel_avf:mbox_setup()
          -- VIRTCHNL_OP_SET_RSS_HENA = 26
       }
    }
+   -- VIRTCHNL_OP_RESET_VF is our default ready-state.
+   self.mbox.state = self.mbox.opcodes['VIRTCHNL_OP_RESET_VF']
    self:mbox_setup_rxq()
    self:mbox_setup_txq()
 end
 
 function Intel_avf:mbox_sr(opcode, datalen)
-   opcode = self.mbox.opcodes[opcode]
    self:mbox_send(opcode, datalen)
-   return self:mbox_recv()
+   return self:mbox_recv(opcode)
 end
 
 function Intel_avf:mbox_send(opcode, datalen)
+   assert(opcode == 'VIRTCHNL_OP_RESET_VF' or
+             self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_RESET_VF'])
+
+   opcode = self.mbox.opcodes[opcode]
+   self.mbox.state = opcode
+
    local idx = self.mbox.next_send_idx
    self.mbox.next_send_idx = ( idx + 1 ) % self.mbox.q_len
 
@@ -576,13 +609,19 @@ function Intel_avf:mbox_sr_caps()
    self.mac = macaddress:from_bytes(tt.default_mac_addr)
 end
 
-function Intel_avf:mbox_recv()
-   local idx = self.mbox.next_recv_idx
-   self.mbox.next_recv_idx = ( idx + 1 ) % self.mbox.q_len
+function Intel_avf:mbox_recv(opcode, async)
+   opcode = self.mbox.opcodes[opcode]
+   assert(opcode == self.mbox.state)
 
-   lib.waitfor(function()
-      return bit.band(self.mbox.rxq[idx].flags0, 1) == 1
-   end)
+   local idx = self.mbox.next_recv_idx
+
+   local function dd () return bit.band(self.mbox.rxq[idx].flags0, 1) == 1 end
+   if async and not dd() then return false
+   else lib.waitfor(dd) end
+
+   self.mbox.state = self.mbox.opcodes['VIRTCHNL_OP_RESET_VF']
+
+   self.mbox.next_recv_idx = ( idx + 1 ) % self.mbox.q_len
 
    assert(bit.band(self.mbox.rxq[idx].flags0, bits({ ERR = 2 })) == 0)
 
@@ -609,7 +648,7 @@ function Intel_avf:mbox_recv()
    C.full_memory_barrier()
    self.r.VF_ARQT( idx )
    if opcode == self.mbox.opcodes['VIRTCHNL_OP_EVENT'] then
-      return self:mbox_recv()
+      return self:mbox_recv('VIRTCHNL_OP_RESET_VF')
    end
    return ptr
 end
@@ -637,21 +676,20 @@ function Intel_avf:new(conf)
       tx_desc_free = conf.ring_buffer_size - 1,
       qno = 0,
       shm = {
-         rx_bytes       = {counter},
-         rx_unicast     = {counter},
-         rx_multicast   = {counter},
-         rx_broadcast   = {counter},
-         rx_discards    = {counter},
+         rxbytes   = {counter},
+         rxpackets = {counter},
+         rxmcast   = {counter},
+         rxbcast   = {counter},
+         rxdrop    = {counter},
          rx_unknown_protocol = {counter},
-         tx_bytes       = {counter},
-         tx_unicast     = {counter},
-         tx_multicast   = {counter},
-         tx_broadcast   = {counter},
-         tx_discards    = {counter},
-         tx_errors      = {counter}
+         txbytes   = {counter},
+         txpackets = {counter},
+         txmcast   = {counter},
+         txbcast   = {counter},
+         txdrop    = {counter},
+         txerrors  = {counter}
       },
-      throttle = lib.throttle(0.5),
-      stats_pos = 0,
+      sync_stats_throttle = lib.throttle(1)
    }
 
    -- pg79 /* number of descriptors, multiple of 32 */
@@ -690,7 +728,6 @@ function Intel_avf:new(conf)
 
    self:mbox_sr_q()
    self:mbox_sr_enable_q()
-   self:mbox_sr_stats()
    return self
 end
 
@@ -699,7 +736,7 @@ function Intel_avf:stop()
    -- VF sends this request to PF with no parameters PF does NOT respond! VF
    -- driver must delay then poll VFGEN_RSTAT register until reset completion
    -- is indicated. The admin queue must be reinitialized after this operation.
-   self:mbox_send(self.mbox.opcodes['VIRTCHNL_OP_RESET_VF'], 0)
+   self:mbox_send('VIRTCHNL_OP_RESET_VF', 0)
    -- As per the above we (the VF driver) must "delay". Sadly, the spec does
    -- (as of this time / to my knowledge) not give further clues as to how to
    -- detect that the delay is sufficient. One second turned out to be not
@@ -734,25 +771,31 @@ function Intel_avf:mbox_sr_add_mac()
    self:mbox_sr('VIRTCHNL_OP_ADD_ETH_ADDR', ffi.sizeof(virtchnl_ether_addr_t) + 8)
 end
 
-function Intel_avf:mbox_sr_stats()
+function Intel_avf:mbox_s_stats()
    local tt = self:mbox_send_buf(queue_select_ptr_t)
    tt.vsi_id = self.vsi_id
+   self:mbox_send('VIRTCHNL_OP_GET_STATS', ffi.sizeof(queue_select_t))
+end
 
-   local stats = ffi.cast(eth_stats_ptr_t, self:mbox_sr('VIRTCHNL_OP_GET_STATS', ffi.sizeof(queue_select_t)))
+function Intel_avf:mbox_r_stats(async)
+   local ret = self:mbox_recv('VIRTCHNL_OP_GET_STATS', async)
+   if ret == false then return end
+
+   local stats = ffi.cast(eth_stats_ptr_t, ret)
    local set = counter.set
 
-   set(self.shm.rx_bytes,     stats.rx_bytes)
-   set(self.shm.rx_unicast,   stats.rx_unicast)
-   set(self.shm.rx_multicast, stats.rx_multicast)
-   set(self.shm.rx_broadcast, stats.rx_broadcast)
-   set(self.shm.rx_discards,  stats.rx_discards)
-   set(self.shm.rx_unknown_protocol,   stats.rx_unknown_protocol)
+   set(self.shm.rxbytes,   stats.rx_bytes)
+   set(self.shm.rxpackets, stats.rx_unicast)
+   set(self.shm.rxmcast,   stats.rx_multicast)
+   set(self.shm.rxbcast,   stats.rx_broadcast)
+   set(self.shm.rxdrop,    stats.rx_discards)
+   set(self.shm.rx_unknown_protocol,  stats.rx_unknown_protocol)
 
-   set(self.shm.tx_bytes,     stats.tx_bytes)
-   set(self.shm.tx_unicast,   stats.tx_unicast)
-   set(self.shm.tx_multicast, stats.tx_multicast)
-   set(self.shm.tx_broadcast, stats.tx_broadcast)
-   set(self.shm.tx_discards,  stats.tx_discards)
-   set(self.shm.tx_errors,    stats.tx_errors)
+   set(self.shm.txbytes,   stats.tx_bytes)
+   set(self.shm.txpackets, stats.tx_unicast)
+   set(self.shm.txmcast,   stats.tx_multicast)
+   set(self.shm.txbcast,   stats.tx_broadcast)
+   set(self.shm.txdrop,    stats.tx_discards)
+   set(self.shm.txerrors,  stats.tx_errors)
 end
 
