@@ -27,6 +27,10 @@ Intel_avf = {
    }
 }
 
+-- The `driver' variable is used as a reference to the driver class in
+-- order to interchangeably use NIC drivers.
+driver = Intel_avf
+
 function Intel_avf:load_registers()
    local scalar_registers = [[
       VFGEN_RSTAT       0x00008800 -       RW   VF Reset Status
