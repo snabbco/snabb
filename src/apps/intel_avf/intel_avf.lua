@@ -14,6 +14,7 @@ local tophysical  = core.memory.virtual_to_physical
 local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
 local transmit, receive, empty = link.transmit, link.receive, link.empty
 local counter     = require("core.counter")
+local shm         = require("core.shm")
 
 local bits        = lib.bits
 local C           = ffi.C
@@ -731,6 +732,13 @@ function Intel_avf:new(conf)
    return self
 end
 
+function Intel_avf:link()
+   -- Alias SHM frame to canonical location.
+   if not shm.exists("pci/"..self.pciaddress) then
+      shm.alias("pci/"..self.pciaddress, "apps/"..self.appname)
+   end
+end
+
 function Intel_avf:stop()
    -- From "Appendix A Virtual Channel Protocol":
    -- VF sends this request to PF with no parameters PF does NOT respond! VF
@@ -743,6 +751,8 @@ function Intel_avf:stop()
    -- enough in some cases, two seconds has always worked so far.
    C.usleep(2e6)
    self:wait_for_vfgen_rstat()
+   -- Unlink SHM alias.
+   shm.unlink("pci/"..self.pciaddress)
 end
 
 function Intel_avf:init_irq()
