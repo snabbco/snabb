@@ -488,6 +488,9 @@ function Intel_avf:flush_stats ()
    self:mbox_r_stats()
 end
 
+function Intel_avf:rxdrop () return counter.read(self.shm.rxdrop) end
+function Intel_avf:txdrop () return counter.read(self.shm.txdrop) end
+
 function Intel_avf:mbox_setup()
    local dlen = 4096
    self.mbox = {
