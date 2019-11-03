@@ -204,6 +204,31 @@ local virtchnl_irq_map_info_t = ffi.typeof([[
 ]])
 local virtchnl_irq_map_info_ptr_t = ffi.typeof('$*', virtchnl_irq_map_info_t)
 
+local virtchnl_rss_key_t = ffi.typeof([[
+   struct {
+      uint16_t vsi_id;
+      uint16_t key_len;
+      uint8_t key[1]; /* RSS hash key, packed bytes */
+   } __attribute__((packed))
+]])
+local virtchnl_rss_key_ptr_t = ffi.typeof('$*', virtchnl_rss_key_t)
+
+local virtchnl_rss_lut_t = ffi.typeof([[
+   struct {
+      uint16_t vsi_id;
+      uint16_t lut_entries;
+      uint8_t lut[1]; /* RSS lookup table*/
+   } __attribute__((packed))
+]])
+local virtchnl_rss_lut_ptr_t = ffi.typeof('$*', virtchnl_rss_lut_t)
+
+local virtchnl_rss_hena_t = ffi.typeof([[
+   struct {
+      uint64_t hena;
+   } __attribute__((packed))
+]])
+local virtchnl_rss_hena_ptr_t = ffi.typeof('$*', virtchnl_rss_hena_t)
+
 local mbox_q_t = ffi.typeof([[
       struct {
          uint8_t flags0;
@@ -354,8 +379,8 @@ function Intel_avf:mbox_sr_q()
    -- Only 32 byte rxdescs are supported, at least by the PF driver in
    -- centos 7 3.10.0-957.1.3.el7.x86_64
    tt.rx_hdr_size = 32
-   tt.rx_databuffer_size = core.packet.max_payload
-   tt.rx_max_pkt_size = core.packet.max_payload
+   tt.rx_databuffer_size = packet.max_payload
+   tt.rx_max_pkt_size = packet.max_payload
    tt.rx_dma_ring_addr = tophysical(self.rxdesc)
 
    self:mbox_sr('VIRTCHNL_OP_CONFIG_VSI_QUEUES', ffi.sizeof(virtchnl_q_pair_t) + 64)
@@ -503,10 +528,10 @@ function Intel_avf:mbox_setup()
          -- VIRTCHNL_OP_IWARP = 20,
          -- VIRTCHNL_OP_CONFIG_IWARP_IRQ_MAP = 21,
          -- VIRTCHNL_OP_RELEASE_IWARP_IRQ_MAP = 22,
-         -- VIRTCHNL_OP_CONFIG_RSS_KEY = 23,
-         -- VIRTCHNL_OP_CONFIG_RSS_LUT = 24,
-         -- VIRTCHNL_OP_GET_RSS_HENA_CAPS = 25,
-         -- VIRTCHNL_OP_SET_RSS_HENA = 26
+         VIRTCHNL_OP_CONFIG_RSS_KEY = 23,
+         VIRTCHNL_OP_CONFIG_RSS_LUT = 24,
+         VIRTCHNL_OP_GET_RSS_HENA_CAPS = 25,
+         VIRTCHNL_OP_SET_RSS_HENA = 26
       }
    }
    -- VIRTCHNL_OP_RESET_VF is our default ready-state.
@@ -590,7 +615,8 @@ function Intel_avf:mbox_sr_caps()
    local supported_caps = bits({
       VIRTCHNL_VF_OFFLOAD_L2 = 0,
       VIRTCHNL_VF_OFFLOAD_VLAN = 16,
-      VIRTCHNL_VF_OFFLOAD_RX_POLLING = 17
+      VIRTCHNL_VF_OFFLOAD_RX_POLLING = 17,
+      VIRTCHNL_VF_OFFLOAD_RSS_PF = 19
    })
    ffi.cast('uint32_t *', self.mbox.send_buf)[0] = supported_caps
    local rcvd = self:mbox_sr('VIRTCHNL_OP_GET_VF_RESOURCES', ffi.sizeof('uint32_t'))
@@ -608,6 +634,8 @@ function Intel_avf:mbox_sr_caps()
    self.vsi_id = tt.vsi_id
    -- FIXME Is this needed?
    self.mac = macaddress:from_bytes(tt.default_mac_addr)
+   self.rss_key_size = tt.rss_key_size
+   self.rss_lut_size = tt.rss_lut_size
 end
 
 function Intel_avf:mbox_recv(opcode, async)
@@ -721,6 +749,7 @@ function Intel_avf:new(conf)
    self:mbox_setup()
    self:mbox_sr_version()
    self:mbox_sr_caps()
+   self:mbox_s_rss()
    self:init_tx_q()
    self:init_rx_q()
 
@@ -779,6 +808,15 @@ function Intel_avf:mbox_sr_add_mac()
    tt.num_elements = 1
    ffi.copy(tt.addr, self.mac, MAC_ADDR_BYTE_LEN)
    self:mbox_sr('VIRTCHNL_OP_ADD_ETH_ADDR', ffi.sizeof(virtchnl_ether_addr_t) + 8)
+end
+
+function Intel_avf:mbox_s_rss()
+   -- pg83
+   -- Forcefully disable the NICs RSS features. Contrary to the spec, RSS
+   -- capabilites are turned on by default and need to be disabled (as least
+   -- under Linux/some NICs.)
+   local tt = self:mbox_send_buf(virtchnl_rss_hena_ptr_t)
+   self:mbox_sr('VIRTCHNL_OP_SET_RSS_HENA', ffi.sizeof(virtchnl_rss_hena_t))
 end
 
 function Intel_avf:mbox_s_stats()
