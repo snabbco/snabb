@@ -46,7 +46,10 @@ function util.if_nametoindex(name) -- standard function in some libc versions
   local s, err = S.socket(c.AF.LOCAL, c.SOCK.STREAM, 0)
   if not s then return nil, err end
   local i, err = if_nametoindex(name, s)
-  if not i then return nil, err end
+  if not i then
+     S.close(s)
+     return nil, err
+  end
   local ok, err = S.close(s)
   if not ok then return nil, err end
   return i

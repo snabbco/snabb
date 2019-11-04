@@ -1,10 +1,19 @@
-    unreleased
+    0.12 release
+
++ Fix seccomp on arm64
++ Linux added support for eBPF
++ bug fixes
+
+    0.11 release
+
 + OSX time functions
 + OSX Mach types
++ OSX fixes for Yosemite
 + arm64 support
-+ OpenBSD 5.6 and 5.7 support
++ OpenBSD 5.6, 5.7 and 5.8 support
 + ppc64le support, by Gustavo Serra Scalet
 + mipsel support
++ added Dockerfile, now available on Docker Hub
 
     0.10 release
 

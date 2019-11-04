@@ -1109,5 +1109,27 @@ c.CLOCKTYPE = {
 
 c.CLOCKTYPE.REALTIME = c.CLOCKTYPE.SYSTEM
 
-return c
+c.CLOCK = strflag {
+  REALTIME             = 0,
+  MONOTONIC_RAW        = 4,
+  MONOTONIC_RAW_APPROX = 5,
+  MONOTONIC            = 6,
+  UPTIME_RAW           = 8,
+  UPTIME_RAW_APPROX    = 9,
+  PROCESS_CPUTIME_ID   = 12,
+  THREAD_CPUTIME_ID    = 16,
+}
 
+-- AT constants only in recent versions, should check when added
+c.AT_FDCWD = atflag {
+  FDCWD = -2,
+}
+
+c.AT = multiflags {
+  EACCESS          = 0x0010,
+  SYMLINK_NOFOLLOW = 0x0020,
+  SYMLINK_FOLLOW   = 0x0040,
+  REMOVEDIR        = 0x0080,
+}
+
+return c

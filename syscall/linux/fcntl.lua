@@ -22,6 +22,7 @@ local fcntl = {
     [c.F.GETLK] = t.flock,
     [c.F.SETLK] = t.flock,
     [c.F.SETLKW] = t.flock,
+    [c.F.ADD_SEALS] = function(arg) return c.F_SEAL[arg] end,
   },
   ret = {
     [c.F.DUPFD] = function(ret) return t.fd(ret) end,
@@ -33,6 +34,7 @@ local fcntl = {
     [c.F.GETSIG] = function(ret) return tonumber(ret) end,
     [c.F.GETPIPE_SZ] = function(ret) return tonumber(ret) end,
     [c.F.GETLK] = function(ret, arg) return arg end,
+    [c.F.GET_SEALS] = function(ret) return tonumber(ret) end,
   }
 }
 
