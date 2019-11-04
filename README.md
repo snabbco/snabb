@@ -142,5 +142,5 @@ Here are the ways you can get involved:
 - Use the Snabb applications in your network.
 - Create your very own application: [Getting Started](src/doc/getting-started.md).
 - Create Github Issues with your ideas and questions and problems.
-- [Join](https://join.slack.com/t/snabb/shared_invite/enQtMzIyOTIwMTg5ODYyLTMzY2FjMGEzM2QzNDlhMDYxNzU0M2UyNjQ1MDc4MDRjY2Q3MWMwY2Q4YWQ1NDllY2E3NTZkZGUyZTQxNzgyNjc) the [Snabb Slack chat](https://snabb.slack.com/) to hang out and shoot the breeze.
+- [Join](https://join.slack.com/t/snabb/shared_invite/enQtMzIyOTIwMTg5ODYyLWUwYzg2MTIwMjAxZTM1N2RlNGFjMWY1YzRkZGZiN2U5ZGU1NTYwNWJiMmQ3MWQ1MDFjYTg0MjNjNTZjMTFlZGQ) the [Snabb Slack chat](https://snabb.slack.com/) to hang out and shoot the breeze.
 
