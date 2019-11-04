@@ -36,6 +36,7 @@ local queue = require('lib.fibers.queue')
 local fiber_sleep = require('lib.fibers.sleep').sleep
 local inotify = require("lib.ptree.inotify")
 local counter = require("core.counter")
+local gauge = require("lib.gauge")
 local cond = require("lib.fibers.cond")
 
 local call_with_output_string = mem.call_with_output_string
@@ -92,6 +93,8 @@ function new_manager (conf)
    ret.state_change_listeners = {}
    -- name->{aggregated=counter, active=pid->counter, archived=uint64[1]}
    ret.counters = {}
+   -- name->{aggregated=gauge, active=pid->gauge}
+   ret.gauges = {}
 
    if conf.rpc_trace_file then
       ret:info("Logging RPCs to %s", conf.rpc_trace_file)
@@ -178,7 +181,7 @@ function Manager:start ()
    fiber.spawn(function () self:accept_rpc_peers() end)
    fiber.spawn(function () self:accept_notification_peers() end)
    fiber.spawn(function () self:notification_poller() end)
-   fiber.spawn(function () self:sample_active_counters() end)
+   fiber.spawn(function () self:sample_active_stats() end)
 end
 
 function Manager:call_with_cleanup(closeable, f, ...)
@@ -317,10 +320,11 @@ local function strip_suffix(a, b)
    return a:sub(1,-(#b+1))
 end
 
-function Manager:make_rrd(counter_name)
-   local name = strip_suffix(counter_name, ".counter")..'.rrd'
+function Manager:make_rrd(counter_name, typ)
+   typ = typ or 'counter'
+   local name = strip_suffix(counter_name, "."..typ)..'.rrd'
    return rrd.create_shm(name, {
-      sources={{name='value', type='counter'}},
+      sources={{name='value', type=typ}},
       -- NOTE: The default heartbeat interval is 1s, so relax
       -- base_interval to 2s as we're only polling every 1s (and we'll
       -- be slightly late).  Also note that these settings correspond to
@@ -340,41 +344,59 @@ local function blacklisted (name)
    return blacklisted_counters[strip_suffix(lib.basename(name), '.counter')]
 end
 
-function Manager:monitor_worker_counters(id)
+function Manager:monitor_worker_stats(id)
    local worker = self.workers[id]
    if not worker then return end -- Worker was removed before monitor started.
    local pid, cancel = worker.pid, worker.cancel:wait_operation()
    local dir = shm.root..'/'..pid
    local events = inotify.recursive_directory_inventory_events(dir, cancel)
    for ev in events.get, events do
-      if has_suffix(ev.name, '.counter') then
+      if has_prefix(ev.name, dir..'/') then
          local name = strip_prefix(ev.name, dir..'/')
          local qualified_name = '/'..pid..'/'..name
-         local counters = self.counters[name]
-         if blacklisted(name) then
+         if has_suffix(ev.name, '.counter') then
+            local counters = self.counters[name]
+            if blacklisted(name) then
             -- Pass.
-         elseif ev.kind == 'creat' then
-            if not counters then
-               counters = { aggregated=counter.create(name), active={},
-                            rrd={}, aggregated_rrd=self:make_rrd(name),
-                            archived=ffi.new('uint64_t[1]') }
-               self.counters[name] = counters
+            elseif ev.kind == 'creat' then
+               if not counters then
+                  counters = { aggregated=counter.create(name), active={},
+                               rrd={}, aggregated_rrd=self:make_rrd(name),
+                               archived=ffi.new('uint64_t[1]') }
+                  self.counters[name] = counters
+               end
+               counters.active[pid] = counter.open(qualified_name)
+               counters.rrd[pid] = self:make_rrd(qualified_name)
+            elseif ev.kind == 'rm' then
+               local val = counter.read(assert(counters.active[pid]))
+               counters.active[pid] = nil
+               counters.rrd[pid] = nil
+               counters.archived[0] = counters.archived[0] + val
+               counter.delete(qualified_name)
+               S.unlink(strip_suffix(qualified_name, ".counter")..".rrd")
             end
-            counters.active[pid] = counter.open(qualified_name)
-            counters.rrd[pid] = self:make_rrd(qualified_name)
-         elseif ev.kind == 'rm' then
-            local val = counter.read(assert(counters.active[pid]))
-            counters.active[pid] = nil
-            counters.rrd[pid] = nil
-            counters.archived[0] = counters.archived[0] + val
-            counter.delete(qualified_name)
-            S.unlink(strip_suffix(qualified_name, ".counter")..".rrd")
+         elseif has_suffix(ev.name, '.gauge') then
+            local gauges = self.gauges[name]
+            if ev.kind == 'creat' then
+               if not gauges then
+                  gauges = { aggregated=gauge.create(name), active={},
+                             rrd={}, aggregated_rrd=self:make_rrd(name, 'gauge') }
+                  self.gauges[name] = gauges
+               end
+               gauges.active[pid] = gauge.open(qualified_name)
+               gauges.rrd[pid] = self:make_rrd(qualified_name, 'gauge')
+            elseif ev.kind == 'rm' then
+               shm.unmap(gauges.active[pid])
+               gauges.active[pid] = nil
+               gauges.rrd[pid] = nil
+               S.unlink(strip_suffix(qualified_name, ".gauge")..".rrd")
+            end
          end
       end
    end
 end
 
-function Manager:sample_active_counters()
+function Manager:sample_active_stats()
    while true do
       local now = rrd.now()
       for name, counters in pairs(self.counters) do
@@ -388,6 +410,16 @@ function Manager:sample_active_counters()
          counter.set(counters.aggregated, sum)
       end
       counter.commit()
+      for name, gauges in pairs(self.gauges) do
+         local sum = 0
+         for pid, active in pairs(gauges.active) do
+            local v = gauge.read(active)
+            gauges.rrd[pid]:add({value=v}, now)
+            sum = sum + v
+         end
+         gauges.aggregated_rrd:add({value=sum}, now)
+         gauge.set(gauges.aggregated, sum)
+      end
       fiber_sleep(1)
    end
 end
@@ -404,7 +436,7 @@ function Manager:start_worker_for_graph(id, graph)
    local actions = self.support.compute_config_actions(
       app_graph.new(), self.workers[id].graph, {}, 'load')
    self:enqueue_config_actions_for_worker(id, actions)
-   fiber.spawn(function () self:monitor_worker_counters(id) end)
+   fiber.spawn(function () self:monitor_worker_stats(id) end)
 
    return self.workers[id]
 end
@@ -583,7 +615,8 @@ function Manager:foreign_rpc_get_state (schema_name, path, format,
                                        print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
-   local foreign_state = translate.get_state(self:get_native_state())
+   local foreign_state = translate.get_state(self:get_native_state(),
+                                             self.current_configuration)
    local printer = path_data.printer_for_schema_by_name(
       schema_name, path, false, format, print_default)
    return { state = call_with_output_string(printer, foreign_state) }

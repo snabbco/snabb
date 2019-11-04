@@ -80,15 +80,18 @@ function load_configuration(filename, opts)
          return
       end
       local compiled = result
-      if opts.schema_name and opts.schema_name ~= compiled.schema_name then
+      local expected_revision = opts.revision_date or
+         load_schema_by_name(opts.schema_name).last_revision
+      if opts.schema_name ~= compiled.schema_name then
          log('expected schema name %s in compiled file, but got %s',
              opts.schema_name, compiled.schema_name)
          return
       end
-      if opts.revision_date and opts.revision_date ~= schema.revision_date then
-         log('expected schema revision date %s in compiled file, but got %s',
-             opts.revision_date, compiled.revision_date)
+      if expected_revision ~= compiled.revision_date then
+         log('expected schema revision date %s in compiled file, but got "%s"',
+             expected_revision, compiled.revision_date)
          return
+      else
       end
       if source_mtime then
          if (source_mtime.sec == compiled.source_mtime.sec and
@@ -105,7 +108,10 @@ function load_configuration(filename, opts)
    end
 
    local source = assert(file.open(filename))
-   if binary.has_magic(source) then return load_compiled(source) end
+   if binary.has_magic(source) then
+      local conf = load_compiled(source)
+      if conf then return conf end
+   end
 
    -- If the file doesn't have the magic, assume it's a source file.
    -- First, see if we compiled it previously and saved a compiled file

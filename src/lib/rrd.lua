@@ -400,8 +400,9 @@ end
 
 local function compute_pdp_value(pdp, secs_per_pdp, dt, heartbeat_interval)
    -- This condition comes from upstream rrdtool.
-   if dt < heartbeat_interval and pdp.unknown_count < secs_per_pdp/2 then
-      return pdp.diff / tonumber(secs_per_pdp - pdp.unknown_count)
+   local unknown = tonumber(pdp.unknown_count)
+   if dt < heartbeat_interval and unknown < secs_per_pdp/2 then
+      return pdp.diff / tonumber(secs_per_pdp - unknown)
    else
       return 0/0
    end
