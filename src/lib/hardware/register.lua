@@ -219,7 +219,7 @@ end
 --- the optional 'n' argument specifies which register of an array gets
 --- created (default 0)
 function define (description, table, base_ptr, n)
-   local pattern = [[ *(%S+) +(%S+) +(%S+) +(%S+) (.-)
+   local pattern = [[ *(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(.-)
 ]]
    for name,offset,index,perm,longname in description:gmatch(pattern) do
       local offs = in_range(offset, index, n)
@@ -233,7 +233,7 @@ end
 -- an array of registers.
 -- naïve implementation: actually create the whole array
 function define_array (description, table, base_ptr)
-   local pattern = [[ *(%S+) +(%S+) +(%S+) +(%S+) (.-)
+   local pattern = [[ *(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(.-)
 ]]
    for name,offset,index,perm,longname in description:gmatch(pattern) do
       if is_range(index) then
