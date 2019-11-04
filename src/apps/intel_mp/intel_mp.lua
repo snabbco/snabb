@@ -321,7 +321,8 @@ Intel = {
       linkup_wait_recheck = {default=0.1},
       wait_for_link = {default=false},
       master_stats = {default=true},
-      run_stats = {default=false}
+      run_stats = {default=false},
+      mac_loopback = {default=false}
    },
 }
 Intel1g = setmetatable({}, {__index = Intel })
@@ -393,7 +394,7 @@ function Intel:new (conf)
       mtu = conf.mtu,
       linkup_wait = conf.linkup_wait,
       linkup_wait_recheck = conf.linkup_wait_recheck,
-      wait_for_link = conf.wait_for_link,
+      wait_for_link = conf.wait_for_link and not conf.mac_loopback,
       vmdq = conf.vmdq,
       poolnum = conf.poolnum,
       macaddr = conf.macaddr,
@@ -408,7 +409,9 @@ function Intel:new (conf)
       -- processes
       shm_root = "/intel-mp/" .. pci.canonical(conf.pciaddr) .. "/",
       -- only used for main process, affects max pool number
-      vmdq_queuing_mode = conf.vmdq_queuing_mode
+      vmdq_queuing_mode = conf.vmdq_queuing_mode,
+      -- Enable Tx->Rx MAC Loopback for diagnostics/testing?
+      mac_loopback = conf.mac_loopback
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -870,7 +873,7 @@ function Intel:push ()
    self.tdh = self.r.TDH()	-- possible race condition, 7.2.2.4, check DD
    --C.full_memory_barrier()
    while cursor ~= self.tdh do
-      if self.txqueue[cursor] then
+      if self.txqueue[cursor] ~= nil then -- Non-null pointer?
          packet.free(self.txqueue[cursor])
          self.txqueue[cursor] = nil
       end
@@ -1224,6 +1227,12 @@ function Intel1g:init ()
    self.r.CTRL_EXT:clr( bits { PowerDown = 20 } )
    self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
    self.r.RLPML(self.mtu + 4) -- mtu + crc
+
+   -- Tx->Rx MAC Loopback?
+   if self.mac_loopback then
+      error("NYI: mac_loopback mode")
+   end
+
    self:unlock_sw_sem()
    if self.wait_for_link then self:wait_linkup() end
 end
@@ -1666,6 +1675,14 @@ function Intel82599:init ()
       self:vmdq_enable()
    end
 
+   -- Diagnostics—Intel 82599 10 GbE Controller
+   -- 14.1 Link Loopback Operations
+   -- Tx->Rx MAC Loopback?
+   if self.mac_loopback then
+      self.r.AUTOC(bits { FLU = 0, LMS0 = 13, Restart_AN = 12  })
+      self.r.HLREG0:set(bits { LPBK = 15 })
+   end
+
    self:unlock_sw_sem()
 end
 
@@ -1767,7 +1784,7 @@ function Intel82599:set_vmdq_tx_pool ()
    -- enables packet Tx for this VF's pool
    self.r.PFVFTE[math.floor(self.poolnum/32)]:set(bits{VFTE=self.poolnum%32})
    -- enable TX loopback
-   self.r.PFVMTXSW[math.floor(self.poolnum/32)]:clr(bits{LLE=self.poolnum%32})
+   self.r.PFVMTXSW[math.floor(self.poolnum/32)]:set(bits{LLE=self.poolnum%32})
 end
 
 function Intel82599:set_mirror ()
