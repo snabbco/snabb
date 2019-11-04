@@ -428,6 +428,7 @@ function S.getpid() return C.getpid() end
 function S.getppid() return C.getppid() end
 function S.getgid() return C.getgid() end
 function S.getegid() return C.getegid() end
+function S.gettid() return C.gettid() end
 function S.setuid(uid) return retbool(C.setuid(uid)) end
 function S.setgid(gid) return retbool(C.setgid(gid)) end
 function S.seteuid(uid) return retbool(C.seteuid(uid)) end
