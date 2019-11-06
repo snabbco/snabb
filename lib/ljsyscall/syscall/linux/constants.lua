@@ -426,6 +426,7 @@ c.SOL = strflag {
   ATM        = 264,
   AAL        = 265,
   IRDA       = 266,
+  XDP        = 283
 }
 
 if arch.SOLSOCKET then c.SOL.SOCKET = arch.SOLSOCKET else c.SOL.SOCKET = 1 end
@@ -483,6 +484,14 @@ c.SO = strflag(arch.SO or {
   ATTACH_BPF         = 50,
   ATTACH_REUSEPORT_CBPF = 51,
   ATTACH_REUSEPORT_EBPF = 52,
+  XDP_MMAP_OFFSETS = 1,
+  XDP_RX_RING = 2,
+  XDP_TX_RING = 3,
+  XDP_UMEM_REG = 4,
+  XDP_UMEM_FILL_RING = 5,
+  XDP_UMEM_COMPLETION_RING = 6,
+  XDP_STATISTICS = 7,
+  XDP_OPTIONS = 8
 })
 
 c.SO.GET_FILTER = c.SO.ATTACH_FILTER
@@ -1433,6 +1442,7 @@ c.AF = strflag {
   CAIF       = 37,
   ALG        = 38,
   NFC        = 39,
+  XDP        = 44
 }
 
 c.AF.UNIX       = c.AF.LOCAL
