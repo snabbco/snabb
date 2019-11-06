@@ -1,12 +1,91 @@
 # Change Log
 
+## [2019.06.01]
+
+### Notable changes
+
+ * Improve stability of receive-side scaling (RSS), in which multiple
+   CPU cores can service traffic on the same NIC.  Previously, the
+   lwAFTR had a pathology whereby a transient error condition that could
+   cause one core to drop packets could then cause another core to
+   attempt to perform self-healing by re-optimizing its code, which
+   could then ping-pong back and cause the other core to try to
+   self-heal, and on and on forever.  See
+   https://github.com/Igalia/snabb/pull/1229 and
+   https://github.com/snabbco/snabb/pull/1443 for more details.
+
+ * Fix a problem whereby `snabb config add` would cause the lwAFTR to
+   crash after a few thousand softwire additions.  See
+   https://github.com/Igalia/snabb/pull/1228.
+
+ * Update the `ieee-softwire` compatibility layer for the native
+   `snabb-softwire-v2` Yang module, corresponding the latest changes in
+   the Internet Draft,
+   [`draft-ietf-softwire-yang-16`](https://datatracker.ietf.org/doc/draft-ietf-softwire-yang/16/).
+
+ * Add counters and historical data records for how much memory a lwAFTR
+   process uses over time, for use in on-line and post-mortem system
+   diagnostics.  See https://github.com/Igalia/snabb/pull/1228 for
+   details.
+
+ * Add `snabb rrdcat` tool that can be used to identify when packet
+   drops occured in the past.  See
+   https://github.com/Igalia/snabb/pull/1225 for details.
+
+ * Incorporate changes from the upstream [Snabb 2019.06
+   "Deltadromeus"](https://github.com/snabbco/snabb/releases/tag/v2019.01)
+   release.  This finally includes a switch over to RaptorJIT, which
+   adds a number of on-line diagnostic tools that can be useful for
+   troubleshooting performance problems in production.
+
+## [2018.09.03]
+
+### Features
+
+ * Add new "revision" declaration to snabb-softwire-v2 YANG module,
+   corresponding to addition of flow-label nodes back in version
+   2018.09.01.  No changes to the schema otherwise.
+
+ * Add new performance diagnostics that will print warnings for common
+   system misconfigurations, such as missing `isolcpus` declarations or
+   the use of power-saving CPU frequency scaling strategies.  These
+   warnings detect conditions which are described in the performance
+   tuning document.
+
+     https://github.com/Igalia/snabb/pull/1212
+     https://github.com/snabbco/snabb/blob/master/src/doc/performance-tuning.md
+
+ * Improve `snabb lwaftr run --help` output.  Try it out!
+
+### Bug fixes
+
+ * Ingress drop monitor treats startup as part of grace period (10
+   seconds by default), postponing the start of dropped packet detection
+   until after the system has settled down.
+
+     https://github.com/Igalia/snabb/issues/1216
+     https://github.com/Igalia/snabb/pull/1217
+
+ * Fix PCI/NUMA affinity diagnostics.
+
+     https://github.com/Igalia/snabb/pull/1211
+
+ * New YANG schema revisions cause Snabb to recompile configurations.
+
+     https://github.com/Igalia/snabb/pull/1209
+
+ * Re-enable NUMA binding on newer kernels (including the kernel used by
+   Ubuntu 18.04).
+
+     https://github.com/Igalia/snabb/pull/1207
+
 ## [2018.09.02]
 
 ### Features
 
 * Add benchmarking test for 2 instances each with 2 queues (total of 4
   queues).
-  
+
     https://github.com/Igalia/snabb/pull/1206
 
 ### Bug fixes

@@ -67,6 +67,8 @@ model = {
    ["X520"]      = 'Intel X520',
    ["i350"]      = 'Intel 350',
    ["i210"]      = 'Intel 210',
+   ["XL710_VF"]  = 'Intel XL710/X710 Virtual Function',
+   ["AVF"]       = 'Intel AVF'
 }
 
 -- Supported cards indexed by vendor and device id.
@@ -81,6 +83,8 @@ local cards = {
       ["0x1521"] = {model = model["i350"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x1533"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x154c"] = {model = model["XL710_VF"],  driver = 'apps.intel_avf.intel_avf'},
+      ["0x1889"] = {model = model["AVF"],       driver = 'apps.intel_avf.intel_avf'},
    },
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
@@ -90,6 +94,7 @@ local cards = {
 local link_names = {
    ['apps.solarflare.solarflare'] = { "rx", "tx" },
    ['apps.intel_mp.intel_mp']     = { "input", "output" },
+   ['apps.intel_avf.intel_avf']   = { "input", "output" },
    ['apps.intel.intel_app']       = { "rx", "tx" }
 }
 

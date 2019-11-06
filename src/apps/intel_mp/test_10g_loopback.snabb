@@ -1,0 +1,31 @@
+#!../../snabb snsh
+
+-- Snabb test script for testing Tx->Rx MAC Loopback mode
+
+local basic_apps = require("apps.basic.basic_apps")
+local intel      = require("apps.intel_mp.intel_mp")
+local pcap       = require("apps.pcap.pcap")
+local lib        = require("core.lib")
+
+local pciaddr0 = lib.getenv("SNABB_PCI_INTEL0")
+
+local c = config.new()
+
+config.app(c, "source", pcap.PcapReader, "source.pcap")
+config.app(c, 'sink', basic_apps.Sink)
+
+-- send/receive packets on nic0
+config.app(c, "nic0", intel.Intel,
+           { pciaddr = pciaddr0,
+             mac_loopback = true })
+config.app(c, "repeat", basic_apps.Repeater)
+config.link(c, "source.output -> repeat.input")
+config.link(c, "repeat.output -> nic0.input")
+config.link(c, "nic0.output -> sink.input")
+
+engine.configure(c)
+engine.main({ duration = 1 })
+engine.report_links()
+
+assert(link.stats(engine.app_table.sink.input.input).rxpackets > 0,
+          "expected packet rx")

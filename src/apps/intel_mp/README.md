@@ -180,6 +180,12 @@ to collect device statistics. The default is true.
 statistics. One per physical NIC (conflicts with `master_stats`). There is a
 small but detectable run time performance hit incurred. The default is false.
 
+— Key **mac_loopback**
+
+*Optional* Boolean indicating if the card should operate in
+“Tx->Rx MAC Loopback mode” for diagnostics or testing purposes. If this is true
+then `wait_for_link` is implicitly false. The default is false.
+
 
 ### RSS hashing methods
 

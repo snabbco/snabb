@@ -2,6 +2,7 @@
 -- COPYING.
 module(..., package.seeall)
 
+local S = require("syscall")
 local ffi = require("ffi")
 local lib = require("core.lib")
 local shm = require("core.shm")
@@ -348,7 +349,7 @@ end
 function data_compiler_from_schema(schema, is_config)
    local grammar = data.data_grammar_from_schema(schema, is_config)
    return data_compiler_from_grammar(data_emitter(grammar),
-                                     schema.id, schema.revision_date)
+                                     schema.id, schema.last_revision)
 end
 
 function config_compiler_from_schema(schema)
@@ -525,10 +526,14 @@ end
 function data_copier_from_grammar(production)
    local compile = data_compiler_from_grammar(data_emitter(production), '')
    return function(data)
-      local basename = 'copy-'..lib.random_printable_string(160)
-      local tmp = shm.root..'/'..shm.resolve(basename)
-      compile(data, tmp)
-      return function() return load_compiled_data_file(tmp).data end
+      return function()
+         local basename = 'copy-'..lib.random_printable_string(160)
+         local tmp = shm.root..'/'..shm.resolve(basename)
+         compile(data, tmp)
+         local copy = load_compiled_data_file(tmp).data
+         S.unlink(tmp)
+         return copy
+      end
    end
 end
 

@@ -1,0 +1,51 @@
+#!../../snabb snsh
+
+-- Snabb test script for testing Tx->Rx MAC Loopback mode
+
+local basic_apps = require("apps.basic.basic_apps")
+local intel      = require("apps.intel_mp.intel_mp")
+local pcap       = require("apps.pcap.pcap")
+local lib        = require("core.lib")
+
+local pciaddr0 = lib.getenv("SNABB_PCI_INTEL0")
+
+local c = config.new()
+
+config.app(c, "source", pcap.PcapReader, "source.pcap")
+config.app(c, 'sink', basic_apps.Sink)
+
+-- send packets on nic0 txq 0
+config.app(c, "nic0tx", intel.Intel,
+           { pciaddr = pciaddr0,
+             -- disable rxq
+             rxq = false,
+             txq = 0,
+             mac_loopback = true })
+config.app(c, "repeat", basic_apps.Repeater)
+config.link(c, "source.output -> repeat.input")
+config.link(c, "repeat.output -> nic0tx.input")
+
+-- receive packets on nic0 rxq 0/1
+config.app(c, "nic0rx0", intel.Intel,
+           { pciaddr = pciaddr0,
+             rxq = 0,
+             -- disable txq
+             txq = false,
+             mac_loopback = true })
+config.app(c, "nic0rx1", intel.Intel,
+           { pciaddr = pciaddr0,
+             rxq = 1,
+             -- disable txq
+             txq = false,
+             mac_loopback = true })
+config.link(c, "nic0rx0.output -> sink.input0")
+config.link(c, "nic0rx1.output -> sink.input1")
+
+engine.configure(c)
+engine.main({ duration = 1 })
+engine.report_links()
+
+assert(link.stats(engine.app_table.sink.input.input0).rxpackets > 0,
+          "expected packet rx on rxq 0")
+assert(link.stats(engine.app_table.sink.input.input1).rxpackets > 0,
+          "expected packet rx on rxq 1")

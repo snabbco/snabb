@@ -18,6 +18,57 @@ local bound_numa_node
 local node_path = '/sys/devices/system/node/node'
 local MAX_CPU = 1023
 
+local function warn(fmt, ...)
+   io.stderr:write(string.format("Warning: ".. fmt .. "\n", ...))
+   io.stderr:flush()
+end
+
+local function die(fmt, ...)
+   error(string.format(fmt, ...))
+end
+
+local function trim (str)
+   return str:gsub("^%s", ""):gsub("%s$", "")
+end
+
+function parse_cpuset (cpus)
+   local ret = {}
+   cpus = trim(cpus)
+   if #cpus == 0 then return ret end
+   for range in cpus:split(',') do
+      local lo, hi = range:match("^%s*([^%-]*)%s*-%s*([^%-%s]*)%s*$")
+      if lo == nil then lo = range:match("^%s*([^%-]*)%s*$") end
+      assert(lo ~= nil, 'invalid range: '..range)
+      lo = assert(tonumber(lo), 'invalid range begin: '..lo)
+      assert(lo == math.floor(lo), 'invalid range begin: '..lo)
+      if hi ~= nil then
+         hi = assert(tonumber(hi), 'invalid range end: '..hi)
+         assert(hi == math.floor(hi), 'invalid range end: '..hi)
+         assert(lo < hi, 'invalid range: '..range)
+      else
+         hi = lo
+      end
+      for cpu=lo,hi do table.insert(ret, cpu) end
+   end
+   return lib.set(unpack(ret))
+end
+
+local function parse_cpuset_from_file (path)
+   local fd = assert(io.open(path))
+   if not fd then return {} end
+   local ret = parse_cpuset(fd:read("*all"))
+   fd:close()
+   return ret
+end
+
+function node_cpus (node)
+   return parse_cpuset_from_file(node_path..node..'/cpulist')
+end
+
+function isolated_cpus (node)
+   return parse_cpuset_from_file('/sys/devices/system/cpu/isolated')
+end
+
 function cpu_get_numa_node (cpu)
    local node = 0
    while true do
@@ -62,10 +113,10 @@ function choose_numa_node_for_pci_addresses (addrs, require_affinity)
          chosen_node = node
          chosen_because_of_addr = addr
       else
-         local msg = string.format(
-            "PCI devices %s and %s have different NUMA node affinities",
-            chosen_because_of_addr, addr)
-         if require_affinity then error(msg) else print('Warning: '..msg) end
+         local warn = warn
+         if require_affinity then warn = die end
+         warn("PCI devices %s and %s have different NUMA node affinities",
+              chosen_because_of_addr, addr)
       end
    end
    return chosen_node
@@ -75,17 +126,51 @@ function check_affinity_for_pci_addresses (addrs)
    local policy = S.get_mempolicy()
    if policy.mode == S.c.MPOL_MODE['default'] then
       if has_numa() then
-         print('Warning: No NUMA memory affinity.')
-         print('Pass --cpu to bind to a CPU and its NUMA node.')
+         warn('No NUMA memory affinity.\n'..
+                 'Pass --cpu to bind to a CPU and its NUMA node.')
       end
-   elseif policy.mode ~= S.c.MPOL_MODE['bind'] then
-      print("Warning: NUMA memory policy already in effect, but it's not --membind.")
+   elseif (policy.mode ~= S.c.MPOL_MODE['bind'] and
+           policy.mode ~= S.c.MPOL_MODE['preferred']) then
+      warn("NUMA memory policy already in effect, but it's not --membind or --preferred.")
    else
       local node = S.getcpu().node
       local node_for_pci = choose_numa_node_for_pci_addresses(addrs)
       if node_for_pci and node ~= node_for_pci then
-         print("Warning: Bound NUMA node does not have affinity with PCI devices.")
+         warn("Bound NUMA node does not have affinity with PCI devices.")
       end
+   end
+end
+
+local irqbalanced_checked = false
+local function assert_irqbalanced_disabled (warn)
+   if irqbalanced_checked then return end
+   irqbalanced_checked = true
+   for path in os.getenv('PATH'):split(':') do
+      if S.stat(path..'/irqbalance') then
+         if S.stat('/etc/default/irqbalance') then
+            for line in io.lines('/etc/default/irqbalance') do
+               if line:match('^ENABLED=0') then return end
+            end
+         end
+         warn('Irqbalanced detected; this will hurt performance!  %s',
+              'Consider uninstalling via "sudo apt-get remove irqbalance" and rebooting.')
+      end
+   end
+end
+
+local function check_cpu_performance_tuning (cpu, strict)
+   local warn = warn
+   if strict then warn = die end
+   assert_irqbalanced_disabled(warn)
+   local path = '/sys/devices/system/cpu/cpu'..cpu..'/cpufreq/scaling_governor'
+   local gov = assert(io.open(path)):read()
+   if not gov:match('performance') then
+      warn('Expected performance scaling governor for CPU %s, but got "%s"',
+           cpu, gov)
+   end
+
+   if not isolated_cpus()[cpu] then
+      warn('Expected dedicated core, but CPU %s is not in isolcpus set', cpu)
    end
 end
 
@@ -97,58 +182,7 @@ function unbind_cpu ()
    bound_cpu = nil
 end
 
-local blacklisted_kernels = {
-   '>=4.15',
-}
-local function sys_kernel ()
-   return lib.readfile('/proc/sys/kernel/osrelease', '*all'):gsub('%s$', '')
-end
-local function parse_version_number (str)
-   local t = {}
-   for each in str:gmatch("([^.]+)") do
-      table.insert(t, tonumber(each) or 0)
-   end
-   return t
-end
-local function equals (v1, v2)
-   for i, p1 in ipairs(v1) do
-      local p2 = v2[i] or 0
-      if p1 ~= p2 then return false end
-   end
-   return true
-end
-local function greater_or_equals (v1, v2)
-   for i, p1 in ipairs(v1) do
-      local p2 = v2[i] or 0
-      if p2 > p1 then return false end
-   end
-   return true
-end
-local function greater (v1, v2)
-   return greater_or_equals(v1, v2) and not equals(v1, v2)
-end
-function is_blacklisted_kernel (v)
-   for _, each in ipairs(blacklisted_kernels) do
-      -- Greater or equal.
-      if each:sub(1, 2) == '>=' then
-         each = each:sub(3, #each)
-         local v1, v2 = parse_version_number(v), parse_version_number(each)
-         if greater_or_equals(v1, v2) then return true end
-      -- Greater than.
-      elseif each:sub(1, 1) == '>' then
-         each = each:sub(2, #each)
-         local v1, v2 = parse_version_number(v), parse_version_number(each)
-         if greater(v1, v2) then return true end
-      -- Equals.
-      else
-         local v1, v2 = parse_version_number(v), parse_version_number(each)
-         if equals(v1, v2) then return true end
-      end
-   end
-   return false
-end
-
-function bind_to_cpu (cpu)
+function bind_to_cpu (cpu, skip_perf_checks)
    local function contains (t, e)
       for k,v in ipairs(t) do
          if tonumber(v) == tonumber(e) then return true end
@@ -167,6 +201,8 @@ function bind_to_cpu (cpu)
    bound_cpu = cpu_and_node.cpu
 
    bind_to_numa_node (cpu_and_node.node)
+
+   if not skip_perf_checks then check_cpu_performance_tuning(bound_cpu) end
 end
 
 function unbind_numa_node ()
@@ -177,11 +213,6 @@ function unbind_numa_node ()
 end
 
 function bind_to_numa_node (node, policy)
-   local kernel = sys_kernel()
-   if is_blacklisted_kernel(kernel) then
-      print(("WARNING: Buggy kernel '%s'. Not binding CPU to NUMA node."):format(kernel))
-      return
-   end
    if node == bound_numa_node then return end
    if not node then return unbind_numa_node() end
    assert(not bound_numa_node, "already bound")
@@ -193,9 +224,8 @@ function bind_to_numa_node (node, policy)
       local from_mask = assert(S.get_mempolicy(nil, nil, nil, 'mems_allowed')).mask
       local ok, err = S.migrate_pages(0, from_mask, node)
       if not ok then
-         io.stderr:write(
-            string.format("Warning: Failed to migrate pages to NUMA node %d: %s\n",
-                          node, tostring(err)))
+         warn("Failed to migrate pages to NUMA node %d: %s\n",
+              node, tostring(err))
       end
    end
 
@@ -209,9 +239,20 @@ end
 
 function selftest ()
 
+   local cpus = parse_cpuset("0-5,7")
+   for i=0,5 do assert(cpus[i]) end
+   assert(not cpus[6])
+   assert(cpus[7])
+   do
+      local count = 0
+      for k,v in pairs(cpus) do count = count + 1 end
+      assert(count == 7)
+   end
+   assert(parse_cpuset("1")[1])
+
    function test_cpu(cpu)
       local node = cpu_get_numa_node(cpu)
-      bind_to_cpu(cpu)
+      bind_to_cpu(cpu, 'skip-perf-checks')
       assert(bound_cpu == cpu)
       assert(bound_numa_node == node)
       assert(S.getcpu().cpu == cpu)
@@ -246,10 +287,6 @@ function selftest ()
    if pciaddr then
       test_pci_affinity(pciaddr)
    end
-
-   assert(greater(parse_version_number('4.15'), parse_version_number('4.4.80')))
-   assert(greater_or_equals(parse_version_number('4.15'), parse_version_number('4.15')))
-   assert(not greater(parse_version_number('4.14'), parse_version_number('4.15')))
 
    print('selftest: numa: ok')
 end
