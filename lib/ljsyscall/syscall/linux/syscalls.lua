@@ -836,7 +836,7 @@ end
 if C.bpf then
   local function ptr_to_u64(p) return ffi.cast('uint64_t', ffi.cast('void *', p)) end
   function S.bpf(cmd, attr)
-    return C.bpf(cmd, attr)
+    return C.bpf(c.BPF_CMD[cmd], attr)
   end
   function S.bpf_prog_load(type, insns, len, license, version, log_level)
     if not license then license = "GPL" end          -- Must stay alive during the syscall
@@ -852,7 +852,7 @@ if C.bpf then
       end
     end
     local attr = t.bpf_attr1()
-    attr[0].prog_type = type
+    attr[0].prog_type = c.BPF_PROG[type]
     attr[0].insns = ptr_to_u64(insns)
     attr[0].insn_cnt = len
     attr[0].license = ptr_to_u64(license)
@@ -868,7 +868,7 @@ if C.bpf then
   end
   function S.bpf_map_create(type, key_size, value_size, max_entries)
     local attr = t.bpf_attr1()
-    attr[0].map_type = type
+    attr[0].map_type = c.BPF_MAP[type]
     attr[0].key_size = key_size
     attr[0].value_size = value_size
     attr[0].max_entries = max_entries
@@ -880,7 +880,7 @@ if C.bpf then
   end
   function S.bpf_map_op(op, fd, key, val_or_next, flags)
     local attr = t.bpf_attr1()
-    attr[0].map_fd = fd
+    attr[0].map_fd = getfd(fd)
     attr[0].key = ptr_to_u64(key)
     attr[0].value = ptr_to_u64(val_or_next)
     attr[0].flags = flags or 0
