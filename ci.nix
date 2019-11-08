@@ -2,10 +2,10 @@
 # Tests run on Snabb owned/operated hardware.
 # Currently simple example to compile Snabb.
 
-with import (builtins.fetchGit {
+with import (builtins.fetchTarball {
   name = "nixpkgs-release-19.09";
-  url = https://github.com/nixos/nixpkgs/;
-  rev = "23af4044501b161a23fea47f8ab0b6f0efca5a6f";
+  url = https://github.com/nixos/nixpkgs/archive/d628521d0b79df8882980a897f1e91fe78c29660.tar.gz;
+  sha256 = "0rdhng8wig4bbmq8r8fcq55zk8nac7527p0qk5whyd1zh9xffiyv";
 }) {};
 {
   build = stdenv.mkDerivation {
