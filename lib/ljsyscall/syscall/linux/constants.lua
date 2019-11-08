@@ -2155,6 +2155,7 @@ c.BPF_MAP = strflag {
   DEVMAP           = 14,
   SOCKMAP          = 15,
   CPUMAP           = 16,
+  XSKMAP           = 17
 }
 
 -- BPF syscall commands
