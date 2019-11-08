@@ -27,6 +27,14 @@ local function make_entry_type(value_type)
       value_type)
 end
 
+local entry_type_cache = {}
+local function get_entry_type(value_type)
+   if not entry_type_cache[value_type] then
+      entry_type_cache[value_type] = make_entry_type(value_type)
+   end
+   return entry_type_cache[value_type]
+end
+
 local function make_entries_type(entry_type)
    return ffi.typeof('$[?]', entry_type)
 end
@@ -63,7 +71,7 @@ end
 function RangeMapBuilder.new(value_type)
    local builder = {}
    builder.value_type = value_type
-   builder.entry_type = make_entry_type(builder.value_type)
+   builder.entry_type = get_entry_type(builder.value_type)
    builder.type = make_entries_type(builder.entry_type)
    builder.equal_fn = make_equal_fn(builder.value_type)
    builder.entries = {}

@@ -15,7 +15,15 @@
 --
 -- This implementation was based on the reference implementation.  See
 -- https://131002.net/siphash/ for more details.
-
+--
+-- The output of the default reference implementation is a uint64_t.
+-- This implementation returns a uint32_t by taking the upper 32 bits
+-- and shifting it left by one bit, see the comment at the end of
+-- X86_64().  By passing a true value for "standard", which implies
+-- "as_specified", the result will be the lower 32 bits of the full
+-- result instead to allow interoperability with other
+-- implementations.  This feature is not available for the multi-hash
+-- backend.
 module(..., package.seeall)
 
 local bit  = require("bit")
@@ -140,15 +148,17 @@ local function X86_64()
          | mov Rb(regnum(dst)), imm
       end
    end
-   function asm.ret(reg)
+   function asm.ret(reg, standard)
       if regnum(reg) ~= regnums["rax"] then
          | mov rax, Rq(regnum(reg))
       end
-      | shr rax, 32
-      -- The ctable needs the hash to not be 0xFFFFFFFF.  If we did the
-      -- lshift there instead of here, we'd have to compensate for that
-      -- weird thing where LuaJIT's bitops can produce negative numbers.
-      | shl eax, 1
+      if not standard then
+         | shr rax, 32
+         -- The ctable needs the hash to not be 0xFFFFFFFF.  If we did the
+         -- lshift there instead of here, we'd have to compensate for that
+         -- weird thing where LuaJIT's bitops can produce negative numbers.
+         | shl eax, 1
+      end
       | ret
    end
    function asm.finish(name, Dst)
@@ -408,9 +418,13 @@ local function Simulator()
    function asm.load_imm8(dst, imm)
       state[dst] = imm
    end
-   function asm.ret(reg)
-      output = tonumber(bit.rshift(state[reg], 32))
-      output = ffi.new('uint32_t[1]', bit.lshift(output, 1))[0]
+   function asm.ret(reg, standard)
+      if standard then
+         output = ffi.new('uint32_t[1]', state[reg])[0]
+      else
+         output = tonumber(bit.rshift(state[reg], 32))
+         output = ffi.new('uint32_t[1]', bit.lshift(output, 1))[0]
+      end
    end
    function asm:assemble(name, gen)
       return function(ptr)
@@ -425,8 +439,10 @@ end
 
 local sip_hash_config = {
    size={required=true}, stride={}, key={default=false},
-   c={default=2}, d={default=4}, as_specified={default=false}, width={default=1}
+   c={default=2}, d={default=4}, as_specified={default=false}, standard={default=false},
+   width={default=1}
 }
+local sip_hash_cache = {} -- Cache for generated variants (reuse if possible.)
 local function make_sip_hash(assembler, opts)
    function siphash(asm)
       -- Arguments:
@@ -508,13 +524,39 @@ local function make_sip_hash(assembler, opts)
       asm.xor(0, 1)
       asm.xor(2, 3)
       asm.xor(0, 2)
-      asm.ret(0)
+      asm.ret(0, opts.standard)
    end
 
    opts = lib.parse(opts, sip_hash_config)
+   if opts.standard then opts.as_specified = true end
    if not opts.stride then opts.stride = opts.size end
+   -- Assemble siphash variant and cache it unless it has not been
+   -- previously generated.
+   sip_hash_cache[assembler] = sip_hash_cache[assembler] or {}
+   for conf, cached in pairs(sip_hash_cache[assembler]) do
+      if lib.equal(conf, opts) then return cached end
+   end
    local asm = assembler(opts.stride)
-   return asm:assemble("siphash_"..opts.c.."_"..opts.d, siphash)
+   local sip_hash = asm:assemble("siphash_"..opts.c.."_"..opts.d, siphash)
+   sip_hash_cache[assembler][opts] = sip_hash
+   return sip_hash
+end
+
+-- Immediate value x86-64 backend for the SipHash implementation.
+local function ImmX86_64()
+   local asm = X86_64()
+   function asm.load_u64_and_advance(dst)
+      asm.copy_argument(dst, 1)
+   end
+   function asm.finish(name, Dst)
+      return finish(name.."_u64",
+                    ffi.typeof("uint32_t (*)(uint64_t)"),
+                    Dst)
+   end
+   asm.load_u32_and_advance = error
+   asm.load_u16_and_advance = error
+   asm.load_u8_and_advance = error
+   return asm
 end
 
 -- A special implementation to hash immediate values; requires our
@@ -523,21 +565,6 @@ function make_u64_hash(opts)
    local opts = lib.deepcopy(opts)
    opts.size = 8
    assert(not opts.as_specified)
-   local function ImmX86_64()
-      local asm = X86_64()
-      function asm.load_u64_and_advance(dst)
-         asm.copy_argument(dst, 1)
-      end
-      function asm.finish(name, Dst)
-         return finish(name.."_u64",
-                       ffi.typeof("uint32_t (*)(uint64_t)"),
-                       Dst)
-      end
-      asm.load_u32_and_advance = error
-      asm.load_u16_and_advance = error
-      asm.load_u8_and_advance = error
-      return asm
-   end
    return make_sip_hash(ImmX86_64, opts)
 end
 
@@ -573,6 +600,7 @@ end
 make_hash = make_hash1
 
 function make_multi_hash(opts)
+   assert(not opts.standard)
    local hash1,hash2,hash4 = make_hash1(opts),make_hash2(opts),make_hash4(opts)
    local width = opts.width or 1
    local stride = (opts.stride or opts.size)
@@ -636,6 +664,8 @@ function selftest()
 
       check(hash1(test_input), 'scalar')
 
+      if opts.standard then return end
+
       local zero_hash = reference_hash(ffi.new("uint8_t[?]", size))
       for _,width in ipairs({1,2,4,8}) do
          local mbuf = ffi.new("uint8_t[?]", size*width)
@@ -643,7 +673,7 @@ function selftest()
          local mhash = make_multi_hash(union(opts, {width=width}))
          for i=0,width-1 do
             ffi.fill(mbuf, size*width)
-            ffi.copy(mbuf+i*size, test_input, size) 
+            ffi.copy(mbuf+i*size, test_input, size)
             mhash(mbuf, result)
             for elt=0,width-1 do
                if elt == i then
@@ -671,12 +701,16 @@ function selftest()
                opts.as_specified = as_specified
                test(opts)
             end
+            for _, standard in ipairs({true, false}) do
+               opts.standard = standard
+               test(opts)
+            end
          end
       end
    end
 
    -- We need a hash function for immediates as well; test that here.
-   opts.size, opts.as_specified = 8, false
+   opts.size, opts.as_specified, opts.standard = 8, false, false
    local val = ffi.new('uint64_t[1]', 0x12345678ULL)
    for c=0,2 do
       opts.c = c

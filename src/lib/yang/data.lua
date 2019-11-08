@@ -12,9 +12,10 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 local lib = require('core.lib')
 local regexp = require("lib.xsd_regexp")
+local lib = require("core.lib")
 
 function normalize_id(id)
-   return id:gsub('[^%w_]', '_')
+   return (id:gsub('[^%w_]', '_'))
 end
 
 -- Helper for parsing C type declarations.
@@ -111,18 +112,30 @@ function typeof(name)
    return type_cache[name]
 end
 
--- If a "list" node has one key that is string-valued, we will represent
--- instances of that node as normal Lua tables where the key is the
--- table key and the value does not contain the key.
-local function table_string_key(keys)
-   local string_key = nil
-   for k,v in pairs(keys) do
-      if v.type ~= 'scalar' then return nil end
-      if v.argument_type.primitive_type ~= 'string' then return nil end
-      if string_key ~= nil then return nil end
-      string_key = k
+-- If a "list" node has a single key that is string-valued or representable as
+-- a Lua number, we will represent instances of that node as normal Lua tables
+-- where the key is the table key and the value does not contain the key.
+local function table_native_key(keys)
+   local native_number_types =
+      lib.set('int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32')
+   local function representable_as_native(v)
+      return v.type == 'scalar' and
+             (v.argument_type.primitive_type == 'string' or
+              native_number_types[v.argument_type.primitive_type])
    end
-   return string_key
+   local native_key = nil
+   for k,v in pairs(keys) do
+      if native_key ~= nil then
+         -- Bail out if the list has multiple keys, native or otherwise.
+         return nil
+      elseif representable_as_native(v) then
+         -- Select the first native key, if any.
+         native_key = k
+      else
+         return nil
+      end
+   end
+   return native_key
 end
 
 -- We need to properly support unions.  It's a big FIXME!  As an
@@ -184,8 +197,12 @@ function data_grammar_from_schema(schema, is_config)
    function handlers.choice(node)
       local choices = {}
       for choice, n in pairs(node.body) do
-         local members = visit_body(n)
-         if not is_empty(members) then choices[choice] = members end
+         if n.kind == 'case' then
+            local members = visit_body(n)
+            if not is_empty(members) then choices[choice] = members end
+         else
+            choices[choice] = { [choice] = visit(n) }
+         end
       end
       if is_empty(choices) then return end
       return {type="choice", default=node.default, mandatory=node.mandatory,
@@ -194,7 +211,8 @@ function data_grammar_from_schema(schema, is_config)
    handlers['leaf-list'] = function(node)
       if node.config ~= is_config then return end
       local t = elide_unions(node.type)
-      return {type='array', element_type=t, ctype=value_ctype(t)}
+      return {type='array', element_type=t, ctype=value_ctype(t),
+              min_elements=node.min_elements, max_elements=node.max_elements}
    end
    function handlers.list(node)
       local norm = {}
@@ -221,9 +239,11 @@ function data_grammar_from_schema(schema, is_config)
       end
       if is_empty(values) and node.config ~= is_config then return end
       return {type='table', keys=keys, values=values,
-              string_key=table_string_key(keys),
+              native_key=table_native_key(keys),
               key_ctype=struct_ctype(keys),
-              value_ctype=struct_ctype(values)}
+              value_ctype=struct_ctype(values),
+              unique = node.unique,
+              min_elements=node.min_elements, max_elements=node.max_elements}
    end
    function handlers.leaf(node, for_key)
       if node.config ~= is_config and not for_key then return end
@@ -495,6 +515,9 @@ function choice_parser(keyword, choices, members, default, mandatory)
       -- using different leaves from different case statements.
       local chosen
 
+      -- keep track of initialzed members
+      local inits = {}
+
       local function init() return {} end
       local function parse(P, out, k)
          if chosen and choice_map[k] ~= chosen then
@@ -502,12 +525,13 @@ function choice_parser(keyword, choices, members, default, mandatory)
          else
             chosen = choice_map[k]
          end
-         return members[chosen][k].parse(P, members[chosen][k].init(), k)
+         inits[k] = inits[k] or members[chosen][k].init()
+         return members[chosen][k].parse(P, inits[k], k)
       end
 
       -- This holds a copy of all the nodes so we know when we've hit the last one.
       local function finish(out, k)
-         if out ~= nil then return out end
+         if out ~= nil then return members[chosen][k].finish(out) end
          if mandatory and chosen == nil then error("missing choice value: "..keyword) end
          if default and default == choice_map[k] then
             return members[default][k].finish()
@@ -538,13 +562,13 @@ local function ctable_builder(key_t, value_t)
    return builder
 end
 
-local function string_keyed_table_builder(string_key)
+local function native_keyed_table_builder(native_key)
    local res = {}
    local builder = {}
    function builder:add(key, value)
-      local str = assert(key[string_key])
-      assert(res[str] == nil, 'duplicate key: '..str)
-      res[str] = value
+      local k = assert(key[native_key])
+      assert(res[k] == nil, 'duplicate key: '..k)
+      res[k] = value
    end
    function builder:finish() return res end
    return builder
@@ -569,7 +593,7 @@ local function ltable_builder()
    return builder
 end
 
-local function table_parser(keyword, keys, values, string_key, key_ctype,
+local function table_parser(keyword, keys, values, native_key, key_ctype,
                             value_ctype)
    local members = {}
    for k,v in pairs(keys) do members[k] = v end
@@ -580,8 +604,8 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
    local init
    if key_t and value_t then
       function init() return ctable_builder(key_t, value_t) end
-   elseif string_key then
-      function init() return string_keyed_table_builder(string_key) end
+   elseif native_key then
+      function init() return native_keyed_table_builder(native_key) end
    elseif key_t then
       function init() return cltable_builder(key_t) end
    else
@@ -635,7 +659,7 @@ function data_parser_from_grammar(production)
    end
    function handlers.table(keyword, production)
       local keys, values = visitn(production.keys), visitn(production.values)
-      return table_parser(keyword, keys, values, production.string_key,
+      return table_parser(keyword, keys, values, production.native_key,
                           production.key_ctype, production.value_ctype)
    end
    function handlers.scalar(keyword, production)
@@ -653,23 +677,40 @@ function data_parser_from_grammar(production)
    function top_parsers.struct(production)
       local struct_t = production.ctype and typeof(production.ctype)
       local members = visitn(production.members)
+      local keys = {}
+      for k,v in pairs(members) do table.insert(keys, k) end
       return function(stream)
          local P = parser_mod.Parser.new(stream)
          local ret = {}
-         for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
+         local expanded_members = {}
+         for _,k in ipairs(keys) do
+            if members[k].represents then
+               -- Choice fields don't include the name of the choice block in the data. They
+               -- need to be able to provide the parser for the leaves it represents.
+               local member_parser = members[k].stateful_parser()
+               for _, node in pairs(members[k].represents()) do
+                  -- Choice fields need to keep state around as they're called multiple times
+                  -- and need to do some validation to comply with spec.
+                  expanded_members[node] = member_parser
+               end
+            else
+               ret[normalize_id(k)] = members[k].init()
+               expanded_members[k] = members[k]
+            end
+         end
          while true do
             P:skip_whitespace()
             if P:is_eof() then break end
             local k = P:parse_identifier()
             if k == '' then P:error("Expected a keyword") end
-            local sub = members[k]
+            local sub = expanded_members[k]
             if not sub then P:error('unrecognized parameter: '..k) end
             local id = normalize_id(k)
             ret[id] = sub.parse(P, ret[id], k)
          end
-         for k,sub in pairs(members) do
+         for k,sub in pairs(expanded_members) do
             local id = normalize_id(k)
-            ret[id] = sub.finish(ret[id])
+            ret[id] = sub.finish(ret[id], k)
          end
          if struct_t then return struct_t(ret) else return ret end
       end
@@ -933,8 +974,8 @@ function xpath_printer_from_grammar(production, print_default, root)
                print_value(entry.value, file, path)
             end
          end
-      elseif production.string_key then
-         local id = normalize_id(production.string_key)
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
          return function(data, file, path)
             path = path or ''
             for key, value in pairs(data) do
@@ -1201,8 +1242,8 @@ function influxdb_printer_from_grammar(production, print_default, root)
                print_value(entry.value, file, path, key)
             end
          end
-      elseif production.string_key then
-         local id = normalize_id(production.string_key)
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
          return function(data, file, path)
             path = path or ''
             for key, value in pairs(data) do
@@ -1402,8 +1443,8 @@ function data_printer_from_grammar(production, print_default)
                file:write(indent..'}\n')
             end
          end
-      elseif production.string_key then
-         local id = normalize_id(production.string_key)
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
          return function(data, file, indent)
             for key, value in pairs(data) do
                if keyword then print_keyword(keyword, file, indent) end
@@ -1701,6 +1742,13 @@ function selftest()
 
       container fruit-bowl {
          leaf description { type string; }
+         leaf material {
+            type enumeration {
+               enum wood;
+               enum glass;
+               enum plastic;
+            }
+         }
          list contents { uses fruit; key name; }
       }
       leaf addr {
@@ -1719,6 +1767,7 @@ function selftest()
                                        mem.open_input_string [[
      fruit-bowl {
        description 'ohai';
+       material glass;
        contents { name foo; score 7; }
        contents { name bar; score 8; }
        contents { name baz; score 9; tree-grown true; }
@@ -1728,6 +1777,7 @@ function selftest()
    ]])
    for i =1,2 do
       assert(data.fruit_bowl.description == 'ohai')
+      assert(data.fruit_bowl.material == 'glass', data.material)
       local contents = data.fruit_bowl.contents
       assert(contents.foo.score == 7)
       assert(contents.foo.tree_grown == nil)
@@ -1873,6 +1923,76 @@ function selftest()
       }
    ]])
    assert(success == false)
+
+   -- Check native number key.
+   local native_number_key_schema = schema.load_schema([[module native-number-key {
+      namespace "urn:ietf:params:xml:ns:yang:native-number-key";
+      prefix "test";
+
+      list number {
+         key "number";
+         leaf number { type uint32; }
+         leaf name { type string; }
+      }
+   }]])
+
+   local native_number_key_data = load_config_for_schema(
+      native_number_key_schema,
+      mem.open_input_string [[
+         number {
+            number 1;
+            name "Number one!";
+         }
+   ]])
+   assert(native_number_key_data.number[1].name == "Number one!")
+
+   -- Test top-level choice with list member.
+   local choice_schema = schema.load_schema([[module toplevel-choice-schema {
+      namespace "urn:ietf:params:xml:ns:yang:toplevel-choice-schema";
+      prefix "test";
+
+      choice test {
+        case this {
+          leaf foo { type string; }
+          leaf bar { type string; }
+        }
+        case that {
+          leaf baz { type uint32; }
+          list qu-x { key id; leaf id { type string; } leaf v { type string; } }
+        }
+      }
+   }]])
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
+      foo "hello";
+      bar "world";
+   ]])
+   assert(choice_data.foo == "hello")
+   assert(choice_data.bar == "world")
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
+      baz 1;
+      qu-x { id "me"; v "hey"; }
+      qu-x { id "you"; v "hi"; }
+   ]])
+   assert(choice_data.baz == 1)
+   assert(choice_data.qu_x.me.v == "hey")
+   assert(choice_data.qu_x.you.v == "hi")
+
+   -- Test choice with case short form.
+   local choice_schema = schema.load_schema([[module shortform-choice-schema {
+      namespace "urn:ietf:params:xml:ns:yang:shortform-choice-schema";
+      prefix "test";
+
+      choice test {
+        default foo;
+        leaf foo { type string; default "something"; }
+        leaf bar { type string; }
+      }
+   }]])
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string "")
+   assert(choice_data.foo == "something")
 
    -- Test range / length restrictions.
    local range_length_schema = schema.load_schema([[module range-length-schema {

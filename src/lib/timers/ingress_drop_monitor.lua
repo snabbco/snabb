@@ -25,7 +25,7 @@ function new(args)
       grace_period = args.grace_period or 10,
       action = args.action or 'flush',
       tips_url = args.tips_url or default_tips_url,
-      last_flush = 0,
+      last_flush = now(), -- Start in the grace period.
       last_value = ffi.new('uint64_t[1]'),
       current_value = ffi.new('uint64_t[1]'),
    }
@@ -57,8 +57,8 @@ function IngressDropMonitor:sample ()
    sum[0] = 0
    for i = 1, #app_array do
       local app = app_array[i]
-      if app.rxdrop and not app.dead then
-         sum[0] = sum[0] + app:rxdrop()
+      if app.get_rxstats and not app.dead then
+         sum[0] = sum[0] + app:get_rxstats().dropped
       end
    end
    if self.counter then

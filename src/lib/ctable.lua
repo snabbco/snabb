@@ -4,13 +4,10 @@ local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
 local lib = require("core.lib")
-local util = require("lib.yang.util")
 local binary_search = require("lib.binary_search")
 local multi_copy = require("lib.multi_copy")
 local siphash = require("lib.hash.siphash")
 
--- TODO: Move to core/lib.lua.
-local memoize = util.memoize
 local min, max, floor, ceil = math.min, math.max, math.floor, math.ceil
 
 CTable = {}
@@ -430,21 +427,6 @@ function CTable:remove(key, missing_allowed)
    return true
 end
 
-local function generate_multi_copy(width, size)
-   return multi_copy.gen(width, size)
-end
-generate_multi_copy = memoize(generate_multi_copy)
-
-local function generate_multi_hash(self, width)
-   return self.make_multi_hash_fn(width)
-end
-generate_multi_hash = memoize(generate_multi_hash)
-
-local function generate_binary_search(entries_per_lookup, entry_type)
-   return binary_search.gen(entries_per_lookup, entry_type)
-end
-generate_binary_search = memoize(generate_binary_search)
-
 function CTable:make_lookup_streamer(width)
    assert(width > 0 and width <= 262144, "Width value out of range: "..width)
    local res = {
@@ -463,6 +445,9 @@ function CTable:make_lookup_streamer(width)
       -- more entry.
       stream_entries = self.type(width * (self.max_displacement + 1) + 1)
    }
+   -- Pointer to first entry key (cache to avoid cdata allocation.)
+   local key_offset = 4 -- Skip past uint32_t hash.
+   res.keys = ffi.cast('uint8_t*', res.entries) + key_offset
    -- Give res.pointers sensible default values in case the first lookup
    -- doesn't fill the pointers vector.
    for i = 0, width-1 do res.pointers[i] = self.entries end
@@ -475,9 +460,9 @@ function CTable:make_lookup_streamer(width)
    -- Compile multi-copy and binary-search procedures that are
    -- specialized for this table and this width.
    local entry_size = ffi.sizeof(self.entry_type)
-   res.multi_copy = generate_multi_copy(width, res.entries_per_lookup * entry_size)
-   res.multi_hash = generate_multi_hash(self, width)
-   res.binary_search = generate_binary_search(res.entries_per_lookup, self.entry_type)
+   res.multi_copy = multi_copy.gen(width, res.entries_per_lookup * entry_size)
+   res.multi_hash = self.make_multi_hash_fn(width)
+   res.binary_search = binary_search.gen(res.entries_per_lookup, self.entry_type)
 
    return setmetatable(res, { __index = LookupStreamer })
 end
@@ -485,13 +470,13 @@ end
 function LookupStreamer:stream()
    local width = self.width
    local entries = self.entries
+   local keys = self.keys
    local pointers = self.pointers
    local stream_entries = self.stream_entries
    local entries_per_lookup = self.entries_per_lookup
    local equal_fn = self.equal_fn
 
-   local key_offset = 4 -- Skip past uint32_t hash.
-   self.multi_hash(ffi.cast('uint8_t*', entries) + key_offset, self.hashes)
+   self.multi_hash(self.keys, self.hashes)
 
    for i=0,width-1 do
       local hash = self.hashes[i]
