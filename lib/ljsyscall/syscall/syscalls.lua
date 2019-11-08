@@ -327,7 +327,9 @@ function S.getsockopt(fd, level, optname, optval, optlen)
   local ret, err = C.getsockopt(getfd(fd), c.SOL[level], c.SO[optname], optval, len)
   if ret == -1 then return nil, t.error(err or errno()) end
   if len[0] ~= optlen then error("incorrect optlen for getsockopt: set " .. optlen .. " got " .. len[0]) end
-  return optval[0] -- TODO will not work if struct, eg see netfilter
+  local ok, ret = pcall(function () return optval[0] end)
+  if ok then return ret
+  else return optval end
 end
 function S.bind(sockfd, addr, addrlen)
   local saddr = pt.sockaddr(addr)
