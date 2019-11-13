@@ -1,0 +1,407 @@
+#!snabb snsh
+
+local S = require("syscall")
+local ffi = require("ffi")
+local bpf = require("apps.xdp.bpf")
+local lib = require("core.lib")
+local bits = lib.bits
+local band, bor, rshift, tobit = bit.band, bit.bor, bit.rshift, bit.tobit
+
+-- BPF boilerplate.
+function bpf_attach (ifname, queue, xsk)
+   assert(S.setrlimit('memlock', {cur=0x7fffffffffffffffULL, max=0x7fffffffffffffffULL}))
+   -- Create queue->xsk map
+   local map = assert(S.bpf_map_create('xskmap', 4, 4, 128))
+   -- Assemble and load BPF mapper program
+   local c, f, m, a, s, j, fn =
+      bpf.c, bpf.f, bpf.m, bpf.a, bpf.s, bpf.j, bpf.fn
+   local insns = bpf.asm{
+      -- r3 = XDP_ABORTED
+      { op=bor(c.ALU, a.MOV, s.K), dst=3, imm=0 },
+      -- r2 = ((struct xdp_md *)ctx)->rx_queue_index
+      { op=bor(c.LDX, f.W, m.MEM), dst=2, src=1, off=16 },
+      -- r1 = map
+      { op=bor(c.LD, f.DW, m.IMM), dst=1, src=s.MAP_FD,
+        imm=band(map:getfd(), 2^32-1) },
+      { imm=rshift(map:getfd(), 32) },
+      -- r0 = redirect_map(r1, r2, r3)
+      { op=bor(c.JMP, j.CALL), imm=fn.redirect_map },
+      -- EXIT:
+      { op=bor(c.JMP, j.EXIT) }
+   }
+   local prog, err, log = S.bpf_prog_load(
+      'xdp', insns, ffi.sizeof(insns) / ffi.sizeof(bpf.ins), "Apache 2.0"
+   )
+   if not prog then
+      print(log)
+      error(err)
+   end
+   -- Attach BPF program to interface
+   local netlink = assert(S.socket('netlink', 'raw', 'route'))
+   -- SOL_NETLINK = 270, NETLINK_EXT_ACK = 11
+   assert(S.setsockopt(netlink, 270, 11, ffi.new("int32_t[1]", 1), 4))
+   assert(S.bind(netlink, S.t.sockaddr_nl()))
+   local req = ffi.new[[
+      struct {
+        struct { /* nlmsghdr */
+          uint32_t nlmsg_len;	/* Length of message including header */
+          uint16_t nlmsg_type;	/* Message content */
+          uint16_t nlmsg_flags;	/* Additional flags */
+          uint32_t nlmsg_seq;	/* Sequence number */
+          uint32_t nlmsg_pid;	/* Sending process port ID */
+        } nh;
+        struct { /* ifinfomsg */
+          unsigned char ifi_family;
+          unsigned char __ifi_pad;
+          unsigned short ifi_type;	/* ARPHRD_* */
+          int ifi_index;		/* Link index	*/
+          unsigned ifi_flags;		/* IFF_* flags	*/
+          unsigned ifi_change;		/* IFF_* change mask */
+        } ifinfo;
+        struct { /* nlattr */
+          uint16_t nla_len;
+          uint16_t nla_type;
+        } xdp;
+        struct { /* nlattr */
+          uint16_t nla_len;
+          uint16_t nla_type;
+          int32_t fd;
+        } xdp_fd;
+        struct { /* nlattr */
+          uint16_t nla_len;
+          uint16_t nla_type;
+          uint32_t flags;
+        } xdp_flags;
+      }__attribute__((packed))]]
+
+   req.nh.nlmsg_flags = bor(S.c.NLM_F.REQUEST, S.c.NLM_F.ACK)
+   req.nh.nlmsg_type = S.c.RTM.SETLINK
+   req.nh.nlmsg_pid = 0
+   req.nh.nlmsg_seq = 1
+   req.nh.nlmsg_len = ffi.sizeof(req)
+   req.ifinfo.ifi_family = S.c.AF.UNSPEC
+   req.ifinfo.ifi_index = S.util.if_nametoindex(ifname)
+   req.xdp.nla_type = bor(bits{ NLA_F_NESTED=15 }, 43) -- IFLA_XDP
+   req.xdp.nla_len = ffi.sizeof(req.xdp)
+      + ffi.sizeof(req.xdp_fd)
+      + ffi.sizeof(req.xdp_flags)
+   req.xdp_fd.nla_type = 1 -- IFLA_XDP_FD
+   req.xdp_fd.fd = prog:getfd()
+   req.xdp_fd.nla_len = ffi.sizeof(req.xdp_fd)
+   req.xdp_flags.nla_type = 3 -- IFLA_XDP_FLAGS
+   req.xdp_flags.flags = bits{ XDP_FLAGS_DRV_MODE=2 }
+   req.xdp_flags.nla_len = ffi.sizeof(req.xdp_flags)
+   assert(netlink:send(req, ffi.sizeof(req)))
+   local res = assert(S.nl.read(netlink, nil, nil, true))
+   if res.error then
+      error("NETLINK responded with error: "..res.error)
+   end
+   netlink:close()
+   -- Insert queue:xsk into map
+   local qno = ffi.new("uint32_t[1]", queue)
+   local sfd = ffi.new("uint32_t[1]", xsk:getfd())
+   assert(S.bpf_map_op('map_update_elem', map, qno, sfd))
+end
+
+-- Types
+ffi.cdef[[
+   struct sockaddr_xdp {
+      uint16_t sxdp_family;
+      uint16_t sxdp_flags;
+      uint32_t sxdp_ifindex;
+      uint32_t sxdp_queue_id;
+      uint32_t sxdp_shared_umem_fd;
+   } __attribute__((packed));
+
+   struct xdp_umem_reg {
+      uint8_t *addr; /* Start of packet data area */
+      uint64_t len; /* Length of packet data area */
+      uint32_t chunk_size;
+      uint32_t headroom;
+      uint32_t flags; /* Not available in 4.19 */
+   } __attribute__((packed));
+
+   struct xdp_ring_offset {
+      uint64_t producer;
+      uint64_t consumer;
+      uint64_t desc;
+      //uint64_t flags; /* Not available in 4.19 */
+   } __attribute__((packed));
+
+   struct xdp_mmap_offsets {
+      struct xdp_ring_offset rx;
+      struct xdp_ring_offset tx;
+      struct xdp_ring_offset fr; /* Fill */
+      struct xdp_ring_offset cr; /* Completion */
+   } __attribute__((packed));
+
+   struct xdp_desc {
+      uint64_t addr;
+      uint32_t len;
+      uint32_t options;
+   } __attribute__((packed));
+]]
+
+
+-- Create XDP socket
+
+local xsk = assert(S.socket('xdp', 'raw'))
+
+-- Socket operations
+
+function xsk_kick (xsk)
+   return S.sendto(xsk, nil, 0, 'dontwait', nil, 0)
+end
+
+function xsk_bind (xsk, ifname, queue)
+   local sxdp = ffi.new("struct sockaddr_xdp")
+   sxdp.sxdp_family = S.c.AF.XDP
+   sxdp.sxdp_ifindex = S.util.if_nametoindex(ifname)
+   sxdp.sxdp_queue_id = queue or 0
+   --sxdp.sxdp_flags = bits{XDP_ZEROCOPY=2}
+   assert(S.bind(xsk, sxdp, ffi.sizeof(sxdp)))
+end
+
+function xsk_poll (xsk)
+   local pfds = S.types.t.pollfds{{ fd=xsk, events='in'}}
+   assert(S.poll(pfds, 1000))
+end
+
+-- Allocate UMEM (overload dma_alloc to trick Snabb into allocating from here)
+
+local packet_overhead = 2 -- leading struct packet length field (uint16_t)
+local default_headroom = 256 -- See core/packet
+
+local page_size = S.getpagesize()
+-- Chunk size must be <= page size and UMEM must be aligned to page size.
+local num_chunks = 10000
+local chunk_size = page_size
+local umem_size = chunk_size * num_chunks
+local umem_backing = ffi.new("uint8_t[?]", umem_size + page_size)
+local umem = ffi.cast("uint8_t*", lib.align(ffi.cast("uintptr_t", umem_backing), page_size))
+
+local umem_used = 0
+require("core.memory").dma_alloc = function (_, align)
+   -- Hack: we ignore the requested size and return short memory regions.
+   -- User has to ensure
+   --   packet.length <= chunk_size-(default_headroom+packet_overhead)
+   assert(umem_used + chunk_size <= umem_size)
+   local chunk = umem + umem_used
+   umem_used = umem_used + chunk_size
+   return chunk
+end
+
+local function to_umem (p)
+   local rel = ffi.cast("uint64_t", p) - ffi.cast("uint64_t", umem)
+   return rel - band(rel, chunk_size - 1) -- realign
+end
+
+local function from_umem (u)
+   return umem + u
+end
+
+-- Register UMEM
+
+local opt = ffi.new("struct xdp_umem_reg")
+opt.addr = umem
+opt.len = umem_size
+opt.chunk_size = chunk_size
+opt.headroom = default_headroom + packet_overhead
+--opt.flags = bits{XDP_UMEM_UNALIGNED_CHUNK_FLAG=1}
+assert(xsk:setsockopt('xdp', 'xdp_umem_reg', opt, ffi.sizeof(opt)))
+
+-- Map rings
+
+local ndesc = 2048
+local opt, optsize = ffi.new("uint32_t[1]", ndesc), 4
+assert(xsk:setsockopt('xdp', 'xdp_rx_ring', opt, optsize))
+assert(xsk:setsockopt('xdp', 'xdp_tx_ring', opt, optsize))
+assert(xsk:setsockopt('xdp', 'xdp_umem_fill_ring', opt, optsize))
+assert(xsk:setsockopt('xdp', 'xdp_umem_completion_ring', opt, optsize))
+
+local offsets = ffi.new("struct xdp_mmap_offsets")
+assert(xsk:getsockopt('xdp', 'xdp_mmap_offsets', offsets, ffi.sizeof(offsets)))
+
+local ring_t = ffi.typeof[[
+   struct {
+      uint32_t *producer, *consumer, *flags;
+      void *desc;
+      uint32_t write, read;
+   }
+]]
+
+local function map_ring (xsk, length, offset)
+   local prot = "read, write"
+   local flags = "shared, populate"
+   local map = assert(S.mmap(nil, length, prot, flags, xsk, offset))
+   return ffi.cast("char *", map)
+end
+
+local ringmaps = {
+   rx = map_ring(
+      xsk,
+      offsets.rx.desc + ndesc*ffi.sizeof("struct xdp_desc"),
+      0x000000000ULL -- XDP_PGOFF_RX_RING
+   ),
+   tx = map_ring(
+      xsk,
+      offsets.tx.desc + ndesc*ffi.sizeof("struct xdp_desc"),
+      0x080000000ULL -- XDP_PGOFF_TX_RING
+   ),
+   fr = map_ring(
+      xsk,
+      offsets.fr.desc + ndesc*ffi.sizeof("uintptr_t"),
+      0x100000000ULL -- XDP_UMEM_PGOFF_FILL_RING
+   ),
+   cr = map_ring(
+      xsk,
+      offsets.cr.desc + ndesc*ffi.sizeof("uintptr_t"),
+      0x180000000ULL -- XDP_UMEM_PGOFF_COMPLETION_RING
+   )
+}
+
+local function make_ring (map, offsets)
+   local r = ffi.new(ring_t)
+   r.producer = ffi.cast("uint32_t *", map + offsets.producer)
+   r.consumer = ffi.cast("uint32_t *", map + offsets.consumer)
+   --r.flags = ffi.cast("uint32_t *", map + offsets.flags)
+   r.desc = map + offsets.desc
+   return r
+end
+
+local rx = make_ring(ringmaps.rx, offsets.rx)
+local tx = make_ring(ringmaps.tx, offsets.tx)
+local fr = make_ring(ringmaps.fr, offsets.fr)
+local cr = make_ring(ringmaps.cr, offsets.cr)
+
+-- Ring operations
+
+local function mask  (i)    return band(i, ndesc - 1)    end
+local function inc   (i)    return tobit(i + 1)          end
+local function full1 (r, w) return tobit(w - r) == ndesc end
+
+function full (r)
+   if full1(r.read, r.write) then
+      if full1(r.consumer[0], r.write) then
+         return true
+      end
+      r.read = r.consumer[0]
+   end
+end
+
+function transmit (r, p)
+   local desc = ffi.cast("struct xdp_desc *", r.desc)
+   local idx = mask(r.write)
+   desc[idx].addr = to_umem(p.data)
+   desc[idx].len = p.length
+   r.write = inc(r.write)
+end
+
+function fill (r, p)
+   local desc = ffi.cast("uint64_t *", r.desc)
+   local idx = mask(r.write)
+   desc[idx] = to_umem(p)
+   r.write = inc(r.write)
+end
+
+function push (r)
+   -- NB: no need for memory barrier on x86 because of TSO.
+   r.producer[0] = r.write
+end
+
+function empty (r)
+   if r.read == r.write then
+      if r.read == r.producer[0] then
+         return true
+      end
+      r.write = r.producer[0]
+   end
+end
+
+function receive (r)
+   local desc = ffi.cast("struct xdp_desc *", r.desc)
+   local idx = mask(r.read)
+   local p = ffi.cast("struct packet *",
+                      -- packet struct begins at payload - packet_overhead
+                      from_umem(desc[idx].addr) - packet_overhead)
+   p.length = desc[idx].len
+   r.read = inc(r.read)
+   return p
+end
+
+function reclaim (r)
+   local desc = ffi.cast("uint64_t *", r.desc)
+   local idx = mask(r.read)
+   local p = ffi.cast("struct packet *", from_umem(desc[idx]))
+   p.length = 0
+   r.read = inc(r.read)
+   return p
+end
+
+function pull (r)
+   -- NB: no need for memory barrier on x86 (see push.)
+   r.consumer[0] = r.read
+end
+
+function needs_wakeup (r)
+   return band(r.flags[0], bits{XDP_RING_NEED_WAKEUP=1})
+end
+
+-- ethtool --config-ntuple ens1f1 flow-type ip4 src-ip 172.16.172.3 action 0
+xsk_bind(xsk, "ens1f1", 0)
+bpf_attach("ens1f1", 0, xsk)
+
+local throttle = lib.throttle(1)
+local filled, reclaimed, received, sent, dropped = 0, 0, 0, 0, 0
+local last_sent, last_received, last_dropped = 0, 0, 0
+
+local eth = require("lib.protocol.ethernet"):new{}
+
+while true do
+   --xsk_poll(xsk)
+
+   if throttle() then
+      print("fill", filled, "comp", reclaimed)
+      print("recv", received, "sent", sent, "drop", dropped)
+      print(("RX   %.6f Mpps"):format((received-last_received)/1e6))
+      print(("TX   %.6f Mpps"):format((sent-last_sent)/1e6))
+      print(("DROP %.6f Mpps"):format((dropped-last_dropped)/1e6))
+      last_received, last_sent, last_dropped = received, sent, dropped
+   end
+
+   for _ = 1, 100 do
+      if not empty(cr) then
+         packet.free(reclaim(cr))
+         reclaimed = reclaimed + 1
+      end
+      if not full(fr) then
+         fill(fr, packet.allocate())
+         filled = filled + 1
+      end
+      if not empty(rx) then
+         local p = receive(rx)
+         received = received + 1
+         if not full(tx) then
+            assert(eth:new_from_mem(p.data, p.length))
+            eth:swap()
+            transmit(tx, p)
+            sent = sent + 1
+         else
+            packet.free(p)
+            dropped = dropped + 1
+         end
+      end
+   end
+   pull(cr)
+   push(fr)
+   pull(rx)
+   push(tx)
+
+   if not empty(tx) then
+      xsk_kick(xsk)
+   end
+
+   -- if needs_wakeup(tx) then
+   --    xsk_kick(xsk)
+   -- end
+end
