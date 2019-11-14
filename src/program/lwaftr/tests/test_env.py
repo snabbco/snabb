@@ -76,7 +76,7 @@ class BaseTestCase(unittest.TestCase):
             cls.daemon.stderr.close()
             cls.fail(cls, '\n'.join(msg_lines))
 
-    def run_cmd(self, args):
+    def run_cmd(self, args, ret=0):
         proc = Popen(args, stdout=PIPE, stderr=PIPE)
         try:
             output, errput = proc.communicate(timeout=COMMAND_TIMEOUT)
@@ -86,7 +86,7 @@ class BaseTestCase(unittest.TestCase):
             print('\nTimeout running command, trying to kill PID %s' % proc.pid)
             proc.kill()
             raise
-        if proc.returncode != 0:
+        if proc.returncode != ret:
             msg_lines = (
                 'Error running command:', " ".join(args),
                 'Daemon Command:', " ".join(self.daemon_args),

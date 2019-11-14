@@ -19,53 +19,7 @@ do
    end
 end
 
-local function trim (str)
-   return str:gsub("^%s", ""):gsub("%s$", "")
-end
-
-local function parse_cpulist (cpus)
-   local ret = {}
-   cpus = trim(cpus)
-   if #cpus == 0 then return ret end
-   for range in cpus:split(',') do
-      local lo, hi = range:match("^%s*([^%-]*)%s*-%s*([^%-%s]*)%s*$")
-      if lo == nil then lo = range:match("^%s*([^%-]*)%s*$") end
-      assert(lo ~= nil, 'invalid range: '..range)
-      lo = assert(tonumber(lo), 'invalid range begin: '..lo)
-      assert(lo == math.floor(lo), 'invalid range begin: '..lo)
-      if hi ~= nil then
-         hi = assert(tonumber(hi), 'invalid range end: '..hi)
-         assert(hi == math.floor(hi), 'invalid range end: '..hi)
-         assert(lo < hi, 'invalid range: '..range)
-      else
-         hi = lo
-      end
-      for cpu=lo,hi do table.insert(ret, cpu) end
-   end
-   return ret
-end
-
-local function parse_cpulist_from_file (path)
-   local fd = assert(io.open(path))
-   if not fd then return {} end
-   local ret = parse_cpulist(fd:read("*all"))
-   fd:close()
-   return ret
-end
-
 local function available_cpus (node)
-   local function set (t)
-      local ret = {}
-      for _,v in pairs(t) do ret[tostring(v)] = true end
-      return ret
-   end
-   local function cpus_in_node (node)
-      local node_path = '/sys/devices/system/node/node'..node
-      return set(parse_cpulist_from_file(node_path..'/cpulist'))
-   end
-   local function isolated_cpus ()
-      return set(parse_cpulist_from_file('/sys/devices/system/cpu/isolated'))
-   end
    local function subtract (s, t)
       local ret = {}
       for k,_ in pairs(s) do
@@ -75,7 +29,7 @@ local function available_cpus (node)
       return ret
    end
    -- XXX: Add sched_getaffinity cpus.
-   return subtract(cpus_in_node(node), isolated_cpus())
+   return subtract(numa.node_cpus(node), numa.isolated_cpus())
 end
 
 function CPUSet:bind_to_numa_node()
@@ -87,7 +41,7 @@ function CPUSet:bind_to_numa_node()
       numa.bind_to_numa_node(nodes[1])
       local cpus = available_cpus(nodes[1])
       assert(#cpus > 0, 'Not available CPUs')
-      numa.bind_to_cpu(cpus)
+      numa.bind_to_cpu(cpus, 'skip-perf-checks')
       print(("Bound main process to NUMA node: %s (CPU %s)"):format(nodes[1], cpus[1]))
    else
       print("CPUs available from multiple NUMA nodes: "..table.concat(nodes, ","))
@@ -96,7 +50,7 @@ function CPUSet:bind_to_numa_node()
 end
 
 function CPUSet:add_from_string(cpus)
-   for _, cpu in ipairs(parse_cpulist(cpus)) do
+   for cpu,_ in pairs(numa.parse_cpuset(cpus)) do
       self:add(cpu)
    end
 end
@@ -156,15 +110,4 @@ function CPUSet:release(cpu)
       end
    end
    error('CPU not found on NUMA node: '..cpu..', '..node)
-end
-
-function selftest ()
-   print('selftest: cpuset')
-   local cpus = parse_cpulist("0-5,7")
-   assert(#cpus == 7 and cpus[6] == 5 and cpus[7] == 7)
-   cpus = parse_cpulist("1")
-   assert(#cpus == 1 and cpus[1] == 1)
-   assert(#parse_cpulist("\n") == 0)
-   assert(#parse_cpulist("") == 0)
-   print('selftest: ok')
 end

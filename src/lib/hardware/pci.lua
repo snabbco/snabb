@@ -67,6 +67,8 @@ model = {
    ["X520"]      = 'Intel X520',
    ["i350"]      = 'Intel 350',
    ["i210"]      = 'Intel 210',
+   ["XL710_VF"]  = 'Intel XL710/X710 Virtual Function',
+   ["AVF"]       = 'Intel AVF'
 }
 
 -- Supported cards indexed by vendor and device id.
@@ -81,6 +83,8 @@ local cards = {
       ["0x1521"] = {model = model["i350"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x1533"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x154c"] = {model = model["XL710_VF"],  driver = 'apps.intel_avf.intel_avf'},
+      ["0x1889"] = {model = model["AVF"],       driver = 'apps.intel_avf.intel_avf'},
    },
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
@@ -90,6 +94,7 @@ local cards = {
 local link_names = {
    ['apps.solarflare.solarflare'] = { "rx", "tx" },
    ['apps.intel_mp.intel_mp']     = { "input", "output" },
+   ['apps.intel_avf.intel_avf']   = { "input", "output" },
    ['apps.intel.intel_app']       = { "rx", "tx" }
 }
 
@@ -144,11 +149,10 @@ end
 --   Pointer for memory-mapped access.
 --   File descriptor for the open sysfs resource file.
 
+function open_pci_resource_locked(device,n) return open_pci_resource(device, n, true) end
+function open_pci_resource_unlocked(device,n) return open_pci_resource(device, n, false) end
 
-function map_pci_memory_locked(device,n) return map_pci_memory (device, n, true) end
-function map_pci_memory_unlocked(device,n) return map_pci_memory (device, n, false) end
-
-function map_pci_memory (device, n, lock)
+function open_pci_resource (device, n, lock)
    assert(lock == true or lock == false, "Explicit lock status required")
    root_check()
    local filepath = path(device).."/resource"..n
@@ -157,9 +161,13 @@ function map_pci_memory (device, n, lock)
    if lock then
      assert(f:flock("ex, nb"), "failed to lock " .. filepath)
    end
+   return f
+end
+
+function map_pci_memory (f)
    local st = assert(f:stat())
    local mem = assert(f:mmap(nil, st.size, "read, write", "shared", 0))
-   return ffi.cast("uint32_t *", mem), f
+   return ffi.cast("uint32_t *", mem)
 end
 
 function close_pci_resource (fd, base)
@@ -188,12 +196,6 @@ function set_bus_master (device, enable)
    f:close()
 end
 
--- For devices used by some Snabb apps, PCI bus mastering should
--- outlive the life of the process.
-function disable_bus_master_cleanup (device)
-   shm.unlink('group/dma/pci/'..canonical(device))
-end
-
 -- Shutdown DMA to prevent "dangling" requests for PCI devices opened
 -- by pid (or other processes in its process group).
 --
@@ -202,7 +204,11 @@ end
 function shutdown (pid)
    local dma = shm.children("/"..pid.."/group/dma/pci")
    for _, device in ipairs(dma) do
-      set_bus_master(device, false)
+      -- Only disable bus mastering if we are able to get an exclusive lock on
+      -- resource 0 (i.e., no process left using the device.)
+      if pcall(open_pci_resource_locked(device, 0)) then
+         set_bus_master(device, false)
+      end
    end
 end
 

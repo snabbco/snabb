@@ -10,14 +10,13 @@ local ipv6 = require("lib.protocol.ipv6")
 local ipsum = require("lib.checksum").ipsum
 
 local ffi = require("ffi")
-local C = ffi.C
 local cast = ffi.cast
-local copy = ffi.copy
+local htons, ntohs = lib.htons, lib.ntohs
+local htonl, ntohl = lib.htonl, lib.ntohl
 
 local PROTO_IPV4_ENCAPSULATION = 0x4
-local PROTO_VLAN = C.htons(0x8100)
-local PROTO_IPV4 = C.htons(0x0800)
-local PROTO_IPV6 = C.htons(0x86DD)
+local PROTO_IPV4 = htons(0x0800)
+local PROTO_IPV6 = htons(0x86DD)
 
 local DEFAULT_TTL = 255
 local MAGIC = 0xaffeface
@@ -30,23 +29,13 @@ struct {
 } __attribute__((packed))
 ]]
 local ether_header_ptr_type = ffi.typeof("$*", ether_header_t)
-local ethernet_header_size = ffi.sizeof(ether_header_t)
-local OFFSET_ETHERTYPE = 12
+local ether_header_size = ffi.sizeof(ether_header_t)
+local ether_min_frame_size = 64
 
 -- The ethernet CRC field is not included in the packet as seen by
 -- Snabb, but it is part of the frame and therefore a contributor to the
 -- frame size.
-local ethernet_crc_size = 4
-
-local ether_vlan_header_type = ffi.typeof([[
-struct {
-   uint16_t tag;
-   uint16_t ether_type;
-}
-]])
-ether_vlan_header_ptr_type = ffi.typeof("$*", ether_vlan_header_type)
-ether_vlan_header_size = ffi.sizeof(ether_vlan_header_type)
-local OFFSET_ETHERTYPE_VLAN = OFFSET_ETHERTYPE + ether_vlan_header_size
+local ether_crc_size = 4
 
 local ipv4hdr_t = ffi.typeof[[
 struct {
@@ -97,19 +86,6 @@ struct {
 local payload_ptr_type = ffi.typeof("$*", payload_t)
 local payload_size = ffi.sizeof(payload_t)
 
-local uint16_ptr_t = ffi.typeof("uint16_t*")
-local uint32_ptr_t = ffi.typeof("uint32_t*")
-
-local n_cache_src_ipv6 = ipv6:pton("::")
-
-local function rd32(offset)
-   return cast(uint32_ptr_t, offset)[0]
-end
-
-local function wr32(offset, val)
-   cast(uint32_ptr_t, offset)[0] = val
-end
-
 local function inc_ipv6(ipv6)
    for i=15,0,-1 do
       if ipv6[i] == 255 then
@@ -122,202 +98,133 @@ local function inc_ipv6(ipv6)
    return ipv6
 end
 
-Lwaftrgen = {
-   config = {
-      sizes = {required=true},
-      dst_mac = {required=true},
-      src_mac = {required=true},
-      rate = {required=true},
-      vlan = {},
-      b4_ipv6 = {},
-      b4_ipv4 = {},
-      public_ipv4 = {},
-      aftr_ipv6 = {},
-      ipv6_only = {},
-      ipv4_only = {},
-      b4_port = {},
-      protocol = {},
-      count = {},
-      single_pass = {}
-   }
-}
+local function inc_ipv4(ipv4)
+   ipv4 = cast("uint32_t*", ipv4)
+   ipv4[0] = htonl(ntohl(ipv4[0]) + 1)
+end
+
+local function printf(fmt, ...)
+   print(string.format(fmt, ...))
+end
 
 local receive, transmit = link.receive, link.transmit
 
-function Lwaftrgen:new(conf)
-   local dst_mac = ethernet:pton(conf.dst_mac)
-   local src_mac = ethernet:pton(conf.src_mac)
-   local vlan = conf.vlan
-   local b4_ipv6 = conf.b4_ipv6 and ipv6:pton(conf.b4_ipv6)
-   local b4_ipv4 = conf.b4_ipv4 and ipv4:pton(conf.b4_ipv4)
-   local public_ipv4 = conf.public_ipv4 and ipv4:pton(conf.public_ipv4)
-   local aftr_ipv6 = conf.aftr_ipv6 and ipv6:pton(conf.aftr_ipv6)
+B4Gen = {
+   config = {
+      sizes = {required=true},
+      rate = {required=true},
+      count = {default=1},
+      single_pass = {default=false},
+      b4_ipv6 = {required=true},
+      aftr_ipv6 = {required=true},
+      b4_ipv4 = {required=true},
+      b4_port = {required=true},
+      public_ipv4 = {required=true},
+      frame_overhead = {default=0}
+   }
+}
 
-   local ipv4_pkt = packet.allocate()
-   ffi.fill(ipv4_pkt.data, packet.max_payload)
-   local eth_hdr = cast(ether_header_ptr_type, ipv4_pkt.data)
-   eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
+function B4Gen:new(conf)
+   local b4_ipv6 = ipv6:pton(conf.b4_ipv6)
+   local b4_ipv4 = ipv4:pton(conf.b4_ipv4)
+   local public_ipv4 = ipv4:pton(conf.public_ipv4)
+   local aftr_ipv6 = ipv6:pton(conf.aftr_ipv6)
 
-   local ipv4_hdr, udp_offset
-   if vlan then
-      udp_offset = 38
-      eth_hdr.ether_type = PROTO_VLAN
-      local vlan_hdr = cast(ether_vlan_header_ptr_type, ipv4_pkt.data + ethernet_header_size)
-      vlan_hdr.ether_type = PROTO_IPV4
-      vlan_hdr.tag = C.htons(vlan)
-      ipv4_hdr = cast(ipv4_header_ptr_type, ipv4_pkt.data + ethernet_header_size + ether_vlan_header_size)
-   else
-      udp_offset = 34
-      eth_hdr.ether_type = PROTO_IPV4
-      ipv4_hdr = cast(ipv4_header_ptr_type, ipv4_pkt.data + ethernet_header_size)
+   -- Template IPv4 in IPv6 packet
+   local pkt = packet.allocate()
+   ffi.fill(pkt.data, packet.max_payload)
+   local function h(ptr_type, offset, size)
+      return cast(ptr_type, pkt.data + offset), offset + size
    end
+   local eth_hdr,  ipv6_offset    = h(ether_header_ptr_type, 0,           ether_header_size)
+   local ipv6_hdr, ipv4_offset    = h(ipv6_header_ptr_type,  ipv6_offset, ipv6_header_size)
+   local ipv4_hdr, udp_offset     = h(ipv4_header_ptr_type,  ipv4_offset, ipv4_header_size)
+   local udp_hdr,  payload_offset = h(udp_header_ptr_type,   udp_offset,  udp_header_size)
+   local payload,  min_length     = h(payload_ptr_type,      payload_offset, payload_size)
 
-   ipv4_hdr.src_ip = public_ipv4
-   ipv4_hdr.dst_ip = b4_ipv4
-   ipv4_hdr.ttl = 15
-   ipv4_hdr.ihl_v_tos = C.htons(0x4500) -- v4
-   ipv4_hdr.id = 0
-   ipv4_hdr.frag_off = 0
+   -- The offset in returned packets where we expect to find the payload.
+   local rx_payload_offset = payload_offset - ipv6_header_size
 
-   local ipv4_udp_hdr, ipv4_payload
-
-   ipv4_hdr.protocol = 17  -- UDP(17)
-   ipv4_udp_hdr = cast(udp_header_ptr_type, ipv4_pkt.data + udp_offset)
-   ipv4_udp_hdr.src_port = C.htons(12345)
-   ipv4_udp_hdr.checksum = 0
-   ipv4_payload = cast(payload_ptr_type, ipv4_pkt.data + udp_offset + udp_header_size)
-   ipv4_payload.magic = MAGIC
-   ipv4_payload.number = 0
-
-   -- IPv4 in IPv6 packet
-   copy(n_cache_src_ipv6, b4_ipv6, 16)
-   local ipv6_pkt = packet.allocate()
-   ffi.fill(ipv6_pkt.data, packet.max_payload)
-   local eth_hdr = cast(ether_header_ptr_type, ipv6_pkt.data)
-   eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
-
-
-   local ipv6_hdr, ipv6_ipv4_hdr
-   if vlan then
-      eth_hdr.ether_type = PROTO_VLAN
-      local vlan_hdr = cast(ether_vlan_header_ptr_type, ipv6_pkt.data + ethernet_header_size)
-      vlan_hdr.ether_type = PROTO_IPV6
-      vlan_hdr.tag = C.htons(vlan)
-      ipv6_hdr = cast(ipv6_header_ptr_type, ipv6_pkt.data + ethernet_header_size + ether_vlan_header_size)
-      ipv6_ipv4_hdr = cast(ipv4_header_ptr_type, ipv6_pkt.data + ethernet_header_size + ether_vlan_header_size + ipv6_header_size)
-   else
-      eth_hdr.ether_type = PROTO_IPV6
-      ipv6_hdr = cast(ipv6_header_ptr_type, ipv6_pkt.data + ethernet_header_size)
-      ipv6_ipv4_hdr = cast(ipv4_header_ptr_type, ipv6_pkt.data + ethernet_header_size + ipv6_header_size)
-   end
+   eth_hdr.ether_type = PROTO_IPV6
 
    lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6) -- IPv6 Version
    lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, 1) -- Traffic class
    ipv6_hdr.next_header = PROTO_IPV4_ENCAPSULATION
    ipv6_hdr.hop_limit = DEFAULT_TTL
+   ipv6_hdr.src_ip = b4_ipv6
    ipv6_hdr.dst_ip = aftr_ipv6
 
-   ipv6_ipv4_hdr.dst_ip = public_ipv4
-   ipv6_ipv4_hdr.ttl = 15
-   ipv6_ipv4_hdr.ihl_v_tos = C.htons(0x4500) -- v4
-   ipv6_ipv4_hdr.id = 0
-   ipv6_ipv4_hdr.frag_off = 0
+   ipv4_hdr.src_ip = b4_ipv4
+   ipv4_hdr.dst_ip = public_ipv4
+   ipv4_hdr.ttl = 15
+   ipv4_hdr.ihl_v_tos = htons(0x4500) -- v4
+   ipv4_hdr.id = 0
+   ipv4_hdr.frag_off = 0
+   ipv4_hdr.protocol = 17  -- UDP
 
-   local ipv6_ipv4_udp_hdr, ipv6_payload
+   udp_hdr.src_port = htons(conf.b4_port)
+   udp_hdr.dst_port = htons(12345)
+   udp_hdr.checksum = 0
 
-   local total_packet_count = 0
+   payload.magic = MAGIC
+   payload.number = 0
+
+   -- The sizes are frame sizes, including the 4-byte ethernet CRC
+   -- that we don't see in Snabb.
+   local sizes = {}
    for _,size in ipairs(conf.sizes) do
-      -- count for IPv4 and IPv6 packets (40 bytes IPv6 encap header)
-      if conf.ipv4_only or conf.ipv6_only then 
-         total_packet_count = total_packet_count + 1
-      else
-         total_packet_count = total_packet_count + 2
-      end
+      assert(size >= ether_min_frame_size)
+      table.insert(sizes, size - ether_crc_size - conf.frame_overhead)
    end
-
-   ipv6_ipv4_hdr.protocol = 17  -- UDP(17)
-   ipv6_ipv4_udp_hdr = cast(udp_header_ptr_type, ipv6_pkt.data + udp_offset + ipv6_header_size)
-   ipv6_ipv4_udp_hdr.dst_port = C.htons(12345)
-   ipv6_ipv4_udp_hdr.checksum = 0
-   ipv6_payload = cast(payload_ptr_type, ipv6_pkt.data + udp_offset + ipv6_header_size + udp_header_size)
-   ipv6_payload.magic = MAGIC
-   ipv6_payload.number = 0
 
    local o = {
       b4_ipv6 = b4_ipv6,
       b4_ipv4 = b4_ipv4,
       b4_port = conf.b4_port,
-      current_port = conf.b4_port,
-      b4_ipv4_offset = 0,
-      ipv6_address = n_cache_src_ipv6,
-      count = conf.count,
+      softwire_idx = 0,
+      softwire_count = conf.count,
       single_pass = conf.single_pass,
-      current_count = 0,
-      ipv4_pkt = ipv4_pkt,
-      ipv4_hdr = ipv4_hdr,
-      ipv4_payload = ipv4_payload,
+      template_pkt = pkt,
       ipv6_hdr = ipv6_hdr,
-      ipv6_pkt = ipv6_pkt,
-      ipv6_payload = ipv6_payload,
-      ipv6_ipv4_hdr = ipv6_ipv4_hdr,
-      ipv4_udp_hdr = ipv4_udp_hdr,
-      ipv6_ipv4_udp_hdr = ipv6_ipv4_udp_hdr,
-      ipv4_only = conf.ipv4_only,
-      ipv6_only = conf.ipv6_only,
-      vlan = vlan,
-      udp_offset = udp_offset,
-      protocol = conf.protocol,
+      ipv4_hdr = ipv4_hdr,
+      udp_hdr = udp_hdr,
+      payload = payload,
+      rx_payload_offset = rx_payload_offset,
       rate = conf.rate,
-      sizes = conf.sizes,
-      total_packet_count = total_packet_count,
+      sizes = sizes,
       bucket_content = conf.rate * 1e6,
-      ipv4_packets = 0, ipv4_bytes = 0,
-      ipv6_packets = 0, ipv6_bytes = 0,
-      ipv4_packet_number = 0, ipv6_packet_number = 0,
-      last_rx_ipv4_packet_number = 0, last_rx_ipv6_packet_number = 0,
+      rx_packets = 0, rx_bytes = 0,
+      tx_packet_number = 0, rx_packet_number = 0,
       lost_packets = 0
    }
-   return setmetatable(o, {__index=Lwaftrgen})
+   return setmetatable(o, {__index=B4Gen})
 end
 
-function Lwaftrgen:pull ()
+function B4Gen:done() return self.stopping end
+
+function B4Gen:pull ()
+
+   if self.stopping then return end
 
    local output = self.output.output
    local input = self.input.input
-   local ipv6_packets = self.ipv6_packets
-   local ipv6_bytes = self.ipv6_bytes
-   local ipv4_packets = self.ipv4_packets
-   local ipv4_bytes = self.ipv4_bytes
+   local rx_packets = self.rx_packets
+   local rx_bytes = self.rx_bytes
    local lost_packets = self.lost_packets
-   local udp_offset = self.udp_offset
-   local o_ethertype = self.vlan and OFFSET_ETHERTYPE_VLAN or OFFSET_ETHERTYPE
+   local rx_payload_offset = self.rx_payload_offset
 
-   if self.current == 0 then
-      main.exit(0)
-   end
-
-   -- count and trash incoming packets
+   -- Count and trash incoming packets.
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      if cast(uint16_ptr_t, pkt.data + o_ethertype)[0] == PROTO_IPV6 then
-         ipv6_bytes = ipv6_bytes + pkt.length
-         ipv6_packets = ipv6_packets + 1
-         local payload = cast(payload_ptr_type, pkt.data + udp_offset + ipv6_header_size + udp_header_size)
+      if cast(ether_header_ptr_type, pkt.data).ether_type == PROTO_IPV4 then
+         rx_bytes = rx_bytes + pkt.length
+         rx_packets = rx_packets + 1
+         local payload = cast(payload_ptr_type, pkt.data + rx_payload_offset)
          if payload.magic == MAGIC then
-            if self.last_rx_ipv6_packet_number > 0 then
-               lost_packets = lost_packets + payload.number - self.last_rx_ipv6_packet_number - 1  
+            if self.last_rx_packet_number and self.last_rx_packet_number > 0 then
+               lost_packets = lost_packets + payload.number - self.last_rx_packet_number - 1
             end
-            self.last_rx_ipv6_packet_number = payload.number
-         end
-      else
-         ipv4_bytes = ipv4_bytes + pkt.length
-         ipv4_packets = ipv4_packets + 1
-         local payload = cast(payload_ptr_type, pkt.data + udp_offset + udp_header_size)
-         if payload.magic == MAGIC then
-            if self.last_rx_ipv4_packet_number > 0 then
-               lost_packets = lost_packets + payload.number - self.last_rx_ipv4_packet_number - 1  
-            end
-            self.last_rx_ipv4_packet_number = payload.number
+            self.last_rx_packet_number = payload.number
          end
       end
       packet.free(pkt)
@@ -327,116 +234,262 @@ function Lwaftrgen:pull ()
    self.period_start = self.period_start or cur_now
    local elapsed = cur_now - self.period_start
    if elapsed > 1 then
-      local ipv6_packet_rate = ipv6_packets / elapsed / 1e6
-      local ipv4_packet_rate = ipv4_packets / elapsed / 1e6
-      local ipv6_octet_rate = ipv6_bytes * 8 / 1e9 / elapsed
-      local ipv4_octet_rate = ipv4_bytes * 8 / 1e9 / elapsed
-      local lost_rate = math.abs(lost_packets / (ipv6_octet_rate + ipv4_octet_rate) / 10000)
-      print(string.format('v6+v4: %.3f+%.3f = %.6f MPPS, %.3f+%.3f = %.6f Gbps, lost %.3f%%',
-      ipv6_packet_rate, ipv4_packet_rate, ipv6_packet_rate + ipv4_packet_rate,
-      ipv6_octet_rate, ipv4_octet_rate, ipv6_octet_rate + ipv4_octet_rate, lost_rate))
+      printf('v4 rx: %.6f MPPS, %.6f Gbps, lost %.3f%%',
+             rx_packets / elapsed / 1e6,
+             rx_bytes * 8 / 1e9 / elapsed,
+             lost_packets / (rx_packets + lost_packets) * 100)
       self.period_start = cur_now
-      self.ipv6_bytes, self.ipv6_packets = 0, 0
-      self.ipv4_bytes, self.ipv4_packets = 0, 0
-      self.lost_packets = 0
-   else
-      self.ipv4_bytes, self.ipv4_packets = ipv4_bytes, ipv4_packets
-      self.ipv6_bytes, self.ipv6_packets = ipv6_bytes, ipv6_packets
-      self.lost_packets = lost_packets
+      rx_packets, rx_bytes, lost_packets = 0, 0, 0
    end
+   self.rx_packets = rx_packets
+   self.rx_bytes = rx_bytes
+   self.lost_packets = lost_packets
 
-   local ipv4_hdr = self.ipv4_hdr
    local ipv6_hdr = self.ipv6_hdr
-   local ipv6_ipv4_hdr = self.ipv6_ipv4_hdr
-   local ipv4_udp_hdr = self.ipv4_udp_hdr
-   local ipv6_ipv4_udp_hdr = self.ipv6_ipv4_udp_hdr
+   local ipv4_hdr = self.ipv4_hdr
+   local udp_hdr = self.udp_hdr
+   local payload = self.payload
 
    local cur_now = tonumber(app.now())
    local last_time = self.last_time or cur_now
    self.bucket_content = self.bucket_content + self.rate * 1e6 * (cur_now - last_time)
    self.last_time = cur_now
 
-   local limit = engine.pull_npackets
-   while limit > self.total_packet_count and
-      self.total_packet_count <= self.bucket_content do
-      limit = limit - 1
-      self.bucket_content = self.bucket_content - self.total_packet_count
-
-      ipv4_hdr.dst_ip = self.b4_ipv4
-      ipv6_ipv4_hdr.src_ip = self.b4_ipv4
-      ipv6_hdr.src_ip = self.b4_ipv6
-      local ipdst = C.ntohl(rd32(ipv4_hdr.dst_ip))
-      ipdst = C.htonl(ipdst + self.b4_ipv4_offset)
-      wr32(ipv4_hdr.dst_ip, ipdst)
-      wr32(ipv6_ipv4_hdr.src_ip, ipdst)
-
-      ipv4_udp_hdr.dst_port = C.htons(self.current_port)
-      ipv6_ipv4_udp_hdr.src_port = C.htons(self.current_port)
-
-      -- The sizes are frame sizes, including the 4-byte ethernet CRC
-      -- that we don't see in Snabb.
-
-      local vlan_size = self.vlan and ether_vlan_header_size or 0
-      local ethernet_total_size = ethernet_header_size + vlan_size
-      local minimum_size = ethernet_total_size + ipv4_header_size +
-         udp_header_size + ethernet_crc_size
+   for _=1, math.min(engine.pull_npackets, self.bucket_content) do
+      if #self.sizes > self.bucket_content then break end
+      self.bucket_content = self.bucket_content - #self.sizes
 
       for _,size in ipairs(self.sizes) do
-         assert(size >= minimum_size)
-         local packet_len = size - ethernet_crc_size
-         local ipv4_len =  packet_len - ethernet_total_size
+         local ipv4_len = size - ether_header_size
          local udp_len = ipv4_len - ipv4_header_size
-         if not self.ipv6_only then
-            ipv4_hdr.total_length = C.htons(ipv4_len)
-            ipv4_udp_hdr.len = C.htons(udp_len)
-            self.ipv4_pkt.length = packet_len
-            ipv4_hdr.checksum =  0
-            ipv4_hdr.checksum = C.htons(ipsum(self.ipv4_pkt.data + ethernet_total_size, 20, 0))
-            if size >= minimum_size + payload_size then
-               self.ipv4_payload.number = self.ipv4_packet_number;
-               self.ipv4_packet_number = self.ipv4_packet_number + 1
-            end
-            local ipv4_pkt = packet.clone(self.ipv4_pkt)
-            transmit(output, ipv4_pkt)
-         end
+         -- Expectation from callers is to make packets that are SIZE
+         -- bytes big, *plus* the IPv6 header.
+         ipv6_hdr.payload_length = htons(ipv4_len)
+         ipv4_hdr.total_length = htons(ipv4_len)
+         ipv4_hdr.checksum =  0
+         ipv4_hdr.checksum = htons(ipsum(cast("char*", ipv4_hdr), ipv4_header_size, 0))
+         udp_hdr.len = htons(udp_len)
+         self.template_pkt.length = size + ipv6_header_size
+         payload.number = self.tx_packet_number;
+         self.tx_packet_number = self.tx_packet_number + 1
+         transmit(output, packet.clone(self.template_pkt))
+      end
 
-         if not self.ipv4_only then
-            -- Expectation from callers is to make packets that are SIZE
-            -- bytes big, *plus* the IPv6 header.
-            ipv6_hdr.payload_length = C.htons(ipv4_len)
-            ipv6_ipv4_hdr.total_length = C.htons(ipv4_len)
-            ipv6_ipv4_udp_hdr.len = C.htons(udp_len)
-            self.ipv6_pkt.length = packet_len + ipv6_header_size
-            if size >= minimum_size + payload_size then
-               self.ipv6_payload.number = self.ipv6_packet_number;
-               self.ipv6_packet_number = self.ipv6_packet_number + 1
-            end
-            local ipv6_pkt = packet.clone(self.ipv6_pkt)
-            transmit(output, ipv6_pkt)
-         end
+      -- Next softwire.
+      inc_ipv6(ipv6_hdr.src_ip)
+      local next_port = ntohs(udp_hdr.src_port) + self.b4_port
+      if next_port >= 2^16 then
+         inc_ipv4(ipv4_hdr.src_ip)
+         next_port = self.b4_port
+      end
+      udp_hdr.src_port = htons(next_port)
 
-       end 
-
-       self.b4_ipv6 = inc_ipv6(self.b4_ipv6)
-       self.current_port = self.current_port + self.b4_port
-       if self.current_port > 65535 then
-         self.current_port = self.b4_port
-         self.b4_ipv4_offset = self.b4_ipv4_offset + 1
-       end
-
-       self.current_count = self.current_count + 1
-       if self.current_count >= self.count then
+      self.softwire_idx = self.softwire_idx + 1
+      if self.softwire_idx >= self.softwire_count then
          if self.single_pass then
-           print(string.format("generated %d packets", self.current_count))
-           -- make sure we won't generate more packets in the same breath, then exit
-           self.current = 0
-           self.bucket_content = 0 
+            printf("generated %d packets for each of %d softwires",
+                   #self.sizes, self.softwire_count)
+            self.stopping = true
+            break
          end
-         self.current_count = 0
-         self.current_port = self.b4_port
-         self.b4_ipv4_offset = 0
-         copy(self.b4_ipv6, self.ipv6_address, 16)
-       end
-     end
+
+         -- Reset to initial softwire.
+         self.softwire_idx = 0
+         ipv6_hdr.src_ip = self.b4_ipv6
+         ipv4_hdr.src_ip = self.b4_ipv4
+         udp_hdr.src_port = htons(self.b4_port)
+      end
+   end
 end
 
+InetGen = {
+   config = {
+      sizes = {required=true},
+      rate = {required=true},
+      b4_ipv4 = {required=true},
+      public_ipv4 = {required=true},
+      b4_port = {required=true},
+      count = {},
+      single_pass = {},
+      frame_overhead = {default=0}
+   }
+}
+
+function InetGen:new(conf)
+   local b4_ipv4 = ipv4:pton(conf.b4_ipv4)
+   local public_ipv4 = ipv4:pton(conf.public_ipv4)
+
+   -- Template IPv4 packet
+   local pkt = packet.allocate()
+   ffi.fill(pkt.data, packet.max_payload)
+   local function h(ptr_type, offset, size)
+      return cast(ptr_type, pkt.data + offset), offset + size
+   end
+   local eth_hdr,  ipv4_offset    = h(ether_header_ptr_type, 0,           ether_header_size)
+   local ipv4_hdr, udp_offset     = h(ipv4_header_ptr_type,  ipv4_offset, ipv4_header_size)
+   local udp_hdr,  payload_offset = h(udp_header_ptr_type,   udp_offset,  udp_header_size)
+   local payload,  min_length     = h(payload_ptr_type,      payload_offset, payload_size)
+
+   -- The offset in returned packets where we expect to find the payload.
+   local rx_payload_offset = payload_offset + ipv6_header_size
+
+   eth_hdr.ether_type = PROTO_IPV4
+
+   ipv4_hdr.src_ip = public_ipv4
+   ipv4_hdr.dst_ip = b4_ipv4
+   ipv4_hdr.ttl = 15
+   ipv4_hdr.ihl_v_tos = htons(0x4500) -- v4
+   ipv4_hdr.id = 0
+   ipv4_hdr.frag_off = 0
+   ipv4_hdr.protocol = 17  -- UDP
+
+   udp_hdr.src_port = htons(12345)
+   udp_hdr.dst_port = htons(conf.b4_port)
+   udp_hdr.checksum = 0
+
+   payload.magic = MAGIC
+   payload.number = 0
+
+   -- The sizes are frame sizes, including the 4-byte ethernet CRC
+   -- that we don't see in Snabb.
+   local sizes = {}
+   for _,size in ipairs(conf.sizes) do
+      assert(size >= ether_min_frame_size)
+      table.insert(sizes, size - ether_crc_size - conf.frame_overhead)
+   end
+
+   local o = {
+      b4_ipv4 = b4_ipv4,
+      b4_port = conf.b4_port,
+      softwire_idx = 0,
+      softwire_count = conf.count,
+      single_pass = conf.single_pass,
+      template_pkt = pkt,
+      ipv4_hdr = ipv4_hdr,
+      udp_hdr = udp_hdr,
+      payload = payload,
+      rx_payload_offset = rx_payload_offset,
+      rate = conf.rate,
+      sizes = sizes,
+      bucket_content = conf.rate * 1e6,
+      rx_packets = 0, rx_bytes = 0,
+      tx_packet_number = 0, rx_packet_number = 0,
+      lost_packets = 0
+   }
+   return setmetatable(o, {__index=InetGen})
+end
+
+function InetGen:done() return self.stopping end
+
+function InetGen:pull ()
+
+   if self.stopping then return end
+
+   local output = self.output.output
+   local input = self.input.input
+   local rx_packets = self.rx_packets
+   local rx_bytes = self.rx_bytes
+   local lost_packets = self.lost_packets
+   local rx_payload_offset = self.rx_payload_offset
+
+   -- Count and trash incoming packets.
+   for _=1,link.nreadable(input) do
+      local pkt = receive(input)
+      if cast(ether_header_ptr_type, pkt.data).ether_type == PROTO_IPV6 then
+         rx_bytes = rx_bytes + pkt.length
+         rx_packets = rx_packets + 1
+         local payload = cast(payload_ptr_type, pkt.data + rx_payload_offset)
+         if payload.magic == MAGIC then
+            if self.last_rx_packet_number and self.last_rx_packet_number > 0 then
+               lost_packets = lost_packets + payload.number - self.last_rx_packet_number - 1
+            end
+            self.last_rx_packet_number = payload.number
+         end
+      end
+      packet.free(pkt)
+   end
+
+   local cur_now = tonumber(app.now())
+   self.period_start = self.period_start or cur_now
+   local elapsed = cur_now - self.period_start
+   if elapsed > 1 then
+      printf('v6 rx: %.6f MPPS, %.6f Gbps, lost %.3f%%',
+             rx_packets / elapsed / 1e6,
+             rx_bytes * 8 / 1e9 / elapsed,
+             lost_packets / (rx_packets + lost_packets) * 100)
+      self.period_start = cur_now
+      rx_packets, rx_bytes, lost_packets = 0, 0, 0
+   end
+   self.rx_packets = rx_packets
+   self.rx_bytes = rx_bytes
+   self.lost_packets = lost_packets
+
+   local ipv4_hdr = self.ipv4_hdr
+   local udp_hdr = self.udp_hdr
+   local payload = self.payload
+
+   local cur_now = tonumber(app.now())
+   local last_time = self.last_time or cur_now
+   self.bucket_content = self.bucket_content + self.rate * 1e6 * (cur_now - last_time)
+   self.last_time = cur_now
+
+   for _=1, math.min(engine.pull_npackets, self.bucket_content) do
+      if #self.sizes > self.bucket_content then break end
+      self.bucket_content = self.bucket_content - #self.sizes
+
+      for _,size in ipairs(self.sizes) do
+         local ipv4_len = size - ether_header_size
+         local udp_len = ipv4_len - ipv4_header_size
+         ipv4_hdr.total_length = htons(ipv4_len)
+         ipv4_hdr.checksum =  0
+         ipv4_hdr.checksum = htons(ipsum(cast("char*", ipv4_hdr), ipv4_header_size, 0))
+         udp_hdr.len = htons(udp_len)
+         self.template_pkt.length = size
+         payload.number = self.tx_packet_number;
+         self.tx_packet_number = self.tx_packet_number + 1
+         transmit(output, packet.clone(self.template_pkt))
+      end
+
+      -- Next softwire.
+      local next_port = ntohs(udp_hdr.dst_port) + self.b4_port
+      if next_port >= 2^16 then
+         inc_ipv4(ipv4_hdr.dst_ip)
+         next_port = self.b4_port
+      end
+      udp_hdr.dst_port = htons(next_port)
+
+      self.softwire_idx = self.softwire_idx + 1
+      if self.softwire_idx >= self.softwire_count then
+         if self.single_pass then
+            printf("generated %d packets for each of %d softwires",
+                   #self.sizes, self.softwire_count)
+            self.stopping = true
+            break
+         end
+
+         -- Reset to initial softwire.
+         self.softwire_idx = 0
+         ipv4_hdr.dst_ip = self.b4_ipv4
+         udp_hdr.dst_port = htons(self.b4_port)
+      end
+   end
+end
+
+Interleave = {}
+
+function Interleave:new()
+   return setmetatable({}, {__index=Interleave})
+end
+
+function Interleave:push ()
+   local continue = true
+   while continue do
+      continue = false
+      for _, inport in ipairs(self.input) do
+         if not link.empty(inport) then
+            transmit(self.output.output, receive(inport))
+            continue = true
+         end
+      end
+   end
+end

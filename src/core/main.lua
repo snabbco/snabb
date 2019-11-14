@@ -47,6 +47,7 @@ function main ()
       error("fatal: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
    end
    initialize()
+   vmprofile.start()
    if lib.getenv("SNABB_PROGRAM_LUACODE") then
       -- Run the given Lua code instead of the command-line
       local expr = lib.getenv("SNABB_PROGRAM_LUACODE")
@@ -54,8 +55,6 @@ function main ()
       if f == nil then
          error(("Failed to load $SNABB_PROGRAM_LUACODE: %q"):format(expr))
       else
-         engine.setvmprofile("program")
-         vmprofile.start()
          f()
       end
    else
@@ -65,8 +64,6 @@ function main ()
          print("unsupported program: "..program:gsub("_", "-"))
          usage(1)
       else
-         engine.setvmprofile("program")
-         vmprofile.start()
          require(modulename(program)).run(args)
       end
    end
@@ -162,9 +159,12 @@ function initialize ()
    _G.engine = require("core.app")
    _G.memory = require("core.memory")
    _G.link   = require("core.link")
-   _G.packet = require("core.packet")
+   _G.packet = require("core.packet"); _G.packet.initialize()
    _G.timer  = require("core.timer")
    _G.main   = getfenv()
+   -- Setup audit.log, vmprofile
+   engine.enable_auditlog()
+   engine.setvmprofile("program")
 end
 
 function handler (reason)
@@ -182,6 +182,7 @@ function shutdown (pid)
       if not ok then print(err) end
    end
    -- Run cleanup hooks
+   safely(function () require("core.packet").shutdown(pid) end)
    safely(function () require("apps.interlink.receiver").shutdown(pid) end)
    safely(function () require("apps.interlink.transmitter").shutdown(pid) end)
    -- Parent process performs additional cleanup steps.

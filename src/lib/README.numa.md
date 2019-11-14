@@ -12,10 +12,16 @@ for some reason the current process is not bound to a NUMA node.  See
 [../doc/performance-tuning.md] for more notes on getting good
 performance out of your Snabb program.
 
-— Function **bind_to_cpu** *cpu*
+— Function **bind_to_cpu** *cpu* *skip_perf_checks*
 Bind the current process to *cpu*, arranging for it to only ever be
 run on that CPU.  Additionally, call **bind_to_numa_node** on the NUMA
 node corresponding to *cpu*.
+
+Unless the optional argument *skip_perf_checks* is true, also run some
+basic checks to verify that the given core is suitable for processing
+low-latency network traffic: that the CPU has the `performance` scaling
+governor, that it has been reserved from the kernel scheduler, and so
+on, printing out any problems to `stderr`.
 
 — Function **bind_to_numa_node** *node*
 Bind the current process to NUMA node *node*, arranging for it to only
@@ -55,3 +61,18 @@ node bound by **bind_to_numa_node**, if present, and in any case that
 all *addrs* are on the same NUMA node.  If *require_affinity* is true
 (not the default), then error if a problem is detected, otherwise just
 print a warning to the console.
+
+— Function **parse_cpuset** *cpus*
+A helper function to parse a CPU set from a string.  A CPU set is either
+the number of a CPU, a range of CPUs, or two or more CPU sets joined by
+commas.  The result is a table whose keys are the CPUs and whose values
+are true (a set).  For example, q`parse_cpuset("1-3,5")` will return a
+table with keys 1, 2, 3, and 5 bound to `true`.
+
+— Function **node_cpus** *node*
+Return a set of CPUs belonging to NUMA node *node*, in the same format
+as in **parse_cpuset**.
+
+— Function **isolated_cpus**
+Return a set of CPUs that have been "isolated" away from the kernel at
+boot via the `isolcpus` kernel boot parameter.

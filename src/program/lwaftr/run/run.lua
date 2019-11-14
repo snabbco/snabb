@@ -39,7 +39,7 @@ local function migrate_device_on_config(config, v4, v6)
    end
 
    if v6 then
-      for id, queue in cltable.pairs(instance.queue) do
+      for id, queue in pairs(instance.queue) do
          queue.external_interface.device = v6
       end
    end
@@ -100,18 +100,14 @@ function parse_args(args)
                   .." (valid values: flush, warn, off)")
       end
    end
-   function handlers.reconfigurable()
-      io.stderr:write("Warning: the --reconfigurable flag has been deprecated")
-      io.stderr:write(" as the lwaftr is now always reconfigurable.\n")
-   end
    function handlers.j(arg) scheduling.j = arg end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:yhir:n:j:t:",
-     { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
-     verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
-     ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
-     ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,
-     hydra = "y", reconfigurable = 0, name = "n", trace = "t" })
+     { conf = "c", name = "n", cpu = 1, v4 = 1, v6 = 1,
+       ["on-a-stick"] = 1, virtio = "i", ["ring-buffer-size"] = "r",
+       ["real-time"] = 0, mirror = 1, ["ingress-drop-monitor"] = 1,
+       verbose = "v", trace = "t", ["bench-file"] = "b",
+       duration = "D", hydra = "y", help = "h" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")

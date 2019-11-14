@@ -265,6 +265,17 @@ function capture.integer_number (radix)
 end
 
 
+-- string parsing
+
+function match.string (s)
+   local chars = {}
+   for i = 1, #s do
+      chars[i] = match.equal(s:sub(i,i))
+   end
+   return match.seq(unpack(chars))
+end
+
+
 -- backtracking combinators
 
 function match.plus (a, b)
