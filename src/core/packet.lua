@@ -24,11 +24,11 @@ max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 -- For operations that add or remove headers from the beginning of a
 -- packet, instead of copying around the payload we just move the
 -- packet structure as a whole around.
-local packet_alignment = 512
-local default_headroom = 256
+packet_alignment = 512
+default_headroom = 256
 -- The Intel82599 driver requires even-byte alignment, so let's keep
 -- things aligned at least this much.
-local minimum_alignment = 2
+minimum_alignment = 2
 
 local function get_alignment (addr, alignment)
    -- Precondition: alignment is a power of 2.
