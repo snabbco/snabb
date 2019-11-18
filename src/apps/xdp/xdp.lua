@@ -540,9 +540,10 @@ function XDP:push ()
       local p = link.receive(input)
       transmit(tx, p)
       -- Stimulate breathing: after the kernel is done with the packet buffer
-      -- it will either fed back from the completion ring onto the free ring,
-      -- or put back onto the freelist via packet.free_internal; hence, account
-      -- statistics for freed packet here.
+      -- it will either be fed back from the completion ring onto the free
+      -- ring, or put back onto the freelist via packet.free_internal; hence,
+      -- account statistics for freed packet here in order to signal to the
+      -- engine that throughput is happening.
       packet.account_free(p)
    end
    push(tx)
