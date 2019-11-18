@@ -257,7 +257,7 @@ end
 function from_string (d)         return from_pointer(d, #d) end
 
 -- Free a packet that is no longer in use.
-local function free_internal (p)
+function free_internal (p)
    local ptr = ffi.cast("char*", p)
    p = ffi.cast(packet_ptr_t, ptr - get_headroom(ptr) + default_headroom)
    p.length = 0
