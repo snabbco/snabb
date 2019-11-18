@@ -381,9 +381,8 @@ function XDP:xdp_prog (xskmap)
       -- r2 = ((struct xdp_md *)ctx)->rx_queue_index
       { op=bor(c.LDX, f.W, m.MEM), dst=2, src=1, off=16 },
       -- r1 = xskmap
-      { op=bor(c.LD, f.DW, m.IMM), dst=1, src=s.MAP_FD,
-        imm=band(xskmap:getfd(), 2^32-1) },
-      { imm=rshift(xskmap:getfd(), 32) },
+      { op=bor(c.LD, f.DW, m.IMM), dst=1, src=s.MAP_FD, imm=xskmap:getfd() },
+      { imm=0 }, -- nb: upper 32 bits of 64-bit (DW) immediate
       -- r0 = redirect_map(r1, r2, r3)
       { op=bor(c.JMP, j.CALL), imm=fn.redirect_map },
       -- EXIT:
