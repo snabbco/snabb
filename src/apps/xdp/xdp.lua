@@ -484,7 +484,11 @@ function XDP:create_xsk (ifname, queue)
         -- flags = bits{ XDP_ZEROCOPY=2 }
       }
    )
-   assert(xsk.sock:bind(sa, ffi.sizeof(sa)))
+   local ok, err = xsk.sock:bind(sa, ffi.sizeof(sa))
+   if not ok then
+      error(("Unable to bind AF_XDP socket to %s queue %d (%s)")
+            :format(ifname, queue, err))
+   end
    return xsk
 end
 
