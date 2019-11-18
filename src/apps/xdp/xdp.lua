@@ -223,9 +223,9 @@ local netlink_set_link_xdp_request_t = ffi.typeof[[
 -- (rx, tx, fr, cr).
 --
 -- For the Linux kernel to be able to fill the rx ring we need to provide it
--- UMEM chunks via the fill ring (fr). Superfluous UMEM chunks held by the
--- kernel are fed back to the userspace application via the
--- completion ring (cr).
+-- UMEM chunks via the fill ring (fr). Chunks used by us to send packets via
+-- the tx ring are returned by the kernel back to the userspace application via
+-- the completion ring (cr).
 --
 -- It is important to note that XDP rings operate on chunks: the addr field
 -- of xdp_desc_t points *into* a chunk, and its len field is, from the kernel’s
@@ -297,10 +297,11 @@ function receive (r)
 end
 
 function reclaim (r)
+   -- NB: reclaim does not (re)set the payload length field.
+   -- Reclaimed packets do *not* have known payload lengths!
    local desc = ffi.cast("uint64_t *", r.desc)
    local idx = mask(r.read)
    local p = ffi.cast("struct packet *", from_umem(desc[idx]))
-   p.length = 0
    r.read = inc(r.read)
    return p
 end
@@ -519,11 +520,8 @@ end
 function XDP:pull ()
    local output = self.output.output
    local rx, fr = self.rx, self.fr
+   self:refill()
    if not output then return end
-   while not full(fr) do
-      fill(fr, packet.allocate())
-   end
-   push(fr)
    for _ = 1, engine.pull_npackets do
       if empty(rx) then break end
       link.transmit(output, receive(rx))
@@ -535,21 +533,57 @@ function XDP:push ()
    local input = self.input.input
    local tx, cr = self.tx, self.cr
    if not input then return end
-   while not empty(cr) do
-      packet.free(reclaim(cr))
-   end
-   pull(cr)
    while not link.empty(input) and not full(tx) do
       local p = link.receive(input)
-      packet.account_free(p)
       transmit(tx, p)
+      -- Stimulate breathing: after the kernel is done with the packet buffer
+      -- it will either fed back from the completion ring onto the free ring,
+      -- or put back onto the freelist via packet.free_internal; hence, account
+      -- statistics for freed packet here.
+      packet.account_free(p)
    end
    push(tx)
    if self.kernel_has_ring_flags then
       if needs_wakeup(tx) then self:kick() end
    else
-      if not empty(tx) then self:kick() end
+      if full(tx) then self:kick() end
    end
+end
+
+function XDP:refill ()
+   local input, output = self.input.input, self.output.output
+   local fr, cr = self.fr, self.cr
+   -- If the queue operates in duplex mode (i.e., has both input and output
+   -- links attached) we feed packet buffers from the completion ring back onto
+   -- the fill ring.
+   if input and output then
+      while not (empty(cr) or full(fr)) do
+         fill(fr, reclaim(cr))
+      end
+   end
+   -- If the queue has its output attached we make sure that the kernel does
+   -- not run out of packet buffers to fill the rx ring with by keeping the
+   -- fill ring topped up with fresh packets.
+   -- (If no input is attached, the completion ring is not used, and
+   -- all packet buffers for rx will be allocated here.)
+   if output then
+      while not full(fr) do
+         fill(fr, packet.allocate())
+      end
+   end
+   -- If the queue has its input attached we release any packet buffers
+   -- remaining in the completion ring back to the packet freelist.
+   -- (If not output is attached, the fill ring is not used, and
+   -- all packet buffers used for tx will be reclaimed here.)
+   if input then
+      while not empty(cr) do
+         -- NB: mandatory free_internal since we do not know the payload length
+         -- of reclaimed packets.
+         packet.free_internal(reclaim(cr))
+      end
+   end
+   push(fr)
+   pull(cr)
 end
 
 function XDP:kick ()
