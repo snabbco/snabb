@@ -611,8 +611,11 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
    snabb_enable_xdp()
+   engine.report_load()
    print("test: rxtx")
    selftest_rxtx(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
+   print("test: duplex")
+   selftest_duplex(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
    print("test: rxtx_match")
    selftest_rxtx_match(xdpdeva, xdpmaca, xdpdevb, xdpmacb)
    print("selftest ok")
@@ -628,12 +631,12 @@ local function random_v4_packets (conf)
    for _, size in ipairs(conf.sizes) do
       for _=1,100 do
          local ip = ipv4:new{src=lib.random_bytes(4),
-                             dst=lib.random_bytes(4),
-                             total_length=size-eth:sizeof()}
+                             dst=lib.random_bytes(4)}
+         ip:total_length(size - eth:sizeof())
          local payload_length = ip:total_length() - ip:sizeof()
          local p = packet.allocate()
          packet.append(p, eth:header(), eth:sizeof())
-         packet.append(p, ip:header(), eth:sizeof())
+         packet.append(p, ip:header(), ip:sizeof())
          packet.append(p, lib.random_bytes(payload_length), payload_length)
          table.insert(packets, p)
       end
@@ -647,7 +650,7 @@ function selftest_rxtx (xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
    local synth = require("apps.test.synth")
    config.app(c, "source", synth.Synth, {
                  packets = random_v4_packets{
-                    sizes = {60,64,67,128,133,192,256,384,512,777,1024,1500,2001},
+                    sizes = {60},
                     src = xdpmaca,
                     dst = xdpmacb
    }})
@@ -668,7 +671,7 @@ function selftest_rxtx (xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
    end
    engine.configure(c)
    print("kernel_has_ring_flags", XDP.kernel_has_ring_flags)
-   engine.main{ duration = 1 }
+   engine.main{ duration=1 }
    engine.report_links()
    local txtotal, rxtotal = 0, 0
    for queue = 0, nqueues-1 do
@@ -681,6 +684,61 @@ function selftest_rxtx (xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
    end
    assert(math.abs(txtotal - rxtotal) <= txtotal*.10, -- 10% tolerance
           "Too little packets received")
+end
+
+function selftest_duplex (xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
+   local c = config.new()
+   local basic = require("apps.basic.basic_apps")
+   local synth = require("apps.test.synth")
+   config.app(c, "source_a", synth.Synth, {
+                 packets = random_v4_packets{
+                    sizes = {60},
+                    src = xdpmaca,
+                    dst = xdpmacb
+   }})
+   config.app(c, "source_b", synth.Synth, {
+                 packets = random_v4_packets{
+                    sizes = {60},
+                    src = xdpmacb,
+                    dst = xdpmaca
+   }})
+   config.app(c, "sink", basic.Sink)
+   for queue = 0, nqueues-1 do
+      local queue_a = xdpdeva.."_q"..queue
+      local queue_b = xdpdevb.."_q"..queue
+      config.app(c, queue_a, XDP, {
+                    ifname = xdpdeva,
+                    queue = queue
+      })
+     config.app(c, queue_b, XDP, {
+                   ifname = xdpdevb,
+                   queue = queue
+     })
+      config.link(c, "source_a.output"..queue.." -> "..queue_a..".input")
+      config.link(c, "source_b.output"..queue.." -> "..queue_b..".input")
+      config.link(c, queue_a..".output -> sink.input_a"..queue)
+      config.link(c, queue_b..".output -> sink.input_b"..queue)
+   end
+   engine.configure(c)
+   print("kernel_has_ring_flags", XDP.kernel_has_ring_flags)
+   engine.main{ duration=1 }
+   engine.report_links()
+   for label, stream in ipairs{
+      ['a->b'] = {'a','b'},
+      ['b->a'] = {'b','a'}
+   } do
+      local txtotal, rxtotal = 0, 0
+      for queue = 0, nqueues-1 do
+         local tx = link.stats(engine.app_table["source_"..stream[0]].output["output_"..queue])
+         local rx = link.stats(engine.app_table.sink.input["input_"..stream[1]..queue])
+         assert(tx.rxpackets > 0, "["..label"..] No packets sent on queue: "..queue)
+         assert(rx.rxpackets > 0, "["..label"..] No packets received on queue: "..queue)
+         txtotal = txtotal + tx.rxpackets
+         rxtotal = rxtotal + rx.rxpackets
+      end
+      assert(math.abs(txtotal - rxtotal) <= txtotal*.10, -- 10% tolerance
+             "["..label"..] Too little packets received")
+   end
 end
 
 function selftest_rxtx_match (xdpdeva, xdpmaca, xdpdevb, xdpmacb)
