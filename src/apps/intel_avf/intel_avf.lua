@@ -730,11 +730,11 @@ function Intel_avf:new(conf)
 
    self = setmetatable(self, { __index = Intel_avf })
    self:supported_hardware()
-   self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
-   self:load_registers()
+   self.fd = pci.open_pci_resource_unlocked(self.pciaddress, 0)
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
-   pci.disable_bus_master_cleanup(self.pciaddress)
+   self.base = pci.map_pci_memory(self.fd)
+   self:load_registers()
 
    -- wait for the nic to be ready, setup the mailbox and then reset it
    -- that way it doesn't matter what state you where given the card
