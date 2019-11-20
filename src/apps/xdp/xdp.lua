@@ -103,7 +103,12 @@ local function from_umem (offset)
 end
 
 local snabb_xdp_enabled = false
-function snabb_enable_xdp ()
+function snabb_enable_xdp (opt)
+   opt = opt or {}
+   if opt.num_chunks then
+      num_chunks = math.ceil(assert(tonumber(opt.num_chunks),
+                                    "num_chunks must be a number"))
+   end
    -- Allocate UMEM
    umem_size = chunk_size * num_chunks
    umem_backing = ffi.new("char[?]", umem_size + page_size)

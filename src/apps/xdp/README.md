@@ -45,9 +45,20 @@ Due to a combination of how Snabb uses packet buffers and a limitation of
 
 ## Module functions
 
-— Function **snabb_enable_xdp**
+— Function **snabb_enable_xdp** *options*
 
 Enables “Snabb XDP mode”. See _Caveats_!
+
+### *Options*
+
+*Options* is a table of configuration options. The following parameters are
+supported:
+
+ - `num_chunks`—number of UMEM chunks to allocate. The default is 200,000 which
+   might not be enough depending on the number of XDP sockets used by the
+   process. Each instance of the XDP app uses up to around 25,000 chunks at any
+   time. However, generous over-provisioning (at least double of the expected
+   residency) is recommended due to buffering in the Snabb engine.
 
 ## Setting up XDP capable devices under Linux
 
