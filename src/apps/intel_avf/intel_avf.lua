@@ -730,23 +730,23 @@ function Intel_avf:new(conf)
 
    self = setmetatable(self, { __index = Intel_avf })
    self:supported_hardware()
-   self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
-   self:load_registers()
+   self.fd = pci.open_pci_resource_unlocked(self.pciaddress, 0)
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
-   pci.disable_bus_master_cleanup(self.pciaddress)
+   self.base = pci.map_pci_memory(self.fd)
+   self:load_registers()
 
    -- wait for the nic to be ready, setup the mailbox and then reset it
    -- that way it doesn't matter what state you where given the card
    self:wait_for_vfgen_rstat()
    self:mbox_setup()
-   self:stop()
+   self:reset()
 
    -- FIXME
    -- I haven't worked out why the sleep is required but without it
    -- self_mbox_set_version hangs indefinitely
    --C.sleep(1)
-   -- See elaboration in Intel_avf:stop()
+   -- See elaboration in Intel_avf:reset()
 
    -- setup the nic for real
    self:mbox_setup()
@@ -771,7 +771,7 @@ function Intel_avf:link()
    end
 end
 
-function Intel_avf:stop()
+function Intel_avf:reset()
    -- From "Appendix A Virtual Channel Protocol":
    -- VF sends this request to PF with no parameters PF does NOT respond! VF
    -- driver must delay then poll VFGEN_RSTAT register until reset completion
@@ -783,6 +783,21 @@ function Intel_avf:stop()
    -- enough in some cases, two seconds has always worked so far.
    C.usleep(2e6)
    self:wait_for_vfgen_rstat()
+end
+
+function Intel_avf:stop()
+   self:reset()
+   pci.set_bus_master(self.pciaddress, false)
+   pci.close_pci_resource(self.fd, self.base)
+   -- Free packets remaining in TX/RX queues.
+   for i = 0, self.ring_buffer_size-1 do
+      if self.txqueue[i] ~= nil then
+         packet.free(self.txqueue[i])
+      end
+   end
+   for i = 0, self.ring_buffer_size-1 do
+      packet.free(self.rxqueue[i])
+   end
    -- Unlink SHM alias.
    shm.unlink("pci/"..self.pciaddress)
 end
