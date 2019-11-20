@@ -169,6 +169,8 @@ local xdp_mmap_offsets_t =
 
 local xdp_ring_t = ffi.typeof[[
    struct {
+      char *map;
+      size_t maplen;
       uint32_t *producer, *consumer, *flags;
       void *desc;
       uint32_t write, read;
@@ -533,15 +535,15 @@ end
 function XDP:xdp_map_ring (socket, layout, desc_t, offset)
    local prot = "read, write"
    local flags = "shared, populate"
-   local length = layout.desc + xdp_ring_ndesc * ffi.sizeof(desc_t)
-   local map = ffi.cast("char*", assert(S.mmap(nil, length, prot, flags, socket, offset)))
    local r = ffi.new(xdp_ring_t)
-   r.producer = ffi.cast("uint32_t *", map + layout.producer)
-   r.consumer = ffi.cast("uint32_t *", map + layout.consumer)
+   r.maplen = layout.desc + xdp_ring_ndesc * ffi.sizeof(desc_t)
+   r.map = assert(S.mmap(nil, r.maplen, prot, flags, socket, offset))
+   r.producer = ffi.cast("uint32_t *", r.map + layout.producer)
+   r.consumer = ffi.cast("uint32_t *", r.map + layout.consumer)
    if self.kernel_has_ring_flags then
-      r.flags = ffi.cast("uint32_t *", map + layout.flags)
+      r.flags = ffi.cast("uint32_t *", r.map + layout.flags)
    end
-   r.desc = map + layout.desc
+   r.desc = r.map + layout.desc
    return r
 end
 
@@ -590,6 +592,11 @@ function XDP:stop ()
    for _ = 1, self.rxq do
       packet.free_internal(rewind_fill(self.fr))
    end
+   -- Unmap rings.
+   assert(S.munmap(self.rx.map, self.rx.maplen))
+   assert(S.munmap(self.tx.map, self.tx.maplen))
+   assert(S.munmap(self.fr.map, self.fr.maplen))
+   assert(S.munmap(self.cr.map, self.cr.maplen))
 end
 
 function XDP:pull ()
