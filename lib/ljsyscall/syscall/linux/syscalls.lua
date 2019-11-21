@@ -887,6 +887,31 @@ if C.bpf then
     end
     return ret
   end
+  function S.bpf_obj_pin(path, fd, flags)
+    local attr = t.bpf_attr1()
+    local pathname = ffi.new("char[?]", #path+1)
+    ffi.copy(pathname, path)
+    attr[0].pathname = ptr_to_u64(pathname)
+    attr[0].bpf_fd = getfd(fd)
+    attr[0].file_flags = flags or 0
+    local ret = S.bpf(c.BPF_CMD.OBJ_PIN, attr)
+    if ret ~= 0 then
+      return nil, t.error(errno())
+    end
+    return ret
+  end
+  function S.bpf_obj_get(path, flags)
+    local attr = t.bpf_attr1()
+    local pathname = ffi.new("char[?]", #path+1)
+    ffi.copy(pathname, path)
+    attr[0].pathname = ptr_to_u64(pathname)
+    attr[0].file_flags = flags or 0
+    local ret = S.bpf(c.BPF_CMD.OBJ_GET, attr)
+    if ret < 0 then
+      return nil, t.error(errno())
+    end
+    return retfd(ret)
+  end
 end
 
 -- Linux performance monitoring

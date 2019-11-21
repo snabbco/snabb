@@ -538,6 +538,7 @@ union bpf_attr {
   struct {
     uint64_t   pathname __attribute__((aligned(8)));
     uint32_t   bpf_fd;
+    uint32_t   file_flags;
   };
 } __attribute__((aligned(8)));
 struct perf_event_attr {
