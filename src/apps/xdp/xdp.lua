@@ -352,7 +352,6 @@ XDP = {
       queue = {default=0}       -- interface queue (zero based)
    },
    -- Class variables:
-   queues = {},                 -- queue-to-socket maps for each interface
    kernel_has_ring_flags = true -- feature detection status for descriptor ring flags
 }
 
@@ -361,16 +360,56 @@ XDP = {
 function XDP:new (conf)
    assert(snabb_xdp_enabled, "Snabb XDP mode must be enabled.")
    -- Ensure interface is initialized for XDP usage.
-   if not self.queues[conf.ifname] then
-      self.queues[conf.ifname] = self:create_xskmap()
-      self:initialize_xdp(conf.ifname, self.queues[conf.ifname])
-   end
+   local lockfd, mapfd = self:open_interface(conf.ifname)
    -- Create XDP socket (xsk) for queue.
-   local xsk = self:create_xsk(conf.ifname, conf.queue)
+   local xsk = self:create_xsk(conf.ifname, lockfd, conf.queue)
    -- Attach the socket to queue in the BPF map.
-   self:set_queue_socket(self.queues[conf.ifname], conf.queue, xsk)
+   self:set_queue_socket(mapfd, conf.queue, xsk)
+   mapfd:close() -- not longer needed
    -- Finish initialization.
    return setmetatable(xsk, {__index=XDP})
+end
+
+function XDP:open_interface (ifname)
+   -- Open an interface-dependent file we know should exist to use as a
+   -- Snabb-wide lock. The contents of the file are really irrelevant here.
+   -- However, we depend on the file not being locked by other applications in
+   -- general. :-) 
+   local lockfd = S.open("/sys/class/net/"..ifname.."/operstate", "rdonly")
+   local mapfd, progfd
+   local xskmap_path = "/sys/fs/bpf/snabb/"..ifname.."/xskmap"
+   local prog_path = "/sys/fs/bpf/snabb/"..ifname.."/xdp"
+   -- If the open above failed we assume that no device by ifname exists.
+   assert(lockfd, "Could not open interface: "..ifname.." (does it exist?)")
+   if lockfd:flock("ex, nb") then
+      -- If we get an exclusive lock we know that no other Snabb processes are
+      -- using the interface so its safe to setup the interface and replace any
+      -- existsing BPF XDP program/maps attached to it.
+      S.mkdir("/sys/fs/bpf/snabb", "rwxu, rgrp, xgrp, roth, xoth")
+      S.util.rm("/sys/fs/bpf/snabb/"..ifname)
+      S.mkdir("/sys/fs/bpf/snabb/"..ifname, "rwxu, rgrp, xgrp, roth, xoth")
+      -- Create xskmap and XDP program to run on the NIC.
+      mapfd = self:create_xskmap()
+      progfd = self:xdp_prog(mapfd)
+      self:set_link_xdp(ifname, progfd)
+      -- Pin xskmap so it can be accessed by other Snabb processes to attach to
+      -- the interface. Also pin the XDP program, just 'cause.
+      assert(S.bpf_obj_pin(xskmap_path, mapfd))
+      assert(S.bpf_obj_pin(prog_path, progfd))
+      progfd:close() -- no longer needed
+      lockfd:flock("sh") -- share lock
+   else
+      lockfd:flock("sh")
+      -- Wait for the lock to be shared: once it is no longer held exclusively
+      -- we know that the interface is setup and ready to use.
+      -- Get the currently pinned xskmap to insert our XDP socket into.
+      mapfd = assert(S.bpf_obj_get(xskmap_path))
+   end
+   -- lockfd: holds a shared lock for as long as we do not close it, signaling
+   --         other Snabb processes that the interface is in use.
+   -- mapfd: the xskmap for the interface used to
+   --        attach XDP sockets to queues.
+   return lockfd, mapfd
 end
 
 function XDP:create_xskmap ()
@@ -389,10 +428,6 @@ function XDP:create_xskmap ()
    end
    -- Exceeded retries, bail.
    error("Failed to create BPF map: "..tostring(err))
-end
-
-function XDP:initialize_xdp (ifname, xskmap)
-   self:set_link_xdp(ifname, self:xdp_prog(xskmap))
 end
 
 function XDP:xdp_prog (xskmap)
@@ -457,8 +492,8 @@ function XDP:set_link_xdp(ifname, prog)
    netlink:close()
 end
 
-function XDP:create_xsk (ifname, queue)
-   local xsk = { sock = assert(S.socket('xdp', 'raw')) }
+function XDP:create_xsk (ifname, lockfd, queue)
+   local xsk = { sock = assert(S.socket('xdp', 'raw')), lockfd = lockfd }
    -- Register UMEM.
    local umem_reg = ffi.new(
       xdp_umem_reg_t,
@@ -597,6 +632,8 @@ function XDP:stop ()
    assert(S.munmap(self.tx.map, self.tx.maplen))
    assert(S.munmap(self.fr.map, self.fr.maplen))
    assert(S.munmap(self.cr.map, self.cr.maplen))
+   -- Close interface lockfd. See XDP:open_interface().
+   self.lockfd:close()
 end
 
 function XDP:pull ()
@@ -694,7 +731,7 @@ function selftest ()
    local xdpmaca = lib.getenv("SNABB_XDP_MAC0")
    local xdpdevb = lib.getenv("SNABB_XDP1")
    local xdpmacb = lib.getenv("SNABB_XDP_MAC1")
-   local nqueues = lib.getenv("SNABB_XDP_NQUEUES") or 1
+   local nqueues = tonumber(lib.getenv("SNABB_XDP_NQUEUES")) or 1
    if not (xdpdeva and xdpmaca and xdpdevb and xdpmacb) then
       print("SNABB_XDP0 and SNABB_XDP1 must be set. Skipping selftest.")
       os.exit(engine.test_skipped_code)
@@ -707,6 +744,10 @@ function selftest ()
    selftest_duplex(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
    print("test: rxtx_match")
    selftest_rxtx_match(xdpdeva, xdpmaca, xdpdevb, xdpmacb)
+   if nqueues > 1 then
+      print("test: share_interface")
+      selftest_share_interface(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
+   end
    print("selftest ok")
 end
 
@@ -854,4 +895,62 @@ function selftest_rxtx_match (xdpdeva, xdpmaca, xdpdevb, xdpmacb)
    engine.report_links()
    engine.report_apps()
    assert(#engine.app_table.match:errors() == 0, "Match errors.")
+end
+
+function selftest_share_interface_worker (xdpdev, queue)
+   snabb_enable_xdp()
+   local c = config.new()
+   local basic = require("apps.basic.basic_apps")
+   local recv = xdpdev.."_q"..queue
+   config.app(c, recv, XDP, {
+                 ifname = xdpdev,
+                 queue = queue
+   })
+   config.app(c, "sink", basic.Sink)
+   config.link(c, recv..".output -> sink.input")
+   engine.configure(c)
+   engine.main{ duration=.1, no_report = true }
+   print("[worker links]")
+   engine.report_links()
+   assert(link.stats(engine.app_table.sink.input.input).rxpackets > 0,
+          "No packets received on "..recv.." in worker.")
+end
+
+function selftest_share_interface (xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
+   local c = config.new()
+   local worker = require("core.worker")
+   local basic = require("apps.basic.basic_apps")
+   local synth = require("apps.test.synth")
+   config.app(c, "source", synth.Synth, {
+                 packets = random_v4_packets{
+                    sizes = {60},
+                    src = xdpmaca,
+                    dst = xdpmacb
+   }})
+   config.app(c, "sink", basic.Sink)
+   for queue = 0, nqueues-2 do
+      local queue_a = xdpdeva.."_q"..queue
+      local queue_b = xdpdevb.."_q"..queue
+      config.app(c, queue_a, XDP, {
+                    ifname = xdpdeva,
+                    queue = queue
+      })
+     config.app(c, queue_b, XDP, {
+                   ifname = xdpdevb,
+                   queue = queue
+     })
+      config.link(c, "source.output"..queue.." -> "..queue_a..".input")
+      config.link(c, queue_b..".output -> sink.input"..queue)
+   end
+   engine.configure(c)
+   worker.start('worker', ("require('apps.xdp.xdp').selftest_share_interface_worker('%s', %d)")
+                   :format(xdpdevb, nqueues-1))
+   engine.main{ done=function () return not worker.status().worker.alive end,
+                no_report = true }
+   local worker_status = worker.status().worker.status
+   print("[parent links]")
+   engine.report_links()
+   if worker_status ~= 0 then
+      os.exit(worker_status)
+   end
 end
