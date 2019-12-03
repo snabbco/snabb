@@ -88,7 +88,10 @@ function IngressDropMonitor:jit_flush_if_needed ()
    print(msg)
 
    self.ingress_packet_drop_alarm:raise({alarm_text=msg})
-   if self.action == 'flush' then jit.flush() end
+   if self.action == 'flush' then
+      jit.flush()
+      engine.clearvmprofiles()
+   end
 end
 
 function IngressDropMonitor:timer(interval)
