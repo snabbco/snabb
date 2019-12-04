@@ -1,5 +1,50 @@
 # Change Log
 
+## [2019.06.02]
+
+### Notable changes
+
+ * Fix `snabb top` to correctly display per-worker statistics for
+   instances of the lwAFTR running with receive-side scaling (RSS).
+   See https://github.com/Igalia/snabb/pull/1237.
+
+ * Fix a problem related to an interaction between late trace
+   compilation and the ingress drop monitor.
+
+   For context, Snabb uses LuaJIT, which is a just-in-time compiler.
+   LuaJIT compiles program segments called traces.  Traces can jump to
+   each other, and thereby form a graph.  The shape of the trace graph
+   can have important performance impacts on a network function, but
+   building the optimal graph shape is fundamentally hard.  Usually
+   LuaJIT does a good job, but if a network function is dropping
+   packets, Snabb's "ingress drop monitor" will ask LuaJIT to re-learn
+   the graph of traces, in the hopes that this self-healing process will
+   fix the packet loss situation.
+
+   Unfortunately, the self-healing process has some poor interactions
+   with so-called "long tail" traces -- traces that aren't taking an
+   important amount of time, but which LuaJIT might decide to compile a
+   few seconds into the running of a network function.  Compiling a
+   trace can cause a latency spike and dropped packets, so the work of
+   compiling these long-tail traces can in fact be interpreted as a
+   packet loss situation, thereby triggering the self-healing process,
+   leading to a pathologically repeating large packet loss situation.
+
+   The right answer is for LuaJIT to avoid the latency cost for
+   long-tail trace compilation.  While this might make long-tail traces
+   run not as fast as they would if they were compiled, these traces
+   take so little time anyway that it doesn't matter enough to pay the
+   cost of trace compilation.
+
+   See https://github.com/Igalia/snabb/pull/1236 and
+   https://github.com/Igalia/snabb/pull/1239 for full details.
+
+ * Disable profiling by default.  The version of LuaJIT that Snabb uses
+   includes a facility for online profiling of network functions.  This
+   facility is low-overhead but not no-overhead.  We have disabled it by
+   default on the lwAFTR; it can be enabled by passing the --profile
+   option.  See https://github.com/Igalia/snabb/pull/1238.
+
 ## [2019.06.01]
 
 ### Notable changes
