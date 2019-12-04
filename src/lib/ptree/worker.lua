@@ -21,6 +21,7 @@ local worker_config_spec = {
    duration = {},
    measure_latency = {default=true},
    measure_memory = {default=true},
+   profile = {default=true},
    no_report = {default=false},
    report = {default={showapps=true,showlinks=true}},
    Hz = {default=1000},
@@ -46,6 +47,7 @@ function new_worker (conf)
    if conf.measure_memory then
       timer.activate(memory_info.HeapSizeMonitor.new():timer())
    end
+   engine.vmprofile_enabled = conf.profile
    return ret
 end
 
@@ -100,16 +102,12 @@ function Worker:handle_actions_from_manager()
 end
 
 function Worker:main ()
-   local vmprofile = require("jit.vmprofile")
    local stop = engine.now() + self.duration
    local next_time = engine.now()
 
-   -- Setup vmprofile.
-   engine.setvmprofile("engine")
-   vmprofile.start()
-
    if not engine.auditlog_enabled then engine.enable_auditlog() end
 
+   engine.setvmprofile("engine")
    repeat
       self.breathe()
       if next_time < engine.now() then

@@ -50,7 +50,7 @@ function parse_args(args)
    local conf_file, v4, v6
    local ring_buffer_size
    local opts = { verbosity = 0 }
-   local scheduling = { ingress_drop_monitor = 'flush' }
+   local scheduling = { ingress_drop_monitor = 'flush', profile = false }
    local handlers = {}
    function handlers.n (arg) opts.name = assert(arg) end
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
@@ -100,13 +100,13 @@ function parse_args(args)
                   .." (valid values: flush, warn, off)")
       end
    end
-   function handlers.j(arg) scheduling.j = arg end
+   function handlers.profile() scheduling.profile = true end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:j:t:",
+   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:t:",
      { conf = "c", name = "n", cpu = 1, v4 = 1, v6 = 1,
        ["on-a-stick"] = 1, virtio = "i", ["ring-buffer-size"] = "r",
        ["real-time"] = 0, mirror = 1, ["ingress-drop-monitor"] = 1,
-       verbose = "v", trace = "t", ["bench-file"] = "b",
+       verbose = "v", trace = "t", ["bench-file"] = "b", ["profile"] = 0,
        duration = "D", hydra = "y", help = "h" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
