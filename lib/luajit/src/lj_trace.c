@@ -371,7 +371,8 @@ static void trace_clearsnapcounts(jit_State *J)
     t = traceref(J, i);
     if (t != NULL)
       for (s = 0; s < t->nsnap; s++)
-        t->snap[s].count = 0;
+        if (t->snap[s].count != SNAPCOUNT_DONE)
+          t->snap[s].count = 0;
   }
 }
 
