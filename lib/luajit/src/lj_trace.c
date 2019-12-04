@@ -61,6 +61,8 @@ void lj_trace_err_info(jit_State *J, TraceError e)
 ** The "one second" constant is certainly tunable.
 ** */
 
+static void trace_clearsnapcounts(jit_State *J); /* Forward decl. */
+
 static inline uint64_t gettime_ns (void)
 {
   struct timespec ts;
@@ -79,6 +81,7 @@ int hotcount_decay (jit_State *J)
   if (decay) {
     /* Reset hotcounts. */
     lj_dispatch_init_hotcount(J2G(J));
+    trace_clearsnapcounts(J);
     hotcount_decay_ts = ts;
   }
   return decay;
@@ -356,6 +359,20 @@ void lj_trace_freestate(global_State *g)
   }
 #endif
   lj_mcode_free(J);
+}
+
+/* Clear all trace snap counts (side-exit hot counters). */
+static void trace_clearsnapcounts(jit_State *J)
+{
+  int i, s;
+  GCtrace *t;
+  /* Clear hotcounts for all snapshots of all traces. */
+  for (i = 1; i < TRACE_MAX; i++) {
+    t = traceref(J, i);
+    if (t != NULL)
+      for (s = 0; s < t->nsnap; s++)
+        t->snap[s].count = 0;
+  }
 }
 
 /* -- Penalties and blacklisting ------------------------------------------ */
