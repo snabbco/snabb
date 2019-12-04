@@ -17,9 +17,9 @@
    can have important performance impacts on a network function, but
    building the optimal graph shape is fundamentally hard.  Usually
    LuaJIT does a good job, but if a network function is dropping
-   packets, Snabb's "ingress drop monitor" will and ask LuaJIT to
-   re-learn the graph of traces, in the hopes that this self-healing
-   process will fix the packet loss situation.
+   packets, Snabb's "ingress drop monitor" will ask LuaJIT to re-learn
+   the graph of traces, in the hopes that this self-healing process will
+   fix the packet loss situation.
 
    Unfortunately, the self-healing process has some poor interactions
    with so-called "long tail" traces -- traces that aren't taking an
