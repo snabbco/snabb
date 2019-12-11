@@ -672,7 +672,7 @@ function XDP:push ()
    if self.kernel_has_ring_flags then
       if needs_wakeup(tx) then self:kick() end
    else
-      if full(tx) then self:kick() end
+      if not empty(tx) then self:kick() end
    end
 end
 
