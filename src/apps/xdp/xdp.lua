@@ -355,6 +355,10 @@ XDP = {
    kernel_has_ring_flags = true -- feature detection status for descriptor ring flags
 }
 
+-- The `driver' variable is used as a reference to the driver class in
+-- order to interchangeably use NIC drivers.
+driver = XDP
+
 -- Class methods
 
 function XDP:new (conf)
