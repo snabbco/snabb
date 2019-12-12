@@ -422,10 +422,21 @@ Allocate packet and fill it with *length* bytes from *pointer*.
 
 Allocate packet and fill it with the contents of *string*.
 
-— Function **packet.clone_to_memory* *pointer* *packet*
+— Function **packet.account_free** *packet*
 
-Creates an exact copy of at memory pointed to by *pointer*. *Pointer* must
-point to a `packet.packet_t`.
+Increment internal engine statistics (*frees*, *freebytes*, *freebits*) as if
+*packet* were freed, but do not actually put it back onto the freelist.
+
+This function is intended to be used by I/O apps in special cases that need
+more finegrained control over packet freeing.
+
+— Function **packet.free_internal** *packet*
+
+Free *packet* and put it back onto the freelist, but do not increment internal
+engine statistics (*frees*, *freebytes*, *freebits*).
+
+See **packet.account_free**, **packet.free**.
+
 
 ## Memory (core.memory)
 

@@ -17,6 +17,7 @@ local scheduling_opts = {
    real_time = {},            -- Boolean.
    ingress_drop_monitor = {}, -- Action string: one of 'flush' or 'warn'.
    busywait = {default=true}, -- Boolean.
+   enable_xdp = {},           -- Enable Snabb XDP mode (see apps.xdp.xdp).
    eval = {}                  -- String.
 }
 
@@ -40,6 +41,10 @@ end
 
 function sched_apply.busywait (busywait)
    engine.busywait = busywait
+end
+
+function sched_apply.enable_xdp (opt)
+   if opt then require('apps.xdp.xdp').snabb_enable_xdp(opt) end
 end
 
 function sched_apply.eval (str)

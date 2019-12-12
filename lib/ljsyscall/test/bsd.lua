@@ -2,7 +2,7 @@
 
 local function init(S)
 
-local helpers = require "syscall.helpers"
+local helpers = require "test.helpers"
 local types = S.types
 local c = S.c
 local abi = S.abi
@@ -89,7 +89,9 @@ test.filesystem_bsd = {
   test_chflags = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:write("append"))
-    assert(S.chflags(tmpfile, "uf_append"))
+    local ok, err = S.chflags(tmpfile, "uf_append")
+    if not ok and err.OPNOTSUPP then error "skipped" end
+    assert(ok, err)
     assert(fd:write("append"))
     assert(fd:seek(0, "set"))
     local n, err = fd:write("not append")
@@ -102,7 +104,9 @@ test.filesystem_bsd = {
     if not S.lchflags then error "skipped" end
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:write("append"))
-    assert(S.lchflags(tmpfile, "uf_append"))
+    local ok, err = S.lchflags(tmpfile, "uf_append")
+    if not ok and err.OPNOTSUPP then error "skipped" end
+    assert(ok, err)
     assert(fd:write("append"))
     assert(fd:seek(0, "set"))
     local n, err = fd:write("not append")
@@ -114,7 +118,9 @@ test.filesystem_bsd = {
   test_fchflags = function()
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:write("append"))
-    assert(fd:chflags("uf_append"))
+    local ok, err = fd:chflags("uf_append")
+    if not ok and err.OPNOTSUPP then error "skipped" end
+    assert(ok, err)
     assert(fd:write("append"))
     assert(fd:seek(0, "set"))
     local n, err = fd:write("not append")
@@ -127,7 +133,9 @@ test.filesystem_bsd = {
     if not S.chflagsat then error "skipped" end
     local fd = assert(S.creat(tmpfile, "RWXU"))
     assert(fd:write("append"))
-    assert(S.chflagsat("fdcwd", tmpfile, "uf_append", "symlink_nofollow"))
+    local ok, err = S.chflagsat("fdcwd", tmpfile, "uf_append", "symlink_nofollow")
+    if not ok and err.OPNOTSUPP then error "skipped" end
+    assert(ok, err)
     assert(fd:write("append"))
     assert(fd:seek(0, "set"))
     local n, err = fd:write("not append")
@@ -258,7 +266,8 @@ test.bsd_extattr = {
     assert(S.unlink(tmpfile))
     local n, err = fd:extattr_get("user", "myattr", false) -- false does raw call with no buffer to return length
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
-    assert(not n and err.NOATTR)
+    assert(not n, "expected to fail")
+    assert(err.NOATTR, err)
     assert(fd:close())
   end,
   test_extattr_getsetdel_fd = function()
@@ -267,7 +276,8 @@ test.bsd_extattr = {
     assert(S.unlink(tmpfile))
     local n, err = fd:extattr_get("user", "myattr", false) -- false does raw call with no buffer to return length
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
-    assert(not n and err.NOATTR)
+    assert(not n, "expected to fail")
+    assert(err.NOATTR, err)
     local n, err = fd:extattr_set("user", "myattr", "myvalue")
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
     assert(n, err)

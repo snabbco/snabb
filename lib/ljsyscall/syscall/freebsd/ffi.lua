@@ -297,6 +297,7 @@ int cap_ioctls_limit(int fd, const unsigned long *cmds, size_t ncmds);
 ssize_t cap_ioctls_get(int fd, unsigned long *cmds, size_t maxcmds);
 int cap_fcntls_limit(int fd, uint32_t fcntlrights);
 int cap_fcntls_get(int fd, uint32_t *fcntlrightsp);
+int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
 
 int __sys_utimes(const char *filename, const struct timeval times[2]);
 int __sys_futimes(int, const struct timeval times[2]);

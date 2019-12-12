@@ -155,6 +155,21 @@ local function fixup_constants(abi, c)
   c.SECCOMP_MODE = nil
   c.SECCOMP_RET = nil
   c.MFD = nil
+  c.RTA.NEWDST = nil
+  c.RTA.PREF = nil
+  c.RTA.VIA = nil
+  c.RTA.MFC_STATS = nil
+  c.AUDIT_ARCH.AARCH64 = nil
+  c.SO.MAX_PACING_RATE = nil
+  c.SO.BPF_EXTENSIONS = nil
+  c.SO.INCOMING_CPU = nil
+  c.SO.ATTACH_BPF = nil
+  c.SO.DETACH_BPF = nil
+  c.SO.ATTACH_REUSEPORT_CBPF = nil
+  c.SO.ATTACH_REUSEPORT_EBPF = nil
+  c.F_SEAL = nil
+  c.F.ADD_SEALS = nil
+  c.F.GET_SEALS = nil
 
   -- these are not even in linux git head headers or names wrong
   c.O.ASYNC = nil
@@ -202,9 +217,58 @@ local function fixup_constants(abi, c)
   c.SYS.getrandom = nil
   c.SYS.memfd_create = nil
   c.SYS.kexec_file_load = nil
+  c.SYS.bpf = nil
 
   -- new constants
   c.GRND = nil
+  -- requires Linux 3.19+, not supported on Travis
+  c.BPF_MAP = {}
+  c.BPF_CMD = {}
+  c.BPF_PROG = {}
+  c.BPF_ATTACH_TYPE = {}
+  c.BPF.ALU64 = nil
+  c.BPF.DW = nil
+  c.BPF.JSGT = nil
+  c.BPF.JSGE = nil
+  c.BPF.CALL = nil
+  c.BPF.EXIT = nil
+  c.BPF.TO_LE = nil
+  c.BPF.TO_BE = nil
+  c.BPF.END = nil
+  c.BPF.ARSH = nil
+  c.BPF.XADD = nil
+  c.BPF.JNE = nil
+  c.BPF.MOV = nil
+  c.BPF.ANY = nil
+  c.BPF.EXIST = nil
+  c.BPF.NOEXIST = nil
+  -- no perf_event_open on Travis CI
+  c.PERF_TYPE = {}
+  c.PERF_COUNT = {}
+  c.PERF_SAMPLE = {}
+  c.PERF_FLAG = {}
+  c.PERF_SAMPLE_REGS = {}
+  c.PERF_SAMPLE_BRANCH = {}
+  c.PERF_READ_FORMAT = {}
+  c.PERF_RECORD = {}
+
+  c.SOF.TIMESTAMPING_LAST = nil
+  c.SOF.TIMESTAMPING_MASK = nil
+  c.SOF.TIMESTAMPING_OPT_CMSG = nil
+  c.SOF.TIMESTAMPING_OPT_ID = nil
+  c.SOF.TIMESTAMPING_OPT_PKTINFO = nil
+  c.SOF.TIMESTAMPING_OPT_STATS = nil
+  c.SOF.TIMESTAMPING_OPT_TSONLY = nil
+  c.SOF.TIMESTAMPING_OPT_TX_SWHW = nil
+  c.SOF.TIMESTAMPING_RAW_HARDWARE = nil
+  c.SOF.TIMESTAMPING_RX_HARDWARE = nil
+  c.SOF.TIMESTAMPING_RX_SOFTWARE = nil
+  c.SOF.TIMESTAMPING_SOFTWARE = nil
+  c.SOF.TIMESTAMPING_SYS_HARDWARE = nil
+  c.SOF.TIMESTAMPING_TX_ACK = nil
+  c.SOF.TIMESTAMPING_TX_HARDWARE = nil
+  c.SOF.TIMESTAMPING_TX_SCHED = nil
+  c.SOF.TIMESTAMPING_TX_SOFTWARE = nil
 
   return c
 end
