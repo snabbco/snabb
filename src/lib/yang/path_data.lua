@@ -562,6 +562,25 @@ local function pairs_from_grammar(grammar)
    end
 end
 
+local function expanded_pairs(values)
+   -- Return an iterator for each non-choice pair in values and each pair of
+   -- all choice bodies recursively.
+   local expanded = {}
+   local function expand(values)
+      for name, value in pairs(values) do
+         if value.type == 'choice' then
+            for _, body in pairs(value.choices) do
+               expand(body)
+            end
+         else
+            expanded[name] = value
+         end
+      end
+   end
+   expand(values)
+   return pairs(expanded)
+end
+
 function uniqueness_checker_from_grammar(grammar)
    -- Generate checker for table
    local function unique_assertion(leaves, grammar)
@@ -593,7 +612,7 @@ function uniqueness_checker_from_grammar(grammar)
       elseif grammar.type == 'table' then
          local pairs = pairs_from_grammar(grammar)
          -- visit values
-         for name, value in _G.pairs(grammar.values) do
+         for name, value in expanded_pairs(grammar.values) do
             for k, datum in pairs(data) do
                visit_unique_and_check(value, datum[normalize_id(name)])
             end
@@ -604,7 +623,7 @@ function uniqueness_checker_from_grammar(grammar)
          end
       elseif grammar.type == 'struct' then
          -- visit members
-         for name, member in pairs(grammar.members) do
+         for name, member in expanded_pairs(grammar.members) do
             visit_unique_and_check(member, data[normalize_id(name)])
          end
       end
@@ -648,7 +667,7 @@ function minmax_elements_checker_from_grammar(grammar)
       elseif grammar.type == 'table' then
          -- visit values
          local pairs = pairs_from_grammar(grammar)
-         for name, value in _G.pairs(grammar.values) do
+         for name, value in expanded_pairs(grammar.values) do
             for k, datum in pairs(data) do
                visit_minmax_and_check(value, datum[normalize_id(name)], name)
             end
@@ -657,7 +676,7 @@ function minmax_elements_checker_from_grammar(grammar)
          minmax_assertion(grammar, name)(data)
       elseif grammar.type == 'struct' then
          -- visit members
-         for name, member in pairs(grammar.members) do
+         for name, member in expanded_pairs(grammar.members) do
             visit_minmax_and_check(member, data[normalize_id(name)], name)
          end
       end
@@ -1001,6 +1020,74 @@ function selftest()
    ]]))
    assert(not success)
    print(result)
+
+   -- Test unique restrictions in choice body:
+   local choice_unique_schema = schema.load_schema([[module choice-unique-schema {
+      namespace "urn:ietf:params:xml:ns:yang:choice-unique-schema";
+      prefix "test";
+
+      choice ab {
+         list unique_test {
+           key "testkey"; unique "testleaf testleaf2";
+           leaf testkey { type string; mandatory true; }
+           leaf testleaf { type string; mandatory true; }
+           leaf testleaf2 { type string; mandatory true; }
+         }
+         list duplicate_test {
+           key "testkey";
+           leaf testkey { type string; mandatory true; }
+           leaf testleaf { type string;}
+           leaf testleaf2 { type string;}
+         }
+      }
+   }]])
+   local checker = consistency_checker_from_schema(choice_unique_schema, true)
+
+   -- Test unique validation in choice body (should fail)
+   local success, result = pcall(
+      checker,
+      data.load_config_for_schema(choice_unique_schema,
+                                  mem.open_input_string [[
+                                     unique_test {
+                                       testkey "foo";
+                                       testleaf "bar";
+                                       testleaf2 "baz";
+                                     }
+                                     unique_test {
+                                       testkey "foo2";
+                                       testleaf "bar";
+                                       testleaf2 "baz";
+                                     }
+   ]]))
+   assert(not success)
+
+   -- Test unique validation in choice body (should succeed)
+   checker(data.load_config_for_schema(choice_unique_schema,
+                                       mem.open_input_string [[
+                                          unique_test {
+                                            testkey "foo";
+                                            testleaf "bar";
+                                            testleaf2 "baz";
+                                          }
+                                          unique_test {
+                                            testkey "foo2";
+                                            testleaf "bar2";
+                                            testleaf2 "baz";
+                                          }
+   ]]))
+
+   -- Test unique validation in choice body (should succeed)
+   checker(data.load_config_for_schema(choice_unique_schema,
+                                       mem.open_input_string [[
+                                          duplicate_test {
+                                            testkey "foo";
+                                            testleaf "bar";
+                                          }
+                                          duplicate_test {
+                                            testkey "foo2";
+                                            testleaf "bar";
+                                          }
+   ]]))
 
    print("selftest: ok")
 end
