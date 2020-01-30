@@ -299,7 +299,7 @@ local function compile(instructions, alloc, dump)
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          | or Rq(reg1), Rq(reg2)
 
-      elseif itype == "or" then
+      elseif itype == "xor" then
          local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
          | xor Rq(reg1), Rq(reg2)
 
