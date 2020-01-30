@@ -44,7 +44,6 @@ function data_parser(schema_name, path, is_config)
    return function (data)
       local config = parser(data)
       validator(config)
-      print("validated")
       return config
    end
 end
