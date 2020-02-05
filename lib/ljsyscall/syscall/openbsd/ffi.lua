@@ -295,6 +295,7 @@ struct  sigaction {
 append [[
 int reboot(int howto);
 int ioctl(int d, unsigned long request, void *arg);
+int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
 
 /* not syscalls, but using for now */
 int grantpt(int fildes);

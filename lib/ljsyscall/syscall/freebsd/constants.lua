@@ -1335,5 +1335,13 @@ c.CAP_RIGHTS_VERSION = 0 -- we do not understand others
 
 end -- freebsd >= 10
 
+if version >= 11 then
+-- for utimensat
+c.UTIME = strflag {
+  NOW  = -1,
+  OMIT = -2,
+}
+end
+
 return c
 
