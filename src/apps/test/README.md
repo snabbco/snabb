@@ -79,6 +79,11 @@ Generate a random payload for each packet in `sizes`.
 Insert the packet number (32bit uint) directly after the ethertype. The packet
 number starts at 0 and is sequential on each output link.
 
+— Key **packets**
+
+Emit *packets* (an array of *packets*) instead of synthesizing packets. When
+this option is used *src*, *dst*, *sizes*, and *random_payload* are ignored.
+
 ## Npackets (apps.test.npackets)
 
 The `Npackets` app allows are most N packets to flow through it. Any further

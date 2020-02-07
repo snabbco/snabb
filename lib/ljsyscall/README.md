@@ -16,13 +16,15 @@ The [video of my FOSDEM 2013 talk](http://www.myriabit.com/ljsyscall/) here, and
 
 ## Install
 
+A Docker hub automated build (currently only for Linux) is available via `docker pull justincormack/ljsyscall`. You can run the test suite with `docker run justincormack/ljsyscall test/test.lua`, use in a scripted way eg `docker run justincormack/ljsyscall -e "print(require('syscall').nl.interfaces())"` or get an interactive session with `docker -it run justincormack/ljsyscall`.
+
 The stable release is now available in the luarocks repository, so you should be able to run ```luarocks install ljsyscall```. There will be a ```ljsyscall-rump``` rock soon, but I need to fix the install for the rump libraries.
 
 For simple uses, you just need to put the ```.lua``` files somewhere that LuaJIT will find them, eg typically in ```/usr/local/share/lua/5.1/```. Keep the directory structure there is. You can safely remove files from architectures and operating systems you do not use.
 
 You can also install the head version using luarocks: ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` .
 
-It is also available as a package in [buildroot](http://buildroot.uclibc.org/), a build system for embedded systems, and in [pkgsrc](http://www.pkgsrc.org] the portable packaging system for many systems.
+It is also available as a package in [buildroot](http://buildroot.uclibc.org/), a build system for embedded systems, and in [pkgsrc](http://www.pkgsrc.org] the portable packaging system for many systems. It is now packaged for [Alpine Linux](http://www.alpinelinux.org/), in the testing repository.
 
 If you are using Lua rather than LuaJIT you need to install [luaffi](https://github.com/jmckaskill/luaffi) first; this is largely working now, but there will be more support for standard Lua coming soon.
 
@@ -66,6 +68,7 @@ This project is being used in a variety of places, such as for testing the Linux
 * [buildroot](http://buildroot.uclibc.org/) has an ljsyscall package.
 * [luatz](https://github.com/daurnimator/luatz) uses ljsyscall when available
 * [Snabb switch](https://github.com/SnabbCo/snabbswitch) a high performance networking toolkit.
+* [Spook](https://github.com/johnae/spook) started out as an fs events based test runner similar to Rubys guard but grew into an event toolkit of sorts.
 
 ## Testing
 

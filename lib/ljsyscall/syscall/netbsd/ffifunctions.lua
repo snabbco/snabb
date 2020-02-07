@@ -78,5 +78,7 @@ int __nanosleep50(const struct timespec *req, struct timespec *rem);
 int __timer_settime50(timer_t timerid, int flags, const struct itimerspec *new_value, struct itimerspec * old_value);
 int __timer_gettime50(timer_t timerid, struct itimerspec *curr_value);
 int __adjtime50(const struct timeval *delta, struct timeval *olddelta);
+
+int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
 ]]
 

@@ -4,3 +4,12 @@ tmp/*
 *.core
 ktrace.out
 obj/*
+
+/5.1-ljsyscall
+/debian/debhelper-build-stamp
+/debian/files
+/debian/lua-ljsyscall*
+/debian/lua_versions
+/debian/tmp
+/debian/trash
+

@@ -38,10 +38,6 @@ struct pcap_pkthdr {
 -- with the high-bit set as negative int32_t values, so we do the same
 -- for all of our 32-bit values including the "k" field in BPF
 -- instructions.
-ffi.cdef[[
-struct bpf_insn { uint16_t code; uint8_t jt, jf; int32_t k; };
-struct bpf_program { uint32_t bf_len; struct bpf_insn *bf_insns; };
-]]
 local bpf_program_mt = {
   __len = function (program) return program.bf_len end,
   __index = function (program, idx)
@@ -50,8 +46,8 @@ local bpf_program_mt = {
   end
 }
 
-bpf_insn = ffi.typeof("struct bpf_insn")
-bpf_program = ffi.metatype("struct bpf_program", bpf_program_mt)
+bpf_insn = ffi.typeof("struct { uint16_t code; uint8_t jt, jf; int32_t k; }")
+bpf_program = ffi.metatype("struct { uint32_t bf_len; struct bpf_insn *bf_insns; }", bpf_program_mt)
 pcap_record = ffi.typeof("struct pcap_record")
 pcap_pkthdr = ffi.typeof("struct pcap_pkthdr")
 

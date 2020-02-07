@@ -129,11 +129,6 @@ local function live_intervals(instrs)
    return order
 end
 
--- All available registers, tied to unix x64 ABI
-local caller_regs = {11, 10, 9, 8, 6, 2, 1, 0}
-local callee_regs = {15, 14, 13, 12, 3}
-local num_regs = #caller_regs + #callee_regs
-
 -- Check if a register is free in the freelist
 local function is_free(seq, reg)
    for _, val in ipairs(seq) do
@@ -182,23 +177,31 @@ local function delete_useless_movs(ir, alloc)
    end
 end
 
+-- All available registers, tied to unix x64 ABI
+x86_regs = {
+   caller_regs = {11, 10, 9, 8, 6, 2, 1, 0},
+   callee_regs = {15, 14, 13, 12, 3},
+   len = 6 -- %rsi
+}
+
 -- Do register allocation with the given IR
 -- Returns a register allocation and potentially mutates
 -- the ir for optimizations
-function allocate(ir)
+function allocate(ir, regs)
+   regs = regs or x86_regs
    local intervals = live_intervals(ir)
    local active = {}
    local next_spill = 0
 
    -- caller-save registers, use these first
-   local free_caller = utils.dup(caller_regs)
+   local free_caller = utils.dup(regs.caller_regs)
    -- callee-save registers, if we have to
-   local free_callee = utils.dup(callee_regs)
+   local free_callee = utils.dup(regs.callee_regs)
 
-   local allocation = { len = 6, -- %rsi
+   local allocation = { len = regs.len,
                         callee_saves = {},
                         spills = {} }
-   remove_free(free_caller, 6)
+   remove_free(free_caller, allocation.len)
 
    local function expire_old(interval)
       local to_expire = {}
@@ -213,9 +216,9 @@ function allocate(ir)
             table.insert(to_expire, idx)
 
             -- figure out which free list this register is supposed to be on
-            if is_free(caller_regs, reg) then
+            if is_free(regs.caller_regs, reg) then
                table.insert(free_caller, reg)
-            elseif is_free(callee_regs, reg) then
+            elseif is_free(regs.callee_regs, reg) then
                table.insert(free_callee, reg)
             else
                error("unknown register")

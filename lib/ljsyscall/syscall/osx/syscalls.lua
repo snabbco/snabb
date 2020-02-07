@@ -53,6 +53,14 @@ function S.clock_get_time(clock_serv, cur_time)
   return cur_time
 end
 
+-- cannot find out how to get new stat type from fstatat
+function S.fstatat(fd, path, buf, flags)
+  if not buf then buf = t.stat32() end
+  local ret, err = C.fstatat(c.AT_FDCWD[fd], path, buf, c.AT[flags])
+  if ret == -1 then return nil, t.error(err or errno()) end
+  return buf
+end
+
 return S
 
 end

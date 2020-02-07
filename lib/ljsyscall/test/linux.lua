@@ -2,7 +2,7 @@
 
 local function init(S)
 
-local helpers = require "syscall.helpers"
+local helpers = require "test.helpers"
 local abi = S.abi
 local types = S.types
 local c = S.c
@@ -269,7 +269,9 @@ test.misc_linux = {
   end,
 ]]
   test_adjtimex = function()
-    local tt = assert(S.adjtimex())
+    local tt, err = S.adjtimex()
+    if not tt and err.PERM then error "skipped" end
+    assert(tt, err)
   end,
   test_prctl = function()
     local n
@@ -346,9 +348,12 @@ test.misc_linux = {
   end,
   test_memfd = function()
     if not S.memfd_create then error "skipped" end
-    local fd, err = S.memfd_create("", "cloexec")
+    local fd, err = S.memfd_create("", "cloexec, allow_sealing")
     if not fd and err.NOSYS then error "skipped" end
     assert(fd, err)
+    local seals = assert(fd:fcntl("get_seals"))
+    assert(seals == 0)
+    assert(fd:fcntl("add_seals", "shrink, grow, write, seal"))
     assert(fd:close())
   end,
 }
@@ -431,10 +436,6 @@ test.netlink = {
   end,
   test_getlink = function()
     local i = assert(nl.getlink())
-    local st, err = S.stat("/sys/class/net") -- just in case sysfs not mounted
-    if not st then error "skipped" end
-    local df = assert(util.dirtable("/sys/class/net", true))
-    assert_equal(#df, #i, "expect same number of interfaces as /sys/class/net")
     assert(i.lo, "expect a loopback interface")
     local lo = i.lo
     assert(lo.flags.up, "loopback interface should be up")
@@ -486,7 +487,9 @@ test.netlink = {
   test_interfaces = function()
     local i = assert(nl.interfaces())
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
-    assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
+    if i.lo.inet6[1] then
+      assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
+    end
   end,
   test_newlink_flags_root = function()
     local p = assert(S.clone())
@@ -565,12 +568,6 @@ test.netlink = {
     assert_equal(tostring(i.dummy0.macaddr), "46:9d:c9:06:dd:dd", "interface should have new mac address")
     assert(i.dummy0:down())
     assert(i.dummy0:delete())
-  end,
-  test_interface_set_macaddr_fail = function()
-    local i = assert(nl.interfaces())
-    assert(i.lo, "expect to find lo")
-    local ok, err = nl.newlink(i.lo.index, 0, 0, 0, "address", "46:9d:c9:06:dd:dd")
-    assert(not ok and err and (err.PERM or err.OPNOTSUPP), "should not be able to change macaddr on lo")
   end,
   test_newlink_error_root = function()
     local ok, err = nl.newlink(-1, 0, "up", "up")
@@ -670,6 +667,7 @@ test.netlink = {
   test_getroute_inet6 = function()
     local r = assert(nl.routes("inet6", "unspec"))
     local nr = r:match("::1/128")
+    if #nr == 0 then error "skipped" end -- no ipv6 support
     assert(#nr >= 1, "expect at least one matched route") -- one of my machines has two
     local lor = nr[1]
     assert_equal(tostring(lor.source), "::", "expect empty source route")
@@ -766,6 +764,10 @@ test.netlink = {
     assert_equal(#n, 1)
     assert_equal(tostring(n[1].lladdr), "46:9d:c9:06:dd:dd")
     assert_equal(tostring(n[1].dst), "10.0.0.2")
+    assert_equal(tostring(n[1].dest), "10.0.0.2")
+    assert_equal(n[1].ifindex, i.dummy0.index)
+    assert_equal(n[1].state, c.NUD.PERMANENT)
+    assert_equal(n[1].flags, 0)
     assert(nl.delneigh(i.dummy0, {family = "inet"}, "dst", "10.0.0.2", "lladdr", "46:9d:c9:06:dd:dd"))
     assert(i.dummy0:delete())
   end,
@@ -1315,9 +1317,152 @@ test.bpf = {
   end,
 }
 
+-- test eBPF filters
+if S.bpf and not S.__rump then
+  test.bpf_root = {}
+  test.bpf_root.test_bpf_map_create = function()
+    local bpf = t.sock_filters(1, {
+      t.sock_filter("RET,K", 0)
+    })
+    -- Update
+    local key, klen = ffi.new('int [1]', 0xdead), ffi.sizeof('int')
+    local fd, err = assert(S.bpf_map_create(c.BPF_MAP.HASH, klen, klen, 10))
+    assert(S.bpf_map_op(c.BPF_CMD.MAP_UPDATE_ELEM, fd, key, key) == 0)
+    -- Retrieve
+    local val = ffi.new('int [1]', 0xbeef)
+    local ok, err = S.bpf_map_op(c.BPF_CMD.MAP_LOOKUP_ELEM, fd, key, val)
+    assert(ok and key[0] == val[0])
+    S.close(fd)
+  end
+  test.bpf_root.test_bpf_prog_load = function()
+    local bpf = t.bpf_insns(2, {
+      t.bpf_insn("ALU64,MOV,K", 0, 0, 0, 1),
+      t.bpf_insn("JMP,EXIT"),
+    })
+    local fd, err, log = S.bpf_prog_load(c.BPF_PROG.SOCKET_FILTER, bpf, 2)
+    if not fd then assert(false, err..': '..log) end
+    S.close(fd)
+  end
+end
+
+-- test perf_event_open
+if S.perf_event_open and not S.__rump then
+  test.perf_root = {}
+  test.perf_root.test_perf_open = function ()
+    -- Create perf event attribute with dummy config
+    local pe = t.perf_event_attr1()
+    pe[0].type = "software"
+    pe[0].config = "sw_dummy"
+    pe[0].disabled = 1
+    pe[0].exclude_kernel = 1
+    pe[0].exclude_hv = 1
+    -- Open event and read a dummy value
+    local fd = S.perf_event_open(pe)
+    fd:ioctl("PERF_EVENT_IOC_ENABLE", 0)
+    local count = t.buffer(ffi.sizeof('int64_t'))
+    local rb = fd:read(count, ffi.sizeof(count))
+    fd:ioctl("PERF_EVENT_IOC_DISABLE", 0)
+    fd:close()
+    -- Check just the size of read count
+    assert(rb == ffi.sizeof(count))
+  end
+  test.perf_root.test_perf_sw = function ()
+    -- Read out a software perf counter
+    local pe = t.perf_event_attr1()
+    pe[0].type = "software"
+    pe[0].config = "sw_cpu_clock"
+    pe[0].exclude_kernel = 1
+    pe[0].exclude_hv = 1
+    -- Open event and read a dummy value
+    -- @note perf event fd has CLO_EXEC, must not fork
+    local reader = t.perf_reader(S.perf_event_open(pe))
+    reader:start()
+    local ticks = reader:read()
+    reader:close()
+    -- Check just the size of read count
+    assert(ticks > 0)
+  end
+  test.perf_root.test_perf_attach = function ()
+    if not S.statfs("/sys/kernel/debug/tracing/events") then
+      print('skipping') -- debugfs must be mounted
+      return
+    end
+    -- Get tracepoint id
+    local tp = assert(S.perf_tracepoint("/sys/kernel/debug/tracing/events/syscalls/sys_enter_getcwd"))
+    local reader = S.perf_attach_tracepoint(tp)
+    -- Trace getcwd() syscall
+    reader:start()
+    S.getcwd()
+    S.getcwd()
+    local cnt = reader:read()
+    reader:stop()
+    reader:close()
+    -- Check value
+    assert(cnt == 2)
+  end
+  test.perf_root.test_perf_sampling = function ()
+    if not S.statfs("/sys/kernel/debug/tracing/events") then
+      print('skipping') -- debugfs must be mounted
+      return
+    end
+    local sample_t = ffi.typeof [[
+    struct {
+      struct perf_event_header header;
+      uint32_t size;
+      struct {
+        uint16_t id;
+        uint8_t flags;
+        uint8_t preempt_count;
+        int pid;
+      };
+      uint64_t ip;
+    } *
+    ]]
+    -- Get tracepoint id
+    local tp = assert(S.perf_tracepoint("/sys/kernel/debug/tracing/events/syscalls/sys_enter_getcwd"))
+    local reader = S.perf_attach_tracepoint(tp)
+    -- Trace getcwd() syscall
+    reader:mmap()
+    reader:start()
+    for i = 1,10 do S.getcwd() end
+    reader:stop()
+    -- Read samples from mmap
+    local cnt = 0;
+    for len,e in ipairs(reader) do
+      if e.type ~= c.PERF_RECORD.SAMPLE then break end
+      -- Check if we're the caller
+      e = ffi.cast(sample_t, e)
+      if e.pid == S.getpid() then
+        cnt = cnt + 1
+      end
+    end
+    reader:close()
+    -- Check if we got all samples
+    assert(cnt == 10)
+  end
+  test.perf_root.test_perf_kprobe = function ()
+    if not S.statfs("/sys/kernel/debug/tracing/events") then
+      print('skipping') -- debugfs must be mounted
+      return
+    end
+    -- Attach a kprobe to open()
+    local tp = assert(S.perf_probe("kprobe", "myprobe", "do_sys_open $retval", true))
+    local reader = S.perf_attach_tracepoint(tp)
+    reader:start()
+    S.open("/tmp", "rdonly")
+    local cnt = reader:read()
+    reader:stop()
+    reader:close()
+    -- Detach probe
+    S.perf_probe("kprobe", "myprobe", false)
+    -- See if we hit the probe
+    assert(cnt == 1)
+  end
+end
+
 -- TODO remove arch tests. Unclear if my ppc/arm does not support or a bug, retest later with newer kernel
 -- still ppc issues with 3.12.6 ppc, need to debug more, and mips issues
-if not (abi.arch == "ppc64le" or abi.arch == "ppc" or abi.arch == "arm" or abi.arch == "mips" or S.__rump) then -- cannot test on rump as uses clone()
+if not (abi.arch == "ppc64le" or abi.arch == "ppc" or abi.arch == "mips" or S.__rump) then -- cannot test on rump as uses clone()
 test.seccomp = {
   test_no_new_privs = function() -- this must be done for non root to call type 2 seccomp
     local p = assert(S.clone())
@@ -1481,7 +1626,7 @@ test.seccomp = {
       local pid = S.getpid()
       local ofd, err = S.open("/dev/null", "rdonly") -- not allowed
       fork_assert(not ofd, "should not run open")
-      fork_assert(err.errno == nr.SYS.open, "syscall that did not work should be open")
+      fork_assert(err.errno == nr.SYS.open or err.errno == nr.SYS.openat, "syscall that did not work should be open[at]")
       local pid = S.getpid()
       S._exit()
     else
@@ -1764,7 +1909,7 @@ test.processes_linux = {
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local infop, rusage = assert(S.waitid("all", 0, "exited, stopped, continued"))
+      local infop, rusage = assert(S.waitid("pid", pid, "exited, stopped, continued"))
       assert_equal(infop.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
       assert_equal(infop.status, 23, "exit should be 23")
       assert_equal(infop.code, c.SIGCLD.EXITED, "normal exit expected")
@@ -1783,6 +1928,9 @@ test.processes_linux = {
       assert(status.WIFEXITED, "process should have exited normally")
       assert(status.EXITSTATUS == 23, "exit should be 23")
     end
+  end,
+  test_tid = function()
+     assert(S.getpid() == S.gettid(), "PID should be the same as TID")
   end,
 }
 test.scheduler = {
@@ -1850,13 +1998,11 @@ test.swap = {
     assert_equal(c.SWAP_FLAG["23, discard"], c.SWAP_FLAG["prefer, discard"] + bit.lshift(23, c.SWAP_FLAG["prio_shift"]))
   end,
   test_swap_fail = function()
-    local ex = "PERM" -- EPERM if not root
-    if S.geteuid() == 0 then ex = "INVAL" end
     local ok, err = S.swapon("/dev/null", "23, discard")
     if not ok and err.NOSYS then return end -- Android does not implement swap, so skip test
-    assert(not ok and err[ex], "should not create swap on /dev/null")
+    assert(not ok and (err.PERM or err.INVAL), "should not create swap on /dev/null")
     local ok, err = S.swapoff("/dev/null")
-    assert(not ok and err[ex], "no swap on /dev/null")
+    assert(not ok and (err.PERM or err.INVAL), "no swap on /dev/null")
   end,
   -- TODO need mkswap to test success
 }
