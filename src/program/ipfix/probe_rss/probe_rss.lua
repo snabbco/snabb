@@ -13,6 +13,7 @@ local main_config = {
    interfaces = { required = true },
    hw_rss_scaling = { default = 1 },
    rss = { required = true },
+   rss_jit = { default = nil },
    ipfix = { required = true }
 }
 local interface_config = {
@@ -67,6 +68,26 @@ for _, key in ipairs({
       "instance"
 }) do
    ipfix_default_config[key] = nil
+end
+
+local function override_jit(default, config_in, dump_suffix)
+   local jit = lib.deepcopy(default)
+   if config_in then
+      local config = lib.parse(config_in, jit_config)
+      if config.opts then
+         jit.opts = config.opts
+      end
+      if config.dump then
+         local dump = lib.deepcopy(config.dump)
+         local file = dump[2]
+         if file then
+            file = file.."_"..dump_suffix
+            dump[2] = file
+         end
+         jit.dump = dump
+      end
+   end
+   return jit
 end
 
 local function create_workers (probe_config, duration, busywait, jit, logger)
@@ -162,22 +183,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
                iconfig.input_type = "interlink"
                iconfig.input = rss_link
 
-               -- Override jit options and dump file
-               local jit = lib.deepcopy(jit)
-               if instance.jit then
-                  if instance.jit.opts then
-                     jit.opts = instance.jit.opts
-                  end
-                  if instance.jit.dump then
-                     local dump = lib.deepcopy(instance.jit.dump)
-                     local file = dump[2]
-                     if file then
-                        file = file.."_"..od
-                        dump[2] = file
-                     end
-                     jit.dump = dump
-                  end
-               end
+               local jit =  override_jit(jit, instance.jit, od)
 
                local worker_expr = string.format(
                   'require("program.ipfix.lib").run(%s, %s, %s, nil, %s)',
@@ -192,17 +198,11 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
          end
       end
 
-      local jit_c = lib.deepcopy(jit)
-      if jit_c.dump then
-         if jit_c.dump[2] then
-            jit_c.dump[2] = jit_c.dump[2].."_"..rssq
-         end
-      end
       local worker_expr = string.format(
          'require("program.ipfix.lib").run_rss(%s, %s, %s, %s, %s, nil, %s)',
          probe.value_to_string(main.rss), probe.value_to_string(inputs),
          probe.value_to_string(outputs), tostring(duration),
-         tostring(busywait), probe.value_to_string(jit_c)
+         tostring(busywait), probe.value_to_string(override_jit(jit, main.rss_jit, rssq))
       )
       rss_workers["rss"..rssq] = worker_expr
 
