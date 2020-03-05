@@ -57,7 +57,7 @@ local hash_info = {
 
 function rss:new (config)
    local o = { classes = {},
-               links_configured = {},
+               classes_active = {},
                queue = link.new("queue"),
                rxpackets = 0,
                rxdrops_filter = 0,
@@ -107,47 +107,43 @@ function rss:new (config)
    return setmetatable(o, { __index = self })
 end
 
-function rss:link ()
-   for name, l in pairs(self.output) do
-      if type(name) == "string" then
-         if not self.links_configured[name] then
-            self.links_configured[name] = true
-            local match = false
-            for _, class in ipairs(self.classes) do
-               local instance = name:match("^"..class.name.."_(.*)")
-               if instance then
-                  match = true
-                  local weight = instance:match("^%w+_(%d+)$") or 1
-                  for _ = 1, weight do
-                     table.insert(class.output, l)
-                  end
-                  -- Avoid calls to lj_tab_len() in distribute()
-                  class.output.n = #class.output
-               end
-            end
-            if not match then
-               print("Ignoring link (does not match any filters): "..name)
-            end
-         end
+local function insert_unique(t, new_elt)
+   for _, elt in ipairs(t) do
+      if elt == new_elt then
+         return
       end
    end
+   table.insert(t, new_elt)
+end
 
-   self.classes_active = {}
-   for _, class in ipairs(self.classes) do
-      if #class.output > 0 then
-         table.insert(self.classes_active, class)
+function rss:link (mode, direction, name, link)
+   if mode == 'unlink' then return end
+
+   if direction == 'input' then
+      local vlan = name:match("^vlan(%d+)$")
+      if vlan then
+         vlan = tonumber(vlan)
+         assert(vlan > 0 and vlan < 4095, "Illegal VLAN id: "..vlan)
       end
-   end
+      return self.push_from_tagged, vlan
+   else
+      local match = false
+      for _, class in ipairs(self.classes) do
+         local instance = name:match("^"..class.name.."_(.*)")
+         if instance then
+            match = true
+            local weight = instance:match("^%w+_(%d+)$") or 1
+            for _ = 1, weight do
+               table.insert(class.output, link)
+            end
+            -- Avoid calls to lj_tab_len() in distribute()
+            class.output.n = #class.output
 
-   self.input_tagged = {}
-   for name, link in pairs(self.input) do
-      if type(name) == "string" then
-         local vlan = name:match("^vlan(%d+)$")
-         if vlan then
-            vlan = tonumber(vlan)
-            assert(vlan > 0 and vlan < 4095, "Illegal VLAN id: "..vlan)
+            insert_unique(self.classes_active, class)
          end
-         table.insert(self.input_tagged, { link = link, vlan = vlan })
+      end
+      if not match then
+         print("Ignoring link (does not match any filters): "..name)
       end
    end
 end
@@ -176,18 +172,15 @@ local function distribute (p, links, hash)
    transmit(links[index], p)
 end
 
-function rss:push ()
+function rss:push_from_tagged(link, vlan)
    local queue = self.queue
 
-   for _, input in ipairs(self.input_tagged) do
-      local link, vlan = input.link, input.vlan
-      local npackets = nreadable(link)
-      self.rxpackets = self.rxpackets + npackets
-      for _ = 1, npackets do
-         local p = receive(link)
-         hash(mdadd(p, self.rm_ext_headers, vlan))
-         transmit(queue, p)
-      end
+   local npackets = nreadable(link)
+   self.rxpackets = self.rxpackets + npackets
+   for _ = 1, npackets do
+      local p = receive(link)
+      hash(mdadd(p, self.rm_ext_headers, vlan))
+      transmit(queue, p)
    end
 
    for _, class in ipairs(self.classes_active) do
@@ -231,7 +224,9 @@ function rss:push ()
          end
       end
    end
+end
 
+function rss:housekeeping()
    if self.sync_timer() then
       counter.set(self.shm.rxpackets, self.rxpackets)
       counter.set(self.shm.rxdrops_filter, self.rxdrops_filter)
