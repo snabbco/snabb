@@ -170,8 +170,6 @@ function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
    local max_length = self.mtu + ether_header_len
 
-   self.outgoing_ipv4_fragments_alarm:check()
-
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
@@ -194,6 +192,10 @@ function Fragmenter:push ()
          packet.free(pkt)
       end
    end
+end
+
+function Fragmenter:housekeeping ()
+   self.outgoing_ipv4_fragments_alarm:check()
 end
 
 function selftest()

@@ -10,7 +10,9 @@ included).  The exporter can produce output in either the standard RFC
 
     DIAGRAM: IPFIX
                    +-----------+
+                   |           |
     input     ---->*   IPFIX   *---->  output
+                   |           |
                    +-----------+
 
 See the `snabb ipfix probe` command-line interface for a program built

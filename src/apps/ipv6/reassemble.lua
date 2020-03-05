@@ -302,8 +302,6 @@ end
 function Reassembler:push ()
    local input, output = self.input.input, self.output.output
 
-   self.incoming_ipv6_fragments_alarm:check()
-
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
@@ -327,6 +325,10 @@ function Reassembler:push ()
          link.transmit(output, pkt)
       end
    end
+end
+
+function Reassembler:housekeeping ()
+   self.incoming_ipv6_fragments_alarm:check()
 
    if self.next_counter_update < engine.now() then
       -- Update counters every second, but add a bit of jitter to smooth

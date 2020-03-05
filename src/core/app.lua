@@ -68,6 +68,10 @@ maxsleep = 100
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
 busywait = false
 
+-- always_push: If true, always call push() methods even if the
+-- receiving link is empty
+always_push = false
+
 -- True when the engine is running the breathe loop.
 local running = false
 
@@ -81,11 +85,11 @@ end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
-function with_restart (app, method)
+function with_restart (app, method, link, arg)
    local status, result
    if use_restart then
       -- Run fn in protected mode using pcall.
-      status, result = pcall(method, app)
+      status, result = pcall(method, app, link, arg)
 
       -- If pcall caught an error mark app as "dead" (record time and cause
       -- of death).
@@ -93,7 +97,7 @@ function with_restart (app, method)
          app.dead = { error = result, time = now() }
       end
    else
-      status, result = true, method(app)
+      status, result = true, method(app, link, arg)
    end
    return status, result
 end
@@ -135,6 +139,12 @@ function configure (new_config)
    local actions = compute_config_actions(configuration, new_config)
    apply_config_actions(actions)
    counter.add(configs)
+end
+
+
+-- Stop all apps by loading an empty configuration.
+function stop ()
+   configure(config.new())
 end
 
 -- Removes the claim on a name, freeing it for other programs.
@@ -299,14 +309,14 @@ function apply_config_actions (actions)
       local link = app.output[linkname]
       app.output[linkname] = nil
       remove_link_from_array(app.output, link)
-      if app.link then app:link() end
+      if app.link then app:link('unlink', 'output', linkname) end
    end
    function ops.unlink_input (appname, linkname)
       local app = app_table[appname]
       local link = app.input[linkname]
       app.input[linkname] = nil
       remove_link_from_array(app.input, link)
-      if app.link then app:link() end
+      if app.link then app:link('unlink', 'input', linkname) end
    end
    function ops.free_link (linkspec)
       link.free(link_table[linkspec], linkspec)
@@ -320,16 +330,23 @@ function apply_config_actions (actions)
    function ops.link_output (appname, linkname, linkspec)
       local app = app_table[appname]
       local link = assert(link_table[linkspec])
+      assert(not app.output[linkname],
+             appname..": duplicate output link "..linkname)
       app.output[linkname] = link
       table.insert(app.output, link)
-      if app.link then app:link() end
+      if app.link then app:link('link', 'output', linkname, link) end
    end
    function ops.link_input (appname, linkname, linkspec)
       local app = app_table[appname]
       local link = assert(link_table[linkspec])
+      assert(not app.input[linkname],
+             appname..": duplicate input link "..linkname)
       app.input[linkname] = link
       table.insert(app.input, link)
-      if app.link then app:link() end
+      if app.link then
+         local method, arg = app:link('link', 'input', linkname, link)
+         app.push_link[linkname] = { method = method, arg = arg }
+      end
    end
    function ops.stop_app (name)
       local app = app_table[name]
@@ -348,6 +365,7 @@ function apply_config_actions (actions)
       app.appname = name
       app.output = {}
       app.input = {}
+      app.push_link = {}
       app_table[name] = app
       app.zone = zone
       if app.shm then
@@ -418,11 +436,19 @@ function compute_breathe_order ()
          end
       end
       for linkname,link in pairs(app.input) do
-         linknames[link] = appname..'.'..linkname
-         inputs[link] = app
+         if type(linkname) == "string" then
+            linknames[link] = appname..'.'..linkname
+            local method, arg = app['push_'..linkname] or app.push, nil
+            if app.push_link[linkname] then
+               method = app.push_link[linkname].method or method
+               arg = app.push_link[linkname].arg
+            end
+            inputs[link] = { app = app, method = method, arg = arg, link = link }
+         end
       end
    end
-   for link,app in pairs(inputs) do
+   for link,spec in pairs(inputs) do
+      local app = spec.app
       successors[link] = {}
       if not app.pull then
          for _,succ in pairs(app.output) do
@@ -452,7 +478,7 @@ function compute_breathe_order ()
    local link_order = tsort(nodes, entry_nodes, successors)
    local i = 1
    for _,link in ipairs(link_order) do
-      if breathe_push_order[#breathe_push_order] ~= inputs[link] then
+      if breathe_push_order[#breathe_push_order] ~= inputs[link].app then
          table.insert(breathe_push_order, inputs[link])
       end
    end
@@ -511,6 +537,7 @@ function pace_breathing ()
    end
 end
 
+local empty = link.empty
 function breathe ()
    running = true
    monotonic_now = C.get_monotonic_time()
@@ -527,11 +554,17 @@ function breathe ()
    end
    -- Exhale: push work out through the app network
    for i = 1, #breathe_push_order do
-      local app = breathe_push_order[i]
-      if app.push and not app.dead then
-         zone(app.zone)
-         with_restart(app, app.push)
-         zone()
+      local spec = breathe_push_order[i]
+      local app = spec.app
+      if spec.method and not app.dead then
+         if always_push or not empty(spec.link) then
+            zone(app.zone)
+            with_restart(app, spec.method, spec.link, spec.arg)
+            zone()
+         end
+      end
+      if app.housekeeping then
+         app:housekeeping()
       end
    end
    counter.add(breaths)
@@ -637,6 +670,7 @@ end
 
 function selftest ()
    print("selftest: app")
+   always_push = true
    local App = { push = true }
    function App:new () return setmetatable({}, {__index = App}) end
    local c1 = config.new()
@@ -723,6 +757,11 @@ function selftest ()
    assert(app_table.app3 == orig_app3) -- should be the same
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
+
+   -- Check engine stop
+   assert(not lib.equal(app_table, {}))
+   engine.stop()
+   assert(lib.equal(app_table, {}))
 
    -- Check one can't unclaim a name if no name is claimed.
    assert(not pcall(unclaim_name))

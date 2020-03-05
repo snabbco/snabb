@@ -189,18 +189,19 @@ local function test_join ()
    engine.configure(config.new()) -- Clean up engine.
 
    local c = config.new()
-   config.app(c, 'source', basic_apps.Join)
+   config.app(c, 'source4', basic_apps.Join)
+   config.app(c, 'source6', basic_apps.Join)
    config.app(c, 'v4v6', V4V6)
    config.app(c, 'sink', basic_apps.Sink)
 
-   config.link(c, 'source.output -> v4v6.v4')
-   config.link(c, 'source.output -> v4v6.v6')
+   config.link(c, 'source4.output -> v4v6.v4')
+   config.link(c, 'source6.output -> v4v6.v6')
    config.link(c, 'v4v6.output -> sink.input')
 
    engine.configure(c)
-   link.transmit(engine.app_table.source.output.output, arp_pkt())
-   link.transmit(engine.app_table.source.output.output, ipv4_pkt())
-   link.transmit(engine.app_table.source.output.output, ipv6_pkt())
+   link.transmit(engine.app_table.source4.output.output, arp_pkt())
+   link.transmit(engine.app_table.source4.output.output, ipv4_pkt())
+   link.transmit(engine.app_table.source6.output.output, ipv6_pkt())
    engine.main({duration = 0.1, noreport = true})
 
    assert(link.stats(engine.app_table.sink.input.input).rxpackets == 3)

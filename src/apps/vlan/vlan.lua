@@ -46,19 +46,17 @@ end
 
 -- pop a VLAN tag (4 byte of TPID and TCI) from a packet
 function pop_tag (pkt)
-   local payload = pkt.data + o_ethernet_ethertype
-   local length = pkt.length
-   pkt.length = length - 4
-   C.memmove(payload, payload + 4, length - o_ethernet_ethertype - 4)
+   C.memmove(pkt.data + 4, pkt.data, o_ethernet_ethertype)
+   return packet.shiftleft(pkt, 4)
 end
 
 -- push a VLAN tag onto a packet.  The tag is in network byte-order.
 function push_tag (pkt, tag)
+   local pkt = packet.shiftright(pkt, 4)
+   C.memmove(pkt.data, pkt.data + 4, o_ethernet_ethertype)
    local payload = pkt.data + o_ethernet_ethertype
-   local length = pkt.length
-   pkt.length = length + 4
-   C.memmove(payload + 4, payload, length - o_ethernet_ethertype)
    cast(uint32_ptr_t, payload)[0] = tag
+   return pkt
 end
 
 -- extract TCI (2 bytes) from packet, no check is performed to verify that the
@@ -102,8 +100,7 @@ function Tagger:push ()
    local tag = self.tag
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      push_tag(pkt, tag)
-      transmit(output, pkt)
+      transmit(output, push_tag(pkt, tag))
    end
 end
 
@@ -124,71 +121,71 @@ function Untagger:push ()
          -- Incorrect VLAN tag; drop.
          packet.free(pkt)
       else
-         pop_tag(pkt)
-         transmit(output, pkt)
+         transmit(output, pop_tag(pkt))
       end
    end
 end
 
 function VlanMux:new (conf)
-   local o = setmetatable({}, {__index=VlanMux})
+   local o = setmetatable({ vlan_links = {} }, {__index=VlanMux})
    return new_aux(o, conf)
 end
 
-function VlanMux:link ()
-   local from_vlans, to_vlans = {}, {}
-   for name, l in pairs(self.input) do
-      if string.match(name, "vlan%d+") then
-         local vid = check_tag(tonumber(string.sub(name, 5)))
-         to_vlans[vid] = self.output[name]
-         table.insert(from_vlans, { link = l, vid = vid })
-      elseif name == "native" then
-         to_vlans[0] = self.output.native
-      elseif type(name) == "string" and name ~= "trunk" then
-         error("invalid link name "..name)
+function VlanMux:link (mode, dir, name, l)
+   local vid
+   if string.match(name, "vlan%d+") then
+      vid = check_tag(tonumber(string.sub(name, 5)))
+   end
+   if dir == 'output' then
+      if name == 'native' then vid = 0 end
+      if vid then
+         if mode == 'unlink' then
+            self.vlan_links[vid] = nil
+         else
+            self.vlan_links[vid] = l
+         end
+         return
+      end
+   else
+      if mode == 'unlink' then return end
+      if vid then
+         return self.push_from_vlans, build_tag(vid, self.tpid)
       end
    end
-   self.from_vlans = from_vlans
-   self.to_vlans = to_vlans
+   if name ~= "trunk" and name ~= "native" then
+      error("invalid link name "..name)
+   end
 end
 
-function VlanMux:push ()
-   local from, to = self.from_vlans, self.to_vlans
+function VlanMux:push_from_vlans (lin, tag)
+   local otrunk = assert(self.output.trunk)
+   for _ = 1, link.nreadable(lin) do
+      self:transmit(otrunk, push_tag(receive(lin), tag))
+   end
+end
+
+function VlanMux:push_native (lin)
+   local otrunk = assert(self.output.trunk)
+   for _ = 1, link.nreadable(lin) do
+      self:transmit(otrunk, receive(lin))
+   end
+end
+
+-- Only called for input from "trunk"
+function VlanMux:push (itrunk)
+   local links = self.vlan_links
    local tpid = self.tpid
-   local l_in = self.input.trunk
-   assert(l_in)
-   while not empty(l_in) do
-      local p = receive(l_in)
+   for _ = 1, link.nreadable(itrunk) do
+      local p = receive(itrunk)
       local ethertype = cast("uint16_t*", p.data
                                 + o_ethernet_ethertype)[0]
       if ethertype == htons(tpid) then
          -- dig out TCI field
          local tci = extract_tci(p)
          local vid = tci_to_vid(tci)
-         pop_tag(p)
-         self:transmit(to[vid], p)
+         self:transmit(links[vid], pop_tag(p))
       else -- untagged, send to native output
-         self:transmit(to[0], p)
-      end
-   end
-
-   local l_out = self.output.trunk
-   local i = 1
-   while from[i] do
-      local from = from[i]
-      local l_in = from.link
-      while not empty(l_in) do
-         local p = receive(l_in)
-         push_tag(p, build_tag(from.vid, tpid))
-         self:transmit(l_out, p)
-      end
-      i = i + 1
-   end
-
-   local l_in = self.input.native
-   if l_in then
-      while not empty(l_in) do
-         self:transmit(l_out, receive(l_in))
+         self:transmit(links[0], p)
       end
    end
 end
@@ -212,13 +209,14 @@ function test_tag_untag ()
       26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
       36 37
    ]], 82))
-   local payload = pkt.data + o_ethernet_ethertype
    local vid = 0
    for i=0,15 do
       for j=0,255 do
          local tag = build_tag(vid, tpids.dot1q)
-         push_tag(pkt, tag)
+         pkt = push_tag(pkt, tag)
+         local payload = pkt.data + o_ethernet_ethertype
          assert(cast(uint32_ptr_t, payload)[0] == tag)
+         pkt = pop_tag(pkt)
          vid = vid + 1
       end
    end
@@ -246,15 +244,17 @@ function selftest()
    app.configure(c)
    app.main({duration = 1})
 
-   print("vlan sent: "
-            ..link.stats(app.app_table.vlan_source.output.output).txpackets)
-   print("native sent: "
-            ..link.stats(app.app_table.native_source.output.output).txpackets)
-   print("trunk received: "
-            ..link.stats(app.app_table.trunk_sink.input.input).rxpackets)
-   print("trunk sent: "
-            ..link.stats(app.app_table.trunk_source.output.output).txpackets)
-   print("native received: "
-            ..link.stats(app.app_table.native_sink.input.input).rxpackets)
+   local vsent = link.stats(app.app_table.vlan_source.output.output).txpackets
+   local nsent = link.stats(app.app_table.native_source.output.output).txpackets
+   local trecv = link.stats(app.app_table.trunk_sink.input.input).rxpackets
+   local tsent = link.stats(app.app_table.trunk_source.output.output).txpackets
+   local nrecv = link.stats(app.app_table.native_sink.input.input).rxpackets
+   print("vlan sent: "..vsent)
+   print("native sent: "..nsent)
+   print("trunk received: "..trecv)
+   assert(trecv == vsent + nsent)
+   print("trunk sent: "..tsent)
+   print("native received: "..nrecv)
+   assert(nrecv == tsent)
    test_tag_untag()
 end
