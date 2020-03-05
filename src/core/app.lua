@@ -544,16 +544,25 @@ function breathe ()
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
-   for i = 1, #breathe_pull_order do
+   local i = 1
+   ::PULL_LOOP::
+   do
+      if i > #breathe_pull_order then goto PULL_EXIT end
       local app = breathe_pull_order[i]
       if app.pull and not app.dead then
          zone(app.zone)
          with_restart(app, app.pull)
          zone()
       end
+      i = i+1
+      goto PULL_LOOP
    end
+   ::PULL_EXIT::
    -- Exhale: push work out through the app network
-   for i = 1, #breathe_push_order do
+   i = 1
+   ::PUSH_LOOP::
+   do
+      if i > #breathe_push_order then goto PUSH_EXIT end
       local spec = breathe_push_order[i]
       local app = spec.app
       if spec.method and not app.dead then
@@ -566,7 +575,10 @@ function breathe ()
       if app.housekeeping then
          app:housekeeping()
       end
+      i = i+1
+      goto PUSH_LOOP
    end
+   ::PUSH_EXIT::
    counter.add(breaths)
    -- Commit counters and rebalance freelists at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then
