@@ -15,6 +15,8 @@ local receive, transmit = link.receive, link.transmit
 local nreadable = link.nreadable
 local free, clone = packet.free, packet.clone
 local mdadd, mdget, mdcopy = metadata.add, metadata.get, metadata.copy
+local ether_header_ptr_t = metadata.ether_header_ptr_t
+
 
 local transport_proto_p = {
    -- TCP
@@ -54,6 +56,44 @@ local hash_info = {
       addr_size = 32
    },
 }
+
+local etht_demux = {}
+
+function etht_demux:alloc_l2 ()
+   local l2 = ffi.new("struct link *[256]", self.default_queue)
+   table.insert(self.l2_anchors, l2)
+   return l2
+end
+
+local function split (type)
+   local hi = bit.rshift(type, 8)
+   local lo = bit.band(type, 0x00FF)
+   return hi, lo
+end
+
+function etht_demux:add (type, link)
+   local hi, lo = split(type)
+   local l2 = self.l1[hi]
+   if l2 == self.default then
+      l2 = self:alloc_l2()
+      self.l1[hi] = l2
+   end
+   l2[lo] = link
+end
+
+function etht_demux:new (default_queue)
+   local o = setmetatable({}, { __index = etht_demux })
+   o.default_queue = default_queue
+   o.l2_anchors = {}
+   o.default = o:alloc_l2()
+   o.l1 = ffi.new("struct link **[256]", o.default)
+   return o
+end
+
+function etht_demux:lookup (type)
+   local hi, lo = split(type)
+   return self.l1[hi][lo]
+end
 
 function rss:new (config)
    local o = { classes = {},
@@ -103,6 +143,50 @@ function rss:new (config)
       -- Catch-all default filter
       add_class("default", function () return true end)
    end
+
+   o.queues_by_name = {}
+   o.demux_queues = {}
+
+   local function add_queue(name, add_to_list)
+      local queue = link.new(name)
+      o.queues_by_name[name] = queue
+      if add_to_list then
+         table.insert(o.demux_queues, queue)
+      end
+      return queue
+   end
+
+   local function add_demux(default, types)
+      local default_queue = add_queue(default, true)
+      local demux = etht_demux:new(default_queue)
+      for _, type in ipairs(types) do
+         local queue = add_queue(type.name, type.add_to_list)
+         demux:add(type.type, queue)
+      end
+      return demux
+   end
+
+   o.demux1 = add_demux("default_untagged", {
+                           { name = "dot1q",
+                             type = 0x8100,
+                             add_to_list = false },
+                           { name = "ipv4",
+                             type = 0x0800,
+                             add_to_list = true},
+                           { name = "ipv6",
+                             type = 0x86dd,
+                             add_to_list = true}
+   })
+   o.demux2 = add_demux("default_tagged", {
+                           { name= "ipv4_tagged",
+                             type = 0x0800,
+                             add_to_list = true },
+                           { name = "ipv6_tagged",
+                             type = 0x86dd,
+                             add_to_list = true}
+   })
+
+   o.nqueues = #o.demux_queues
 
    return setmetatable(o, { __index = self })
 end
@@ -173,14 +257,30 @@ local function distribute (p, links, hash)
 end
 
 function rss:push_from_tagged(link, vlan)
-   local queue = self.queue
-
    local npackets = nreadable(link)
    self.rxpackets = self.rxpackets + npackets
+
    for _ = 1, npackets do
       local p = receive(link)
-      hash(mdadd(p, self.rm_ext_headers, vlan))
-      transmit(queue, p)
+      local hdr = ffi.cast(ether_header_ptr_t, p.data)
+      transmit(self.demux1:lookup(lib.ntohs(hdr.ether.type)), p)
+   end
+
+   local dot1q = self.queues_by_name.dot1q
+   for _ = 1, nreadable(dot1q) do
+      local p = receive(dot1q)
+      local hdr = ffi.cast(ether_header_ptr_t, p.data)
+      transmit(self.demux2:lookup(lib.ntohs(hdr.dot1q.type)), p)
+   end
+
+   local queue, demux_queues = self.queue, self.demux_queues
+   for i = 1, self.nqueues do
+      local demux_queue = demux_queues[i]
+      for _ = 1, nreadable(demux_queue) do
+         local p = receive(demux_queue)
+         hash(mdadd(p, self.rm_ext_headers, vlan))
+         transmit(queue, p)
+      end
    end
 
    for _, class in ipairs(self.classes_active) do
