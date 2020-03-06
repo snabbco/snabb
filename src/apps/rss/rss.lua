@@ -274,14 +274,24 @@ function rss:push_from_tagged(link, vlan)
    end
 
    local queue, demux_queues = self.queue, self.demux_queues
-   for i = 1, self.nqueues do
+
+   -- Perform explicit unrolling of the loop over the queues to make
+   -- sure each one inlines copy of metadata.add() which is
+   -- specialized to the packet type being processed.
+   local i = 1
+   ::LOOP::
+   do
+      if i > self.nqueues then goto EXIT end
       local demux_queue = demux_queues[i]
       for _ = 1, nreadable(demux_queue) do
          local p = receive(demux_queue)
          hash(mdadd(p, self.rm_ext_headers, vlan))
          transmit(queue, p)
       end
+      i = i+1
+      goto LOOP
    end
+   ::EXIT::
 
    for _, class in ipairs(self.classes_active) do
       -- Apply the filter to all packets.  If a packet matches, it is
