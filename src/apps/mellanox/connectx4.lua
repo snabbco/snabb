@@ -177,9 +177,18 @@ end
 ConnectX4 = {}
 ConnectX4.__index = ConnectX4
 
+local mlx_types = {
+   ["0x1013" ] = 4, -- ConnectX4
+   ["0x1017" ] = 5, -- ConnectX5
+   ["0x1019" ] = 5, -- ConnectX5
+}
+
 function ConnectX4:new (conf)
    local self = setmetatable({}, self)
    local pciaddress = pci.qualified(conf.pciaddress)
+   local device_info = pci.device_info(pciaddress)
+   self.mlx = assert(mlx_types[device_info.device],
+                     "Unsupported device "..device_info.device)
 
    local sendq_size = conf.sendq_size or 1024
    local recvq_size = conf.recvq_size or 1024
@@ -210,7 +219,9 @@ function ConnectX4:new (conf)
    local hca = hca_factory:new()
 
    -- Makes enable_hca() hang with ConnectX5
-   -- init_seg:reset()
+   if self.mlx == 4 then
+      init_seg:reset()
+   end
    if debug_trace then init_seg:dump() end
    while not init_seg:ready() do
       C.usleep(1000)
