@@ -177,9 +177,18 @@ end
 ConnectX4 = {}
 ConnectX4.__index = ConnectX4
 
+local mlx_types = {
+   ["0x1013" ] = 4, -- ConnectX4
+   ["0x1017" ] = 5, -- ConnectX5
+   ["0x1019" ] = 5, -- ConnectX5
+}
+
 function ConnectX4:new (conf)
    local self = setmetatable({}, self)
    local pciaddress = pci.qualified(conf.pciaddress)
+   local device_info = pci.device_info(pciaddress)
+   self.mlx = assert(mlx_types[device_info.device],
+                     "Unsupported device "..device_info.device)
 
    local sendq_size = conf.sendq_size or 1024
    local recvq_size = conf.recvq_size or 1024
@@ -210,7 +219,9 @@ function ConnectX4:new (conf)
    local hca = hca_factory:new()
 
    -- Makes enable_hca() hang with ConnectX5
-   -- init_seg:reset()
+   if self.mlx == 4 then
+      init_seg:reset()
+   end
    if debug_trace then init_seg:dump() end
    while not init_seg:ready() do
       C.usleep(1000)
@@ -246,6 +257,9 @@ function ConnectX4:new (conf)
    local rqlist = {}
    local rqs = {}
 
+   -- List of queue counter IDs (ConnectX5 and up)
+   local counter_set_ids = {}
+
    local usevlan = false
 
    for _, queue in ipairs(conf.queues) do
@@ -266,9 +280,15 @@ function ConnectX4:new (conf)
       cxq.swq = cast(ffi.typeof(cxq.swq), workqueues + 64 * recvq_size)
       -- Create the queue objects
       local tis = hca:create_tis(0, tdomain)
+      local counter_set_id
+      if self.mlx > 4 then
+         counter_set_id = hca:alloc_q_counter()
+         table.insert(counter_set_ids, counter_set_id)
+      end
       -- XXX order check
       cxq.sqn = hca:create_sq(scqn, pd, sendq_size, cxq.doorbell, cxq.swq, uar, tis)
-      cxq.rqn = hca:create_rq(rcqn, pd, recvq_size, cxq.doorbell, cxq.rwq)
+      cxq.rqn = hca:create_rq(rcqn, pd, recvq_size, cxq.doorbell, cxq.rwq,
+                              counter_set_id)
       hca:modify_sq(cxq.sqn, 0, 1) -- RESET -> READY
       hca:modify_rq(cxq.rqn, 0, 1) -- RESET -> READY
 
@@ -310,6 +330,11 @@ function ConnectX4:new (conf)
          for _, l4_proto in ipairs(l4_protos) do
             local tir = hca:create_tir_indirect(rqt, tdomain,
                                                 l3_proto, l4_proto)
+            -- NOTE: flow table entries will only match if the packet
+            -- contains the complete L4 header. Keep this in mind when
+            -- processing truncated packets (e.g. from a port-mirror).
+            -- If the header is incomplete, the packet will fall through
+            -- to the wildcard match and end up in the first queue.
             hca:set_flow_table_entry_ip(rxtable, NIC_RX, flow_group_ip,
                                         index, tir, l3_proto, l4_proto)
             index = index + 1
@@ -368,7 +393,11 @@ function ConnectX4:new (conf)
            set(stats.rxpackets, r.rxpackets)
            set(stats.rxmcast, r.rxmcast)
            set(stats.rxbcast, r.rxbcast)
-           set(stats.rxdrop, r.rxdrop)
+           if self.mlx == 4 then
+              -- ConnectX 4 doesn't have per-queue drop stats,
+              -- but this counter appears to always be zero :/
+              set(stats.rxdrop, r.rxdrop)
+           end
            set(stats.rxerrors, r.rxerrors)
            set(stats.txbytes, r.txbytes)
            set(stats.txpackets, r.txpackets)
@@ -393,10 +422,27 @@ function ConnectX4:new (conf)
         end
       },
    }
+
+   -- Empty for ConnectX4
+   for _, id in ipairs(counter_set_ids) do
+      table.insert(self.stats_reqs,
+                   {
+                      start_fn = HCA.query_q_counter_start,
+                      finish_fn = HCA.query_q_counter_finish,
+                      args = { set_id = id },
+                      process_fn = function(r, stats)
+                         -- Incremental update relies on query_q_counter to
+                         -- clear the counter after read.
+                         counter.set(stats.rxdrop,
+                                     counter.read(stats.rxdrop) + r.out_of_buffer)
+                      end
+      })
+   end
+
    for _, req in ipairs(self.stats_reqs) do
       req.hca = hca_factory:new()
       -- Post command
-      req.start_fn(req.hca)
+      req.start_fn(req.hca, req.args)
    end
    self.sync_timer = lib.throttle(1)
 
@@ -857,7 +903,10 @@ function HCA:create_tir_indirect (rqt, transport_domain, l3_proto, l4_proto)
    self:command("CREATE_TIR", 0x10C, 0x0C)
       :input("opcode",           0x00,        31, 16, 0x900)
       :input("disp_type",        0x20 + 0x04, 31, 28, 1) -- indirect
-      :input("rx_hash_symmetric",0x20 + 0x20, 31, 31, 1) -- hash symmetrically
+   -- Symmetric hashing would sort src/dst ports prior to hashing to
+   -- map bi-directional traffic to the same queue. We don't need that
+   -- since flows are inherently uni-directional.
+      :input("rx_hash_symmetric",0x20 + 0x20, 31, 31, 0) -- disabled
       :input("indirect_table",   0x20 + 0x20, 23,  0, rqt)
       :input("rx_hash_fn",       0x20 + 0x24, 31, 28, 2) -- toeplitz
       :input("transport_domain", 0x20 + 0x24, 23,  0, transport_domain)
@@ -939,7 +988,7 @@ end
 
 -- Create a receive queue and return a receive queue object.
 -- Return the receive queue number and a pointer to the WQEs.
-function HCA:create_rq (cqn, pd, size, doorbell, rwq)
+function HCA:create_rq (cqn, pd, size, doorbell, rwq, counter_set_id)
    local log_wq_size = log2size(size)
    local db_phy = memory.virtual_to_physical(doorbell)
    local rwq_phy = memory.virtual_to_physical(rwq)
@@ -958,7 +1007,11 @@ function HCA:create_rq (cqn, pd, size, doorbell, rwq)
       :input("log_wq_size",   0x20 + 0x30 + 0x20,  4 , 0, log_wq_size)
       :input("pas[0] high",   0x20 + 0x30 + 0xC0, 63, 32, ptrbits(rwq_phy, 63, 32))
       :input("pas[0] low",    0x20 + 0x30 + 0xC4, 31,  0, ptrbits(rwq_phy, 31, 0))
-      :execute()
+   if counter_set_id then
+      -- Only set for ConnectX5 and higher
+      self:input("counter_set_id",0x20 + 0x0C, 31, 24, counter_set_id)
+   end
+   self:execute()
    return self:output(0x08, 23, 0)
 end
 
@@ -1609,6 +1662,32 @@ function HCA:get_port_stats_finish ()
    port_stats.txdrop = self:output64(0x18 + 0x38)
    port_stats.txerrors = self:output64(0x18 + 0x40)
    return port_stats
+end
+
+function HCA:alloc_q_counter()
+   self:command("ALLOC_Q_COUNTER", 0x18, 0x10C)
+      :input("opcode", 0x00, 31, 16, 0x771)
+      :execute()
+   return self:output(0x08, 7, 0)
+end
+
+local q_stats = {
+   out_of_buffer = 0ULL
+}
+function HCA:query_q_counter_start (args)
+   self:command("QUERY_Q_COUNTER", 0x20, 0x10C)
+      :input("opcode",        0x00, 31, 16, 0x773)
+   -- Clear the counter after reading. This allows us to
+   -- update the rxdrop stat incrementally.
+      :input("clear",         0x18, 31,  31, 1)
+      :input("counter_set_id",0x1c,  7,   0, args.set_id)
+      :execute_async()
+end
+
+local out_of_buffer = 0ULL
+function HCA:query_q_counter_finish ()
+   q_stats.out_of_buffer = self:output(0x10 + 0x20, 31, 0)
+   return q_stats
 end
 
 ---------------------------------------------------------------
