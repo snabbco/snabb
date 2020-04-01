@@ -121,12 +121,14 @@ function rss:new (config)
 
    local function add_class (name, match_fn, continue)
       assert(name:match("%w+"), "Illegal class name: "..name)
+      local seq = #o.classes
       table.insert(o.classes, {
                       name = name,
                       match_fn = match_fn,
                       continue = continue,
                       input = link.new(name),
-                      output = { n = 0 }
+                      output = { n = 0 },
+                      seq = seq
       })
    end
 
@@ -144,23 +146,19 @@ function rss:new (config)
       add_class("default", function () return true end)
    end
 
-   o.queues_by_name = {}
    o.demux_queues = {}
 
-   local function add_queue(name, add_to_list)
+   local function add_queue(name)
       local queue = link.new(name)
-      o.queues_by_name[name] = queue
-      if add_to_list then
-         table.insert(o.demux_queues, queue)
-      end
+      o.demux_queues[name] = queue
       return queue
    end
 
    local function add_demux(default, types)
-      local default_queue = add_queue(default, true)
+      local default_queue = add_queue(default)
       local demux = etht_demux:new(default_queue)
       for _, type in ipairs(types) do
-         local queue = add_queue(type.name, type.add_to_list)
+         local queue = add_queue(type.name)
          demux:add(type.type, queue)
       end
       return demux
@@ -169,21 +167,21 @@ function rss:new (config)
    o.demux1 = add_demux("default_untagged", {
                            { name = "dot1q",
                              type = 0x8100,
-                             add_to_list = false },
+                           },
                            { name = "ipv4",
                              type = 0x0800,
-                             add_to_list = true},
+                           },
                            { name = "ipv6",
                              type = 0x86dd,
-                             add_to_list = true}
+                           }
    })
    o.demux2 = add_demux("default_tagged", {
                            { name= "ipv4_tagged",
                              type = 0x0800,
-                             add_to_list = true },
+                           },
                            { name = "ipv6_tagged",
                              type = 0x86dd,
-                             add_to_list = true}
+                           }
    })
 
    o.nqueues = #o.demux_queues
@@ -209,7 +207,7 @@ function rss:link (mode, direction, name, link)
          vlan = tonumber(vlan)
          assert(vlan > 0 and vlan < 4095, "Illegal VLAN id: "..vlan)
       end
-      return self.push_from_tagged, vlan
+      return self.push_with_vlan, vlan
    else
       local match = false
       for _, class in ipairs(self.classes) do
@@ -226,6 +224,9 @@ function rss:link (mode, direction, name, link)
             insert_unique(self.classes_active, class)
          end
       end
+      -- Preserve order
+      table.sort(self.classes_active, function (a, b)  return a.seq < b.seq end)
+
       if not match then
          print("Ignoring link (does not match any filters): "..name)
       end
@@ -256,42 +257,82 @@ local function distribute (p, links, hash)
    transmit(links[index], p)
 end
 
-function rss:push_from_tagged(link, vlan)
+local function md_wrapper(self, demux_queue, queue, vlan)
+   local p = receive(demux_queue)
+   hash(mdadd(p, self.rm_ext_headers, vlan))
+   transmit(queue, p)
+end
+
+function rss:push_with_vlan(link, vlan)
    local npackets = nreadable(link)
    self.rxpackets = self.rxpackets + npackets
+   local queue = self.queue
 
-   for _ = 1, npackets do
-      local p = receive(link)
-      local hdr = ffi.cast(ether_header_ptr_t, p.data)
-      transmit(self.demux1:lookup(lib.ntohs(hdr.ether.type)), p)
-   end
-
-   local dot1q = self.queues_by_name.dot1q
-   for _ = 1, nreadable(dot1q) do
-      local p = receive(dot1q)
-      local hdr = ffi.cast(ether_header_ptr_t, p.data)
-      transmit(self.demux2:lookup(lib.ntohs(hdr.dot1q.type)), p)
-   end
-
-   local queue, demux_queues = self.queue, self.demux_queues
-
-   -- Perform explicit unrolling of the loop over the queues to make
-   -- sure each one inlines copy of metadata.add() which is
-   -- specialized to the packet type being processed.
-   local i = 1
-   ::LOOP::
+   -- Use a do..end blocks here to limit the scopes of locals to avoid
+   -- "too many spill slots" trace aborts
    do
-      if i > self.nqueues then goto EXIT end
-      local demux_queue = demux_queues[i]
-      for _ = 1, nreadable(demux_queue) do
-         local p = receive(demux_queue)
-         hash(mdadd(p, self.rm_ext_headers, vlan))
-         transmit(queue, p)
+      -- Performance tuning: mdadd() needs to be called for every
+      -- packet. With a mix of tagged/untagged ipv4/ipv6 traffic, that
+      -- function has a number of unbiased branches, leading to
+      -- inefficient side traces. We use a branch-free classifier on
+      -- the Ethertype to separate packets of each type into separate
+      -- queues and process them in separate loops. In each loop,
+      -- mdadd() is inlined and compiled for the specifics of that
+      -- type of packet, which results in 100% biased branches and
+      -- thus no side traces. Note that for this to work, the loops
+      -- have to be explicite in the code below to allow the compiler
+      -- to produce distinct versions of the inlined function.
+      for _ = 1, npackets do
+         local p = receive(link)
+         local hdr = ffi.cast(ether_header_ptr_t, p.data)
+         transmit(self.demux1:lookup(lib.ntohs(hdr.ether.type)), p)
       end
-      i = i+1
-      goto LOOP
+
+      local dot1q = self.demux_queues.dot1q
+      for _ = 1, nreadable(dot1q) do
+         local p = receive(dot1q)
+         local hdr = ffi.cast(ether_header_ptr_t, p.data)
+         transmit(self.demux2:lookup(lib.ntohs(hdr.dot1q.type)), p)
+      end
+
+      local demux_queues = self.demux_queues
+      do
+         local dqueue = demux_queues.default_untagged
+         for _ = 1, nreadable(dqueue) do
+            md_wrapper(self, dqueue, queue, vlan)
+         end
+      end
+      do
+         local dqueue = demux_queues.default_tagged
+         for _ = 1, nreadable(dqueue) do
+            md_wrapper(self, dqueue, queue, vlan)
+         end
+      end
+      do
+         local dqueue = demux_queues.ipv4
+         for _ = 1, nreadable(dqueue) do
+            md_wrapper(self, dqueue, queue, vlan)
+         end
+      end
+      do
+         local dqueue = demux_queues.ipv6
+         for _ = 1, nreadable(dqueue) do
+            md_wrapper(self, dqueue, queue, vlan)
+         end
+      end
+      do
+         local dqueue = demux_queues.ipv4_tagged
+         for _ = 1, nreadable(dqueue) do
+            md_wrapper(self, dqueue, queue, vlan)
+         end
+      end
+      do
+         local dqueue = demux_queues.ipv6_tagged
+         for _ = 1, nreadable(dqueue) do
+            md_wrapper(self, dqueue, queue, vlan)
+         end
+      end
    end
-   ::EXIT::
 
    for _, class in ipairs(self.classes_active) do
       -- Apply the filter to all packets.  If a packet matches, it is
