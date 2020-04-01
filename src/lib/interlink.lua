@@ -63,7 +63,8 @@ local band = require("bit").band
 local waitfor = require("core.lib").waitfor
 local sync = require("core.sync")
 
-local SIZE = 1024
+--local SIZE = 1024
+local SIZE = 131072
 local CACHELINE = 64 -- XXX - make dynamic
 local INT = ffi.sizeof("int")
 
