@@ -251,6 +251,10 @@ function configure_graph (arg, in_graph)
       local pciaddr = unpack(parse_spec(config.input, '/'))
       create_ifmib(engine.app_table['in'].stats, (pciaddr:gsub("[:%.]", "_")))
    end
+   if config.output_type == "tap_routed" then
+      create_ifmib(engine.app_table[out_name].shm, config.output,
+                   "IPFIX Observation Domain "..config.observation_domain)
+   end
 
    if config.output_type == "tap_routed" then
       local tap_config = out_app[2]
