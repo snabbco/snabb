@@ -137,7 +137,8 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
             if not spec then
                spec = { ifName = input.name,
                         ifAlias = input.description,
-                        queues = {} }
+                        queues = {},
+                        recvq_size = input.config.recvq_size or 8192 }
                mellanox[input.device] = spec
             end
             table.insert(spec.queues, { id = rssq })
@@ -216,7 +217,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
       local conf = {
          pciaddress = device,
          queues = spec.queues,
-         recvq_size = 8192
+         recvq_size = spec.recvq_size
       }
       local driver = pci.device_info(device).driver
       app_graph.app(ctrl_graph, "ctrl_"..device,
