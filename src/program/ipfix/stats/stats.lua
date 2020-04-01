@@ -53,13 +53,18 @@ local function pci_stats(indent, path)
          end
       end
       table.sort(qids)
-      for _, i in ipairs(qids) do
-         local name = "q"..i.."_"
-         local rxdrops = read(pci[name..'rxdrops'])
-         format(indent+2, "Queue #"..i)
-         format(indent+4, "rxpackets         %s", read(pci[name..'rxpackets'], true))
-         format(indent+4, "rxdrops           %s", comma_value(rxdrops))
-         rxdrops_total = rxdrops_total + rxdrops
+
+      if #qids == 0 then
+         rxdrops_total = read(pci['rxdrop'])
+      else
+         for _, i in ipairs(qids) do
+            local name = "q"..i.."_"
+            local rxdrops = read(pci[name..'rxdrops'])
+            format(indent+2, "Queue #"..i)
+            format(indent+4, "rxpackets         %s", read(pci[name..'rxpackets'], true))
+            format(indent+4, "rxdrops           %s", comma_value(rxdrops))
+            rxdrops_total = rxdrops_total + rxdrops
+         end
       end
       local rxpackets = read(pci.rxpackets)
       format(indent+2, "Total")
