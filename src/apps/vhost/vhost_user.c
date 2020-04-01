@@ -33,10 +33,14 @@ int vhost_user_connect(const char *path)
     }
 
     un.sun_family = AF_UNIX;
+#if __GNUC__ >= 8
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
+#endif
     strncpy(un.sun_path, path, sizeof(un.sun_path));
+#if __GNUC__ >= 8
 #pragma GCC diagnostic pop
+#endif
     if (connect(sock, (struct sockaddr *) &un, sizeof(un)) == -1) {
         close(sock);
         return -1;
@@ -56,10 +60,14 @@ int vhost_user_listen(const char *path)
     }
 
     un.sun_family = AF_UNIX;
+#if __GNUC__ >= 8
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-truncation"
+#endif
     strncpy(un.sun_path, path, sizeof(un.sun_path));
+#if __GNUC__ >= 8
 #pragma GCC diagnostic pop
+#endif
     unlink(un.sun_path);
     if (bind(sock, (struct sockaddr *) &un, sizeof(un)) == -1) {
         close(sock);
