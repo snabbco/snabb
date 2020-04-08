@@ -44,16 +44,27 @@ local class_config = {
    continue = { default = false }
 }
 
+local function mk_addr_copy_fn (size)
+   local str = "return function (dst, src)\n"
+   for i = 0, size-1 do
+      str = str..string.format("   dst[%d] = src[%d]\n", i, i)
+   end
+   str = str.."end\n"
+   return loadstring(str)()
+end
+
 local hash_info = {
    -- IPv4
    [0x0800] = {
       addr_offset = 12,
-      addr_size = 8
+      -- 64-bit words
+      addr_size = 1
    },
    -- IPv6
    [0x86dd] = {
       addr_offset = 8,
-      addr_size = 32
+      -- 64-bit words
+      addr_size = 4
    },
 }
 
@@ -108,7 +119,7 @@ function rss:new (config)
    for _, info in pairs(hash_info) do
       info.key_t = ffi.typeof([[
             struct {
-               uint8_t addrs[$];
+               uint64_t addrs[$];
                uint32_t ports;
                uint8_t proto;
             } __attribute__((packed))
@@ -117,6 +128,7 @@ function rss:new (config)
       info.hash_fn =
          siphash.make_hash({ size = ffi.sizeof(info.key),
                              key = siphash.random_sip_hash_key() })
+      info.copy_addr_fn = mk_addr_copy_fn(info.addr_size)
    end
 
    local function add_class (name, match_fn, continue)
@@ -237,7 +249,7 @@ local function hash (md)
    local info = hash_info[md.ethertype]
    local hash = 0
    if info then
-      ffi.copy(info.key.addrs, md.l3 + info.addr_offset, info.addr_size)
+      info.copy_addr_fn(info.key.addrs, ffi.cast("uint64_t*", md.l3 + info.addr_offset))
       if transport_proto_p[md.proto] then
          info.key.ports = ffi.cast("uint32_t *", md.l4)[0]
       else
