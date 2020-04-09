@@ -47,7 +47,7 @@ end
 
 -- Freelist containing empty packets ready for use.
 
-local max_packets = 1e6
+local max_packets = 1e7
 
 ffi.cdef([[
 struct freelist {
