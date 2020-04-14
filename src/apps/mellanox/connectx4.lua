@@ -163,8 +163,12 @@ local DEAD = 3
 -- Returns true on successful transition, false if oldstate does not match.
 function transition (cxq, oldstate, newstate)
    -- XXX use atomic x86 "LOCK CMPXCHG" instruction. Have to teach DynASM.
-   cxq.state = newstate
-   return true
+   if cxq.state == oldstate then
+      cxq.state = newstate
+      return true
+   else
+      return false
+   end
 end
 
 ---------------------------------------------------------------
