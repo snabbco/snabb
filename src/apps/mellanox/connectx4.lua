@@ -1084,6 +1084,9 @@ function IO:new (conf)
 
    local pciaddress = pci.qualified(conf.pciaddress)
    local queue = conf.queue
+   -- This is also done in Connectex4:new() but might not have
+   -- happened yet.
+   pci.unbind_device_from_linux(pciaddress)
    local mmio, fd = pci.map_pci_memory(pciaddress, 0, false)
 
    local online = false      -- True when queue is up and running
