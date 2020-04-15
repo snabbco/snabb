@@ -360,6 +360,9 @@ function Intel:new (conf)
    self.max_q = byid.max_q
 
    -- Setup device access
+   -- XXX: must call unbind before map, must figure out
+   -- how to do this properly.
+   pci.unbind_device_from_linux(self.pciaddress)
    self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
    self.master = self.fd:flock("ex, nb")
 
