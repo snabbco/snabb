@@ -560,8 +560,6 @@ function IPFIX:push(input)
    -- FIXME: Use engine.now() for monotonic time.  Have to check that
    -- engine.now() gives values relative to the UNIX epoch though.
    local timestamp = ffi.C.get_unix_time()
-   assert(self.output.output, "missing output link")
-   local output = self.output.output
 
    local flow_sets = self.flow_sets
    local nreadable = link.nreadable(input)
@@ -594,11 +592,15 @@ function IPFIX:push(input)
    end
 
    for _,set in ipairs(flow_sets) do set:record_flows(timestamp) end
-   for _,set in ipairs(flow_sets) do set:expire_records(output, timestamp) end
 
 end
 
 function IPFIX:housekeeping()
+   local timestamp = ffi.C.get_unix_time()
+   assert(self.output.output, "missing output link")
+   local output = self.output.output
+   for _,set in ipairs(self.flow_sets) do set:expire_records(output, timestamp) end
+
    if self.next_template_refresh < engine.now() then
       self.next_template_refresh = engine.now() + self.template_refresh_interval
       self:send_template_records(self.output.output)
