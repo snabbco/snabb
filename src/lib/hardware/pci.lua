@@ -176,7 +176,17 @@ function map_pci_memory (device, n, lock)
      assert(f:flock("ex, nb"), "failed to lock " .. filepath)
    end
    local st = assert(f:stat())
-   local mem = assert(f:mmap(nil, st.size, "read, write", "shared", 0))
+   local mem
+   -- mmap() returns EINVAL on Linux >= 4.5 if the device is still
+   -- claimed by the kernel driver. We assume that
+   -- unbind_device_from_linux() has already been called but it may take
+   -- some time for the driver to release the device.
+   lib.waitfor2("mmap of "..filepath,
+                function ()
+                   mem, err = f:mmap(nil, st.size, "read, write", "shared", 0)
+                   assert(not err or err.INVAL)
+                   return mem
+                end, 5, 1000000)
    return ffi.cast("uint32_t *", mem), f
 end
 
