@@ -71,6 +71,7 @@ local function gen_checksum ()
       | jl >5                       -- Jump to branch '3'.
       | mov r9d, dword [rdi + r8]   -- Fetch 32-bit from data + r8 into r9d.
       | add rax, r9                 -- Sum acc with r9. Accumulate carry.
+      | adc rax, 0                  -- Sum carry-bit into acc.
       | sub rcx, 4                  -- Decrease index by 4.
       | add r8, 4                   -- Next 32-bit.
       | 5:
@@ -78,6 +79,7 @@ local function gen_checksum ()
       | jl >6                       -- Jump to branch '4'.
       | movzx r9, word [rdi + r8]   -- Fetch 16-bit from data + r8 into r9.
       | add rax, r9                 -- Sum acc with r9. Accumulate carry.
+      | adc rax, 0                  -- Sum carry-bit into acc.
       | sub rcx, 2                  -- Decrease index by 2.
       | add r8, 2                   -- Next 16-bit.
       | 6:
@@ -85,6 +87,7 @@ local function gen_checksum ()
       | jl >7                       -- Jump to branch '5'.
       | movzx r9, byte [rdi + r8]   -- Fetch 8-bit from data + r8 into r9.
       | add rax, r9                 -- Sum acc with r9. Accumulate carry.
+      | adc rax, 0                  -- Sum carry-bit into acc.
       -- Fold 64-bit into 16-bit.
       | 7:
       | mov r9, rax                 -- Assign acc to r9.
@@ -154,6 +157,13 @@ function selftest ()
    local ntohs = lib.ntohs
    for size=44,1500 do
       local pkt = create_packet(size)
+      assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
+      assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
+   end
+   -- Test carry propagation
+   for l = 1, 63 do
+      local pkt = { data = ffi.new("uint8_t[?]", l), length = l }
+      for i = 0, l-2 do pkt.data[i]=0xff end; pkt.data[l-1] = 0x01
       assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
       assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
    end
