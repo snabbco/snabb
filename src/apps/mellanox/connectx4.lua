@@ -1649,19 +1649,27 @@ end
 function HCA:get_port_stats_finish ()
    port_stats.rxbytes = self:output64(0x18 + 0x00) -- includes 4-byte CRC
    local in_ucast_packets = self:output64(0x18 + 0x08)
-   port_stats.rxmcast = self:output64(0x18 + 0x48)
-   port_stats.rxbcast = self:output64(0x18 + 0x50)
+   local in_mcast_packets = self:output64(0x18 + 0x48)
+   local in_bcast_packets = self:output64(0x18 + 0x50)
+   -- This is weird. The intel_mp driver adds broadcast packets to the
+   -- mcast counter, it is unclear why.  Then
+   -- lib.ipc.shmem.iftable_mib reverses it to get the true mcast
+   -- counter back.  So we do the same here.  The proper fix would be
+   -- to fix the Intel driver and remove the anti-hack from
+   -- iftable_mib.
+   port_stats.rxmcast = in_mcast_packets + in_bcast_packets
+   port_stats.rxbcast = in_bcast_packets
    port_stats.rxpackets = in_ucast_packets + port_stats.rxmcast
-      + port_stats.rxbcast
    port_stats.rxdrop = self:output64(0x18 + 0x10)
    port_stats.rxerrors = self:output64(0x18 + 0x18)
 
    port_stats.txbytes = self:output64(0x18 + 0x28)
    local out_ucast_packets = self:output64(0x18 + 0x30)
-   port_stats.txmcast = self:output64(0x18 + 0x58)
-   port_stats.txbcast = self:output64(0x18 + 0x60)
+   local out_mcast_packets = self:output64(0x18 + 0x58)
+   local out_bcast_packets = self:output64(0x18 + 0x60)
+   port_stats.txmcast = out_mcast_packets + out_bcast_packets
+   port_stats.txbcast = out_bcast_packets
    port_stats.txpackets = out_ucast_packets + port_stats.txmcast
-      + port_stats.txbcast
    port_stats.txdrop = self:output64(0x18 + 0x38)
    port_stats.txerrors = self:output64(0x18 + 0x40)
    return port_stats
