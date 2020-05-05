@@ -150,8 +150,38 @@ function rss:new (config)
       assert(not classes[config.name],
              "Duplicate filter class: "..config.name)
       classes[config.name] = true
-      add_class(config.name, pf.compile_filter(config.filter),
-                config.continue)
+      local match_fn
+      local vlans = config.filter:match("^VLAN (.*)$")
+      if vlans then
+         local expr = ""
+         local pf_fn
+         for vlan in vlans:split("%s") do
+            if (vlan:match("^(%d+)$")) then
+               expr = expr.."md.vlan == "..vlan.." or "
+            elseif vlan == "BPF" then
+               local bpf = config.filter:match("BPF (.*)")
+               pf_fn = pf.compile_filter(bpf)
+               break
+            else
+               error(string.format("illegal VLAN ID in filter expression of "..
+                                      "class %s: %s", class, vlan))
+            end
+         end
+         expr = expr.."nil"
+         match_fn = loadstring("return function(md) return "..expr.." end")()
+         if pf_fn then
+            match_fn_aux = match_fn
+            match_fn = function(md)
+               return match_fn_aux(md) and pf_fn(md.filter_start, md.filter_length)
+            end
+         end
+      else
+         pf_fn = pf.compile_filter(config.filter)
+         match_fn = function(md)
+            return pf_fn(md.filter_start, md.filter_length)
+         end
+      end
+      add_class(config.name, match_fn, config.continue)
    end
    if config.default_class then
       -- Catch-all default filter
@@ -354,7 +384,7 @@ function rss:push_with_vlan(link, vlan)
       for _ = 1, nreadable(queue) do
          local p = receive(queue)
          local md = mdget(p)
-         if class.match_fn(md.filter_start, md.filter_length) then
+         if class.match_fn(md) then
             md.ref = md.ref + 1
             transmit(class.input, p)
             if class.continue then
