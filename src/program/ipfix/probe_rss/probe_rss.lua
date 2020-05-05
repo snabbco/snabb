@@ -220,10 +220,10 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
                   tostring(instance.busywait), probe.value_to_string(jit)
                )
                local child_pid = worker.start(rss_link, worker_expr)
+               logger:log("Launched IPFIX worker process #"..child_pid)
                logger:log(string.format("Selected collector %s:%d from pool %s "
                                         .."for process #%d ",
                                         collector.ip, collector.port, pool, child_pid))
-               logger:log("Launched IPFIX worker process #"..child_pid)
                shm.create("ipfix_workers/"..child_pid, "uint64_t")
             end
             table.insert(outputs, output)
@@ -278,7 +278,7 @@ function run (parameters)
    local profiling, traceprofiling
    local jit = { opts = {} }
    local log_pid = string.format("[%5d]", S.getpid())
-   local logger = logger.new({ module = log_pid.." RSS master" })
+   local logger = logger.new({ rate = 30, module = log_pid.." RSS master" })
    local opt = {
       D = function (arg)
          if arg:match("^[0-9]+$") then
