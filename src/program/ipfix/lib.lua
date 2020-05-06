@@ -92,7 +92,7 @@ function in_apps.pci (spec)
 end
 out_apps.pci = in_apps.pci
 
-function create_ifmib(stats, ifname, ifalias)
+function create_ifmib(stats, ifname, ifalias, log_date)
    -- stats can be nil in case this process is not the master
    -- of the device
    if not stats then return end
@@ -103,7 +103,7 @@ function create_ifmib(stats, ifname, ifalias)
                       ifName = ifname,
                       ifAlias = ifalias or "NetFlow input", },
       ifname:gsub('/', '-'), stats,
-      shm.root..ifmib_dir, 5)
+      shm.root..ifmib_dir, 5, log_date)
 end
 
 function value_to_string (value, string)
@@ -154,7 +154,8 @@ probe_config = {
    maps = { default = {} },
    maps_logfile = { default = nil },
    instance = { default = 1 },
-   add_packet_metadata = { default = true }
+   add_packet_metadata = { default = true },
+   log_date = { default = false }
 }
 
 function configure_graph (arg, in_graph)
@@ -195,7 +196,8 @@ function configure_graph (arg, in_graph)
                maps_log_fh = config.maps_logfile and
                   assert(io.open(config.maps_logfile, "a")) or nil,
                instance = config.instance,
-               add_packet_metadata = config.add_packet_metadata }
+               add_packet_metadata = config.add_packet_metadata,
+               log_date = config.log_date }
    end
 
    local ipfix_config = mk_ipfix_config()
@@ -249,11 +251,13 @@ function configure_graph (arg, in_graph)
 
    if config.input_type and config.input_type == "pci" then
       local pciaddr = unpack(parse_spec(config.input, '/'))
-      create_ifmib(engine.app_table['in'].stats, (pciaddr:gsub("[:%.]", "_")))
+      create_ifmib(engine.app_table['in'].stats, (pciaddr:gsub("[:%.]", "_")),
+                   config.log_date)
    end
    if config.output_type == "tap_routed" then
       create_ifmib(engine.app_table[out_name].shm, config.output,
-                   "IPFIX Observation Domain "..config.observation_domain)
+                   "IPFIX Observation Domain "..config.observation_domain,
+                   config.log_date)
    end
 
    if config.output_type == "tap_routed" then
@@ -370,7 +374,7 @@ end
 -- Run an instance of the RSS app.  The output links can either be
 -- interlinks or regular links with an instance of an ipfix probe
 -- attached.
-function run_rss(config, inputs, outputs, duration, busywait, cpu, jit)
+function run_rss(config, inputs, outputs, duration, busywait, cpu, jit, log_date)
    if cpu then numa.bind_to_cpu(cpu) end
    set_jit_options(jit)
 
@@ -424,7 +428,7 @@ function run_rss(config, inputs, outputs, duration, busywait, cpu, jit)
    engine.configure(graph)
    for _, spec in ipairs(in_app_specs) do
       create_ifmib(engine.app_table[spec.name].stats,
-                   spec.ifname, spec.ifalias)
+                   spec.ifname, spec.ifalias, log_date)
    end
    require("jit").flush()
 

@@ -96,7 +96,7 @@ local function override_jit(default, config_in, dump_suffix)
    return jit
 end
 
-local function create_workers (probe_config, duration, busywait, jit, logger)
+local function create_workers (probe_config, duration, busywait, jit, logger, log_date)
    local main = lib.parse(probe_config, main_config)
    local maps = lib.parse(main.ipfix.maps, maps_config)
    local ipfix = lib.parse(main.ipfix, ipfix_config)
@@ -191,6 +191,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
             iconfig.collector_port = collector.port
             iconfig.collector_pool = nil
 
+            iconfig.log_date = log_date
             observation_domain = observation_domain + 1
             iconfig.observation_domain = od
             iconfig.output = "ipfixexport"..od
@@ -237,7 +238,8 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
          'require("program.ipfix.lib").run_rss(%s, %s, %s, %s, %s, nil, %s)',
          probe.value_to_string(main.rss), probe.value_to_string(inputs),
          probe.value_to_string(outputs), tostring(duration),
-         tostring(busywait), probe.value_to_string(override_jit(jit, main.rss_jit, rssq))
+         tostring(busywait), probe.value_to_string(override_jit(jit, main.rss_jit, rssq)),
+         log_date
       )
       rss_workers["rss"..rssq] = worker_expr
 
@@ -272,40 +274,51 @@ local long_opts = {
    debug = "d",
    jit = "j",
    help = "h",
-   ["busy-wait"] = "b"
+   ["busy-wait"] = "b",
+   ["log-date"] = 'L'
 }
+
+local function usage(exit_code)
+   print(require("program.ipfix.probe_rss.README_inc"))
+   main.exit(exit_code)
+end
 
 function run (parameters)
    local duration
    local busywait = false
+   local log_date = false
    local profiling, traceprofiling
    local jit = { opts = {} }
    local log_pid = string.format("[%5d]", S.getpid())
-   local logger = logger.new({ rate = 30, module = log_pid.." RSS master" })
    local opt = {
       D = function (arg)
          if arg:match("^[0-9]+$") then
             duration = tonumber(arg)
          else
-            usage()
+            usage(1)
          end
       end,
-      h = function (arg) usage() end,
+      h = function (arg) usage(0) end,
       d = function (arg) _G.developer_debug = true end,
       b = function (arg)
          busywait = true
       end,
-      j = probe.parse_jit_option_fn(jit)
+      j = probe.parse_jit_option_fn(jit),
+      L = function(arg)
+         log_date = true
+      end
    }
 
    -- Parse command line arguments
-   parameters = lib.dogetopt(parameters, opt, "hdj:D:l:b", long_opts)
-   if #parameters ~= 1 then usage () end
+   parameters = lib.dogetopt(parameters, opt, "hdj:D:l:bL", long_opts)
+   if #parameters ~= 1 then usage (1) end
 
+   local logger = logger.new({ rate = 30, date = log_date,
+                               module = log_pid.." RSS master" })
    local file = table.remove(parameters, 1)
    local probe_config = assert(loadfile(file))()
    local ctrl_graph, mellanox =
-      create_workers(probe_config, duration, busywait, jit, logger)
+      create_workers(probe_config, duration, busywait, jit, logger, log_date)
 
    engine.busywait = false
    engine.Hz = 10
@@ -313,7 +326,7 @@ function run (parameters)
 
    for device, spec in pairs(mellanox) do
       probe.create_ifmib(engine.app_table["ctrl_"..device].stats,
-                         spec.ifName, spec.ifAlias)
+                         spec.ifName, spec.ifAlias, log_date)
    end
 
    engine.main({ duration = duration })

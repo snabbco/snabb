@@ -137,6 +137,9 @@ function FlowSet:new (spec, args)
 
    local template =
       template.make_template_info(template.templates[template_name])
+   template.logger = logger.new({ date = args.log_date,
+                                  module = ("[%5d]"):format(S.getpid())
+                                     .." IPFIX template #"..template.id })
    template.name = template_name
    template.maps = {}
    for _, name in ipairs(template.require_maps) do
@@ -400,7 +403,8 @@ local ipfix_config_params = {
    -- Used to distinguish instances of the app running in the same
    -- process
    instance = { default = 1 },
-   add_packet_metadata = { default = true }
+   add_packet_metadata = { default = true },
+   log_date = { default = true }
 }
 
 local function setup_transport_header(self, config)
@@ -441,7 +445,8 @@ function IPFIX:new(config)
                observation_domain = config.observation_domain,
                instance = config.instance,
                add_packet_metadata = config.add_packet_metadata,
-               logger = logger.new({ module = ("[%5d]"):format(S.getpid())
+               logger = logger.new({ date = config.log_date,
+                                     module = ("[%5d]"):format(S.getpid())
                                         .." IPFIX exporter"} ) }
    o.shm = {
       -- Total number of packets received
@@ -484,7 +489,8 @@ function IPFIX:new(config)
                            parent = o,
                            maps = config.maps,
                            maps_log_fh = config.maps_log_fh,
-                           instance = config.instance }
+                           instance = config.instance,
+                           log_date = config.log_date }
 
    o.flow_sets = {}
    for _, template in ipairs(config.templates) do
