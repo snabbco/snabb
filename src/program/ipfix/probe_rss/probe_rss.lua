@@ -220,10 +220,13 @@ local function create_workers (probe_config, duration, busywait, jit, logger)
                   tostring(instance.busywait), probe.value_to_string(jit)
                )
                local child_pid = worker.start(rss_link, worker_expr)
-               logger:log("Launched IPFIX worker process #"..child_pid)
+               logger:log(string.format("Launched IPFIX worker process #%d, "..
+                                           "observation domain %d",
+                                        child_pid, od))
                logger:log(string.format("Selected collector %s:%d from pool %s "
                                         .."for process #%d ",
-                                        collector.ip, collector.port, pool, child_pid))
+                                        collector.ip, collector.port, pool,
+                                        child_pid))
                shm.create("ipfix_workers/"..child_pid, "uint64_t")
             end
             table.insert(outputs, output)
