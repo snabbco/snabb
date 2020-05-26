@@ -155,7 +155,8 @@ probe_config = {
    maps_logfile = { default = nil },
    instance = { default = 1 },
    add_packet_metadata = { default = true },
-   log_date = { default = false }
+   log_date = { default = false },
+   scan_protection = { default = {} }
 }
 
 function configure_graph (arg, in_graph)
@@ -197,7 +198,8 @@ function configure_graph (arg, in_graph)
                   assert(io.open(config.maps_logfile, "a")) or nil,
                instance = config.instance,
                add_packet_metadata = config.add_packet_metadata,
-               log_date = config.log_date }
+               log_date = config.log_date,
+               scan_protection = config.scan_protection }
    end
 
    local ipfix_config = mk_ipfix_config()

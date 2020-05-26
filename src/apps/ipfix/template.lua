@@ -11,6 +11,7 @@ local lib      = require("core.lib")
 local counter  = require("core.counter")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
+local ipv6     = require("lib.protocol.ipv6")
 local metadata = require("apps.rss.metadata")
 local strings  = require("apps.ipfix.strings")
 local dns      = require("apps.ipfix.dns")
@@ -105,6 +106,72 @@ local ipfix_elements =
                             'ipfix_information_elements_local' })
 
 local swap_fn_env = { htons = htons, htonl = htonl, htonq = htonq }
+
+local aggregate_info = {
+   v4 = {
+      key_type = ffi.typeof([[
+         struct {
+            uint32_t addr;
+         } __attribute__((packed))
+      ]]),
+      mk_fns = function(plen_v4, plen_v6)
+         local plen = plen_v4
+         local mask = 0
+         if plen > 0 then
+            mask = bit.bnot(bit.lshift(1, 32-plen) - 1)
+         end
+         return
+            function (flow_key, rate_key)
+               rate_key.addr = htonl(
+                  bit.band(
+                     htonl(ffi.cast("uint32_t *",
+                                    flow_key.sourceIPv4Address)[0]),
+                     mask))
+            end,
+         function(rate_key)
+            return ipv4:ntop(ffi.cast("uint8_t*", rate_key)).."/"..plen
+         end
+      end
+   },
+   v6 = {
+      key_type = ffi.typeof([[
+         struct {
+            uint64_t addr[2];
+         } __attribute__((packed))
+      ]]),
+      mk_fns = function(plen_v4, plen_v6)
+         local plen = plen_v6
+
+         local function plen2mask(plen)
+            local mask = 0ULL
+            if plen > 0 then
+               mask = bit.bnot(bit.lshift(1ULL, 64-plen) - 1)
+            end
+            return mask
+         end
+
+         mask_low = plen2mask(plen > 64 and plen - 64 or 0)
+         mask_high = plen2mask(plen >= 64 and 64 or plen)
+         return
+            function (flow_key, rate_key)
+               local addr = ffi.cast("uint64_t *", flow_key.sourceIPv6Address)
+               rate_key.addr[0] = htonq(
+                  bit.band(
+                     htonq(ffi.cast("uint64_t *",
+                                    flow_key.sourceIPv6Address)[0]),
+                     mask_high))
+               rate_key.addr[1] = htonq(
+                  bit.band(
+                     htonq(ffi.cast("uint64_t *",
+                                    flow_key.sourceIPv6Address)[1]),
+                     mask_low))
+            end,
+         function(rate_key)
+            return ipv6:ntop(ffi.cast("uint8_t*", rate_key)).."/"..plen
+         end
+      end
+   }
+}
 
 -- Create a table describing the information needed to create
 -- flow templates and data records.
@@ -217,7 +284,8 @@ function make_template_info(spec)
             counters_names = counters_names,
             extract = spec.extract,
             accumulate = spec.accumulate,
-            require_maps = spec.require_maps or {}
+            require_maps = spec.require_maps or {},
+            aggregate_info = aggregate_info[spec.aggregation_type]
           }
 end
 
@@ -541,6 +609,7 @@ templates = {
    v4 = {
       id     = 256,
       filter = "ip",
+      aggregation_type = 'v4',
       keys   = { "sourceIPv4Address",
                  "destinationIPv4Address",
                  "protocolIdentifier",
@@ -573,6 +642,7 @@ templates = {
    v4_HTTP = {
       id     = 257,
       filter = "ip and tcp dst port 80",
+      aggregation_type = 'v4',
       keys   = { "sourceIPv4Address",
                  "destinationIPv4Address",
                  "protocolIdentifier",
@@ -598,6 +668,7 @@ templates = {
    v4_DNS = {
       id     = 258,
       filter = "ip and udp port 53",
+      aggregation_type = 'v4',
       keys   = { "sourceIPv4Address",
                  "destinationIPv4Address",
                  "protocolIdentifier",
@@ -627,6 +698,7 @@ templates = {
    v4_extended = {
       id     = 1256,
       filter = "ip",
+      aggregation_type = 'v4',
       keys   = { "sourceIPv4Address",
                  "destinationIPv4Address",
                  "protocolIdentifier",
@@ -656,6 +728,7 @@ templates = {
    v6 = {
       id     = 512,
       filter = "ip6",
+      aggregation_type = 'v6',
       keys   = { "sourceIPv6Address",
                  "destinationIPv6Address",
                  "protocolIdentifier",
@@ -688,6 +761,7 @@ templates = {
    v6_HTTP = {
       id     = 513,
       filter = "ip6 and tcp dst port 80",
+      aggregation_type = 'v6',
       keys   = { "sourceIPv6Address",
                  "destinationIPv6Address",
                  "protocolIdentifier",
@@ -713,6 +787,7 @@ templates = {
    v6_DNS = {
       id     = 514,
       filter = "ip6 and udp port 53",
+      aggregation_type = 'v6',
       keys   = { "sourceIPv6Address",
                  "destinationIPv6Address",
                  "protocolIdentifier",
@@ -742,6 +817,7 @@ templates = {
    v6_extended = {
       id     = 1512,
       filter = "ip6",
+      aggregation_type = 'v6',
       keys   = { "sourceIPv6Address",
                  "destinationIPv6Address",
                  "protocolIdentifier",

@@ -210,20 +210,70 @@ function FlowSet:new (spec, args)
    o.scratch_entry = o.table.entry_type()
    o.expiry_cursor = 0
 
+   o.scan_protection = args.scan_protection
+   local sp = { table = {} }
+   if args.scan_protection.enable then
+      aggr_info = template.aggregate_info
+      sp.aggr_key_fn, sp.ntop_fn = aggr_info.mk_fns(
+         args.scan_protection.aggregate_v4,
+         args.scan_protection.aggregate_v6
+      )
+      sp.table_tb = token_bucket.new({ rate = 1 })
+      sp.export_rate_tb = token_bucket.new(
+         { rate = args.scan_protection.export_rate })
+      sp.table = ctable.new({
+            key_type = aggr_info.key_type,
+            value_type = ffi.typeof([[
+               struct {
+                  uint8_t  suppress;
+                  uint64_t tstamp;
+                  uint64_t flow_count;
+                  uint64_t packets;
+                  uint64_t octets;
+                  uint64_t tstamp_drop_start;
+                  uint64_t drops;
+                  uint64_t exports;
+               } __attribute__((packed))
+            ]]),
+            initial_size = args.scan_protection.cache_size,
+            max_occupancy_rate = 0.4,
+            resize_callback = function(table, old_size)
+               if old_size > 0 then
+                  template.logger:log("resize flow rate tracking cache "
+                                         ..old_size.." -> "..table.size)
+               end
+               require('jit').flush()
+               sp.table_tb:set(
+                  math.ceil(table.size / (2*args.scan_protection.interval))
+               )
+            end
+      })
+      sp.expiry_cursor = 0
+      sp.scratch_entry = sp.table.entry_type()
+   end
+   o.sp = sp
+
    o.match = template.match
    o.incoming_link_name, o.incoming = new_internal_link('IPFIX incoming')
 
    -- Generic per-template counters
    local shm_name = "ipfix_templates/"..args.instance.."/"..template.id
-   o.shm = shm.create_frame(shm_name,
-                            {  packets_in = { counter },
-                               flow_export_packets = { counter },
-                               exported_flows = { counter },
-                               table_size = { counter, o.table.size },
-                               table_byte_size = { counter, o.table.byte_size },
-                               table_occupancy = { counter, o.table.occupancy },
-                               table_max_displacement = { counter, o.table.max_displacement },
-                               table_scan_time = { counter, 0 } })
+   local frame_init = {
+      packets_in = { counter, 0 },
+      flow_export_packets = { counter, 0 },
+      exported_flows = { counter, 0 },
+      table_scan_time = { counter, 0 },
+   }
+   local function add_table_counters(prefix, table)
+      for _, item in ipairs({ 'size', 'byte_size',
+                              'occupancy', 'max_displacement' }) do
+         frame_init[prefix..'_'..item] = { counter, table[item] }
+      end
+   end
+   add_table_counters('table', o.table)
+   add_table_counters('rate_table', o.sp.table)
+   o.shm = shm.create_frame(shm_name, frame_init)
+
    -- Template-specific counters
    if template.counters then
       local conf = {}
@@ -321,6 +371,115 @@ function FlowSet:debug_flow(entry, msg)
    end
 end
 
+function FlowSet:expire_flow_rate_records(now)
+   if not self.scan_protection.enable then
+      return
+   end
+   local cursor = self.sp.expiry_cursor
+   local now_ms = to_milliseconds(now)
+   local interval = to_milliseconds(self.scan_protection.interval)
+   for i = 1, self.sp.table_tb:take_burst() do
+      local entry
+      cursor, entry = self.sp.table:next_entry(cursor, cursor + 1)
+      if entry then
+         if now_ms - tonumber(entry.value.tstamp) > 2*interval then
+            self.sp.table:remove_ptr(entry)
+         else
+            cursor = cursor + 1
+         end
+      end
+   end
+   self.sp.expiry_cursor = cursor
+end
+
+local function reset_rate_entry(entry, flow_entry, timestamp)
+      entry.value.tstamp = timestamp
+      entry.value.flow_count = 1
+      entry.value.packets = flow_entry.value.packetDeltaCount
+      entry.value.octets = flow_entry.value.octetDeltaCount
+end
+
+local function reset_drop_stats(entry, timestamp)
+   entry.value.drops = 0
+   entry.value.exports = 0
+   entry.value.tstamp_drop_start = timestamp
+end
+
+function FlowSet:suppress_flow(flow_entry, timestamp)
+   local config = self.scan_protection
+   if not config.enable then
+      return false
+   end
+   local entry = self.sp.scratch_entry
+   self.sp.aggr_key_fn(flow_entry.key, entry.key)
+   local result = self.sp.table:lookup_ptr(entry.key)
+   if result then
+      local interval = tonumber(timestamp - result.value.tstamp)/1000
+      if interval >= config.interval then
+         local fps = result.value.flow_count/interval
+         local ppf = result.value.packets/result.value.flow_count
+         local bpp = result.value.octets/result.value.packets
+         local drop_interval = (timestamp - result.value.tstamp_drop_start)/1000
+         if (fps >= config.threshold_rate and bpp <= config.max_bytes_per_packet and
+             ppf <= config.max_packets_per_flow) then
+            if result.value.suppress == 0 then
+               self.template.logger:log(
+                  string.format("Flow rate threshold exceeded from %s: "..
+                                   "%d fps, %d bpp, %d ppf",
+                                self.sp.ntop_fn(entry.key),
+                                tonumber(fps), tonumber(bpp), tonumber(ppf)))
+               reset_drop_stats(result, timestamp)
+               result.value.suppress = 1
+            elseif drop_interval > config.report_interval then
+               self.template.logger:log(
+                  string.format("Flow rate report for %s: "..
+                                   "%d fps, %d bpp, %d ppf, %d flows dropped, "..
+                                   "%d exported in past %d seconds",
+                                self.sp.ntop_fn(entry.key),
+                                tonumber(fps), tonumber(bpp), tonumber(ppf),
+                                tonumber(result.value.drops),
+                                tonumber(result.value.exports),
+                                tonumber(drop_interval)))
+               reset_drop_stats(result, timestamp)
+            end
+         else
+            if result.value.suppress == 1 then
+               self.template.logger:log(
+                  string.format("Flow rate below threshold from %s: "..
+                                   "%d flows dropped, %d exported in past "..
+                                   "%d seconds ",
+                                self.sp.ntop_fn(entry.key),
+                                tonumber(result.value.drops),
+                                tonumber(result.value.exports),
+                                tonumber(drop_interval)))
+               result.value.suppress = 0
+            end
+         end
+         reset_rate_entry(result, flow_entry, timestamp)
+      else
+         result.value.flow_count = result.value.flow_count + 1
+         result.value.packets = result.value.packets +
+            flow_entry.value.packetDeltaCount
+         result.value.octets = result.value.octets +
+            flow_entry.value.octetDeltaCount
+      end
+      if config.drop and result.value.suppress == 1 then
+         if self.sp.export_rate_tb:take(1) then
+            result.value.exports = result.value.exports + 1
+            return false
+         else
+            result.value.drops = result.value.drops + 1
+            return true
+         end
+      end
+   else
+      ffi.fill(entry.value, ffi.sizeof(entry.value))
+      reset_rate_entry(entry, flow_entry, timestamp)
+      self.sp.table:add(entry.key, entry.value)
+   end
+   return false
+end
+
 -- Walk through flow set to see if flow records need to be expired.
 -- Collect expired records and export them to the collector.
 function FlowSet:expire_records(out, now)
@@ -334,12 +493,16 @@ function FlowSet:expire_records(out, now)
       if entry then
          if now_ms - tonumber(entry.value.flowEndMilliseconds) > idle then
             self:debug_flow(entry, "expire idle")
-            -- Relying on key and value being contiguous.
-            self:add_data_record(entry.key, out)
+            if not self:suppress_flow(entry, now_ms) then
+               -- Relying on key and value being contiguous.
+               self:add_data_record(entry.key, out)
+            end
             self.table:remove_ptr(entry)
          elseif now_ms - tonumber(entry.value.flowStartMilliseconds) > active then
             self:debug_flow(entry, "expire active")
-            self:add_data_record(entry.key, out)
+            if not self:suppress_flow(entry, now_ms) then
+               self:add_data_record(entry.key, out)
+            end
             -- TODO: what should timers reset to?
             entry.value.flowStartMilliseconds = now_ms
             entry.value.flowEndMilliseconds = now_ms
@@ -369,6 +532,10 @@ function FlowSet:sync_stats()
    counter.set(self.shm.table_occupancy, self.table.occupancy)
    counter.set(self.shm.table_max_displacement, self.table.max_displacement)
    counter.set(self.shm.table_scan_time, self.table_scan_time)
+   counter.set(self.shm.rate_table_size, self.sp.table.size or 0)
+   counter.set(self.shm.rate_table_byte_size, self.sp.table.byte_size or 0)
+   counter.set(self.shm.rate_table_occupancy, self.sp.table.occupancy or 0)
+   counter.set(self.shm.rate_table_max_displacement, self.sp.table.max_displacement or 0)
    if self.shm_template then
       for _, name in ipairs(self.template.counters_names) do
          counter.set(self.shm_template[name], self.template.counters[name])
@@ -382,6 +549,7 @@ local ipfix_config_params = {
    active_timeout = { default = 120 },
    flush_timeout = { default = 10 },
    cache_size = { default = 20000 },
+   scan_protection = { default = {} },
    scan_time = { default = 10 },
    -- RFC 5153 §6.2 recommends a 10-minute template refresh
    -- configurable from 1 minute to 1 day.
@@ -405,6 +573,20 @@ local ipfix_config_params = {
    instance = { default = 1 },
    add_packet_metadata = { default = true },
    log_date = { default = true }
+}
+
+local scan_protection_params = {
+   enable = { default = false },
+   drop = { default = true },
+   aggregate_v4 = { default = 24 },
+   aggregate_v6 = { default = 64 },
+   cache_size = { default = 20000 },
+   interval = { default = 300 },
+   report_interval = { default = 43200 },
+   threshold_rate = { default = 10000 },
+   export_rate = { default = 500 },
+   max_bytes_per_packet = { default = 90 },
+   max_packets_per_flow = { default = 2 }
 }
 
 local function setup_transport_header(self, config)
@@ -482,6 +664,8 @@ function IPFIX:new(config)
    local flow_set_args = { mtu = config.mtu - total_header_len,
                            version = config.ipfix_version,
                            cache_size = config.cache_size,
+                           scan_protection = lib.parse(config.scan_protection,
+                                                       scan_protection_params),
                            idle_timeout = config.idle_timeout,
                            active_timeout = config.active_timeout,
                            scan_time = config.scan_time,
@@ -605,7 +789,10 @@ function IPFIX:housekeeping()
    local timestamp = ffi.C.get_unix_time()
    assert(self.output.output, "missing output link")
    local output = self.output.output
-   for _,set in ipairs(self.flow_sets) do set:expire_records(output, timestamp) end
+   for _,set in ipairs(self.flow_sets) do
+      set:expire_records(output, timestamp)
+      set:expire_flow_rate_records(timestamp)
+   end
 
    if self.next_template_refresh < engine.now() then
       self.next_template_refresh = engine.now() + self.template_refresh_interval

@@ -199,6 +199,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
                iconfig.maps_logfile =
                   exporter.maps_log_dir.."/"..od..".log"
             end
+            iconfig.scan_protection = config.scan_protection
 
             local output
             if instance.embed then

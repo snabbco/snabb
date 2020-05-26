@@ -285,16 +285,28 @@ function run (args)
                    read(template.exported_flows, true))
             format(6, "Flow export packets  %s",
                    read(template.flow_export_packets, true))
-            local size = read(template.table_size)
-            local occupancy = read(template.table_occupancy)
-            local max_disp = read(template.table_max_displacement)
-            format(6,"Table stats")
-            format(8,"Occupancy          %s", comma_value(occupancy))
-            format(8,"Size               %s", comma_value(size))
-            format(8,"Byte size          %s", read(template.table_byte_size, true))
-            format(8,"Load-factor        %1.2f", occupancy/size)
-            format(8,"Max displacement   %d", max_disp)
-            format(8,"Last scan time     %d", read(template.table_scan_time))
+
+            local function table_stats(prefix, title)
+               local function get(name)
+                  return  template[prefix..'_'..name]
+               end
+               local size = read(get('size'))
+               local occupancy = read(get('occupancy'))
+               local max_disp = read(get('max_displacement'))
+               format(6,title )
+               format(8,"Occupancy          %s", comma_value(occupancy))
+               format(8,"Size               %s", comma_value(size))
+               format(8,"Byte size          %s", read(get('byte_size'), true))
+               format(8,"Load-factor        %1.2f", occupancy/size)
+               format(8,"Max displacement   %d", max_disp)
+               if template[prefix..'_scan_time'] then
+                  format(8,"Last scan time     %d", read(get('scan_time')))
+               end
+            end
+            table_stats('table', 'Table stats')
+            if read(template.rate_table_size) > 0 then
+               table_stats('rate_table', 'Export Flow-Rate Table stats')
+            end
             shm.delete_frame(template)
             if shm.exists(path.."/"..id.."/stats") then
                format(6, "Template-specific stats")
