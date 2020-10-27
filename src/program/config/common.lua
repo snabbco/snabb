@@ -8,7 +8,7 @@ local shm = require("core.shm")
 local rpc = require("lib.yang.rpc")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
-local path_resolver = require("lib.yang.path").resolver
+local path_resolver = require("lib.yang.path_data").resolver
 
 function show_usage(command, status, err_msg)
    if err_msg then print('error: '..err_msg) end
@@ -24,6 +24,7 @@ local parse_command_line_opts = {
    require_schema = { default=false },
    is_config = { default=true },
    usage = { default=show_usage },
+   allow_extra_args = { default=false },
 }
 
 local function path_grammar(schema_name, path, is_config)
@@ -120,8 +121,8 @@ function parse_command_line(args, opts)
       end
       ret.value = parser(ret.value_str)
    end
-   if #args ~= 0 then err("too many arguments") end
-   return ret
+   if not opts.allow_extra_args and #args ~= 0 then err("too many arguments") end
+   return ret, args
 end
 
 function open_socket_or_die(instance_id)
@@ -146,7 +147,7 @@ end
 
 function serialize_data(data, schema_name, path, is_config)
    local printer = data_serializer(schema_name, path, is_config)
-   return printer(data, yang.string_output_file())
+   return printer(data, yang.string_io_file())
 end
 
 function serialize_config(config, schema_name, path)
@@ -169,7 +170,7 @@ local function read_length(socket)
       if ch == '\n' then return len end
       assert(tonumber(ch), 'not a number: '..ch)
       len = len * 10 + tonumber(ch)
-      assert(len < 1e8, 'length too long: '..len)
+      assert(len < 1e9, 'length too long: '..len)
    end
 end
 

@@ -11,15 +11,16 @@ Want to be a known developer? Sure! Just edit the [user account list](https://gi
 
 ## Servers
 
-Name        | Purpose                                           | SSH                     | Xeon model   | NICs
+Name        | Purpose                                           | SSH                     | Intel CPU    | NICs
 ------------|---------------------------------------------------|-------------------------| --------     | ------------------------------------------------
-lugano-1    | General use                                       | lugano-1.snabb.co       | E3 1650v3    | 2 x 10G (82599), 4 x 10G (X710), 2 x 40G (XL710)
-lugano-2    | General use                                       | lugano-2.snabb.co       | E3 1650v3    | 2 x 10G (82599), 4 x 10G (X710), 2 x 40G (XL710)
-lugano-3    | General use                                       | lugano-3.snabb.co       | E3 1650v3    | 2 x 10G (82599), 2 x 100G (ConnectX-4)
-lugano-4    | General use                                       | lugano-4.snabb.co       | E3 1650v3    | 2 x 10G (82599), 2 x 100G (ConnectX-4)
+lugano-1    | General use                                       | lugano-1.snabb.co       | E5 1650v3    | 2 x 10G (82599), 4 x 10G (X710), 2 x 40G (XL710)
+lugano-2    | General use                                       | lugano-2.snabb.co       | E5 1650v3    | 2 x 10G (82599), 4 x 10G (X710), 2 x 40G (XL710)
+lugano-3    | General use                                       | lugano-3.snabb.co       | E5 1650v3    | 2 x 10G (82599), 2 x 100G (ConnectX-4)
+lugano-4    | General use                                       | lugano-4.snabb.co       | E5 1650v3    | 2 x 10G (82599), 2 x 100G (ConnectX-4)
 davos       | Continuous Integration tests & driver development | lab1.snabb.co port 2000 | 2x E5 2603   | Diverse 10G/40G: Intel, SolarFlare, Mellanox, Chelsio, Broadcom. Installed upon request.
 grindelwald | Snabb NFV testing                                 | lab1.snabb.co port 2010 | 2x E5 2697v2 | 12 x 10G (Intel 82599)
 interlaken  | Haswell/AVX2 testing                              | lab1.snabb.co port 2030 | 2x E5 2620v3 | 12 x 10G (Intel 82599)
+murren-*    | Hydra fleet for tests without NICs                | (none)                  | i7-6700      | (none)
 
 ## Get started
 
