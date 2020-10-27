@@ -180,6 +180,7 @@ function shutdown (pid)
    -- Run cleanup hooks
    safely(function () require("apps.interlink.receiver").shutdown(pid) end)
    safely(function () require("apps.interlink.transmitter").shutdown(pid) end)
+   safely(function () require("apps.mellanox.connectx4").shutdown(pid) end)
    -- Parent process performs additional cleanup steps.
    -- (Parent is the process whose 'group' folder is not a symlink.)
    local st, err = S.lstat(shm.root.."/"..pid.."/group")
