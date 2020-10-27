@@ -190,7 +190,7 @@ function FlowSet:new (spec, args)
    local params = {
       key_type = template.key_t,
       value_type = template.value_t,
-      max_occupancy_rate = 0.4,
+      max_occupancy_rate = args.max_load_factor,
       resize_callback = function(table, old_size)
          if old_size > 0 then
             template.logger:log("resize flow cache "..old_size..
@@ -201,7 +201,7 @@ function FlowSet:new (spec, args)
       end
    }
    if args.cache_size then
-      params.initial_size = math.ceil(args.cache_size / 0.4)
+      params.initial_size = math.ceil(args.cache_size / args.max_load_factor)
    end
    o.table_tb = token_bucket.new({ rate = 1 }) -- Will be set by resize_callback
    o.table = ctable.new(params)
@@ -236,7 +236,7 @@ function FlowSet:new (spec, args)
                } __attribute__((packed))
             ]]),
             initial_size = args.scan_protection.cache_size,
-            max_occupancy_rate = 0.4,
+            max_occupancy_rate = args.scan_protection.max_load_factor,
             resize_callback = function(table, old_size)
                if old_size > 0 then
                   template.logger:log("resize flow rate tracking cache "
@@ -549,6 +549,7 @@ local ipfix_config_params = {
    active_timeout = { default = 120 },
    flush_timeout = { default = 10 },
    cache_size = { default = 20000 },
+   max_load_factor = { default = 0.4 },
    scan_protection = { default = {} },
    scan_time = { default = 10 },
    -- RFC 5153 §6.2 recommends a 10-minute template refresh
@@ -581,6 +582,7 @@ local scan_protection_params = {
    aggregate_v4 = { default = 24 },
    aggregate_v6 = { default = 64 },
    cache_size = { default = 20000 },
+   max_load_factor = { default = 0.6 },
    interval = { default = 300 },
    report_interval = { default = 43200 },
    threshold_rate = { default = 10000 },
@@ -664,6 +666,7 @@ function IPFIX:new(config)
    local flow_set_args = { mtu = config.mtu - total_header_len,
                            version = config.ipfix_version,
                            cache_size = config.cache_size,
+			   max_load_factor = config.max_load_factor,
                            scan_protection = lib.parse(config.scan_protection,
                                                        scan_protection_params),
                            idle_timeout = config.idle_timeout,

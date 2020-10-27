@@ -142,6 +142,7 @@ probe_config = {
    idle_timeout = { default = nil },
    flush_timeout = { default = nil },
    cache_size = { default = nil },
+   max_load_factor = { default = nil },
    scan_time = { default = nil },
    observation_domain = { default = nil },
    template_refresh_interval = { default = nil },
@@ -183,6 +184,7 @@ function configure_graph (arg, in_graph)
                idle_timeout = config.idle_timeout,
                flush_timeout = config.flush_timeout,
                cache_size = config.cache_size,
+	       max_load_factor = config.max_load_factor,
                scan_time = config.scan_time,
                observation_domain = config.observation_domain,
                template_refresh_interval =
