@@ -8,6 +8,10 @@ Available options:
                                 uses sleep(3) during periods of little or no traffic to
                                 reduce CPU usage.
        -L, --log-date           Include date and time in log messages. Off by default.
+       -c, --worker-check-interval
+                                Interval in seconds at which the master process checks if
+				its worker processes are still alive.  Dead workers are
+				restarted.
        -j CMD, --jit CMD        Control LuaJIT behavior. Available commands:
                                   -jv=FILE, --jit v=FILE
                                     Write verbose JIT trace output to FILE.
