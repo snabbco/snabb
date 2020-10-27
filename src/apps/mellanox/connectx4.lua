@@ -32,6 +32,7 @@ module(...,package.seeall)
 local ffi      = require "ffi"
 local C        = ffi.C
 local lib      = require("core.lib")
+local sync     = require("core.sync")
 local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local index_set = require("lib.index_set")
@@ -76,7 +77,8 @@ local rqt_max_size = 128
 -- future that we do not need this much flexibility. Time will tell.)
 ---------------------------------------------------------------
 
--- CXQs can be in one of four states:
+-- CXQs can be in one of five states:
+--   INIT: CXQ is being initialized by the control app
 --   FREE: CXQ is ready and available for use by an IO app.
 --   IDLE: CXQ is owned by an app, but not actively processing right now.
 --   BUSY: CXQ is owned by an app and is currently processing (e.g. push/pull).
@@ -90,13 +92,13 @@ local rqt_max_size = 128
 --
 -- App  Change      Why
 -- ---- ----------- --------------------------------------------------------
--- CTRL none->BUSY: Control app starts initialization.
--- CTRL BUSY->FREE: Control app completes initialization.
+-- CTRL none->INIT: Control app starts initialization.
+-- CTRL INIT->FREE: Control app completes initialization.
 -- IO   FREE->IDLE: IO app starts and becomes owner of the CXQ.
 -- IO   IDLE->FREE: IO app stops and releases the CXQ for future use.
 -- IO   IDLE->BUSY: IO app starts running a pull/push method.
 -- IO   BUSY->IDLE: IO app stops running a pull/push method.
--- CTRL IDLE->DEAD: Control app closes the CXQ. (Replacement can be created.)
+-- CTRL IDLE->DEAD: Control app closes the CXQ. (Replacement can be created.) NYI
 -- 
 -- These state transitions are *PROHIBITED* for important reasons:
 --
@@ -120,7 +122,7 @@ local rqt_max_size = 128
 -- format.)
 local cxq_t = ffi.typeof([[
   struct {
-    uint32_t state;    // current state / availability
+    int state[1];    // current state / availability
 
     // configuration information:
     uint32_t sqn;      // send queue number
@@ -154,20 +156,28 @@ local cxq_t = ffi.typeof([[
 ]])
 
 -- CXQ states:
-local BUSY = 0 -- Implicit initial state due to 0 value.
-local IDLE = 1
-local FREE = 2
-local DEAD = 3
+local INIT = 0 -- Implicit initial state due to 0 value.
+local BUSY = 1
+local IDLE = 2
+local FREE = 3
+local DEAD = 4
 
--- Transition from oldstate to newstate.
--- Returns true on successful transition, false if oldstate does not match.
-function transition (cxq, oldstate, newstate)
-   -- XXX use atomic x86 "LOCK CMPXCHG" instruction. Have to teach DynASM.
-   if cxq.state == oldstate then
-      cxq.state = newstate
-      return true
-   else
-      return false
+-- Release CXQ after process termination.  Called from
+-- core.main.shutdown
+function shutdown(pid)
+   for _, pciaddr in ipairs(shm.children("/"..pid.."/mellanox")) do
+      for _, queue in ipairs(shm.children("/"..pid.."/mellanox/"..pciaddr)) do
+	 local backlink = "/"..pid.."/mellanox/"..pciaddr.."/"..queue
+	 local shm_name = "/"..pid.."/group/pci/"..pciaddr.."/"..queue
+	 if shm.exists(shm_name) then
+	    local cxq = shm.open(shm_name, cxq_t)
+	    assert(sync.cas(cxq.state, IDLE, FREE) or
+		      sync.cas(cxq.state, BUSY, FREE),
+		   "ConnectX4: failed to free "..shm_name..
+		      " during shutdown")
+	 end
+	 shm.unlink(backlink)
+      end
    end
 end
 
@@ -297,7 +307,7 @@ function ConnectX4:new (conf)
       hca:modify_rq(cxq.rqn, 0, 1) -- RESET -> READY
 
       -- CXQ is now fully initialized & ready for attach.
-      assert(transition(cxq, BUSY, FREE))
+      assert(sync.cas(cxq.state, INIT, FREE))
 
       usevlan = usevlan or (queue.vlan ~= nil)
 
@@ -1098,6 +1108,7 @@ function IO:new (conf)
 
    -- Close the queue mapping.
    local function close ()
+      shm.unlink(self.backlink)
       shm.unmap(cxq)
       cxq = nil
    end
@@ -1105,9 +1116,11 @@ function IO:new (conf)
    -- Open the queue mapping.
    local function open ()
       local shmpath = "group/pci/"..pciaddress.."/"..queue
+      self.backlink = "mellanox/"..pciaddress.."/"..queue
       if shm.exists(shmpath) then
+	 shm.alias(self.backlink, shmpath)
          cxq = shm.open(shmpath, cxq_t)
-         if transition(cxq, FREE, IDLE) then
+         if sync.cas(cxq.state, FREE, IDLE) then
             sq = SQ:new(cxq, mmio)
             rq = RQ:new(cxq)
          else
@@ -1124,10 +1137,10 @@ function IO:new (conf)
       end
       if cxq then
          -- Careful: Control app may have closed the CXQ.
-         if transition(cxq, IDLE, BUSY) then
+         if sync.cas(cxq.state, IDLE, BUSY) then
             return true
          else
-            assert(cxq.state == DEAD, "illegal state detected")
+            assert(cxq.state[0] == DEAD, "illegal state detected")
             close()
          end
       end
@@ -1135,7 +1148,7 @@ function IO:new (conf)
 
    -- Enter the idle state.
    local function deactivate ()
-      assert(transition(cxq, BUSY, IDLE))
+      assert(sync.cas(cxq.state, BUSY, IDLE))
    end
 
    -- Send packets to the NIC
