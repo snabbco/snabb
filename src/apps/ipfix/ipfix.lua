@@ -427,21 +427,22 @@ function FlowSet:suppress_flow(flow_entry, timestamp)
    self.sp.aggr_key_fn(flow_entry.key, entry.key)
    local result = self.sp.table:lookup_ptr(entry.key)
    if result then
-      local interval = tonumber(timestamp - result.value.tstamp)/1000
+      local aggr = result.value
+      local interval = tonumber(timestamp - aggr.tstamp)/1000
       if interval >= config.interval then
-         local fps = result.value.flow_count/interval
-         local drop_interval = (timestamp - result.value.tstamp_drop_start)/1000
+         local fps = aggr.flow_count/interval
+         local drop_interval = (timestamp - aggr.tstamp_drop_start)/1000
          if (fps >= config.threshold_rate) then
-	    local aggr_ppf = result.value.packets/result.value.flow_count
-	    local aggr_bpp = result.value.octets/result.value.packets
-            if result.value.suppress == 0 then
+	    local aggr_ppf = aggr.packets/aggr.flow_count
+	    local aggr_bpp = aggr.octets/aggr.packets
+            if aggr.suppress == 0 then
                self.template.logger:log(
                   string.format("Flow rate threshold exceeded from %s: "..
                                    "%d fps, %d bpp, %d ppf",
                                 self.sp.ntop_fn(entry.key),
                                 tonumber(fps), tonumber(aggr_bpp), tonumber(aggr_ppf)))
                reset_drop_stats(result, timestamp)
-               result.value.suppress = 1
+               aggr.suppress = 1
             elseif drop_interval > config.report_interval then
                self.template.logger:log(
                   string.format("Flow rate report for %s: "..
@@ -449,38 +450,41 @@ function FlowSet:suppress_flow(flow_entry, timestamp)
                                    "%d exported in past %d seconds",
                                 self.sp.ntop_fn(entry.key),
                                 tonumber(fps), tonumber(aggr_bpp), tonumber(aggr_ppf),
-                                tonumber(result.value.drops),
-                                tonumber(result.value.exports),
+                                tonumber(aggr.drops),
+                                tonumber(aggr.exports),
                                 tonumber(drop_interval)))
                reset_drop_stats(result, timestamp)
             end
          else
-            if result.value.suppress == 1 then
+            if aggr.suppress == 1 then
                self.template.logger:log(
                   string.format("Flow rate below threshold from %s: "..
                                    "%d flows dropped, %d exported in past "..
                                    "%d seconds ",
                                 self.sp.ntop_fn(entry.key),
-                                tonumber(result.value.drops),
-                                tonumber(result.value.exports),
+                                tonumber(aggr.drops),
+                                tonumber(aggr.exports),
                                 tonumber(drop_interval)))
-               result.value.suppress = 0
+               aggr.suppress = 0
             end
          end
          reset_rate_entry(result, flow_entry, timestamp)
       else
-         result.value.flow_count = result.value.flow_count + 1
-         result.value.packets = result.value.packets +
+         aggr.flow_count = aggr.flow_count + 1
+         aggr.packets = aggr.packets +
             flow_entry.value.packetDeltaCount
-         result.value.octets = result.value.octets +
+         aggr.octets = aggr.octets +
             flow_entry.value.octetDeltaCount
       end
-      if config.drop and result.value.suppress == 1 then
+      if config.drop and aggr.suppress == 1 then
+	 -- NB: this rate-limiter applies to flows from *all*
+	 -- aggregates, while the threshold rate applies to each
+	 -- aggregate individually.
          if self.sp.export_rate_tb:take(1) then
-            result.value.exports = result.value.exports + 1
+            aggr.exports = aggr.exports + 1
             return false
          else
-            result.value.drops = result.value.drops + 1
+            aggr.drops = aggr.drops + 1
             return true
          end
       end

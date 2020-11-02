@@ -212,7 +212,15 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
                iconfig.maps_logfile =
                   exporter.maps_log_dir.."/"..od..".log"
             end
-            iconfig.scan_protection = config.scan_protection
+
+	    -- Scale the scan protection parameters by the number of
+	    -- ipfix instances in this RSS class
+	    iconfig.scan_protection = lib.deepcopy(config.scan_protection)
+	    local scale_factor = main.hw_rss_scaling * #exporter.instances
+	    for _, field in ipairs({ "threshold_rate", "export_rate" }) do
+	       iconfig.scan_protection[field] =
+		  iconfig.scan_protection[field]/scale_factor
+	    end
 
             local output
             if instance.embed then
