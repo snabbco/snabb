@@ -136,13 +136,13 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
    local workers = {}
    local function add_worker (name, expr, create_fn, remove_fn)
       table.insert(workers,
-		   {
-		      name = name,
-		      expr = expr,
-		      create_fn = create_fn,
-		      remove_fn = remove_fn,
-		      restarts = 0
-		   }
+                   {
+                      name = name,
+                      expr = expr,
+                      create_fn = create_fn,
+                      remove_fn = remove_fn,
+                      restarts = 0
+                   }
       )
    end
 
@@ -161,23 +161,23 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
    local cpu_pool_size = #main.cpu_pool
    local function cpu_for_node ()
       for n, cpu in ipairs(main.cpu_pool) do
-	 local cpu_node =  numa.cpu_get_numa_node(cpu)
-	 if cpu_node == node then
-	    return table.remove(main.cpu_pool, n)
-	 end
+         local cpu_node =  numa.cpu_get_numa_node(cpu)
+         if cpu_node == node then
+            return table.remove(main.cpu_pool, n)
+         end
       end
       return nil
    end
    local function log_cpu_choice (pid, cpu)
       if cpu_pool_size == 0 then return end
       if cpu then
-	 logger:log(string.format("Binding #%d to CPU %d, "
-				     .."NUMA node %d",
-				  pid, cpu, node))
+         logger:log(string.format("Binding #%d to CPU %d, "
+                                     .."NUMA node %d",
+                                  pid, cpu, node))
       else
-	 logger:log(string.format("Not binding #%d to any CPU "
-				  .."(no match found in pool for "
-				     .."NUMA node %d)", pid, node))
+         logger:log(string.format("Not binding #%d to any CPU "
+                                  .."(no match found in pool for "
+                                     .."NUMA node %d)", pid, node))
       end
    end
 
@@ -245,14 +245,14 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
                   exporter.maps_log_dir.."/"..od..".log"
             end
 
-	    -- Scale the scan protection parameters by the number of
-	    -- ipfix instances in this RSS class
-	    iconfig.scan_protection = lib.deepcopy(config.scan_protection)
-	    local scale_factor = main.hw_rss_scaling * #exporter.instances
-	    for _, field in ipairs({ "threshold_rate", "export_rate" }) do
-	       iconfig.scan_protection[field] =
-		  iconfig.scan_protection[field]/scale_factor
-	    end
+            -- Scale the scan protection parameters by the number of
+            -- ipfix instances in this RSS class
+            iconfig.scan_protection = lib.deepcopy(config.scan_protection)
+            local scale_factor = main.hw_rss_scaling * #exporter.instances
+            for _, field in ipairs({ "threshold_rate", "export_rate" }) do
+               iconfig.scan_protection[field] =
+                  iconfig.scan_protection[field]/scale_factor
+            end
 
             local output
             if instance.embed then
@@ -269,29 +269,29 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
 
                local jit =  override_jit(jit, instance.jit, od)
 
-	       local cpu = cpu_for_node()
+               local cpu = cpu_for_node()
                local worker_expr = string.format(
                   'require("program.ipfix.lib").run(%s, %s, %s, %s, %s)',
                   probe.value_to_string(iconfig), tostring(duration),
                   tostring(instance.busywait), tostring(cpu),
-		  probe.value_to_string(jit)
+                  probe.value_to_string(jit)
                )
-	       add_worker(rss_link, worker_expr,
-			  function(pid)
-			     logger:log(string.format("Launched IPFIX worker process #%d, "..
-							 "observation domain %d",
-						      pid, od))
-			     logger:log(string.format("Selected collector %s:%d from pool %s "
-						      .."for process #%d ",
-						      collector.ip, collector.port, pool,
-						      pid))
-			     log_cpu_choice(pid, cpu)
-			     shm.create("ipfix_workers/"..pid, "uint64_t")
-			  end,
-			  function(pid)
-			     shm.unlink("ipfix_workers/"..pid)
-			  end
-	       )
+               add_worker(rss_link, worker_expr,
+                          function(pid)
+                             logger:log(string.format("Launched IPFIX worker process #%d, "..
+                                                         "observation domain %d",
+                                                      pid, od))
+                             logger:log(string.format("Selected collector %s:%d from pool %s "
+                                                      .."for process #%d ",
+                                                      collector.ip, collector.port, pool,
+                                                      pid))
+                             log_cpu_choice(pid, cpu)
+                             shm.create("ipfix_workers/"..pid, "uint64_t")
+                          end,
+                          function(pid)
+                             shm.unlink("ipfix_workers/"..pid)
+                          end
+               )
             end
             table.insert(outputs, output)
          end
@@ -303,19 +303,19 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
          probe.value_to_string(main.rss), probe.value_to_string(inputs),
          probe.value_to_string(outputs), tostring(duration),
          tostring(busywait), tostring(cpu),
-	 probe.value_to_string(override_jit(jit, main.rss_jit, rssq)),
+         probe.value_to_string(override_jit(jit, main.rss_jit, rssq)),
          log_date
       )
       add_worker("rss"..rssq, worker_expr,
-		 function(pid)
-		    logger:log(string.format("Launched RSS worker process #%d",
-					     pid))
-		    log_cpu_choice(pid, cpu)
-		    shm.create("rss_workers/"..pid, "uint64_t")
-		 end,
-		 function(pid)
-		    shm.unlink("rss_workers/"..pid)
-		 end
+                 function(pid)
+                    logger:log(string.format("Launched RSS worker process #%d",
+                                             pid))
+                    log_cpu_choice(pid, cpu)
+                    shm.create("rss_workers/"..pid, "uint64_t")
+                 end,
+                 function(pid)
+                    shm.unlink("rss_workers/"..pid)
+                 end
       )
 
    end
@@ -390,7 +390,7 @@ function run (parameters)
       c = function(arg)
          if arg:match("^[0-9]+$") then
             worker_check_interval = tonumber(arg)
-	 end
+         end
       end
    }
 
@@ -408,33 +408,33 @@ function run (parameters)
    if worker_check_interval > 0 then
       local workers_by_name = {}
       for _, spec in ipairs(workers) do
-	 workers_by_name[spec.name] = spec
+         workers_by_name[spec.name] = spec
       end
 
       local worker_check = function()
-	 for n, s in pairs(worker.status()) do
-	    if not s.alive then
-	       logger:log(string.format("Worker process %d died (status %d)",
-					s.pid, s.status))
-	       local spec = workers_by_name[n]
-	       spec.restarts = spec.restarts + 1
-	       if spec.restarts > restart_limit then
-		  logger:log(string.format("Too many restarts (>%d), "
-					      .."terminating", restart_limit))
-		  S.exit(1)
-	       end
-	       logger:log(string.format("Restarting process (attempt #%d)",
-					spec.restarts))
-	       spec.remove_fn(s.pid)
-	       local new_pid = worker.start(n, spec.expr)
-	       spec.create_fn(new_pid)
-	    else
-	       workers_by_name[n].restarts = 0
-	    end
-	 end
+         for n, s in pairs(worker.status()) do
+            if not s.alive then
+               logger:log(string.format("Worker process %d died (status %d)",
+                                        s.pid, s.status))
+               local spec = workers_by_name[n]
+               spec.restarts = spec.restarts + 1
+               if spec.restarts > restart_limit then
+                  logger:log(string.format("Too many restarts (>%d), "
+                                              .."terminating", restart_limit))
+                  S.exit(1)
+               end
+               logger:log(string.format("Restarting process (attempt #%d)",
+                                        spec.restarts))
+               spec.remove_fn(s.pid)
+               local new_pid = worker.start(n, spec.expr)
+               spec.create_fn(new_pid)
+            else
+               workers_by_name[n].restarts = 0
+            end
+         end
       end
       timer.activate(timer.new("workermon", worker_check,
-			       worker_check_interval * 10e8, "repeating"))
+                               worker_check_interval * 10e8, "repeating"))
    end
 
    engine.busywait = false

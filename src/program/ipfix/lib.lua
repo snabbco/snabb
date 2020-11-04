@@ -184,7 +184,7 @@ function configure_graph (arg, in_graph)
                idle_timeout = config.idle_timeout,
                flush_timeout = config.flush_timeout,
                cache_size = config.cache_size,
-	       max_load_factor = config.max_load_factor,
+               max_load_factor = config.max_load_factor,
                scan_time = config.scan_time,
                observation_domain = config.observation_domain,
                template_refresh_interval =
