@@ -401,7 +401,7 @@ function run (parameters)
    parameters = lib.dogetopt(parameters, opt, "hdj:D:l:bLc:", long_opts)
    if #parameters ~= 1 then usage (1) end
 
-   local logger = logger.new({ rate = 30, date = log_date,
+   local logger = logger.new({ rate = 200, date = log_date,
                                module = log_pid.." RSS master" })
    local file = table.remove(parameters, 1)
    local probe_config = assert(loadfile(file))()
