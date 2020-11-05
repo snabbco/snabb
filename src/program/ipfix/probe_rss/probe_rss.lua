@@ -16,6 +16,7 @@ local main_config = {
    hw_rss_scaling = { default = 1 },
    rss = { required = true },
    cpu_pool = { default = {} },
+   rss_pin_cpu = { default = false },
    rss_jit = { default = nil },
    ipfix = { required = true }
 }
@@ -54,7 +55,8 @@ local instance_config = {
    embed = { default = true },
    weight = { default = 1 },
    jit = { default = nil },
-   busywait = { default = nil }
+   busywait = { default = nil },
+   pin_cpu = { default = false },
 }
 local jit_config = {
    v = { default = nil },
@@ -159,7 +161,8 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
    end
    local node = numa.choose_numa_node_for_pci_addresses(pci_addrs)
    local cpu_pool_size = #main.cpu_pool
-   local function cpu_for_node ()
+   local function cpu_for_node (activate)
+      if not activate then return nil end
       for n, cpu in ipairs(main.cpu_pool) do
          local cpu_node =  numa.cpu_get_numa_node(cpu)
          if cpu_node == node then
@@ -168,8 +171,8 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
       end
       return nil
    end
-   local function log_cpu_choice (pid, cpu)
-      if cpu_pool_size == 0 then return end
+   local function log_cpu_choice (pid, cpu, activate)
+      if cpu_pool_size == 0 or not activate then return end
       if cpu then
          logger:log(string.format("Binding #%d to CPU %d, "
                                      .."NUMA node %d",
@@ -269,7 +272,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
 
                local jit =  override_jit(jit, instance.jit, od)
 
-               local cpu = cpu_for_node()
+               local cpu = cpu_for_node(instance.pin_cpu)
                local worker_expr = string.format(
                   'require("program.ipfix.lib").run(%s, %s, %s, %s, %s)',
                   probe.value_to_string(iconfig), tostring(duration),
@@ -285,7 +288,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
                                                       .."for process #%d ",
                                                       collector.ip, collector.port, pool,
                                                       pid))
-                             log_cpu_choice(pid, cpu)
+                             log_cpu_choice(pid, cpu, instance.pin_cpu)
                              shm.create("ipfix_workers/"..pid, "uint64_t")
                           end,
                           function(pid)
@@ -297,7 +300,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
          end
       end
 
-      local cpu = cpu_for_node()
+      local cpu = cpu_for_node(main.rss_pin_cpu)
       local worker_expr = string.format(
          'require("program.ipfix.lib").run_rss(%s, %s, %s, %s, %s, %s, %s)',
          probe.value_to_string(main.rss), probe.value_to_string(inputs),
@@ -310,7 +313,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
                  function(pid)
                     logger:log(string.format("Launched RSS worker process #%d",
                                              pid))
-                    log_cpu_choice(pid, cpu)
+                    log_cpu_choice(pid, cpu, main.rss_pin_cpu)
                     shm.create("rss_workers/"..pid, "uint64_t")
                  end,
                  function(pid)
