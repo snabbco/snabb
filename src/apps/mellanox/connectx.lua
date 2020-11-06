@@ -1,10 +1,10 @@
--- Device driver for the Mellanox ConnectX-4 Ethernet controller family.
+-- Device driver for the Mellanox ConnectX-4+ Ethernet controller family.
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
--- This is a device driver for Mellanox ConnectX-4 and ConnectX-4 LX
--- ethernet cards. This driver is completely stand-alone and does not
--- depend on any other software such as Mellanox OFED library or the
--- Linux mlx5 driver.
+-- This is a device driver for Mellanox ConnectX family ethernet
+-- cards. This driver is completely stand-alone and does not depend on
+-- any other software such as Mellanox OFED library or the Linux mlx5
+-- driver.
 --
 -- Thanks are due to Mellanox and Deutsche Telekom for making it
 -- possible to develop this driver based on publicly available
@@ -142,6 +142,10 @@ local cxq_t = ffi.typeof([[
     // send work queue and send/receive completion queues
     union { uint8_t u8[64]; uint32_t u32[0]; uint64_t u64[0];} *swq, *scq, *rcq;
 
+    // The tx and rx lists must each be large enough for the maximum
+    // queue size, which currently is 32768.  We should probably add
+    // a check for that.
+
     // Transmit state
     struct packet *tx[64*1024]; // packets queued for transmit
     uint16_t next_tx_wqeid;           // work queue ID for next transmit descriptor
@@ -173,7 +177,7 @@ function shutdown(pid)
 	    local cxq = shm.open(shm_name, cxq_t)
 	    assert(sync.cas(cxq.state, IDLE, FREE) or
 		      sync.cas(cxq.state, BUSY, FREE),
-		   "ConnectX4: failed to free "..shm_name..
+		   "ConnectX: failed to free "..shm_name..
 		      " during shutdown")
 	 end
 	 shm.unlink(backlink)
@@ -182,14 +186,14 @@ function shutdown(pid)
 end
 
 ---------------------------------------------------------------
--- ConnectX4 Snabb app.
+-- ConnectX Snabb app.
 --
 -- Uses the driver routines to implement ConnectX-4 support in
 -- the Snabb app network.
 ---------------------------------------------------------------
 
-ConnectX4 = {}
-ConnectX4.__index = ConnectX4
+ConnectX = {}
+ConnectX.__index = ConnectX
 
 local mlx_types = {
    ["0x1013" ] = 4, -- ConnectX4
@@ -197,7 +201,7 @@ local mlx_types = {
    ["0x1019" ] = 5, -- ConnectX5
 }
 
-function ConnectX4:new (conf)
+function ConnectX:new (conf)
    local self = setmetatable({}, self)
    local pciaddress = pci.qualified(conf.pciaddress)
    local device_info = pci.device_info(pciaddress)
@@ -246,6 +250,7 @@ function ConnectX4:new (conf)
    hca:enable_hca()
    hca:set_issi(1)
    hca:alloc_pages(hca:query_pages("boot"))
+   local max_cap = hca:query_hca_general_cap('max')
    if debug_trace then self:dump_capabilities(hca) end
 
    -- Initialize the card
@@ -280,6 +285,19 @@ function ConnectX4:new (conf)
       -- Create a shared memory object for controlling the queue pair
       local cxq = shm.create("group/pci/"..pciaddress.."/"..queue.id, cxq_t)
 
+      local function check_qsize (type, size)
+	 assert(check_pow2(size),
+		string.format("%s: %s queue size must be a power of 2: %d",
+			      conf.pciaddress, type, size))
+	 assert(log2size(size) <= max_cap['log_max_wq_sz'],
+		string.format("%s: %s queue size too big: requested %d, allowed %d",
+			      conf.pciaddress, type, size,
+			      math.pow(2, max_cap['log_max_wq_sz'])))
+      end
+
+      check_qsize("Send", sendq_size)
+      check_qsize("Receive", recvq_size)
+
       cxq.rlkey = rlkey
       cxq.sqsize = sendq_size
       cxq.rqsize = recvq_size
@@ -289,9 +307,13 @@ function ConnectX4:new (conf)
       cxq.scq = cast(typeof(cxq.scq), scqe)
       cxq.rcq = cast(typeof(cxq.rcq), rcqe)
       cxq.doorbell = cast(typeof(cxq.doorbell), memory.dma_alloc(16))
-      local workqueues = memory.dma_alloc(64 * (sendq_size + recvq_size), 4096)
+
+      local rq_stride = ffi.sizeof(ffi.typeof(cxq.rwq[0]))
+      local sq_stride = ffi.sizeof(ffi.typeof(cxq.swq[0]))
+      local workqueues = memory.dma_alloc(sq_stride * sendq_size +
+					     rq_stride *recvq_size, 4096)
       cxq.rwq = cast(ffi.typeof(cxq.rwq), workqueues)
-      cxq.swq = cast(ffi.typeof(cxq.swq), workqueues + 64 * recvq_size)
+      cxq.swq = cast(ffi.typeof(cxq.swq), workqueues + rq_stride * recvq_size)
       -- Create the queue objects
       local tis = hca:create_tis(0, tdomain)
       local counter_set_id
@@ -300,8 +322,10 @@ function ConnectX4:new (conf)
          table.insert(counter_set_ids, counter_set_id)
       end
       -- XXX order check
-      cxq.sqn = hca:create_sq(scqn, pd, sendq_size, cxq.doorbell, cxq.swq, uar, tis)
-      cxq.rqn = hca:create_rq(rcqn, pd, recvq_size, cxq.doorbell, cxq.rwq,
+      cxq.sqn = hca:create_sq(scqn, pd, sq_stride, sendq_size,
+			      cxq.doorbell, cxq.swq, uar, tis)
+      cxq.rqn = hca:create_rq(rcqn, pd, rq_stride, recvq_size,
+			      cxq.doorbell, cxq.rwq,
                               counter_set_id)
       hca:modify_sq(cxq.sqn, 0, 1) -- RESET -> READY
       hca:modify_rq(cxq.rqn, 0, 1) -- RESET -> READY
@@ -489,7 +513,7 @@ function ConnectX4:new (conf)
    return self
 end
 
-function ConnectX4:dump_capabilities (hca)
+function ConnectX:dump_capabilities (hca)
    --if true then return end
    -- Print current and maximum card capabilities.
    -- XXX Check if we have any specific requirements that we need to
@@ -502,7 +526,7 @@ function ConnectX4:dump_capabilities (hca)
    end
 end
 
-function ConnectX4:check_vport ()
+function ConnectX:check_vport ()
    if true then return end
    local vport_ctx = hca:query_nic_vport_context()
    for k,v in pairs(vport_ctx) do
@@ -514,7 +538,7 @@ function ConnectX4:check_vport ()
    end
 end
 
-function ConnectX4:print_vport_counter ()
+function ConnectX:print_vport_counter ()
    local c = self.hca:query_vport_counter()
    local t = {}
    -- Sort into key order
@@ -1002,7 +1026,8 @@ end
 
 -- Create a receive queue and return a receive queue object.
 -- Return the receive queue number and a pointer to the WQEs.
-function HCA:create_rq (cqn, pd, size, doorbell, rwq, counter_set_id)
+function HCA:create_rq (cqn, pd, stride, size, doorbell, rwq, counter_set_id)
+   local log_wq_stride = log2size(stride)
    local log_wq_size = log2size(size)
    local db_phy = memory.virtual_to_physical(doorbell)
    local rwq_phy = memory.virtual_to_physical(rwq)
@@ -1016,7 +1041,7 @@ function HCA:create_rq (cqn, pd, size, doorbell, rwq, counter_set_id)
       :input("pd",            0x20 + 0x30 + 0x08, 23,  0, pd)
       :input("dbr_addr high", 0x20 + 0x30 + 0x10, 31,  0, ptrbits(db_phy, 63, 32))
       :input("dbr_addr low",  0x20 + 0x30 + 0x14, 31,  0, ptrbits(db_phy, 31, 0))
-      :input("log_wq_stride", 0x20 + 0x30 + 0x20, 19, 16, 4)
+      :input("log_wq_stride", 0x20 + 0x30 + 0x20, 19, 16, log_wq_stride)
       :input("log_page_size", 0x20 + 0x30 + 0x20, 12,  8, log_page_size)
       :input("log_wq_size",   0x20 + 0x30 + 0x20,  4 , 0, log_wq_size)
       :input("pas[0] high",   0x20 + 0x30 + 0xC0, 63, 32, ptrbits(rwq_phy, 63, 32))
@@ -1051,7 +1076,8 @@ end
 
 -- Create a Send Queue.
 -- Return the send queue number and a pointer to the WQEs.
-function HCA:create_sq (cqn, pd, size, doorbell, swq, uar, tis)
+function HCA:create_sq (cqn, pd, stride, size, doorbell, swq, uar, tis)
+   local log_wq_stride = log2size(stride)
    local log_wq_size = log2size(size)
    local db_phy = memory.virtual_to_physical(doorbell)
    local swq_phy = memory.virtual_to_physical(swq)
@@ -1069,7 +1095,7 @@ function HCA:create_sq (cqn, pd, size, doorbell, swq, uar, tis)
       :input("uar_page",       0x20 + 0x30 + 0x0C, 23, 0, uar)
       :input("pas[0] high",    0x20 + 0x30 + 0x10, 31, 0, ptrbits(db_phy, 63, 32))
       :input("pas[0] low",     0x20 + 0x30 + 0x14, 31, 0, ptrbits(db_phy, 31, 0))
-      :input("log_wq_stride",  0x20 + 0x30 + 0x20, 19, 16, 6)
+      :input("log_wq_stride",  0x20 + 0x30 + 0x20, 19, 16, log_wq_stride)
       :input("log_wq_page_sz", 0x20 + 0x30 + 0x20, 12, 8,  6) -- XXX check
       :input("log_wq_size",    0x20 + 0x30 + 0x20, 4,  0,  log_wq_size)
       :input("pas[0] high",    0x20 + 0x30 + 0xC0, 31, 0, ptrbits(swq_phy, 63, 32))
@@ -1175,33 +1201,7 @@ end
 ---------------------------------------------------------------
 -- Receive queue
 
--- Work queue entries have irregular shapes and sizes.
--- We operate on them simply as 64-byte chunks.
-local wqe_t = ffi.typeof[[
-  union {
-    uint8_t  u8[64];
-    uint32_t u32[0];
-    uint64_t u64[0];
-  } *
-  ]]
-
--- CQEs are similar to WQEs.
-local cqe_t = wqe_t
-
-local doorbell_t = ffi.typeof[[
-  struct {
-    uint32_t receive;
-    uint32_t send;
-  }*
-]]
-
 RQ = {}
-
-local rwqe_t = ffi.typeof[[
-  struct {
-    uint32_t length, lkey, address_high, address_low;
-  } *
-]]
 
 function RQ:new (cxq)
    local rq = {}
@@ -2186,18 +2186,22 @@ function log2size (size)
    return math.ceil(math.log(size) / math.log(2))
 end
 
+function check_pow2 (num)
+   return bit.band(num, num - 1) == 0
+end
+
 function selftest ()
    io.stdout:setvbuf'no'
 
-   local pcidev0 = lib.getenv("SNABB_PCI_CONNECTX4_0")
-   local pcidev1 = lib.getenv("SNABB_PCI_CONNECTX4_1")
+   local pcidev0 = lib.getenv("SNABB_PCI_CONNECTX_0")
+   local pcidev1 = lib.getenv("SNABB_PCI_CONNECTX_1")
    -- XXX check PCI device type
    if not pcidev0 then
-      print("SNABB_PCI_CONNECTX4_0 not set")
+      print("SNABB_PCI_CONNECTX_0 not set")
       os.exit(engine.test_skipped_code)
    end
    if not pcidev1 then
-      print("SNABB_PCI_CONNECTX4_1 not set")
+      print("SNABB_PCI_CONNECTX_1 not set")
       os.exit(engine.test_skipped_code)
    end
 
@@ -2209,8 +2213,8 @@ function selftest ()
    io1.output = { output = link.new('output1') }
    -- Exercise the IO apps before the NIC is initialized.
    io0:pull() io0:push() io1:pull() io1:push()
-   local nic0 = ConnectX4:new{pciaddress = pcidev0, queues = {{id='a'}}}
-   local nic1 = ConnectX4:new{pciaddress = pcidev1, queues = {{id='b'}}}
+   local nic0 = ConnectX:new{pciaddress = pcidev0, queues = {{id='a'}}}
+   local nic1 = ConnectX:new{pciaddress = pcidev1, queues = {{id='b'}}}
 
    print("selftest: waiting for both links up")
    while (nic0.hca:query_vport_state().oper_state ~= 1) or
