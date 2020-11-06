@@ -142,6 +142,10 @@ local cxq_t = ffi.typeof([[
     // send work queue and send/receive completion queues
     union { uint8_t u8[64]; uint32_t u32[0]; uint64_t u64[0];} *swq, *scq, *rcq;
 
+    // The tx and rx lists must each be large enough for the maximum
+    // queue size, which currently is 32768.  We should probably add
+    // a check for that.
+
     // Transmit state
     struct packet *tx[64*1024]; // packets queued for transmit
     uint16_t next_tx_wqeid;           // work queue ID for next transmit descriptor
@@ -246,6 +250,7 @@ function ConnectX4:new (conf)
    hca:enable_hca()
    hca:set_issi(1)
    hca:alloc_pages(hca:query_pages("boot"))
+   local max_cap = hca:query_hca_general_cap('max')
    if debug_trace then self:dump_capabilities(hca) end
 
    -- Initialize the card
@@ -280,6 +285,19 @@ function ConnectX4:new (conf)
       -- Create a shared memory object for controlling the queue pair
       local cxq = shm.create("group/pci/"..pciaddress.."/"..queue.id, cxq_t)
 
+      local function check_qsize (type, size)
+	 assert(check_pow2(size),
+		string.format("%s: %s queue size must be a power of 2: %d",
+			      conf.pciaddress, type, size))
+	 assert(log2size(size) <= max_cap['log_max_wq_sz'],
+		string.format("%s: %s queue size too big: requested %d, allowed %d",
+			      conf.pciaddress, type, size,
+			      math.pow(2, max_cap['log_max_wq_sz'])))
+      end
+
+      check_qsize("Send", sendq_size)
+      check_qsize("Receive", recvq_size)
+
       cxq.rlkey = rlkey
       cxq.sqsize = sendq_size
       cxq.rqsize = recvq_size
@@ -289,9 +307,13 @@ function ConnectX4:new (conf)
       cxq.scq = cast(typeof(cxq.scq), scqe)
       cxq.rcq = cast(typeof(cxq.rcq), rcqe)
       cxq.doorbell = cast(typeof(cxq.doorbell), memory.dma_alloc(16))
-      local workqueues = memory.dma_alloc(64 * (sendq_size + recvq_size), 4096)
+
+      local rq_stride = ffi.sizeof(ffi.typeof(cxq.rwq[0]))
+      local sq_stride = ffi.sizeof(ffi.typeof(cxq.swq[0]))
+      local workqueues = memory.dma_alloc(sq_stride * sendq_size +
+					     rq_stride *recvq_size, 4096)
       cxq.rwq = cast(ffi.typeof(cxq.rwq), workqueues)
-      cxq.swq = cast(ffi.typeof(cxq.swq), workqueues + 64 * recvq_size)
+      cxq.swq = cast(ffi.typeof(cxq.swq), workqueues + rq_stride * recvq_size)
       -- Create the queue objects
       local tis = hca:create_tis(0, tdomain)
       local counter_set_id
@@ -300,8 +322,10 @@ function ConnectX4:new (conf)
          table.insert(counter_set_ids, counter_set_id)
       end
       -- XXX order check
-      cxq.sqn = hca:create_sq(scqn, pd, sendq_size, cxq.doorbell, cxq.swq, uar, tis)
-      cxq.rqn = hca:create_rq(rcqn, pd, recvq_size, cxq.doorbell, cxq.rwq,
+      cxq.sqn = hca:create_sq(scqn, pd, sq_stride, sendq_size,
+			      cxq.doorbell, cxq.swq, uar, tis)
+      cxq.rqn = hca:create_rq(rcqn, pd, rq_stride, recvq_size,
+			      cxq.doorbell, cxq.rwq,
                               counter_set_id)
       hca:modify_sq(cxq.sqn, 0, 1) -- RESET -> READY
       hca:modify_rq(cxq.rqn, 0, 1) -- RESET -> READY
@@ -1002,7 +1026,8 @@ end
 
 -- Create a receive queue and return a receive queue object.
 -- Return the receive queue number and a pointer to the WQEs.
-function HCA:create_rq (cqn, pd, size, doorbell, rwq, counter_set_id)
+function HCA:create_rq (cqn, pd, stride, size, doorbell, rwq, counter_set_id)
+   local log_wq_stride = log2size(stride)
    local log_wq_size = log2size(size)
    local db_phy = memory.virtual_to_physical(doorbell)
    local rwq_phy = memory.virtual_to_physical(rwq)
@@ -1016,7 +1041,7 @@ function HCA:create_rq (cqn, pd, size, doorbell, rwq, counter_set_id)
       :input("pd",            0x20 + 0x30 + 0x08, 23,  0, pd)
       :input("dbr_addr high", 0x20 + 0x30 + 0x10, 31,  0, ptrbits(db_phy, 63, 32))
       :input("dbr_addr low",  0x20 + 0x30 + 0x14, 31,  0, ptrbits(db_phy, 31, 0))
-      :input("log_wq_stride", 0x20 + 0x30 + 0x20, 19, 16, 4)
+      :input("log_wq_stride", 0x20 + 0x30 + 0x20, 19, 16, log_wq_stride)
       :input("log_page_size", 0x20 + 0x30 + 0x20, 12,  8, log_page_size)
       :input("log_wq_size",   0x20 + 0x30 + 0x20,  4 , 0, log_wq_size)
       :input("pas[0] high",   0x20 + 0x30 + 0xC0, 63, 32, ptrbits(rwq_phy, 63, 32))
@@ -1051,7 +1076,8 @@ end
 
 -- Create a Send Queue.
 -- Return the send queue number and a pointer to the WQEs.
-function HCA:create_sq (cqn, pd, size, doorbell, swq, uar, tis)
+function HCA:create_sq (cqn, pd, stride, size, doorbell, swq, uar, tis)
+   local log_wq_stride = log2size(stride)
    local log_wq_size = log2size(size)
    local db_phy = memory.virtual_to_physical(doorbell)
    local swq_phy = memory.virtual_to_physical(swq)
@@ -1069,7 +1095,7 @@ function HCA:create_sq (cqn, pd, size, doorbell, swq, uar, tis)
       :input("uar_page",       0x20 + 0x30 + 0x0C, 23, 0, uar)
       :input("pas[0] high",    0x20 + 0x30 + 0x10, 31, 0, ptrbits(db_phy, 63, 32))
       :input("pas[0] low",     0x20 + 0x30 + 0x14, 31, 0, ptrbits(db_phy, 31, 0))
-      :input("log_wq_stride",  0x20 + 0x30 + 0x20, 19, 16, 6)
+      :input("log_wq_stride",  0x20 + 0x30 + 0x20, 19, 16, log_wq_stride)
       :input("log_wq_page_sz", 0x20 + 0x30 + 0x20, 12, 8,  6) -- XXX check
       :input("log_wq_size",    0x20 + 0x30 + 0x20, 4,  0,  log_wq_size)
       :input("pas[0] high",    0x20 + 0x30 + 0xC0, 31, 0, ptrbits(swq_phy, 63, 32))
@@ -1175,33 +1201,7 @@ end
 ---------------------------------------------------------------
 -- Receive queue
 
--- Work queue entries have irregular shapes and sizes.
--- We operate on them simply as 64-byte chunks.
-local wqe_t = ffi.typeof[[
-  union {
-    uint8_t  u8[64];
-    uint32_t u32[0];
-    uint64_t u64[0];
-  } *
-  ]]
-
--- CQEs are similar to WQEs.
-local cqe_t = wqe_t
-
-local doorbell_t = ffi.typeof[[
-  struct {
-    uint32_t receive;
-    uint32_t send;
-  }*
-]]
-
 RQ = {}
-
-local rwqe_t = ffi.typeof[[
-  struct {
-    uint32_t length, lkey, address_high, address_low;
-  } *
-]]
 
 function RQ:new (cxq)
    local rq = {}
@@ -2184,6 +2184,10 @@ function log2size (size)
    -- Note: Lua provides only natural logarithm function (base e) built-in.
    --       See http://www.mathwords.com/c/change_of_base_formula.htm
    return math.ceil(math.log(size) / math.log(2))
+end
+
+function check_pow2 (num)
+   return bit.band(num, num - 1) == 0
 end
 
 function selftest ()
