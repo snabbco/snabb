@@ -202,7 +202,7 @@ function run (args)
    local mellanox_qs
    if input_type == "pci" then
       local device_info = pci.device_info(input)
-      if device_info.driver == 'apps.mellanox.connectx4' then
+      if device_info.driver == 'apps.mellanox.connectx' then
          mellanox_qs = {}
       end
    end
@@ -246,7 +246,7 @@ function run (args)
       }
       local driver = pci.device_info(input).driver
       app_graph.app(ctrl_graph, "ctrl_"..input,
-                    require(driver).ConnectX4, conf)
+                    require(driver).ConnectX, conf)
    end
 
    engine.busywait = false

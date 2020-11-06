@@ -195,7 +195,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
          -- all queues for the interface. We collect all queues per
          -- device of this type here.
          local device_info = pci.device_info(input.device)
-         if device_info.driver == 'apps.mellanox.connectx4' then
+         if device_info.driver == 'apps.mellanox.connectx' then
             local spec = mellanox[input.device]
             if not spec then
                spec = { ifName = input.name,
@@ -335,7 +335,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
       }
       local driver = pci.device_info(device).driver
       app_graph.app(ctrl_graph, "ctrl_"..device,
-                    require(driver).ConnectX4, conf)
+                    require(driver).ConnectX, conf)
    end
 
    for _, spec in ipairs(workers) do
