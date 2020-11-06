@@ -177,7 +177,7 @@ function shutdown(pid)
 	    local cxq = shm.open(shm_name, cxq_t)
 	    assert(sync.cas(cxq.state, IDLE, FREE) or
 		      sync.cas(cxq.state, BUSY, FREE),
-		   "ConnectX4: failed to free "..shm_name..
+		   "ConnectX: failed to free "..shm_name..
 		      " during shutdown")
 	 end
 	 shm.unlink(backlink)
@@ -186,14 +186,14 @@ function shutdown(pid)
 end
 
 ---------------------------------------------------------------
--- ConnectX4 Snabb app.
+-- ConnectX Snabb app.
 --
 -- Uses the driver routines to implement ConnectX-4 support in
 -- the Snabb app network.
 ---------------------------------------------------------------
 
-ConnectX4 = {}
-ConnectX4.__index = ConnectX4
+ConnectX = {}
+ConnectX.__index = ConnectX
 
 local mlx_types = {
    ["0x1013" ] = 4, -- ConnectX4
@@ -201,7 +201,7 @@ local mlx_types = {
    ["0x1019" ] = 5, -- ConnectX5
 }
 
-function ConnectX4:new (conf)
+function ConnectX:new (conf)
    local self = setmetatable({}, self)
    local pciaddress = pci.qualified(conf.pciaddress)
    local device_info = pci.device_info(pciaddress)
@@ -513,7 +513,7 @@ function ConnectX4:new (conf)
    return self
 end
 
-function ConnectX4:dump_capabilities (hca)
+function ConnectX:dump_capabilities (hca)
    --if true then return end
    -- Print current and maximum card capabilities.
    -- XXX Check if we have any specific requirements that we need to
@@ -526,7 +526,7 @@ function ConnectX4:dump_capabilities (hca)
    end
 end
 
-function ConnectX4:check_vport ()
+function ConnectX:check_vport ()
    if true then return end
    local vport_ctx = hca:query_nic_vport_context()
    for k,v in pairs(vport_ctx) do
@@ -538,7 +538,7 @@ function ConnectX4:check_vport ()
    end
 end
 
-function ConnectX4:print_vport_counter ()
+function ConnectX:print_vport_counter ()
    local c = self.hca:query_vport_counter()
    local t = {}
    -- Sort into key order
@@ -2193,15 +2193,15 @@ end
 function selftest ()
    io.stdout:setvbuf'no'
 
-   local pcidev0 = lib.getenv("SNABB_PCI_CONNECTX4_0")
-   local pcidev1 = lib.getenv("SNABB_PCI_CONNECTX4_1")
+   local pcidev0 = lib.getenv("SNABB_PCI_CONNECTX_0")
+   local pcidev1 = lib.getenv("SNABB_PCI_CONNECTX_1")
    -- XXX check PCI device type
    if not pcidev0 then
-      print("SNABB_PCI_CONNECTX4_0 not set")
+      print("SNABB_PCI_CONNECTX_0 not set")
       os.exit(engine.test_skipped_code)
    end
    if not pcidev1 then
-      print("SNABB_PCI_CONNECTX4_1 not set")
+      print("SNABB_PCI_CONNECTX_1 not set")
       os.exit(engine.test_skipped_code)
    end
 
@@ -2213,8 +2213,8 @@ function selftest ()
    io1.output = { output = link.new('output1') }
    -- Exercise the IO apps before the NIC is initialized.
    io0:pull() io0:push() io1:pull() io1:push()
-   local nic0 = ConnectX4:new{pciaddress = pcidev0, queues = {{id='a'}}}
-   local nic1 = ConnectX4:new{pciaddress = pcidev1, queues = {{id='b'}}}
+   local nic0 = ConnectX:new{pciaddress = pcidev0, queues = {{id='a'}}}
+   local nic1 = ConnectX:new{pciaddress = pcidev1, queues = {{id='b'}}}
 
    print("selftest: waiting for both links up")
    while (nic0.hca:query_vport_state().oper_state ~= 1) or
