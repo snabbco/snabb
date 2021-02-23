@@ -160,11 +160,14 @@ end
 -- hugepages, not this code.
 local try_huge_pages = true
 local huge_page_threshold = 1e6
+local huge_page_size = memory.get_huge_page_size()
 local function calloc(t, count)
    if count == 0 then return 0, 0 end
    local byte_size = ffi.sizeof(t) * count
+   local alloc_byte_size = byte_size
    local mem, err
    if try_huge_pages and byte_size > huge_page_threshold then
+      alloc_byte_size = ceil(byte_size/huge_page_size) * huge_page_size
       mem, err = S.mmap(nil, byte_size, 'read, write',
                         'private, anonymous, hugetlb')
       if not mem then
@@ -179,7 +182,7 @@ local function calloc(t, count)
       if not mem then error("mmap failed: " .. tostring(err)) end
    end
    local ret = ffi.cast(ffi.typeof('$*', t), mem)
-   ffi.gc(ret, function (ptr) S.munmap(ptr, byte_size) end)
+   ffi.gc(ret, function (ptr) S.munmap(ptr, alloc_byte_size) end)
    return ret, byte_size
 end
 
