@@ -396,6 +396,14 @@ local function extract_5_tuple(pkt, timestamp, entry, md, extract_addr_fn)
 end
 
 local function accumulate_generic(dst, new)
+   -- If dst is a flow entry which has been cleared after an active
+   -- timeout and this is the first packet received since then,
+   -- flowStartMilliseconds is the time at which the flow was last
+   -- exported rather than the time at which the flow actually started
+   -- in the new active window.
+   if dst.value.packetDeltaCount == 0 then
+      dst.value.flowStartMilliseconds = new.value.flowStartMilliseconds
+   end
    dst.value.flowEndMilliseconds = new.value.flowEndMilliseconds
    dst.value.packetDeltaCount = dst.value.packetDeltaCount + 1
    dst.value.octetDeltaCount =
