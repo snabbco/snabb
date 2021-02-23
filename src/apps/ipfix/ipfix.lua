@@ -509,17 +509,18 @@ function FlowSet:expire_records(out, now)
       if entry then
          if now_ms - tonumber(entry.value.flowEndMilliseconds) > idle then
             self:debug_flow(entry, "expire idle")
-            if not self:suppress_flow(entry, now_ms) then
+            if (not self:suppress_flow(entry, now_ms) and
+                entry.value.packetDeltaCount > 0) then
                -- Relying on key and value being contiguous.
                self:add_data_record(entry.key, out)
             end
             self.table:remove_ptr(entry)
          elseif now_ms - tonumber(entry.value.flowStartMilliseconds) > active then
             self:debug_flow(entry, "expire active")
-            if not self:suppress_flow(entry, now_ms) then
+            if (not self:suppress_flow(entry, now_ms) and
+                entry.value.packetDeltaCount > 0) then
                self:add_data_record(entry.key, out)
             end
-            -- TODO: what should timers reset to?
             entry.value.flowStartMilliseconds = now_ms
             entry.value.flowEndMilliseconds = now_ms
             entry.value.packetDeltaCount = 0
