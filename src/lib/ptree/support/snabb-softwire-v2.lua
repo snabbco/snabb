@@ -156,11 +156,15 @@ local function memoize1(f)
    end
 end
 
-local function cltable_for_grammar(grammar)
-   assert(grammar.key_ctype)
-   assert(not grammar.value_ctype)
-   local key_t = data.typeof(grammar.key_ctype)
-   return cltable.new({key_type=key_t}), key_t
+local function table_for_grammar(grammar)
+   if grammar.native_key then
+      return {}, function (key) return key[grammar.native_key] end
+   elseif grammar.key_ctype and not grammar.value_ctype then
+      local key_t = data.typeof(grammar.key_ctype)
+      return cltable.new({key_type=key_t}), key_t
+   else
+      error("Unsupported table type")
+   end
 end
 
 local ietf_bind_instance_grammar
@@ -189,7 +193,7 @@ local function get_ietf_softwire_grammar()
 end
 
 local function ietf_binding_table_from_native(bt)
-   local ret, key_t = cltable_for_grammar(get_ietf_softwire_grammar())
+   local ret, key_t = table_for_grammar(get_ietf_softwire_grammar())
    local warn_lossy = false
    for softwire in bt.softwire:iterate() do
       local k = key_t({ binding_ipv6info = softwire.value.b4_ipv6 })

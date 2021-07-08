@@ -15,7 +15,7 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
-local VERSION = 0x0000d000
+local VERSION = 0x0000f000
 
 local header_t = ffi.typeof([[
 struct {
@@ -141,9 +141,17 @@ local function data_emitter(production)
       end
    end
    function handlers.struct(production)
-      local member_names = {}
-      for k,_ in pairs(production.members) do table.insert(member_names, k) end
-      table.sort(member_names)
+      local member_keys = {}
+      for k,_ in pairs(production.members) do table.insert(member_keys, k) end
+      local function order_predicate (x, y)
+         if (type(x) == 'number' and type(y) == 'number') or
+            (type(x) == 'string' and type(y) == 'string') then
+            return x >= y
+         else
+            return type(y) == 'number'
+         end
+      end
+      table.sort(member_keys, order_predicate)
       if production.ctype then
          local data_t = data.typeof(production.ctype)
          return function(data, stream)
@@ -156,15 +164,36 @@ local function data_emitter(production)
          local normalize_id = data.normalize_id
          return function(data, stream)
             stream:write_stringref('lstruct')
-            local out = {}
-            for _,k in ipairs(member_names) do
-               local id = normalize_id(k)
-               if data[id] ~= nil then
-                  table.insert(out, {id, emit_member[k], data[id]})
+            -- We support Lua tables with string and number (<=uint32_t) keys,
+            -- first we emit the number keyed members...
+            local outn = {}
+            for _,k in ipairs(member_keys) do
+               if type(k) == 'number' then
+                  local id = tonumber(ffi.cast("uint32_t", k))
+                  assert(id == k)
+                  if data[id] ~= nil then
+                     table.insert(outn, {id, emit_member[k], data[id]})
+                  end
                end
             end
-            stream:write_scalar(uint32_t, #out)
-            for _,elt in ipairs(out) do
+            stream:write_scalar(uint32_t, #outn)
+            for _,elt in ipairs(outn) do
+               local id, emit, data = unpack(elt)
+               stream:write_scalar(uint32_t, id)
+               emit(data, stream)
+            end
+            -- ...and then the string keyed members.
+            local outs = {}
+            for _,k in ipairs(member_keys) do
+               if type(k) == 'string' then
+                  local id = normalize_id(k)
+                  if data[id] ~= nil then
+                     table.insert(outs, {id, emit_member[k], data[id]})
+                  end
+               end
+            end
+            stream:write_scalar(uint32_t, #outs)
+            for _,elt in ipairs(outs) do
                local id, emit, data = unpack(elt)
                stream:write_stringref(id)
                emit(data, stream)
@@ -199,15 +228,33 @@ local function data_emitter(production)
             stream:write_stringref(production.value_ctype)
             data:save(stream)
          end
-      elseif production.string_key then
+      elseif production.native_key then
          local emit_value = visit1({type='struct', members=production.values,
                                     ctype=production.value_ctype})
          -- FIXME: sctable if production.value_ctype?
          return function(data, stream)
             -- A string-keyed table is the same as a tagged struct.
             stream:write_stringref('lstruct')
-            stream:write_scalar(uint32_t, table_size(data))
-            for k,v in pairs(data) do
+            local number_keyed_members = {}
+            for k, v in pairs(data) do
+               if type(k) == 'number' then
+                  assert(ffi.cast("uint32_t", k) == k)
+                  number_keyed_members[k] = v
+               end
+            end
+            stream:write_scalar(uint32_t, table_size(number_keyed_members))
+            for k,v in pairs(number_keyed_members) do
+               stream:write_scalar(uint32_t, k)
+               emit_value(v, stream)
+            end
+            local string_keyed_members = {}
+            for k, v in pairs(data) do
+               if type(k) == 'string' then
+                  string_keyed_members[k] = v
+               end
+            end
+            stream:write_scalar(uint32_t, table_size(string_keyed_members))
+            for k,v in pairs(string_keyed_members) do
                stream:write_stringref(k)
                emit_value(v, stream)
             end
@@ -330,7 +377,7 @@ local function ad_hoc_grammar_from_data(data)
    if type(data) == 'table' then
       local members = {}
       for k,v in pairs(data) do
-         assert(type(k) == 'string')
+         assert(type(k) == 'string' or type(k) == 'number')
          members[k] = ad_hoc_grammar_from_data(v)
       end
       return {type='struct', members=members}
@@ -384,6 +431,10 @@ local function read_compiled_data(stream, strtab)
    end
    function readers.lstruct()
       local ret = {}
+      for i=1,stream:read_scalar(nil, uint32_t) do
+         local k = stream:read_scalar(nil, uint32_t)
+         ret[k] = read1()
+      end
       for i=1,stream:read_scalar(nil, uint32_t) do
          local k = read_string()
          ret[k] = read1()
@@ -513,6 +564,14 @@ end
 
 function selftest()
    print('selfcheck: lib.yang.binary')
+   do
+      -- Test Lua table support
+      local data = { foo = 12, [42] = { [43] = "bar", baz = 44 } }
+      local tmp = os.tmpname()
+      compile_ad_hoc_lua_data_to_file(tmp, data)
+      local data2 = load_compiled_data_file(tmp).data
+      assert(lib.equal(data, data2))
+   end
    local test_schema = schema.load_schema([[module snabb-simple-router {
       namespace snabb:simple-router;
       prefix simple-router;

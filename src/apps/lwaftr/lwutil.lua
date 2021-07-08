@@ -28,9 +28,9 @@ function parse_instance(conf)
    end
    assert(device ~= nil, "configuration has no instance")
    local id, queue
-   for k, v in cltable.pairs(instance.queue) do
+   for k, v in pairs(instance.queue) do
       assert(id == nil, "configuration has more than one RSS queue")
-      id, queue = k.id, v
+      id, queue = k, v
    end
    assert(id ~= nil, "configuration has no RSS queues")
    return device, id, queue

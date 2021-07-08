@@ -816,9 +816,12 @@ end
 
 Returns hexadecimal string for bytes in *string*.
 
-— Function **lib.hexundump** *hexstring*
+— Function **lib.hexundump** *hexstring*, *n*, *error* 
 
-Returns byte string for *hexstring*.
+Returns string of *n* bytes for *hexstring*. Throws an error if less than *n*
+hex-encoded bytes could be parsed unless *error* is `false`.
+
+*Error* is optional and can be the error message to throw.
 
 — Function **lib.comma_value** *n*
 
@@ -1016,6 +1019,7 @@ Groups of Snabb processes each have the following special properties:
   mastering (DMA) is disabled upon termination before any DMA memory
   is returned to the kernel. This prevents "dangling" DMA requests
   from corrupting memory that has been freed and reused.
+  See [lib.hardware.pci](#pci-lib.hardware.pci) for details.
 
 The `core.worker` API functions are available in the main process only:
 
