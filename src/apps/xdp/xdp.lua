@@ -595,63 +595,7 @@ end
 -- Instance methods
 
 function XDP:stop ()
-   print("STOP BEGIN", self.rxq, self.txq, packet.nfree())
-   -- Close socket.
-   self.sock:close()
-   -- Reclaim packet buffers left on rings.
-   --
-   -- Problem: we need a way to tell apart which packets buffers on the
-   -- (write-only) tx and fill rings need to be freed, and which packet buffers
-   -- were already enqueued to the (read-only) rx and completions rings.
-   -- Otherwise, we might cause memory corruption by double-freeing packets.
-   --
-   -- We can not however reliably inspect the kernel's internal read cursors
-   -- for the tx and fill rings. Instead we solve this with a *hack* based on
-   -- the assumptions that 1) the kernel does not modify the rings after
-   -- closing the XDP socket; 2) the kernel moves packets from fill to rx rings
-   -- and tx to completion rings *in-order*; 3) the kernel does not clobber
-   -- descriptors that have not yet moved to an rx or completion ring.
-   --
-   -- First we flush the rx and completion rings, freeing any dequeued packets,
-   -- while updating the rxq and txq tallies (see XDP:create_xsk()).
-   while not empty(self.rx) do
-      packet.free_internal(receive(self.rx))
-      self.rxq = self.rxq - 1
-   end
-   while not empty(self.cr) do
-      packet.free_internal(reclaim(self.cr))
-      self.txq = self.txq - 1
-   end
-   print("STOP FLUSH", self.rxq, self.txq, packet.nfree())
-   -- Then, we use the final rxq/txq tallies to infer how many packets on the
-   -- transmit and fill rings are left dangling, and free those amounts of
-   -- packets (starting from the most recently enqueued, going backwards) from
-   -- each ring individually.
-   for _ = 1, math.min(self.txq, xdp_ring_ndesc) do
-      packet.free_internal(rewind_transmit(self.tx))
-      self.txq = self.txq - 1
-   end
-   for _ = 1, math.min(self.rxq, xdp_ring_ndesc) do
-      packet.free_internal(rewind_fill(self.fr))
-      self.rxq = self.rxq - 1
-   end
-   print("STOP REWIND", self.rxq, self.txq, packet.nfree())
-   for _ = 1, self.rxq do
-      packet.free_internal(receive(self.rx))
-      self.rxq = self.rxq - 1
-   end
-   for _ = 1, self.txq do
-      packet.free_internal(reclaim(self.cr))
-      self.txq = self.txq - 1
-   end
-   print("STOP UNACCOUNTED", self.rxq, self.txq, packet.nfree())
-   -- Unmap rings.
-   assert(S.munmap(self.rx.map, self.rx.maplen))
-   assert(S.munmap(self.tx.map, self.tx.maplen))
-   assert(S.munmap(self.fr.map, self.fr.maplen))
-   assert(S.munmap(self.cr.map, self.cr.maplen))
-   -- Close interface lockfd. See XDP:open_interface().
-   self.lockfd:close()
+   error("Can not stop XDP driver (operation not supported)")
 end
 
 function XDP:pull ()
@@ -756,14 +700,14 @@ function selftest ()
    end
    snabb_enable_xdp()
    engine.report_load()
-   print("test: rxtx")
-   selftest_rxtx(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
-   print("test: duplex")
-   selftest_duplex(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
    if nqueues == 1 then
       print("test: rxtx_match")
       selftest_rxtx_match(xdpdeva, xdpmaca, xdpdevb, xdpmacb)
    end
+   print("test: rxtx")
+   selftest_rxtx(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
+   print("test: duplex")
+   selftest_duplex(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
    if nqueues > 1 then
       print("test: share_interface")
       selftest_share_interface(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
@@ -904,10 +848,10 @@ function selftest_rxtx_match (xdpdeva, xdpmaca, xdpdevb, xdpmacb)
    })
    config.app(c, "npackets", npackets.Npackets, {npackets=1000})
    config.app(c, "match", match.Match)
-   config.app(c, xdpdeva, XDP, {ifname=xdpdeva})
-   config.app(c, xdpdevb, XDP, {ifname=xdpdevb})
-   config.link(c, "source.output -> "..xdpdeva..".input")
-   config.link(c, xdpdevb..".output -> match.rx")
+   config.app(c, xdpdeva.."_q0", XDP, {ifname=xdpdeva})
+   config.app(c, xdpdevb.."_q0", XDP, {ifname=xdpdevb})
+   config.link(c, "source.output -> "..xdpdeva.."_q0.input")
+   config.link(c, xdpdevb.."_q0.output -> match.rx")
    config.link(c, "source.copy -> npackets.input")
    config.link(c, "npackets.output -> match.comparator")
    engine.configure(c)
