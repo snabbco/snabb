@@ -595,6 +595,7 @@ end
 -- Instance methods
 
 function XDP:stop ()
+   print("STOP BEGIN", self.rxq, self.txq, packet.nfree())
    -- Close socket.
    self.sock:close()
    -- Reclaim packet buffers left on rings.
@@ -621,16 +622,29 @@ function XDP:stop ()
       packet.free_internal(reclaim(self.cr))
       self.txq = self.txq - 1
    end
+   print("STOP FLUSH", self.rxq, self.txq, packet.nfree())
    -- Then, we use the final rxq/txq tallies to infer how many packets on the
    -- transmit and fill rings are left dangling, and free those amounts of
    -- packets (starting from the most recently enqueued, going backwards) from
    -- each ring individually.
-   for _ = 1, self.txq do
+   for _ = 1, math.min(self.txq, xdp_ring_ndesc) do
       packet.free_internal(rewind_transmit(self.tx))
+      self.txq = self.txq - 1
    end
-   for _ = 1, self.rxq do
+   for _ = 1, math.min(self.rxq, xdp_ring_ndesc) do
       packet.free_internal(rewind_fill(self.fr))
+      self.rxq = self.rxq - 1
    end
+   print("STOP REWIND", self.rxq, self.txq, packet.nfree())
+   for _ = 1, self.rxq do
+      packet.free_internal(receive(self.rx))
+      self.rxq = self.rxq - 1
+   end
+   for _ = 1, self.txq do
+      packet.free_internal(reclaim(self.cr))
+      self.txq = self.txq - 1
+   end
+   print("STOP UNACCOUNTED", self.rxq, self.txq, packet.nfree())
    -- Unmap rings.
    assert(S.munmap(self.rx.map, self.rx.maplen))
    assert(S.munmap(self.tx.map, self.tx.maplen))
@@ -747,8 +761,8 @@ function selftest ()
    print("test: duplex")
    selftest_duplex(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
    if nqueues == 1 then
-   print("test: rxtx_match")
-   selftest_rxtx_match(xdpdeva, xdpmaca, xdpdevb, xdpmacb)
+      print("test: rxtx_match")
+      selftest_rxtx_match(xdpdeva, xdpmaca, xdpdevb, xdpmacb)
    end
    if nqueues > 1 then
       print("test: share_interface")
