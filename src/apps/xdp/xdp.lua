@@ -746,8 +746,10 @@ function selftest ()
    selftest_rxtx(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
    print("test: duplex")
    selftest_duplex(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
-   print("test: rxtx_match")
-   selftest_rxtx_match(xdpdeva, xdpmaca, xdpdevb, xdpmacb)
+   if nqueues == 1 then
+      print("test: rxtx_match")
+      selftest_rxtx_match(xdpdeva, xdpmaca, xdpdevb, xdpmacb)
+   end
    if nqueues > 1 then
       print("test: share_interface")
       selftest_share_interface(xdpdeva, xdpmaca, xdpdevb, xdpmacb, nqueues)
