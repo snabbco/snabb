@@ -11,6 +11,11 @@ module snabb-softwire-v2 {
   description
    "Configuration for the Snabb Switch lwAFTR.";
 
+  revision 2021-07-13 {
+    description
+      "Add default value for error-rate-limiting/packets.";
+  }
+
   revision 2019-09-17 {
     description
       "Add discontinuity time to softwire-state.";
@@ -508,6 +513,7 @@ module snabb-softwire-v2 {
       container error-rate-limiting {
         leaf packets {
           type uint32;
+          default 200;
           description
            "The number of ICMP error messages which can be sent within
             the specified time period.";
