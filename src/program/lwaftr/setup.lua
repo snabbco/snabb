@@ -254,6 +254,27 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
    link_sink(c,   v4_nic_name..'.'..v4_info.rx, v6_nic_name..'.'..v6_info.rx)
 end
 
+function load_xdp(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
+   local v4_device, id, queue = lwutil.parse_instance(conf)
+   local v6_device = queue.external_interface.device
+   assert(lib.is_iface(v4_device), v4_nic_name..": "..v4_device.." is not a Linux interface")
+   assert(lib.is_iface(v6_device), v6_nic_name..": "..v6_device.." is not a Linux interface")
+   assert(not lwutil.is_on_a_stick(v4_device, queue),
+          "--xdp does not support on-a-stick configuration")
+          
+   lwaftr_app(c, conf)
+
+   config.app(c, v4_nic_name, require("apps.xdp.xdp").driver, {
+      ifname=v4_device,
+      queue=id})
+   config.app(c, v6_nic_name, require("apps.xdp.xdp").driver, {
+      ifname=v6_device,
+      queue=id})
+
+   link_source(c, v4_nic_name..'.output', v6_nic_name..'.output')
+   link_sink(c,   v4_nic_name..'.input', v6_nic_name..'.input')
+end
+
 function load_on_a_stick_kernel_iface (c, conf, args)
    local RawSocket = require("apps.socket.raw").RawSocket
    local iface, id, queue = lwutil.parse_instance(conf)
