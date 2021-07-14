@@ -483,25 +483,30 @@ local function get_maxnumnodes()
        return math.floor(((#line+1)/9)*32)
      end
    end
+   -- If we don't know, guess that the system has a max of 1024 nodes.
+   return 1024
+end
+
+local function ensure_bitmask(mask, size)
+  if ffi.istype(t.bitmask, mask) then return mask end
+  return t.bitmask(mask, size or get_maxnumnodes())
 end
 
 function S.get_mempolicy(mode, mask, addr, flags)
   mode = mode or t.int1()
-  mask = mktype(t.bitmask, mask)
-  -- Size should be at least equals to maxnumnodes.
-  local size = ffi.cast("uint64_t", math.max(tonumber(mask.size), get_maxnumnodes()))
-  local ret, err = C.get_mempolicy(mode, mask.mask, size, addr or 0, c.MPOL_FLAG[flags])
+  mask = ensure_bitmask(mask);
+  local ret, err = C.get_mempolicy(mode, mask.mask, mask.size, addr or 0, c.MPOL_FLAG[flags])
   if ret == -1 then return nil, t.error(err or errno()) end
   return { mode=mode[0], mask=mask }
 end
 function S.set_mempolicy(mode, mask)
-  mask = mktype(t.bitmask, mask)
+  mask = ensure_bitmask(mask);
   return retbool(C.set_mempolicy(c.MPOL_MODE[mode], mask.mask, mask.size))
 end
 
 function S.migrate_pages(pid, from, to)
-  from = mktype(t.bitmask, from)
-  to = mktype(t.bitmask, to)
+  from = ensure_bitmask(from);
+  to = ensure_bitmask(to, from.size)
   assert(from.size == to.size, "incompatible nodemask sizes")
   return retbool(C.migrate_pages(pid or 0, from.size, from.mask, to.mask))
 end

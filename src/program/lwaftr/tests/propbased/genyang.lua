@@ -385,7 +385,7 @@ local function path_generator_from_grammar(production, generate_invalid)
       table.sort(members)
       return function ()
          local head = keyword or ''
-         if math.random() < 0.1 then return head end
+         if #members == 0 or math.random() < 0.1 then return head end
          if head ~= '' then head = head..'/' end
          local k = choose(members)
          return head..gen_tail[k]()

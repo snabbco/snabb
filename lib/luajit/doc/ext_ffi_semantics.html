@@ -46,8 +46,6 @@ td.convop { font-style: italic; width: 40%; }
 <a href="ext_jit.html">jit.* Library</a>
 </li><li>
 <a href="ext_c_api.html">Lua/C API</a>
-</li><li>
-<a href="ext_profiler.html">Profiler</a>
 </li></ul>
 </li><li>
 <a href="status.html">Status</a>
@@ -864,7 +862,7 @@ place of a type, you'd need to use <tt>ffi.typeof("int")</tt> instead.
 <p>
 The main use for parameterized types are libraries implementing abstract
 data types
-(<a href="http://www.freelists.org/post/luajit/ffi-type-of-pointer-to,8"><span class="ext">&raquo;</span>&nbsp;example</a>),
+(<a href="https://www.freelists.org/post/luajit/ffi-type-of-pointer-to,8">example</a>),
 similar to what can be achieved with C++ template metaprogramming.
 Another use case are derived types of anonymous structs, which avoids
 pollution of the global struct namespace.
@@ -1215,19 +1213,17 @@ perform strict checks.</li>
 <p>
 The JIT compiler already handles a large subset of all FFI operations.
 It automatically falls back to the interpreter for unimplemented
-operations (you can check for this with the
-<a href="running.html#opt_j"><tt>-jv</tt></a> command line option).
+operations.
 The following operations are currently not compiled and may exhibit
 suboptimal performance, especially when used in inner loops:
 </p>
 <ul>
-<li>Bitfield accesses and initializations.</li>
 <li>Vector operations.</li>
 <li>Table initializers.</li>
 <li>Initialization of nested <tt>struct</tt>/<tt>union</tt> types.</li>
 <li>Non-default initialization of VLA/VLS or large C&nbsp;types
 (&gt; 128&nbsp;bytes or &gt; 16 array elements.</li>
-<li>Conversions from lightuserdata to <tt>void&nbsp;*</tt>.</li>
+<li>Bitfield initializations.</li>
 <li>Pointer differences for element sizes that are not a power of
 two.</li>
 <li>Calls to C&nbsp;functions with aggregates passed or returned by

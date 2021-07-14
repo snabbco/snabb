@@ -231,7 +231,8 @@ function ConnectX:new (conf)
 
    -- Setup the command channel
    --
-   local mmio, fd = pci.map_pci_memory(pciaddress, 0, true)
+   local fd = pci.open_pci_resource_locked(pciaddress, 0)
+   local mmio = pci.map_pci_memory(fd)
    local init_seg = InitializationSegment:new(mmio)
    local hca_factory = HCA_factory(init_seg)
    local hca = hca_factory:new()

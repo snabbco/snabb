@@ -16,31 +16,19 @@
 #include "lauxlib.h"
 #include "lualib.h"
 #include "luajit.h"
+#include "lj_vmprofile.h"
 
 #include "lj_arch.h"
+#include "lj_auditlog.h"
 
-#if LJ_TARGET_POSIX
 #include <unistd.h>
 #define lua_stdin_is_tty()	isatty(0)
-#elif LJ_TARGET_WINDOWS
-#include <io.h>
-#ifdef __BORLANDC__
-#define lua_stdin_is_tty()	isatty(_fileno(stdin))
-#else
-#define lua_stdin_is_tty()	_isatty(_fileno(stdin))
-#endif
-#else
-#define lua_stdin_is_tty()	1
-#endif
 
-#if !LJ_TARGET_CONSOLE
 #include <signal.h>
-#endif
 
 static lua_State *globalL = NULL;
 static const char *progname = LUA_PROGNAME;
 
-#if !LJ_TARGET_CONSOLE
 static void lstop(lua_State *L, lua_Debug *ar)
 {
   (void)ar;  /* unused arg. */
@@ -57,7 +45,6 @@ static void laction(int i)
 			 terminate process (default action) */
   lua_sethook(globalL, lstop, LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
 }
-#endif
 
 static void print_usage(void)
 {
@@ -68,11 +55,13 @@ static void print_usage(void)
   "  -e chunk  Execute string " LUA_QL("chunk") ".\n"
   "  -l name   Require library " LUA_QL("name") ".\n"
   "  -b ...    Save or list bytecode.\n"
-  "  -j cmd    Perform LuaJIT control command.\n"
-  "  -O[opt]   Control LuaJIT optimizations.\n"
+  "  -j cmd    Perform RaptorJIT control command.\n"
+  "  -O[opt]   Control RaptorJIT optimizations.\n"
   "  -i        Enter interactive mode after executing " LUA_QL("script") ".\n"
+  "  -p file   Enable trace profiling to a VMProfile file.\n"
   "  -v        Show version information.\n"
   "  -E        Ignore environment variables.\n"
+  "  -a path   Enable auditlog at path.\n"
   "  --        Stop handling options.\n"
   "  -         Execute stdin and stop handling options.\n", stderr);
   fflush(stderr);
@@ -115,22 +104,18 @@ static int docall(lua_State *L, int narg, int clear)
   int base = lua_gettop(L) - narg;  /* function index */
   lua_pushcfunction(L, traceback);  /* push traceback function */
   lua_insert(L, base);  /* put it under chunk and args */
-#if !LJ_TARGET_CONSOLE
   signal(SIGINT, laction);
-#endif
   status = lua_pcall(L, narg, (clear ? 0 : LUA_MULTRET), base);
-#if !LJ_TARGET_CONSOLE
   signal(SIGINT, SIG_DFL);
-#endif
   lua_remove(L, base);  /* remove traceback function */
   /* force a complete garbage collection in case of errors */
-  if (status != 0) lua_gc(L, LUA_GCCOLLECT, 0);
+  if (status != LUA_OK) lua_gc(L, LUA_GCCOLLECT, 0);
   return status;
 }
 
 static void print_version(void)
 {
-  fputs(LUAJIT_VERSION " -- " LUAJIT_COPYRIGHT ". " LUAJIT_URL "\n", stdout);
+  fputs(LUAJIT_VERSION " -- " LUAJIT_URL "\n", stdout);
 }
 
 static void print_jit_status(lua_State *L)
@@ -249,9 +234,9 @@ static void dotty(lua_State *L)
   const char *oldprogname = progname;
   progname = NULL;
   while ((status = loadline(L)) != -1) {
-    if (status == 0) status = docall(L, 0, 0);
+    if (status == LUA_OK) status = docall(L, 0, 0);
     report(L, status);
-    if (status == 0 && lua_gettop(L) > 0) {  /* any result to print? */
+    if (status == LUA_OK && lua_gettop(L) > 0) {  /* any result to print? */
       lua_getglobal(L, "print");
       lua_insert(L, 1);
       if (lua_pcall(L, lua_gettop(L)-1, 0, 0) != 0)
@@ -273,7 +258,7 @@ static int handle_script(lua_State *L, char **argx)
   if (strcmp(fname, "-") == 0 && strcmp(argx[-1], "--") != 0)
     fname = NULL;  /* stdin */
   status = luaL_loadfile(L, fname);
-  if (status == 0) {
+  if (status == LUA_OK) {
     /* Fetch args from arg table. LUA_INIT or -e might have changed them. */
     int narg = 0;
     lua_getglobal(L, "arg");
@@ -421,8 +406,10 @@ static int collectargs(char **argv, int *flags)
       break;
     case 'e':
       *flags |= FLAGS_EXEC;
+    case 'a':  /* RaptorJIT extension */
     case 'j':  /* LuaJIT extension */
     case 'l':
+    case 'p':  /* RaptorJIT extension */
       *flags |= FLAGS_OPTION;
       if (argv[i][2] == '\0') {
 	i++;
@@ -480,21 +467,37 @@ static int runargs(lua_State *L, char **argv, int argn)
       break;
     case 'b':  /* LuaJIT extension. */
       return dobytecode(L, argv+i);
+    case 'a': { /* RaptorJIT extension. */
+      const char *filename = argv[i] + 2;
+      if (*filename == '\0') filename = argv[++i];
+      /* XXX Support auditlog file size limit argument. */
+      if (!lj_auditlog_open(filename, 0)) {
+        fprintf(stderr, "unable to open auditlog\n");
+        fflush(stderr);
+      }
+      break;
+    }
+    case 'p': {
+      const char *filename = argv[i] + 2;
+      if (*filename == '\0') filename = argv[++i];
+      luaJIT_vmprofile_open(L, filename, 0, 0);
+      if (lua_isnil(L, -1)) {
+        fprintf(stderr, "unable to open vmprofile: %s\n", filename);
+        fflush(stderr);
+      }
+      break;
+      }
     default: break;
     }
   }
-  return 0;
+  return LUA_OK;
 }
 
 static int handle_luainit(lua_State *L)
 {
-#if LJ_TARGET_CONSOLE
-  const char *init = NULL;
-#else
   const char *init = getenv(LUA_INIT);
-#endif
   if (init == NULL)
-    return 0;  /* status OK */
+    return LUA_OK;
   else if (init[0] == '@')
     return dofile(L, init+1);
   else
@@ -539,17 +542,17 @@ static int pmain(lua_State *L)
 
   if (!(flags & FLAGS_NOENV)) {
     s->status = handle_luainit(L);
-    if (s->status != 0) return 0;
+    if (s->status != LUA_OK) return 0;
   }
 
   if ((flags & FLAGS_VERSION)) print_version();
 
   s->status = runargs(L, argv, argn);
-  if (s->status != 0) return 0;
+  if (s->status != LUA_OK) return 0;
 
   if (s->argc > argn) {
     s->status = handle_script(L, argv + argn);
-    if (s->status != 0) return 0;
+    if (s->status != LUA_OK) return 0;
   }
 
   if ((flags & FLAGS_INTERACTIVE)) {

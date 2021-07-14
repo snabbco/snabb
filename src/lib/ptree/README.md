@@ -32,7 +32,7 @@ configuration of a network function as a whole, and uses "app graph" to
 refer to the network of Snabb apps that runs in a single worker
 data-plane process.
 
-The high-level design is that a manager from `lib.ptree.manager` is
+The high-level design is that a manager from `lib.ptree.ptree` is
 responsible for knowing the state and configuration of a data plane.
 The manager also offers an interface to allow the outside world to query
 the configuration and state, and to request configuration updates.
@@ -47,6 +47,23 @@ as part of its engine breathe loop, also reads and applies update
 messages sent to it from the manager.  Checking for update availability
 requires just a memory access, not a system call, so the overhead of the
 message channel on the data plane is very low.
+
+The ptree manager will also periodically read counter values from the
+data-plane processes that it manages, and aggregates them into
+corresponding counters associated with the manager process.  For
+example, if two workers have an `apps/if/drops.counter` file, then the
+manager will also expose an `apps/if/drops.counter`, whose value is the
+sum of the counters from the individual workers, plus an archived
+counter value that's the sum of counters from workers before they shut
+down.
+
+Finally, all of these periodically sampled counters from the workers as
+well as the aggregate counters from the manager are also written into
+[RRD files](../README.rrd.md), as a kind of "flight recorder" black-box
+record of past counter change rates.  This facility, limited by default
+to the last 7 days, complements a more long-term statistics database,
+and is mostly useful as a debugging and troubleshooting resource.  To
+view this historical data, use [`snabb top`](../../program/top/README).
 
 ## Example
 
@@ -74,12 +91,17 @@ is a table of key/value pairs.  The following keys are required:
 
 Optional entries that may be present in the *parameters* table include:
 
- * `socket_file_name`: The name of the socket on which to listen for
+ * `rpc_socket_file_name`: The name of the socket on which to listen for
    incoming connections from `snabb config` clients.  See [the `snabb
    config` documentation](../../program/config/README.md) for more
    information.  Default is `$SNABB_SHM_ROOT/PID/config-leader-socket`,
    where the `$SNABB_SHM_ROOT` environment variable defaults to
    `/var/run/snabb`.
+ * `notification_socket_file_name`: The name of the socket on which to
+   listen for incoming connections from `snabb alarms` clients.  See
+   [the `snabb alarms` documentation](../../program/alarms/README.md)
+   for more information.  Default is
+   `$SNABB_SHM_ROOT/PID/notifications`.
  * `name`: A name to claim for this process tree.  `snabb config` can
    address network functions by name in addition to PID.  If the name is
    already claimed on the local machine, an error will be signalled.

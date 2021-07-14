@@ -40,6 +40,7 @@ local function assemble (name, prototype, generator)
    return ffi.cast(prototype, mcode)
 end
 
+local gencache = {} -- Cache for generated variants (reuse if possible.)
 function gen(count, size)
    local function gen_multi_copy(Dst)
       -- dst in rdi
@@ -58,7 +59,7 @@ function gen(count, size)
          tail_mask = ffi.new("uint8_t[32]")
          for i=0,tail_size-1 do tail_mask[i]=255 end
          table.insert(anchor, tail_mask)
-         | mov rax, tail_mask
+         | mov64 rax, tail_mask
          | vmovdqu ymm15, [rax]
       end
 
@@ -115,10 +116,13 @@ function gen(count, size)
       | pop r12
       | ret
    end
-
-   return assemble("multi_copy_"..size,
-                   "void(*)(void*, void*)",
-                   gen_multi_copy)
+   local name = "multi_copy_"..size.."_"..count
+   -- Assemble multi copy variant and cache it unless it has not been
+   -- previously generated.
+   if not gencache[name] then
+      gencache[name] = assemble(name, "void(*)(void*, void*)", gen_multi_copy)
+   end
+   return gencache[name]
 end
 
 function selftest ()

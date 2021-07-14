@@ -17,71 +17,39 @@
 
 /* Memory and GC object sizes. */
 typedef uint32_t MSize;
-#if LJ_GC64
 typedef uint64_t GCSize;
-#else
-typedef uint32_t GCSize;
-#endif
 
 /* Memory reference */
-typedef struct MRef {
-#if LJ_GC64
-  uint64_t ptr64;	/* True 64 bit pointer. */
-#else
-  uint32_t ptr32;	/* Pseudo 32 bit pointer. */
-#endif
-} MRef;
+typedef void * MRef;
 
-#if LJ_GC64
-#define mref(r, t)	((t *)(void *)(r).ptr64)
+#define mref(r, t)	((t *)(r))
 
-#define setmref(r, p)	((r).ptr64 = (uint64_t)(void *)(p))
-#define setmrefr(r, v)	((r).ptr64 = (v).ptr64)
-#else
-#define mref(r, t)	((t *)(void *)(uintptr_t)(r).ptr32)
-
-#define setmref(r, p)	((r).ptr32 = (uint32_t)(uintptr_t)(void *)(p))
-#define setmrefr(r, v)	((r).ptr32 = (v).ptr32)
-#endif
+#define setmref(r, p)	((r) = (void *)(p))
+#define setmrefr(r, v)	((r) = (v))
 
 /* -- GC object references (32 bit address space) ------------------------- */
 
+/* Forward declaration. */
+union GCobj;
+
 /* GCobj reference */
-typedef struct GCRef {
-#if LJ_GC64
-  uint64_t gcptr64;	/* True 64 bit pointer. */
-#else
-  uint32_t gcptr32;	/* Pseudo 32 bit pointer. */
-#endif
-} GCRef;
+typedef union GCobj * GCRef;
 
 /* Common GC header for all collectable objects. */
 #define GCHeader	GCRef nextgc; uint8_t marked; uint8_t gct
 /* This occupies 6 bytes, so use the next 2 bytes for non-32 bit fields. */
 
-#if LJ_GC64
-#define gcref(r)	((GCobj *)(r).gcptr64)
-#define gcrefp(r, t)	((t *)(void *)(r).gcptr64)
-#define gcrefu(r)	((r).gcptr64)
-#define gcrefeq(r1, r2)	((r1).gcptr64 == (r2).gcptr64)
+#define gcref(r)	(r)
+#define gcrefp(r, t)	((t *)(void *)(r))
+#define gcrefu(r)	((uint64_t)(r))
+#define gcrefeq(r1, r2)	((r1)==(r2))
 
-#define setgcref(r, gc)	((r).gcptr64 = (uint64_t)&(gc)->gch)
+#define setgcref(r, gc)	((r) = (GCobj *)&(gc)->gch)
 #define setgcreft(r, gc, it) \
-  (r).gcptr64 = (uint64_t)&(gc)->gch | (((uint64_t)(it)) << 47)
-#define setgcrefp(r, p)	((r).gcptr64 = (uint64_t)(p))
-#define setgcrefnull(r)	((r).gcptr64 = 0)
-#define setgcrefr(r, v)	((r).gcptr64 = (v).gcptr64)
-#else
-#define gcref(r)	((GCobj *)(uintptr_t)(r).gcptr32)
-#define gcrefp(r, t)	((t *)(void *)(uintptr_t)(r).gcptr32)
-#define gcrefu(r)	((r).gcptr32)
-#define gcrefeq(r1, r2)	((r1).gcptr32 == (r2).gcptr32)
-
-#define setgcref(r, gc)	((r).gcptr32 = (uint32_t)(uintptr_t)&(gc)->gch)
-#define setgcrefp(r, p)	((r).gcptr32 = (uint32_t)(uintptr_t)(p))
-#define setgcrefnull(r)	((r).gcptr32 = 0)
-#define setgcrefr(r, v)	((r).gcptr32 = (v).gcptr32)
-#endif
+  (r) = (GCobj *)((uint64_t)&(gc)->gch | ((uint64_t)(it) << 47))
+#define setgcrefp(r, p) ((r) = (GCobj *)p)
+#define setgcrefnull(r)	((r) = NULL)
+#define setgcrefr(r, v)	((r) = (v))
 
 #define gcnext(gc)	(gcref((gc)->gch.nextgc))
 
@@ -172,7 +140,6 @@ typedef union {
 typedef LJ_ALIGN(8) union TValue {
   uint64_t u64;		/* 64 bit pattern overlaps number. */
   lua_Number n;		/* Number object overlaps split tag/value object. */
-#if LJ_GC64
   GCRef gcr;		/* GCobj reference with tag. */
   int64_t it64;
   struct {
@@ -181,27 +148,7 @@ typedef LJ_ALIGN(8) union TValue {
     , uint32_t it;	/* Internal object tag. Must overlap MSW of number. */
     )
   };
-#else
-  struct {
-    LJ_ENDIAN_LOHI(
-      union {
-	GCRef gcr;	/* GCobj reference (if any). */
-	int32_t i;	/* Integer value. */
-      };
-    , uint32_t it;	/* Internal object tag. Must overlap MSW of number. */
-    )
-  };
-#endif
-#if LJ_FR2
   int64_t ftsz;		/* Frame type and size of previous frame, or PC. */
-#else
-  struct {
-    LJ_ENDIAN_LOHI(
-      GCRef func;	/* Function for next frame (or dummy L). */
-    , FrameLink tp;	/* Link to previous frame. */
-    )
-  } fr;
-#endif
   struct {
     LJ_ENDIAN_LOHI(
       uint32_t lo;	/* Lower 32 bits of number. */
@@ -234,7 +181,6 @@ typedef const TValue cTValue;
 ** lightuserdata   |  itype  |  void * |  (32 bit platforms)
 ** lightuserdata   |ffff|    void *    |  (64 bit platforms, 47 bit pointers)
 ** GC objects      |  itype  |  GCRef  |
-** int (LJ_DUALNUM)|  itype  |   int   |
 ** number           -------double------
 **
 ** Format for 64 bit GC references (LJ_GC64):
@@ -246,7 +192,6 @@ typedef const TValue cTValue;
 **                     ------MSW------.------LSW------
 ** primitive types    |1..1|itype|1..................1|
 ** GC objects/lightud |1..1|itype|-------GCRef--------|
-** int (LJ_DUALNUM)   |1..1|itype|0..0|-----int-------|
 ** number              ------------double-------------
 **
 ** ORDER LJ_T
@@ -271,19 +216,13 @@ typedef const TValue cTValue;
 #define LJ_TNUMX		(~13u)
 
 /* Integers have itype == LJ_TISNUM doubles have itype < LJ_TISNUM */
-#if LJ_64 && !LJ_GC64
-#define LJ_TISNUM		0xfffeffffu
-#else
 #define LJ_TISNUM		LJ_TNUMX
-#endif
 #define LJ_TISTRUECOND		LJ_TFALSE
 #define LJ_TISPRI		LJ_TTRUE
 #define LJ_TISGCV		(LJ_TSTR+1)
 #define LJ_TISTABUD		LJ_TTAB
 
-#if LJ_GC64
 #define LJ_GCVMASK		(((uint64_t)1 << 47) - 1)
-#endif
 
 /* -- String object ------------------------------------------------------- */
 
@@ -358,9 +297,7 @@ typedef struct GCproto {
   uint8_t numparams;	/* Number of parameters. */
   uint8_t framesize;	/* Fixed frame size. */
   MSize sizebc;		/* Number of bytecode instructions. */
-#if LJ_GC64
   uint32_t unused_gc64;
-#endif
   GCRef gclist;
   MRef k;		/* Split constant array (points to the middle). */
   MRef uv;		/* Upvalue list. local slot|0x8000 or parent uv idx. */
@@ -374,9 +311,10 @@ typedef struct GCproto {
   GCRef chunkname;	/* Name of the chunk this function was defined in. */
   BCLine firstline;	/* First line of the function definition. */
   BCLine numline;	/* Number of lines for the function definition. */
-  MRef lineinfo;	/* Compressed map from bytecode ins. to source line. */
+  MRef lineinfo;	/* Map from bytecode ins. to source line. */
   MRef uvinfo;		/* Upvalue names. */
   MRef varinfo;		/* Names and compressed extents of local variables. */
+  MRef declname;	/* Declared name of function (null-terminated). */
 } GCproto;
 
 /* Flags for prototype. */
@@ -407,9 +345,10 @@ typedef struct GCproto {
 
 #define proto_chunkname(pt)	(strref((pt)->chunkname))
 #define proto_chunknamestr(pt)	(strdata(proto_chunkname((pt))))
-#define proto_lineinfo(pt)	(mref((pt)->lineinfo, const void))
+#define proto_lineinfo(pt)	(mref((pt)->lineinfo, const uint32_t))
 #define proto_uvinfo(pt)	(mref((pt)->uvinfo, const uint8_t))
 #define proto_varinfo(pt)	(mref((pt)->varinfo, const uint8_t))
+#define proto_declname(pt)	(mref((pt)->declname, const char))
 
 /* -- Upvalue object ------------------------------------------------------ */
 
@@ -472,9 +411,6 @@ typedef struct Node {
   TValue val;		/* Value object. Must be first field. */
   TValue key;		/* Key object. */
   MRef next;		/* Hash chain. */
-#if !LJ_GC64
-  MRef freetop;		/* Top of free elements (stored in t->node[0]). */
-#endif
 } Node;
 
 LJ_STATIC_ASSERT(offsetof(Node, val) == 0);
@@ -489,27 +425,21 @@ typedef struct GCtab {
   MRef node;		/* Hash part. */
   uint32_t asize;	/* Size of array part (keys [0, asize-1]). */
   uint32_t hmask;	/* Hash part mask (size of hash part - 1). */
-#if LJ_GC64
   MRef freetop;		/* Top of free elements. */
-#endif
 } GCtab;
 
 #define sizetabcolo(n)	((n)*sizeof(TValue) + sizeof(GCtab))
 #define tabref(r)	(&gcref((r))->tab)
 #define noderef(r)	(mref((r), Node))
 #define nextnode(n)	(mref((n)->next, Node))
-#if LJ_GC64
 #define getfreetop(t, n)	(noderef((t)->freetop))
 #define setfreetop(t, n, v)	(setmref((t)->freetop, (v)))
-#else
-#define getfreetop(t, n)	(noderef((n)->freetop))
-#define setfreetop(t, n, v)	(setmref((n)->freetop, (v)))
-#endif
 
 /* -- State objects ------------------------------------------------------- */
 
 /* VM states. */
 enum {
+  /* VM states. */
   LJ_VMST_INTERP,	/* Interpreter. */
   LJ_VMST_C,		/* C function. */
   LJ_VMST_GC,		/* Garbage collector. */
@@ -517,25 +447,23 @@ enum {
   LJ_VMST_RECORD,	/* Trace recorder. */
   LJ_VMST_OPT,		/* Optimizer. */
   LJ_VMST_ASM,		/* Assembler. */
+  /* JIT trace states.
+  ** These are "abstract" states that logically exist but are never
+  ** directly used for the value of global_State.vmstate.
+  */
+  LJ_VMST_HEAD,		/* Trace mcode before loop */
+  LJ_VMST_LOOP,		/* Trace mcode inside loop */
+  LJ_VMST_JGC,		/* GC invoked from JIT mcode. */
+  LJ_VMST_FFI,		/* Other code outside trace mcode */
   LJ_VMST__MAX
 };
 
 #define setvmstate(g, st)	((g)->vmstate = ~LJ_VMST_##st)
 
 /* Metamethods. ORDER MM */
-#ifdef LJ_HASFFI
 #define MMDEF_FFI(_) _(new)
-#else
-#define MMDEF_FFI(_)
-#endif
 
-#if LJ_52 || LJ_HASFFI
 #define MMDEF_PAIRS(_) _(pairs) _(ipairs)
-#else
-#define MMDEF_PAIRS(_)
-#define MM_pairs	255
-#define MM_ipairs	255
-#endif
 
 #define MMDEF(_) \
   _(index) _(newindex) _(gc) _(mode) _(eq) _(len) \
@@ -598,7 +526,9 @@ typedef struct global_State {
   lua_Alloc allocf;	/* Memory allocator. */
   void *allocd;		/* Memory allocator data. */
   GCState gc;		/* Garbage collector. */
-  volatile int32_t vmstate;  /* VM state or current JIT code trace number. */
+  volatile int32_t vmstate;   /* VM state or current JIT code trace number. */
+  volatile int32_t gcvmstate; /* Previous VM state (only when state is GC). */
+  volatile int32_t lasttrace; /* VM state before exit to interpreter. */
   SBuf tmpbuf;		/* Temporary string buffer. */
   GCstr strempty;	/* Empty string. */
   uint8_t stremptyz;	/* Zero terminator of empty string. */
@@ -633,13 +563,10 @@ typedef struct global_State {
 #define HOOK_EVENTMASK		0x0f
 #define HOOK_ACTIVE		0x10
 #define HOOK_ACTIVE_SHIFT	4
-#define HOOK_VMEVENT		0x20
-#define HOOK_GC			0x40
-#define HOOK_PROFILE		0x80
+#define HOOK_GC			0x20
 #define hook_active(g)		((g)->hookmask & HOOK_ACTIVE)
 #define hook_enter(g)		((g)->hookmask |= HOOK_ACTIVE)
 #define hook_entergc(g)		((g)->hookmask |= (HOOK_ACTIVE|HOOK_GC))
-#define hook_vmevent(g)		((g)->hookmask |= (HOOK_ACTIVE|HOOK_VMEVENT))
 #define hook_leave(g)		((g)->hookmask &= ~HOOK_ACTIVE)
 #define hook_save(g)		((g)->hookmask & ~HOOK_EVENTMASK)
 #define hook_restore(g, h) \
@@ -666,13 +593,7 @@ struct lua_State {
 #define registry(L)		(&G(L)->registrytv)
 
 /* Macros to access the currently executing (Lua) function. */
-#if LJ_GC64
 #define curr_func(L)		(&gcval(L->base-2)->fn)
-#elif LJ_FR2
-#define curr_func(L)		(&gcref((L->base-2)->gcr)->fn)
-#else
-#define curr_func(L)		(&gcref((L->base-1)->fr.func)->fn)
-#endif
 #define curr_funcisL(L)		(isluafunc(curr_func(L)))
 #define curr_proto(L)		(funcproto(curr_func(L)))
 #define curr_topL(L)		(L->base + curr_proto(L)->framesize)
@@ -736,21 +657,12 @@ typedef union GCobj {
 #endif
 
 /* Macros to test types. */
-#if LJ_GC64
 #define itype(o)	((uint32_t)((o)->it64 >> 47))
 #define tvisnil(o)	((o)->it64 == -1)
-#else
-#define itype(o)	((o)->it)
-#define tvisnil(o)	(itype(o) == LJ_TNIL)
-#endif
 #define tvisfalse(o)	(itype(o) == LJ_TFALSE)
 #define tvistrue(o)	(itype(o) == LJ_TTRUE)
 #define tvisbool(o)	(tvisfalse(o) || tvistrue(o))
-#if LJ_64 && !LJ_GC64
-#define tvislightud(o)	(((int32_t)itype(o) >> 15) == -2)
-#else
 #define tvislightud(o)	(itype(o) == LJ_TLIGHTUD)
-#endif
 #define tvisstr(o)	(itype(o) == LJ_TSTR)
 #define tvisfunc(o)	(itype(o) == LJ_TFUNC)
 #define tvisthread(o)	(itype(o) == LJ_TTHREAD)
@@ -759,7 +671,6 @@ typedef union GCobj {
 #define tvistab(o)	(itype(o) == LJ_TTAB)
 #define tvisudata(o)	(itype(o) == LJ_TUDATA)
 #define tvisnumber(o)	(itype(o) <= LJ_TISNUM)
-#define tvisint(o)	(LJ_DUALNUM && itype(o) == LJ_TISNUM)
 #define tvisnum(o)	(itype(o) < LJ_TISNUM)
 
 #define tvistruecond(o)	(itype(o) < LJ_TISTRUECOND)
@@ -769,37 +680,20 @@ typedef union GCobj {
 
 /* Special macros to test numbers for NaN, +0, -0, +1 and raw equality. */
 #define tvisnan(o)	((o)->n != (o)->n)
-#if LJ_64
 #define tviszero(o)	(((o)->u64 << 1) == 0)
-#else
-#define tviszero(o)	(((o)->u32.lo | ((o)->u32.hi << 1)) == 0)
-#endif
 #define tvispzero(o)	((o)->u64 == 0)
 #define tvismzero(o)	((o)->u64 == U64x(80000000,00000000))
 #define tvispone(o)	((o)->u64 == U64x(3ff00000,00000000))
 #define rawnumequal(o1, o2)	((o1)->u64 == (o2)->u64)
 
 /* Macros to convert type ids. */
-#if LJ_64 && !LJ_GC64
-#define itypemap(o) \
-  (tvisnumber(o) ? ~LJ_TNUMX : tvislightud(o) ? ~LJ_TLIGHTUD : ~itype(o))
-#else
 #define itypemap(o)	(tvisnumber(o) ? ~LJ_TNUMX : ~itype(o))
-#endif
 
 /* Macros to get tagged values. */
-#if LJ_GC64
 #define gcval(o)	((GCobj *)(gcrefu((o)->gcr) & LJ_GCVMASK))
-#else
-#define gcval(o)	(gcref((o)->gcr))
-#endif
 #define boolV(o)	check_exp(tvisbool(o), (LJ_TFALSE - itype(o)))
-#if LJ_64
 #define lightudV(o) \
   check_exp(tvislightud(o), (void *)((o)->u64 & U64x(00007fff,ffffffff)))
-#else
-#define lightudV(o)	check_exp(tvislightud(o), gcrefp((o)->gcr, void))
-#endif
 #define gcV(o)		check_exp(tvisgcv(o), gcval(o))
 #define strV(o)		check_exp(tvisstr(o), &gcval(o)->str)
 #define funcV(o)	check_exp(tvisfunc(o), &gcval(o)->fn)
@@ -812,48 +706,21 @@ typedef union GCobj {
 #define intV(o)		check_exp(tvisint(o), (int32_t)(o)->i)
 
 /* Macros to set tagged values. */
-#if LJ_GC64
 #define setitype(o, i)		((o)->it = ((i) << 15))
 #define setnilV(o)		((o)->it64 = -1)
 #define setpriV(o, x)		((o)->it64 = (int64_t)~((uint64_t)~(x)<<47))
 #define setboolV(o, x)		((o)->it64 = (int64_t)~((uint64_t)((x)+1)<<47))
-#else
-#define setitype(o, i)		((o)->it = (i))
-#define setnilV(o)		((o)->it = LJ_TNIL)
-#define setboolV(o, x)		((o)->it = LJ_TFALSE-(uint32_t)(x))
-#define setpriV(o, i)		(setitype((o), (i)))
-#endif
 
 static LJ_AINLINE void setlightudV(TValue *o, void *p)
 {
-#if LJ_GC64
   o->u64 = (uint64_t)p | (((uint64_t)LJ_TLIGHTUD) << 47);
-#elif LJ_64
-  o->u64 = (uint64_t)p | (((uint64_t)0xffff) << 48);
-#else
-  setgcrefp(o->gcr, p); setitype(o, LJ_TLIGHTUD);
-#endif
 }
 
-#if LJ_64
 #define checklightudptr(L, p) \
   (((uint64_t)(p) >> 47) ? (lj_err_msg(L, LJ_ERR_BADLU), NULL) : (p))
-#else
-#define checklightudptr(L, p)	(p)
-#endif
 
-#if LJ_FR2
 #define contptr(f)		((void *)(f))
 #define setcont(o, f)		((o)->u64 = (uint64_t)(uintptr_t)contptr(f))
-#elif LJ_64
-#define contptr(f) \
-  ((void *)(uintptr_t)(uint32_t)((intptr_t)(f) - (intptr_t)lj_vm_asm_begin))
-#define setcont(o, f) \
-  ((o)->u64 = (uint64_t)(void *)(f) - (uint64_t)lj_vm_asm_begin)
-#else
-#define contptr(f)		((void *)(f))
-#define setcont(o, f)		setlightudV((o), contptr(f))
-#endif
 
 #define tvchecklive(L, o) \
   UNUSED(L), lua_assert(!tvisgcv(o) || \
@@ -861,11 +728,7 @@ static LJ_AINLINE void setlightudV(TValue *o, void *p)
 
 static LJ_AINLINE void setgcVraw(TValue *o, GCobj *v, uint32_t itype)
 {
-#if LJ_GC64
   setgcreft(o->gcr, v, itype);
-#else
-  setgcref(o->gcr, v); setitype(o, itype);
-#endif
 }
 
 static LJ_AINLINE void setgcV(lua_State *L, TValue *o, GCobj *v, uint32_t it)
@@ -893,26 +756,15 @@ define_setV(setudataV, GCudata, LJ_TUDATA)
 
 static LJ_AINLINE void setintV(TValue *o, int32_t i)
 {
-#if LJ_DUALNUM
-  o->i = (uint32_t)i; setitype(o, LJ_TISNUM);
-#else
   o->n = (lua_Number)i;
-#endif
 }
 
 static LJ_AINLINE void setint64V(TValue *o, int64_t i)
 {
-  if (LJ_DUALNUM && LJ_LIKELY(i == (int64_t)(int32_t)i))
-    setintV(o, (int32_t)i);
-  else
-    setnumV(o, (lua_Number)i);
+  setnumV(o, (lua_Number)i);
 }
 
-#if LJ_64
 #define setintptrV(o, i)	setint64V((o), (i))
-#else
-#define setintptrV(o, i)	setintV((o), (i))
-#endif
 
 /* Copy tagged values. */
 static LJ_AINLINE void copyTV(lua_State *L, TValue *o1, const TValue *o2)
@@ -922,47 +774,29 @@ static LJ_AINLINE void copyTV(lua_State *L, TValue *o1, const TValue *o2)
 
 /* -- Number to integer conversion ---------------------------------------- */
 
-#if LJ_SOFTFP
-LJ_ASMF int32_t lj_vm_tobit(double x);
-#endif
 
 static LJ_AINLINE int32_t lj_num2bit(lua_Number n)
 {
-#if LJ_SOFTFP
-  return lj_vm_tobit(n);
-#else
   TValue o;
   o.n = n + 6755399441055744.0;  /* 2^52 + 2^51 */
   return (int32_t)o.u32.lo;
-#endif
 }
 
 #define lj_num2int(n)   ((int32_t)(n))
 
 static LJ_AINLINE uint64_t lj_num2u64(lua_Number n)
 {
-#ifdef _MSC_VER
-  if (n >= 9223372036854775808.0)  /* They think it's a feature. */
-    return (uint64_t)(int64_t)(n - 18446744073709551616.0);
-  else
-#endif
     return (uint64_t)n;
 }
 
 static LJ_AINLINE int32_t numberVint(cTValue *o)
 {
-  if (LJ_LIKELY(tvisint(o)))
-    return intV(o);
-  else
-    return lj_num2int(numV(o));
+  return lj_num2int(numV(o));
 }
 
 static LJ_AINLINE lua_Number numberVnum(cTValue *o)
 {
-  if (LJ_UNLIKELY(tvisint(o)))
-    return (lua_Number)intV(o);
-  else
-    return numV(o);
+  return numV(o);
 }
 
 /* -- Miscellaneous object handling --------------------------------------- */
@@ -974,7 +808,7 @@ LJ_DATA const char *const lj_obj_itypename[~LJ_TNUMX+1];
 #define lj_typename(o)	(lj_obj_itypename[itypemap(o)])
 
 /* Compare two objects without calling metamethods. */
-LJ_FUNC int LJ_FASTCALL lj_obj_equal(cTValue *o1, cTValue *o2);
-LJ_FUNC const void * LJ_FASTCALL lj_obj_ptr(cTValue *o);
+LJ_FUNC int lj_obj_equal(cTValue *o1, cTValue *o2);
+LJ_FUNC const void * lj_obj_ptr(cTValue *o);
 
 #endif

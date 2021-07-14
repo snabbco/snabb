@@ -385,16 +385,28 @@ TEST_DATA=(
 "no_icmp_with_filters_drop.conf" "tcp-frominet-trafficclass.pcap" "" "" ""
 "in-1p-ipv4-out-0p-drop.lua"
 
+# Ping to lwAFTR (IPv4).
+
 "ICMP Echo to AFTR (IPv4)"
 "no_icmp.conf" "ping-v4.pcap" "" "ping-v4-reply.pcap" ""
+"nofrag4.lua"
+
+"ICMP Echo to AFTR (IPv4) (ttl=32)"
+"no_icmp.conf" "ping-v4-ttl-32.pcap" "" "ping-v4-reply.pcap" ""
 "nofrag4.lua"
 
 "ICMP Echo to AFTR (IPv4) + data"
 "no_icmp.conf" "ping-v4-and-data.pcap" "" "ping-v4-reply.pcap" "tcp-afteraftr-ipv6.pcap"
 "in-1p-ipv4-out-1p-ipv6-echo.lua"
 
+# Ping to lwAFTR (IPv6).
+
 "ICMP Echo to AFTR (IPv6)"
 "no_icmp.conf" "" "ping-v6.pcap" "" "ping-v6-reply.pcap"
+"icmpv6-ping-and-reply.lua"
+
+"ICMP Echo to AFTR (IPv6) (hop-limit=32)"
+"no_icmp.conf" "" "ping-v6-hop-limit-32.pcap" "" "ping-v6-reply.pcap"
 "icmpv6-ping-and-reply.lua"
 
 "ICMP Echo to AFTR (IPv6) + data"

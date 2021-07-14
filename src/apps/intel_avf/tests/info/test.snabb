@@ -1,0 +1,11 @@
+#!../../../../snabb snsh
+local vf0 = os.getenv("SNABB_AVF_PF0_VF0")
+
+assert(vf0 ~= nil, "SNABB_AVF_PF0_VF0 is nil")
+
+local pci = require("lib.hardware.pci")
+
+local info = pci.device_info(vf0)
+print(info.pciaddress, info.vendor, info.device, info.model)
+assert(info.driver == 'apps.intel_avf.intel_avf',
+       "Driver should be apps.intel_avf.intel_avf (is "..info.driver..")")

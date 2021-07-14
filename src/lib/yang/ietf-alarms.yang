@@ -376,8 +376,6 @@ module ietf-alarms {
         }
 
 
-        /*
-         * XXX: Temporarily replace leafref datatype for string as leafref is not supported.
         list related-alarm {
             key "resource alarm-type-id alarm-type-qualifier";
 
@@ -411,30 +409,6 @@ module ietf-alarms {
                         + "/alarm-type-qualifier";
                     require-instance false;
                 }
-                description
-                    "The alarm qualifier for the related alarm.";
-            }
-        }
-        */
-        list related-alarm {
-            key "resource alarm-type-id alarm-type-qualifier";
-
-            description
-                "References to related alarms.  Note that the related alarm
-                might have been removed from the alarm list.";
-
-            leaf resource {
-                type string;
-                description
-                    "The alarming resource for the related alarm.";
-            }
-            leaf alarm-type-id {
-                type string;
-                description
-                    "The alarm type identifier for the related alarm.";
-            }
-            leaf alarm-type-qualifier {
-                type string;
                 description
                     "The alarm qualifier for the related alarm.";
             }
@@ -990,8 +964,6 @@ module ietf-alarms {
             alarms.  Conditions in the input are logically ANDed.  If no
             input condition is given, all alarms are compressed.";
         input {
-            /*
-             * XXX: Temporarily replace leafref datatype for string as leafref is not supported.
             leaf resource {
                 type leafref {
                     path "/alarms/alarm-list/alarm/resource";
@@ -1011,22 +983,6 @@ module ietf-alarms {
                 type leafref {
                     path "/alarms/alarm-list/alarm/alarm-type-qualifier";
                 }
-                description
-                    "Compress the alarms with this alarm-type-qualifier.";
-            }
-            */
-            leaf resource {
-                type string;
-                description
-                    "Compress the alarms with this resource.";
-            }
-            leaf alarm-type-id {
-                type string;
-                description
-                    "Compress alarms with this alarm-type-id.";
-            }
-            leaf alarm-type-qualifier {
-                type string;
                 description
                     "Compress the alarms with this alarm-type-qualifier.";
             }
@@ -1197,8 +1153,6 @@ module ietf-alarms {
             "This notification is used to report that an operator
             acted upon an alarm.";
 
-        /*
-         * XXX: Temporarily replace leafref datatype for string as leafref is not supported.
         leaf resource {
             type leafref {
                 path "/alarms/alarm-list/alarm/resource";
@@ -1225,22 +1179,6 @@ module ietf-alarms {
                     + "/alarm-type-qualifier";
                 require-instance false;
             }
-            description
-                "The alarm qualifier for the alarm.";
-        }
-        */
-        leaf resource {
-            type string;
-            description
-                "The alarming resource.";
-        }
-        leaf alarm-type-id {
-            type string;
-            description
-                "The alarm type identifier for the alarm.";
-        }
-        leaf alarm-type-qualifier {
-            type string;
             description
                 "The alarm qualifier for the alarm.";
         }

@@ -255,7 +255,7 @@ local function update_fib(s)
             if false and key_id and encap_key and decap_key then
                local enc = esp.encrypt:new{
                   spi = key_id,
-                  mode = "aes-gcm-128-12",
+                  aead = "aes-gcm-16-icv",
                   keymat = encap_key,
                   salt = conf.esp_salt,
                }
@@ -264,7 +264,7 @@ local function update_fib(s)
                end
                local dec = esp.decrypt:new{
                   spi = key_id,
-                  mode = "aes-gcm-128-12",
+                  aead = "aes-gcm-16-icv",
                   keymat = decap_key,
                   salt = conf.esp_salt,
                }
@@ -800,6 +800,7 @@ function run(args)
    if not os.getenv'LISP_PERFTEST' then
       engine.main({report = {showlinks=true}})
    else
+      -- FIXME: Port to RaptorJIT.
       local jdump = require("jit.dump")
       local traceprof = require("lib.traceprof.traceprof")
       jdump.start("+rs", "tracedump.txt")

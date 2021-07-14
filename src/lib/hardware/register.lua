@@ -6,6 +6,7 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local lib = require("core.lib")
+local band = bit.band
 
 --- ### Register object
 --- There are eight types of register objects, set by the mode when created:
@@ -30,12 +31,9 @@ function Register:readrc ()
 end
 
 function Register:readrcr ()
-  local val = self.ptr[0]
-  self.acc[0] = self.acc[0] + val - self.last
-  if val < self.last then
-    self.acc[0] = self.acc[0] + 2^32
-  end
-  self.last = val
+   local val =  self.ptr[0]
+   self.acc[0] = self.acc[0] + bit.band(val - self.prev[0], 0xFFFFFFFF)
+   self.prev[0] = val
   return self.acc[0]
 end
 
@@ -134,7 +132,7 @@ local mt = {
   RCR = { __index = { read=Register.readrcr, reset = Register.reset,
                     bits=ro_bits, byte=ro_byte,
                     print=Register.printrc},
-          __call = Register.readrc, __tostring = Register.__tostring  }
+          __call = Register.readrcr, __tostring = Register.__tostring  }
 }
 mt['RO64'] = mt.RO
 mt['RW64'] = mt.RW
@@ -155,6 +153,9 @@ function new (name, longname, offset, base_ptr, mode)
    end
    if string.find(mode, "64$") then
       o.ptr = ffi.cast("uint64_t*", o.ptr)
+   end
+   if string.find(mode, "^RCR") then
+      o.prev = ffi.new("uint64_t[1]")
    end
    return setmetatable(o, mt)
 end
@@ -218,7 +219,7 @@ end
 --- the optional 'n' argument specifies which register of an array gets
 --- created (default 0)
 function define (description, table, base_ptr, n)
-   local pattern = [[ *(%S+) +(%S+) +(%S+) +(%S+) (.-)
+   local pattern = [[ *(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(.-)
 ]]
    for name,offset,index,perm,longname in description:gmatch(pattern) do
       local offs = in_range(offset, index, n)
@@ -232,7 +233,7 @@ end
 -- an array of registers.
 -- naïve implementation: actually create the whole array
 function define_array (description, table, base_ptr)
-   local pattern = [[ *(%S+) +(%S+) +(%S+) +(%S+) (.-)
+   local pattern = [[ *(%S+)%s+(%S+)%s+(%S+)%s+(%S+)%s+(.-)
 ]]
    for name,offset,index,perm,longname in description:gmatch(pattern) do
       if is_range(index) then

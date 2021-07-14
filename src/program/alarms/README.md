@@ -181,6 +181,24 @@ $ snabb alarms compress test 12345 arp-resolution
 
 See [`snabb alarms compress --help`](./compress/README) for more information.
 
+### Notifications
+
+Alarm notification are sent by a leader under certain circumstances. There
+are 3 types of alarm notifications:
+
+- Alarm notification: sent to report a newly raised alarm, a cleared alarm
+or changing the text and/or severity of an existing alarm.
+
+- Alarm inventory changed notification: sent to report that the list of
+possible alarms has changed.  This can happen when for example if a new
+software module is installed, or a new physical card is inserted.
+
+- Operator action notification: sent to report that an operator acted upon an
+alarm.
+
+To listen to these notifications open a connection to a Snabb instance using
+the subprogram `alarms listen`.
+
 ## How does it work?
 
 The Snabb instance itself should be running in *multi-process mode*,

@@ -11,6 +11,16 @@ module snabb-softwire-v2 {
   description
    "Configuration for the Snabb Switch lwAFTR.";
 
+  revision 2019-09-17 {
+    description
+      "Add discontinuity time to softwire-state.";
+  }
+
+  revision 2018-10-13 {
+    description
+      "Add flow-label setting.";
+  }
+
   revision 2017-04-17 {
     description
       "Removal of br-address leaf-list and  br leaf. It adds the
@@ -39,6 +49,15 @@ module snabb-softwire-v2 {
 
       description "State data about interface.";
       config false;
+
+      leaf discontinuity-time {
+        type yang:date-and-time;
+        mandatory true;
+        description
+          "The time of the most recent occasion on which the lwaftr instance
+           suffered a discontinuity. This is set to the current time whenever
+           the lwaftr instance is started or configured.";
+      }
 
       leaf drop-all-ipv4-iface-bytes {
         type yang:zero-based-counter64;
@@ -721,6 +740,13 @@ module snabb-softwire-v2 {
         default 1460;
         description
          "Maximum packet size to recieve on the IPv6 interface.";
+      }
+
+      leaf flow-label {
+        type uint32;
+        default 0;
+        description
+          "IPv6 flow label";
       }
 
       uses traffic-filters;

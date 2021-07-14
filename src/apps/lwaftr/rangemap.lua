@@ -27,6 +27,14 @@ local function make_entry_type(value_type)
       value_type)
 end
 
+local entry_type_cache = {}
+local function get_entry_type(value_type)
+   if not entry_type_cache[value_type] then
+      entry_type_cache[value_type] = make_entry_type(value_type)
+   end
+   return entry_type_cache[value_type]
+end
+
 local function make_entries_type(entry_type)
    return ffi.typeof('$[?]', entry_type)
 end
@@ -63,7 +71,7 @@ end
 function RangeMapBuilder.new(value_type)
    local builder = {}
    builder.value_type = value_type
-   builder.entry_type = make_entry_type(builder.value_type)
+   builder.entry_type = get_entry_type(builder.value_type)
    builder.type = make_entries_type(builder.entry_type)
    builder.equal_fn = make_equal_fn(builder.value_type)
    builder.entries = {}
@@ -151,34 +159,6 @@ function RangeMap:iterate()
       return lo, hi, val
    end
    return next_entry
-end
-
-local range_map_header_t = ffi.typeof[[
-struct {
-   uint32_t size;
-   uint32_t entry_size;
-}
-]]
-
-function RangeMap:save(stream)
-   local entry_size = ffi.sizeof(self.entry_type)
-   stream:write_ptr(range_map_header_t(self.size, entry_size),
-                    range_map_header_t)
-   stream:write_array(self.entries, self.entry_type, self.size)
-end
-
-function load(stream, value_type)
-   local map = {}
-   map.value_type = value_type
-   map.entry_type = make_entry_type(map.value_type)
-   map.type = make_entries_type(map.entry_type)
-
-   local header = stream:read_ptr(range_map_header_t)
-   assert(header.entry_size == ffi.sizeof(map.entry_type))
-   map.size = header.size
-   map.entries = stream:read_array(map.entry_type, map.size)
-   map.binary_search = binary_search.gen(map.size, map.entry_type)
-   return setmetatable(map, { __index = RangeMap })
 end
 
 function selftest()

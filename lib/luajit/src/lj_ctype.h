@@ -9,7 +9,6 @@
 #include "lj_obj.h"
 #include "lj_gc.h"
 
-#if LJ_HASFFI
 
 /* -- C type definitions -------------------------------------------------- */
 
@@ -174,6 +173,7 @@ typedef LJ_ALIGN(8) struct CCallback {
 typedef struct CTState {
   CType *tab;		/* C type table. */
   CTypeID top;		/* Current top of C type table. */
+  CTypeID log;		/* Current top of logged C types table. */
   MSize sizetab;	/* Size of C type table. */
   lua_State *L;		/* Lua state (needed for errors and allocations). */
   global_State *g;	/* Global state. */
@@ -247,13 +247,8 @@ typedef struct CTState {
    CTINFO(CT_ATTRIB, CTATTRIB(at)))
 
 /* Target-dependent sizes and alignments. */
-#if LJ_64
 #define CTSIZE_PTR	8
 #define CTALIGN_PTR	CTALIGN(3)
-#else
-#define CTSIZE_PTR	4
-#define CTALIGN_PTR	CTALIGN(2)
-#endif
 
 #define CTINFO_REF(ref) \
   CTINFO(CT_PTR, (CTF_CONST|CTF_REF|CTALIGN_PTR) + (ref))
@@ -263,12 +258,7 @@ typedef struct CTState {
 /* -- Predefined types ---------------------------------------------------- */
 
 /* Target-dependent types. */
-#if LJ_TARGET_PPC
-#define CTTYDEFP(_) \
-  _(LINT32,		4,	CT_NUM, CTF_LONG|CTALIGN(2))
-#else
 #define CTTYDEFP(_)
-#endif
 
 /* Common types. */
 #define CTTYDEF(_) \
@@ -307,21 +297,10 @@ CTTYDEF(CTTYIDDEF)
 };
 
 /* Target-dependent type IDs. */
-#if LJ_64
 #define CTID_INT_PSZ	CTID_INT64
 #define CTID_UINT_PSZ	CTID_UINT64
-#else
-#define CTID_INT_PSZ	CTID_INT32
-#define CTID_UINT_PSZ	CTID_UINT32
-#endif
 
-#if LJ_ABI_WIN
-#define CTID_WCHAR	CTID_UINT16
-#elif LJ_TARGET_PPC
-#define CTID_WCHAR	CTID_LINT32
-#else
 #define CTID_WCHAR	CTID_INT32
-#endif
 
 /* -- C tokens and keywords ----------------------------------------------- */
 
@@ -454,8 +433,8 @@ LJ_FUNC GCstr *lj_ctype_repr(lua_State *L, CTypeID id, GCstr *name);
 LJ_FUNC GCstr *lj_ctype_repr_int64(lua_State *L, uint64_t n, int isunsigned);
 LJ_FUNC GCstr *lj_ctype_repr_complex(lua_State *L, void *sp, CTSize size);
 LJ_FUNC CTState *lj_ctype_init(lua_State *L);
+LJ_FUNC void lj_ctype_log(lua_State *L);
 LJ_FUNC void lj_ctype_freestate(global_State *g);
 
-#endif
 
 #endif

@@ -16,7 +16,7 @@ local debug = false
 
 local lib = require("core.lib")
 local ffi = require("ffi")
-local C = ffi.C
+local S = require("syscall")
 
 local dasm = require("dasm")
 
@@ -85,6 +85,7 @@ name.reg.ebx, name.reg.ecx, name.reg.edx = id.ebx, id.ecx, id.edx
 local vendor = ffi.string(name.string, 12)
 cpuid(0x1, id)
 local family = bit.band(bit.rshift(id.eax, 8), 0xf)
+local extfamily = bit.band(bit.rshift(id.eax, 20), 0xff)
 local model  = bit.band(bit.rshift(id.eax, 4), 0xf)
 local extmodel = bit.band(bit.rshift(id.eax, 16), 0xf)
 
@@ -93,13 +94,28 @@ local extmodel = bit.band(bit.rshift(id.eax, 16), 0xf)
 --     (Could alternatively grovel this from /proc/cpuinfo.)
 cpu_model = ("%s-%X-%X%X"):format(vendor, family, extmodel, model)
 
--- Calculate nfixed, ngeneral, ncounters: number of CPU performance
--- counters for the running CPU.
-local id = ffi.new(cpuid_t)
-cpuid(0xa, id)
-nfixed   = bit.band(id.edx, 0x1f)
-ngeneral = bit.band(bit.rshift(id.eax, 8), 0xff)
-ncounters = nfixed + ngeneral
+-- PMC control register base and step.
+local pmc_ctl_base, pmc_ctl_step
+
+if vendor == "GenuineIntel" then
+   pmc_ctl_base, pmc_ctl_step = 0x186, 1
+   -- Calculate nfixed, ngeneral, ncounters: number of CPU performance
+   -- counters for the running CPU.
+   local id = ffi.new(cpuid_t)
+   cpuid(0xa, id)
+   nfixed   = bit.band(id.edx, 0x1f)
+   ngeneral = bit.band(bit.rshift(id.eax, 8), 0xff)
+elseif vendor == "AuthenticAMD" then
+   if family+extfamily >= 0x15 then
+      pmc_ctl_base, pmc_ctl_step = 0xc0010200, 2
+      nfixed = 0
+      ngeneral = 4
+   end
+   if family+extfamily >= 0x17 then
+      ngeneral = 6
+   end
+end
+ncounters = (nfixed or 0) + (ngeneral or 0)
 
 -- rdpmc_multi(uint64_t[nfixed+ngeneral] *dst)
 -- 
@@ -147,22 +163,95 @@ function enable_rdpmc ()
    end
 end
 
+-- Enable MSR
+function enable_msr ()
+   if not S.stat("/dev/cpu/0/msr") then
+      print("[pmu: modprobe msr]")
+      os.execute("modprobe msr")
+      if not S.stat("/dev/cpu/0/msr") then
+         return false, "requires /dev/cpu/*/msr (Linux 'msr' module)"
+      end
+   end
+   return true
+end
+
+local function writemsr (cpu, msr, value)
+   local msrfile = ("/dev/cpu/%d/msr"):format(cpu)
+   if not S.stat(msrfile) then
+      error("Cannot open "..msrfile.." (consider 'modprobe msr')")
+   end
+   local fd = assert(S.open(msrfile, "rdwr"))
+   assert(fd:lseek(msr, "set"))
+   assert(fd:write(ffi.new("uint64_t[1]", value), 8))
+   fd:close()
+end
+
+-- Platform specifc MSR functions:
+--
+--   init_events(cpu, nevents) -> fixed-function counters, gen. ctrs claimed
+--      Initializes and enables fixed-function counters.
+--
+--   enable_event(index, code)
+--      Sets up counter at index to count event(s) by code.
+
+if vendor == "GenuineIntel" then
+   function init_events (cpu)
+      -- All available counters are globally enabled
+      -- (IA32_PERF_GLOBAL_CTRL).
+      writemsr(cpu, 0x38f, bit.bor(bit.lshift(0x3ULL, 32),
+                                   bit.lshift(1ULL, ngeneral) - 1))
+      -- Enable all fixed-function counters (IA32_FIXED_CTR_CTRL)
+      writemsr(cpu, 0x38d, 0x333)
+      return {"instructions", "cycles", "ref_cycles"}, 0
+   end
+
+elseif vendor == "AuthenticAMD" and family+extfamily >= 0x15 then
+   function init_events (cpu, nselected)
+      -- No setup, no fixed-function counters. To keep API portability we add
+      -- enable some events by default if there is room.
+      local default = {}
+      for event, code in pairs({instructions=0x00c0, cycles=0x0076}) do
+         if nselected < ngeneral then
+            enable_event(cpu, #default, code)
+            default[#default+1] = event
+            nselected = nselected + 1
+         end
+      end
+      return default, #default
+   end
+end
+
+function enable_event (cpu, index, code)
+   local USR = bit.lshift(1, 16)
+   local EN = bit.lshift(1, 22)
+   -- AMD BKDG says: To accurately start counting with the write that enables
+   -- the counter, disable the counter when changing the event and then enable
+   -- the counter with a second MSR write
+   writemsr(cpu, pmc_ctl_base+index*pmc_ctl_step, 0)
+   writemsr(cpu, pmc_ctl_base+index*pmc_ctl_step, bit.bor(USR, EN, code))
+end
+
 function selftest ()
    print("selftest: pmu_x86")
    enable_rdpmc()
-   -- Expected values for Sandy Bridge - Skylake
    print("nfixed", nfixed, "ngeneral", ngeneral)
-   assert(nfixed == 3,                    "nfixed: " .. nfixed)
-   assert(ngeneral == 4 or ngeneral == 8, "ngeneral: " .. ngeneral)
-   local buf = ffi.new("uint64_t[?]", nfixed + ngeneral + 1)
+   if vendor == "GenuineIntel" then
+      -- Expected values for Sandy Bridge - Skylake
+      assert(nfixed == 3,                    "nfixed: " .. nfixed)
+      assert(ngeneral == 4 or ngeneral == 8, "ngeneral: " .. ngeneral)
+   elseif vendor == "AuthenticAMD" and family+extfamily >= 0x15 then
+      assert(nfixed == 0,                    "nfixed: " .. nfixed)
+      assert(ngeneral >= 4,                  "ngeneral: " .. nfixed)
+   end
+   local buf = ffi.new("uint64_t[?]", ncounters + 1)
    local magic = 0x0001020304050607ULL
    -- Store magic number in all fields (including extra sentinel)
-   for i = 0, nfixed+ngeneral do buf[i] = magic end
+   for i = 0, ncounters do buf[i] = magic end
    rdpmc_multi(buf)
-   for i = 0, 9-1 do print("buf["..i.."]", tonumber(buf[i])) end
+   for i = 0, ncounters do print("buf["..i.."]", tonumber(buf[i])) end
    -- Check that all values are written
-   for i = 0, nfixed+ngeneral-1 do assert(buf[i] ~= magic, "overwrite") end
-   assert(buf[nfixed+ngeneral] == magic, "sentinel")
+   for i = 0, ncounters-1 do assert(buf[i] ~= magic, "overwrite") end
+   assert(buf[ncounters] == magic, "sentinel")
    print("selftest: ok")
 end
 
