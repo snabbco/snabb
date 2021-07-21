@@ -185,6 +185,7 @@ function shutdown (pid)
    safely(function () require("core.packet").shutdown(pid) end)
    safely(function () require("apps.interlink.receiver").shutdown(pid) end)
    safely(function () require("apps.interlink.transmitter").shutdown(pid) end)
+   safely(function () require("apps.mellanox.connectx").shutdown(pid) end)
    -- Parent process performs additional cleanup steps.
    -- (Parent is the process whose 'group' folder is not a symlink.)
 
