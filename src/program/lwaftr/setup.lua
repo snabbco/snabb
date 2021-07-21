@@ -206,8 +206,8 @@ end
 
 function load_kernel_iface (c, conf, v4_nic_name, v6_nic_name)
    local RawSocket = require("apps.socket.raw").RawSocket
-   local v4_iface, id, queue = lwutil.parse_instance(conf)
-   local v6_iface = queue.external_interface.dev_info
+   local v6_iface, id, queue = lwutil.parse_instance(conf)
+   local v4_iface = queue.external_interface.dev_info
    local dev_info = {rx = "rx", tx = "tx"}
 
    lwaftr_app(c, conf, v6_iface)
@@ -220,8 +220,8 @@ function load_kernel_iface (c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
-   local v4_pci, id, queue = lwutil.parse_instance(conf)
-   local v6_pci = queue.external_interface.device
+   local v6_pci, id, queue = lwutil.parse_instance(conf)
+   local v4_pci = queue.external_interface.device
    local v4_info = pci.device_info(v4_pci)
    local v6_info = pci.device_info(v6_pci)
    validate_pci_devices({v4_pci, v6_pci})
@@ -255,11 +255,11 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
 end
 
 function load_xdp(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
-   local v4_device, id, queue = lwutil.parse_instance(conf)
-   local v6_device = queue.external_interface.device
+   local v6_device, id, queue = lwutil.parse_instance(conf)
+   local v4_device = queue.external_interface.device
    assert(lib.is_iface(v4_device), v4_nic_name..": "..v4_device.." is not a Linux interface")
    assert(lib.is_iface(v6_device), v6_nic_name..": "..v6_device.." is not a Linux interface")
-   assert(not lwutil.is_on_a_stick(v4_device, queue),
+   assert(not lwutil.is_on_a_stick(v6_device, queue),
           "--xdp does not support on-a-stick configuration")
           
    lwaftr_app(c, conf)
@@ -388,8 +388,8 @@ function load_on_a_stick(c, conf, args)
 end
 
 function load_virt(c, conf, v4_nic_name, v6_nic_name)
-   local v4_pci, id, queue = lwutil.parse_instance(conf)
-   local v6_pci = queue.external_device.device
+   local v6_pci, id, queue = lwutil.parse_instance(conf)
+   local v4_pci = queue.external_device.device
    lwaftr_app(c, conf, device)
 
    validate_pci_devices({v4_pci, v6_pci})
