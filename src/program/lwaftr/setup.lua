@@ -271,8 +271,25 @@ function load_xdp(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
       ifname=v6_device,
       queue=id})
 
-   link_source(c, v4_nic_name..'.output', v6_nic_name..'.output')
-   link_sink(c,   v4_nic_name..'.input', v6_nic_name..'.input')
+   local v4_src, v6_src = v4_nic_name..'.output', v6_nic_name..'.output'
+   local v4_sink, v6_sink = v4_nic_name..'.input', v6_nic_name..'.input'
+
+   -- Linux removes VLAN tag, but we have to tag outgoing packets
+   if queue.external_interface.vlan_tag then
+      config.app(c, "tagv4", vlan.Tagger,
+                 { tag=queue.external_interface.vlan_tag })
+      config.link(c, "tagv4.output -> "..v4_sink)
+      v4_sink = "tagv4.input"
+   end
+   if queue.internal_interface.vlan_tag then
+      config.app(c, "tagv6", vlan.Tagger,
+                 { tag=queue.internal_interface.vlan_tag })
+      config.link(c, "tagv6.output -> "..v6_sink)
+      v6_sink = "tagv6.input"
+   end
+
+   link_source(c, v4_src, v6_src)
+   link_sink(c, v4_sink, v6_sink)
 end
 
 function load_on_a_stick_kernel_iface (c, conf, args)
