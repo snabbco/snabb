@@ -21,6 +21,7 @@ local vlan       = require("apps.vlan.vlan")
 local pci        = require("lib.hardware.pci")
 local cltable    = require("lib.cltable")
 local ipv4       = require("lib.protocol.ipv4")
+local ipv6       = require("lib.protocol.ipv6")
 local ethernet   = require("lib.protocol.ethernet")
 local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 local binary     = require("lib.yang.binary")
@@ -290,6 +291,50 @@ function load_xdp(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
 
    link_source(c, v4_src, v6_src)
    link_sink(c, v4_sink, v6_sink)
+end
+
+function xdp_ifsetup(conf)
+   for idevice, instance in pairs(conf.softwire_config.instance) do
+      local icfg, ecfg
+      local nqueues = 0
+      for _, queue in pairs(instance.queue) do
+         nqueues = nqueues + 1
+         if not icfg then icfg = queue.internal_interface
+         else assert(lib.equal(icfg, queue.internal_interface)) end
+         if not ecfg then ecfg = queue.external_interface
+         else assert(lib.equal(ecfg, queue.external_interface)) end
+      end
+      for qid in pairs(instance.queue) do
+         assert(qid < nqueues)
+      end
+      local function cmd(...)
+         local cmd
+         for _, part in ipairs({...}) do
+            if not cmd then cmd = part
+            else            cmd = cmd.." "..part end
+         end
+         print("shell:", cmd)
+         assert(os.execute(cmd))
+      end
+      local function ifsetup(ifname, cfg, opts, ip_ntop)
+         cmd('ip link set down', 'dev', ifname)
+         cmd('ip address flush', 'dev', ifname)
+         cmd('ip link set address', ethernet:ntop(cfg.mac), 'dev', ifname)
+         cmd('ip link set arp off', 'dev', ifname)
+         cmd('ip link set broadcast', "ff:ff:ff:ff:ff:ff", 'dev', ifname)
+         cmd('ip link set multicast on', 'dev', ifname)
+         cmd('ip link set mtu', opts.mtu, 'dev', ifname)
+         cmd('ip address add', ip_ntop(cfg.ip),  'dev', ifname)
+         cmd('ethtool --set-channels', ifname,  'combined', nqueues)
+         cmd('ip link set up', 'dev', ifname)
+      end
+      print("Configuring internal interface for XDP...")
+      ifsetup(idevice, icfg, conf.softwire_config.internal_interface,
+              function (ip) return ipv6:ntop(ip) end)
+      print("Configuring external interface for XDP...")
+      ifsetup(ecfg.device, ecfg, conf.softwire_config.external_interface,
+              ipv4_ntop)
+   end
 end
 
 function load_on_a_stick_kernel_iface (c, conf, args)

@@ -152,6 +152,11 @@ function run(args)
    -- anything defined in the config.
    if opts.name then conf.softwire_config.name = opts.name end
 
+   -- If we’re using XDP, setup interfaces here
+   if opts.xdp then
+      setup.xdp_ifsetup(conf)
+   end
+
    local function setup_fn(graph, lwconfig)
       -- If --virtio has been specified, always use this.
       if opts.virtio_net then
