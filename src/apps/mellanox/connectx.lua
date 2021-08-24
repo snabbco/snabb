@@ -1124,7 +1124,8 @@ function IO:new (conf)
    -- This is also done in Connectex4:new() but might not have
    -- happened yet.
    pci.unbind_device_from_linux(pciaddress)
-   local mmio, fd = pci.map_pci_memory(pciaddress, 0, false)
+   local fd = pci.open_pci_resource_unlocked(pciaddress, 0)
+   local mmio = pci.map_pci_memory(fd)
 
    local online = false      -- True when queue is up and running
    local cxq                 -- shm object containing queue control information
