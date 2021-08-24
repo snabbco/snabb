@@ -105,7 +105,8 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
 
    local start = engine.now()
    local remaining = npackets
-   require("lib.traceprof.traceprof").start()
+   engine.vmprofile_enabled = true
+   engine.setvmprofile("connectx")
    while remaining > 0 do
       -- Send packets
       for id, _ in pairs(io0) do
@@ -125,7 +126,7 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       for id, app in pairs(io1) do app:pull() app:push() dump(pci1, id, app) end
       -- Simulate breathing
    end
-   require("lib.traceprof.traceprof").stop()
+   engine.setvmprofile("engine")
    -- Receive any last packets
    C.usleep(100)
    for i = 1, 10 do
