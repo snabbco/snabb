@@ -66,6 +66,11 @@ function ethernet:ntop (n)
    return table.concat(p, ":")
 end
 
+-- Convert printable address to integer
+function ethernet:ptoi (p)
+   return tonumber(ffi.cast("uint64_t *", ethernet:pton(p))[0])
+end
+
 -- Mapping of an IPv6 multicast address to a MAC address per RFC2464,
 -- section 7
 function ethernet:ipv6_mcast(ip)
