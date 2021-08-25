@@ -2235,7 +2235,7 @@ function selftest ()
             for i = 1, each do
                local p = packet.allocate()
                ffi.fill(p.data, octets, 0)  -- zero packet
-               local header = lib.hexundump("000000000001 000000000002 0800", 16)
+               local header = lib.hexundump("000000000001 000000000002 0800", 14)
                ffi.copy(p.data, header, #header)
                p.data[12] = 0x08 -- ethertype = 0x0800
                p.length = octets
@@ -2258,17 +2258,17 @@ function selftest ()
    print("recv0", tonumber(counter.read(o0.stats.txpackets)), tonumber(counter.read(o0.stats.txbytes)), tonumber(counter.read(o0.stats.txdrop)))
    print("recv1", tonumber(counter.read(o1.stats.txpackets)), tonumber(counter.read(o1.stats.txbytes)), tonumber(counter.read(o1.stats.txdrop)))
 
-   print("payload snippets of first 5 packets")
-   print("port0")
-   for i = 1, 5 do
-      local p = link.receive(o0)
-      if p then print(p.length, lib.hexdump(ffi.string(p.data, math.min(32, p.length)))) end
-   end
-   print("port1")
-   for i = 1, 5 do
-      local p = link.receive(o1)
-      if p then print(p.length, lib.hexdump(ffi.string(p.data, math.min(32, p.length)))) end
-   end
+   -- print("payload snippets of first 5 packets")
+   -- print("port0")
+   -- for i = 1, 5 do
+   --    local p = link.receive(o0)
+   --    if p then print(p.length, lib.hexdump(ffi.string(p.data, math.min(32, p.length)))) end
+   -- end
+   -- print("port1")
+   -- for i = 1, 5 do
+   --    local p = link.receive(o1)
+   --    if p then print(p.length, lib.hexdump(ffi.string(p.data, math.min(32, p.length)))) end
+   -- end
 
    print()
    print(("%-16s  %20s  %20s"):format("hardware counter", pcidev0, pcidev1))

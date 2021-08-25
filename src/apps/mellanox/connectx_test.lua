@@ -176,10 +176,10 @@ function between (min, max)
 end
 
 function selftest ()
-   local pci0 = os.getenv("SNABB_PCI_CONNECTX0")
-   local pci1 = os.getenv("SNABB_PCI_CONNECTX1")
+   local pci0 = os.getenv("SNABB_PCI_CONNECTX_0")
+   local pci1 = os.getenv("SNABB_PCI_CONNECTX_1")
    if not (pci0 and pci1) then
-      print("SNABB_PCI_CONNECTX0 and SNABB_PCI_CONNECTX1 must be set. Skipping selftest.")
+      print("SNABB_PCI_CONNECTX_0 and SNABB_PCI_CONNECTX_1 must be set. Skipping selftest.")
       os.exit(engine.test_skipped_code)
    end
    switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 4, 4, 1)
