@@ -211,6 +211,14 @@ function ConnectX:new (conf)
    local sendq_size = conf.sendq_size or 1024
    local recvq_size = conf.recvq_size or 1024
 
+   -- XXX Config says whether to setup queues with MAC+VLAN
+   -- dispatching ("VMDq") or to simply hash uniformly over them ("RSS").
+   --
+   -- To be replaced with a more generic algorithm that looks at the
+   -- configurations of the individual ports and creates an
+   -- appropriate flow table.
+   local macvlan = conf.macvlan
+
    local mtu = conf.mtu or 9500
 
    -- Perform a hard reset of the device to bring it into a blank state.
@@ -272,15 +280,7 @@ function ConnectX:new (conf)
    -- List of queue counter IDs (ConnectX5 and up)
    local counter_set_ids = {}
 
-   -- Enable MAC/VLAN switching?
-   local usemac = false
    local usevlan = false
-
-   -- Sets of MACs and VLANs
-   local macs, vlans = {}, {}
-
-   -- Lists of receive queues by macvlan
-   local macvlan_rqlist = {}
 
    for _, queue in ipairs(conf.queues) do
       -- Create a shared memory object for controlling the queue pair
@@ -334,42 +334,24 @@ function ConnectX:new (conf)
       -- CXQ is now fully initialized & ready for attach.
       assert(sync.cas(cxq.state, INIT, FREE))
 
-      usemac = usemac or (queue.mac ~= nil)
       usevlan = usevlan or (queue.vlan ~= nil)
 
       -- XXX collect for flow table construction
       rqs[queue.id] = cxq.rqn
       rqlist[#rqlist+1] = cxq.rqn
    end
-   
-   if usemac then
-      -- Collect macs, and vlans
+
+   local rxtable = hca:create_root_flow_table(NIC_RX)
+   local rule = 0
+   if macvlan then
+      local flow_group_id = hca:create_flow_group_macvlan(rxtable, NIC_RX, 0, #conf.queues-1, usevlan)
       for _, queue in ipairs(conf.queues) do
-         assert(queue.mac, "Queue does not specifiy MAC: "..queue.id)
-         macs[queue.mac] = true
-         if usevlan then
-            assert(queue.vlan, "Queue does not specify a VLAN: "..queue.id)
-            vlans[queue.vlan] = true
-         else
-            vlans[false] = true
-         end
+         local tir = hca:create_tir_direct(rqs[queue.id], tdomain)
+         hca:set_flow_table_entry_macvlan(rxtable, NIC_RX, flow_group_id, rule, tir,
+                                          ethernet:ptoi(queue.mac), queue.vlan)
+         rule = rule + 1
       end
-
-      -- Collect macvlan_rqlist for flow table construction
-      for mac in pairs(macs) do
-         macvlan_rqlist[mac] = {}
-         for vlan in pairs(vlans) do
-            macvlan_rqlist[mac][vlan] = {}
-            for _, queue in ipairs(conf.queues) do
-               if queue.mac == mac and (queue.vlan or false) == vlan then
-                  table.insert(macvlan_rqlist[mac][vlan], rqs[queue.id])
-               end
-            end
-         end
-      end
-   end
-
-   local function setup_rss_rxtable (rqlist, tdomain, level)
+   else
       -- Set up RSS accross all queues. Hashing is only performed for
       -- IPv4/IPv6 and TCP/UDP, i.e. non-IP packets as well as non
       -- TCP/UDP packets are mapped to Queue #1.  Hashing is done by
@@ -378,8 +360,6 @@ function ConnectX:new (conf)
       -- appropriate types of packets.
       local l3_protos = { 'v4', 'v6' }
       local l4_protos = { 'udp', 'tcp' }
-      local rxtable = hca:create_flow_table(NIC_RX, level,
-                                            #l3_protos * #l4_protos + 1)
       local rqt = hca:create_rqt(rqlist)
       local flow_group_ip =
          hca:create_flow_group_ip(rxtable, NIC_RX, 0,
@@ -395,7 +375,7 @@ function ConnectX:new (conf)
             -- If the header is incomplete, the packet will fall through
             -- to the wildcard match and end up in the first queue.
             hca:set_flow_table_entry_ip(rxtable, NIC_RX, flow_group_ip,
-                                        index, TIR, tir, l3_proto, l4_proto)
+                                        index, tir, l3_proto, l4_proto)
             index = index + 1
          end
       end
@@ -404,44 +384,9 @@ function ConnectX:new (conf)
          hca:create_flow_group_wildcard(rxtable, NIC_RX, index, index)
       local tir_q1 = hca:create_tir_direct(rqlist[1], tdomain)
       hca:set_flow_table_entry_wildcard(rxtable, NIC_RX,
-                                        flow_group_wildcard, index, TIR, tir_q1)
-      return rxtable
+                                        flow_group_wildcard, index, tir_q1)
    end
-
-   local function setup_macvlan_rxtable (macvlan_rqlist, usevlan, tdomain, level)
-      -- Set up RSS across multiple queues with matching MAC+VLAN.
-      -- See notes on RSS in setup_rss_rxtable above.
-      local num_entries = 0
-      for mac in pairs(macvlan_rqlist) do
-         for vlan, rqlist in pairs(macvlan_rqlist[mac]) do
-            if #rqlist > 0 then
-               num_entries = num_entries + 1
-            end
-         end
-      end
-      local rxtable = hca:create_flow_table(NIC_RX, level or 0, num_entries)
-      local index = 0
-      local flow_group_id = hca:create_flow_group_macvlan(rxtable, NIC_RX, 0, num_entries-1, usevlan)
-      for mac in pairs(macvlan_rqlist) do
-         for vlan, rqlist in pairs(macvlan_rqlist[mac]) do
-            if #rqlist > 0 then
-               local tid = setup_rss_rxtable(rqlist, tdomain, 1)
-               hca:set_flow_table_entry_macvlan(rxtable, NIC_RX, flow_group_id, index,
-                                                FLOW_TABLE, tid, ethernet:ptoi(mac), vlan)
-               index = index + 1
-            end
-         end
-      end
-      return rxtable
-   end
-
-   if usemac then
-      local rxtable = setup_macvlan_rxtable(macvlan_rqlist, usevlan, tdomain, 0)
-      hca:set_flow_table_root(rxtable, NIC_RX)
-   else
-      local rxtable = setup_rss_rxtable(rqlist, tdomain, 0)
-      hca:set_flow_table_root(rxtable, NIC_RX)
-   end
+   hca:set_flow_table_root(rxtable, NIC_RX)
 
    self.shm = {
       mtu    = {counter, mtu},
@@ -1435,16 +1380,12 @@ end
 NIC_RX = 0 -- Flow table type code for incoming packets
 NIC_TX = 1 -- Flow table type code for outgoing packets
 
-FLOW_TABLE = 1 -- Flow table entry destination_type for FLOW_TABLE
-TIR = 2 -- Flow table entry destination_type for TIR
-
--- Create a flow table.
-function HCA:create_flow_table (table_type, level, size)
+-- Create the root flow table.
+function HCA:create_root_flow_table (table_type)
    self:command("CREATE_FLOW_TABLE", 0x3C, 0x0C)
       :input("opcode",     0x00,        31, 16, 0x930)
       :input("table_type", 0x10,        31, 24, table_type)
-      :input("level",      0x18 + 0x00, 23, 16, level or 0)
-      :input("log_size",   0x18 + 0x00,  7,  0, math.ceil(math.log(size or 1024, 2)))
+      :input("log_size",   0x18 + 0x00,  7,  0, 10) -- XXX make parameter
       :execute()
    local table_id = self:output(0x08, 23, 0)
    return table_id
@@ -1475,7 +1416,7 @@ end
 
 -- Set a "wildcard" flow table entry that does not match on any fields.
 function HCA:set_flow_table_entry_wildcard (table_id, table_type, group_id,
-                                            flow_index, dest_type, dest_id)
+                                            flow_index, tir)
    self:command("SET_FLOW_TABLE_ENTRY", 0x40 + 0x300, 0x0C)
       :input("opcode",       0x00,         31, 16, 0x936)
       :input("opmod",        0x04,         15,  0, 0) -- new entry
@@ -1485,8 +1426,8 @@ function HCA:set_flow_table_entry_wildcard (table_id, table_type, group_id,
       :input("group_id",     0x40 + 0x04,  31,  0, group_id)
       :input("action",       0x40 + 0x0C,  15,  0, 4) -- action = FWD_DST
       :input("dest_list_sz", 0x40 + 0x10,  23,  0, 1) -- destination list size
-      :input("dest_type",    0x40 + 0x300, 31, 24, dest_type)
-      :input("dest_id",      0x40 + 0x300, 23,  0, dest_id)
+      :input("dest_type",    0x40 + 0x300, 31, 24, 2)
+      :input("dest_id",      0x40 + 0x300, 23,  0, tir)
       :execute()
 end
 
@@ -1509,7 +1450,7 @@ end
 -- Set a flow table entry that matches on the ethertype for IPv4/IPv6
 -- as well as TCP/UDP protocol/next-header.
 function HCA:set_flow_table_entry_ip (table_id, table_type, group_id,
-                                      flow_index, dest_type, dest_id, l3_proto, l4_proto)
+                                      flow_index, tir, l3_proto, l4_proto)
    local ethertypes = {
       v4 = 0x0800,
       v6 = 0x86dd
@@ -1531,8 +1472,8 @@ function HCA:set_flow_table_entry_ip (table_id, table_type, group_id,
       :input("dest_list_sz", 0x40 + 0x10,  23,  0, 1) -- destination list size
       :input("match_ether",  0x40 + 0x40 + 0x04, 15, 0, type)
       :input("match_proto",  0x40 + 0x40 + 0x10, 31, 24, proto)
-      :input("dest_type",    0x40 + 0x300, 31, 24, dest_type)
-      :input("dest_id",      0x40 + 0x300, 23,  0, dest_id)
+      :input("dest_type",    0x40 + 0x300, 31, 24, 2) -- TIR
+      :input("dest_id",      0x40 + 0x300, 23,  0, tir)
       :execute()
 end
 
@@ -1556,8 +1497,7 @@ function HCA:create_flow_group_macvlan (table_id, table_type, start_ix, end_ix, 
 end
 
 -- Set a DMAC+VLAN flow table rule.
-function HCA:set_flow_table_entry_macvlan (table_id, table_type, group_id,
-                                           flow_index, dest_type, dest_id, dmac, vlanid)
+function HCA:set_flow_table_entry_macvlan (table_id, table_type, group_id, flow_index, tir, dmac, vlanid)
    self:command("SET_FLOW_TABLE_ENTRY", 0x40 + 0x300, 0x0C)
       :input("opcode",       0x00,         31, 16, 0x936)
       :input("opmod",        0x04,         15,  0, 0) -- new entry
@@ -1570,8 +1510,8 @@ function HCA:set_flow_table_entry_macvlan (table_id, table_type, group_id,
       :input("dmac0",        0x40 + 0x48,  31,  0, math.floor(dmac/2^16))
       :input("dmac1",        0x40 + 0x4C,  31, 16, band(dmac, 0xFFFF))
       :input("vlan",         0x40 + 0x4C,  11,  0, vlanid or 0)
-      :input("dest_type",    0x40 + 0x300, 31, 24, dest_type)
-      :input("dest_id",      0x40 + 0x300, 23,  0, dest_id)
+      :input("dest_type",    0x40 + 0x300, 31, 24, 2)
+      :input("dest_id",      0x40 + 0x300, 23,  0, tir)
       :execute()
 end
 
