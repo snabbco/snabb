@@ -1343,8 +1343,8 @@ function SQ:new (cxq, mmio)
          wqe.u32[12] = bswap(p.length - ninline)
          wqe.u32[13] = bswap(cxq.rlkey)
          local phy = memory.virtual_to_physical(p.data + ninline)
-         wqe.u32[14] = bswap(tonumber(phy) / 2^32)
-         wqe.u32[15] = bswap(tonumber(phy) % 2^32)
+         wqe.u32[14] = bswap(tonumber(shr(phy, 32)))
+         wqe.u32[15] = bswap(tonumber(band(phy, 0xFFFFFFFF)))
          -- Advance counters
          cxq.next_tx_wqeid = cxq.next_tx_wqeid + 1
          next_slot = slot(cxq.next_tx_wqeid)
