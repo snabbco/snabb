@@ -356,13 +356,13 @@ function ConnectX:new (conf)
       end
 
       -- Collect macvlan_rqlist for flow table construction
-      for mac in pairs(macs) do
-         macvlan_rqlist[mac] = {}
          for vlan in pairs(vlans) do
-            macvlan_rqlist[mac][vlan] = {}
+         macvlan_rqlist[vlan] = {}
+         for mac in pairs(macs) do
+            macvlan_rqlist[vlan][mac] = {}
             for _, queue in ipairs(conf.queues) do
-               if queue.mac == mac and (queue.vlan or false) == vlan then
-                  table.insert(macvlan_rqlist[mac][vlan], rqs[queue.id])
+               if (queue.vlan or false) == vlan and queue.mac == mac then
+                  table.insert(macvlan_rqlist[vlan][mac], rqs[queue.id])
                end
             end
          end
@@ -422,8 +422,8 @@ function ConnectX:new (conf)
       local rxtable = hca:create_flow_table(NIC_RX, level or 0, num_entries)
       local index = 0
       local flow_group_id = hca:create_flow_group_macvlan(rxtable, NIC_RX, 0, num_entries-1, usevlan)
-      for mac in pairs(macvlan_rqlist) do
-         for vlan, rqlist in pairs(macvlan_rqlist[mac]) do
+      for vlan in pairs(macvlan_rqlist) do
+         for mac, rqlist in pairs(macvlan_rqlist[vlan]) do
             if #rqlist > 0 then
                local tid = setup_rss_rxtable(rqlist, tdomain, 1)
                hca:set_flow_table_entry_macvlan(rxtable, NIC_RX, flow_group_id, index,
