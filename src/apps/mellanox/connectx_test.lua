@@ -28,19 +28,20 @@ local lib = require("core.lib")
 -- Hardware queue count will be macs*vlans*rss on each interface.
 function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburst, macs, vlans, rss)
    print("selftest: connectx_test switch")
-   assert(rss == 1, "rss not yet handled")
    assert(ncores == 1, "multicore not yet handled")
    -- Create queue definitions
    local queues = {}
    for vlan = 1, vlans do
       for mac = 1, macs do
-         local id = ("vlan%d.mac%d"):format(vlan, mac)
-         queues[#queues+1] = {id=id, vlan=vlan, mac="00:00:00:00:00:"..bit.tohex(mac, 2)}
+         for q = 1, rss do
+            local id = ("vlan%d.mac%d.rss%d"):format(vlan, mac, q)
+            queues[#queues+1] = {id=id, vlan=vlan, mac="00:00:00:00:00:"..bit.tohex(mac, 2)}
+         end
       end
    end
    -- Instantiate app network
-   local nic0 = connectx.ConnectX:new({pciaddress=pci0, queues=queues, macvlan=true})
-   local nic1 = connectx.ConnectX:new({pciaddress=pci1, queues=queues, macvlan=true})
+   local nic0 = connectx.ConnectX:new({pciaddress=pci0, queues=queues})
+   local nic1 = connectx.ConnectX:new({pciaddress=pci1, queues=queues})
    local io0 = {}               -- io apps on nic0
    local io1 = {}               -- io apps on nic1
    print(("creating %d queues per device..."):format(#queues))
@@ -73,19 +74,44 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       else                          -- rest are unicast to known mac
          p.data[5] = between(1, macs)
       end
-
-      p.data[12] = 0x08 -- ipv4
       
       -- MAC source
       for i = 7, 11 do p.data[i] = math.random(256) - 1 end
+
       -- 802.1Q
       p.data[12] = 0x81
       p.data[15] = between(1, vlans) -- vlan id can be out of expected range
       p.data[16] = 0x08 -- ipv4
+
+      local ip_ofs = 18
+
+      -- IPv4
+      local ip = require("lib.protocol.ipv4"):new{
+         src = lib.random_bytes(4),
+         dst = lib.random_bytes(4),
+         ttl = 64,
+         protocol = 17 -- UDP
+      }
+      ip:copy(p.data+ip_ofs, 'relocate')
+      ip:total_length(p.length-ip_ofs)
+      ip:checksum()
+
+      -- UDP
+      local udp = require("lib.protocol.udp"):new{
+         src_port = math.random(30000),
+         dst_port = math.random(30000)
+      }
+      udp:copy(p.data+ip_ofs+ip:sizeof(), 'relocate')
+      udp:length(p.length-(ip_ofs+ip:sizeof()))
+
       -- Random payload
-      for i = 50, p.length-1 do
+      for i = ip_ofs+ip:sizeof()+udp:sizeof(), p.length-1 do
          p.data[i] = math.random(256) - 1
       end
+
+      -- UDP checksum
+      udp:checksum(p.data, p.length-(ip_ofs+ip:sizeof()+udp:sizeof()), ip)
+
       --print(lib.hexdump(ffi.string(p.data, 32)))
    end
    -- Wait for linkup on both ports
@@ -182,6 +208,6 @@ function selftest ()
       print("SNABB_PCI_CONNECTX_0 and SNABB_PCI_CONNECTX_1 must be set. Skipping selftest.")
       os.exit(engine.test_skipped_code)
    end
-   switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 4, 4, 1)
+   switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 2, 2, 4)
 end
 
