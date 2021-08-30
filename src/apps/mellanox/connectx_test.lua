@@ -28,19 +28,20 @@ local lib = require("core.lib")
 -- Hardware queue count will be macs*vlans*rss on each interface.
 function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburst, macs, vlans, rss)
    print("selftest: connectx_test switch")
-   assert(rss == 1, "rss not yet handled")
    assert(ncores == 1, "multicore not yet handled")
    -- Create queue definitions
    local queues = {}
    for vlan = 1, vlans do
       for mac = 1, macs do
-         local id = ("vlan%d.mac%d"):format(vlan, mac)
-         queues[#queues+1] = {id=id, vlan=vlan, mac="00:00:00:00:00:"..bit.tohex(mac, 2)}
+         for q = 1, rss do
+            local id = ("vlan%d.mac%d.rss%d"):format(vlan, mac, q)
+            queues[#queues+1] = {id=id, vlan=vlan, mac="00:00:00:00:00:"..bit.tohex(mac, 2)}
+         end
       end
    end
    -- Instantiate app network
-   local nic0 = connectx.ConnectX:new({pciaddress=pci0, queues=queues, macvlan=true})
-   local nic1 = connectx.ConnectX:new({pciaddress=pci1, queues=queues, macvlan=true})
+   local nic0 = connectx.ConnectX:new({pciaddress=pci0, queues=queues})
+   local nic1 = connectx.ConnectX:new({pciaddress=pci1, queues=queues})
    local io0 = {}               -- io apps on nic0
    local io1 = {}               -- io apps on nic1
    print(("creating %d queues per device..."):format(#queues))
@@ -73,19 +74,56 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       else                          -- rest are unicast to known mac
          p.data[5] = between(1, macs)
       end
-
-      p.data[12] = 0x08 -- ipv4
       
       -- MAC source
       for i = 7, 11 do p.data[i] = math.random(256) - 1 end
+
       -- 802.1Q
       p.data[12] = 0x81
       p.data[15] = between(1, vlans) -- vlan id can be out of expected range
       p.data[16] = 0x08 -- ipv4
-      -- Random payload
-      for i = 50, p.length-1 do
-         p.data[i] = math.random(256) - 1
+
+      local ip_ofs = 18
+
+      -- IPv4
+      local ip = require("lib.protocol.ipv4"):new{
+         src = lib.random_bytes(4),
+         dst = lib.random_bytes(4),
+         ttl = 64
+      }
+      if r < 0.50 then              -- 50% of packets are UDP (have L4 header)
+         ip:protocol(17) -- UDP
+      else                          -- rest have random payloads
+         ip:protocol(253)
       end
+      ip:copy(p.data+ip_ofs, 'relocate')
+      ip:total_length(p.length-ip_ofs)
+      ip:checksum()
+
+      if ip:protocol() == 17 then
+         -- UDP
+         local udp = require("lib.protocol.udp"):new{
+            src_port = math.random(30000),
+            dst_port = math.random(30000)
+         }
+         udp:copy(p.data+ip_ofs+ip:sizeof(), 'relocate')
+         udp:length(p.length-(ip_ofs+ip:sizeof()))
+
+         -- Random payload
+         for i = ip_ofs+ip:sizeof()+udp:sizeof(), p.length-1 do
+            p.data[i] = math.random(256) - 1
+         end
+
+         -- UDP checksum
+         udp:checksum(p.data, p.length-(ip_ofs+ip:sizeof()+udp:sizeof()), ip)
+      
+      else
+         -- Random payload
+         for i = ip_ofs+ip:sizeof(), p.length-1 do
+            p.data[i] = math.random(256) - 1
+         end
+      end
+
       --print(lib.hexdump(ffi.string(p.data, 32)))
    end
    -- Wait for linkup on both ports
@@ -105,7 +143,8 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
 
    local start = engine.now()
    local remaining = npackets
-   require("lib.traceprof.traceprof").start()
+   engine.vmprofile_enabled = true
+   engine.setvmprofile("connectx")
    while remaining > 0 do
       -- Send packets
       for id, _ in pairs(io0) do
@@ -125,7 +164,7 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       for id, app in pairs(io1) do app:pull() app:push() dump(pci1, id, app) end
       -- Simulate breathing
    end
-   require("lib.traceprof.traceprof").stop()
+   engine.setvmprofile("engine")
    -- Receive any last packets
    C.usleep(100)
    for i = 1, 10 do
@@ -175,6 +214,12 @@ function between (min, max)
 end
 
 function selftest ()
-   switch("02:00.0", "03:00.0", 10e6, 1, 60, 1500, 100, 100, 4, 4, 1)
+   local pci0 = os.getenv("SNABB_PCI_CONNECTX_0")
+   local pci1 = os.getenv("SNABB_PCI_CONNECTX_1")
+   if not (pci0 and pci1) then
+      print("SNABB_PCI_CONNECTX_0 and SNABB_PCI_CONNECTX_1 must be set. Skipping selftest.")
+      os.exit(engine.test_skipped_code)
+   end
+   switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 2, 2, 4)
 end
 

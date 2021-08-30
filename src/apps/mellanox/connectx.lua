@@ -211,14 +211,6 @@ function ConnectX:new (conf)
    local sendq_size = conf.sendq_size or 1024
    local recvq_size = conf.recvq_size or 1024
 
-   -- XXX Config says whether to setup queues with MAC+VLAN
-   -- dispatching ("VMDq") or to simply hash uniformly over them ("RSS").
-   --
-   -- To be replaced with a more generic algorithm that looks at the
-   -- configurations of the individual ports and creates an
-   -- appropriate flow table.
-   local macvlan = conf.macvlan
-
    local mtu = conf.mtu or 9500
 
    -- Perform a hard reset of the device to bring it into a blank state.
@@ -280,7 +272,12 @@ function ConnectX:new (conf)
    -- List of queue counter IDs (ConnectX5 and up)
    local counter_set_ids = {}
 
+   -- Enable MAC/VLAN switching?
+   local usemac = false
    local usevlan = false
+
+   -- Lists of receive queues by macvlan (used if usemac=true)
+   local macvlan_rqlist = {}
 
    for _, queue in ipairs(conf.queues) do
       -- Create a shared memory object for controlling the queue pair
@@ -334,37 +331,54 @@ function ConnectX:new (conf)
       -- CXQ is now fully initialized & ready for attach.
       assert(sync.cas(cxq.state, INIT, FREE))
 
+      usemac = usemac or (queue.mac ~= nil)
       usevlan = usevlan or (queue.vlan ~= nil)
 
       -- XXX collect for flow table construction
       rqs[queue.id] = cxq.rqn
       rqlist[#rqlist+1] = cxq.rqn
    end
-
-   local rxtable = hca:create_root_flow_table(NIC_RX)
-   local rule = 0
-   if macvlan then
-      local flow_group_id = hca:create_flow_group_macvlan(rxtable, NIC_RX, 0, #conf.queues-1, usevlan)
+   
+   if usemac then
+      -- Collect macvlan_rqlist for flow table construction
       for _, queue in ipairs(conf.queues) do
-         local tir = hca:create_tir_direct(rqs[queue.id], tdomain)
-         hca:set_flow_table_entry_macvlan(rxtable, NIC_RX, flow_group_id, rule, tir,
-                                          ethernet:ptoi(queue.mac), queue.vlan)
-         rule = rule + 1
+         assert(queue.mac, "Queue does not specifiy MAC: "..queue.id)
+         if usevlan then
+            assert(queue.vlan, "Queue does not specify a VLAN: "..queue.id)
+         end
+         local vlan = queue.vlan or false
+         local mac = queue.mac
+         if not macvlan_rqlist[vlan] then
+            macvlan_rqlist[vlan] = {}
+         end
+         if not macvlan_rqlist[vlan][mac] then
+            macvlan_rqlist[vlan][mac] = {}
+         end
+         table.insert(macvlan_rqlist[vlan][mac], rqs[queue.id])
       end
-   else
+   elseif usevlan then
+      error("NYI: promisc vlan")
+   end
+
+   local function setup_rss_rxtable (rqlist, tdomain, level)
       -- Set up RSS accross all queues. Hashing is only performed for
-      -- IPv4/IPv6 and TCP/UDP, i.e. non-IP packets as well as non
-      -- TCP/UDP packets are mapped to Queue #1.  Hashing is done by
-      -- the TIR for a specific combination of protocols, hence
-      -- separate flows are needed to provide each TIR with the
-      -- appropriate types of packets.
+      -- IPv4/IPv6 with or without TCP/UDP. All non-IP packets are
+      -- mapped to Queue #1.  Hashing is done by the TIR for a
+      -- specific combination of header values, hence separate flows
+      -- are needed to provide each TIR with the appropriate types of
+      -- packets.
       local l3_protos = { 'v4', 'v6' }
       local l4_protos = { 'udp', 'tcp' }
+      local rxtable = hca:create_flow_table(
+         -- #rules = #l3*l4 rules + #l3 rules + 1 wildcard rule
+         NIC_RX, level, #l3_protos * #l4_protos + #l3_protos + 1
+      )
       local rqt = hca:create_rqt(rqlist)
-      local flow_group_ip =
-         hca:create_flow_group_ip(rxtable, NIC_RX, 0,
-                                  #l3_protos * #l4_protos - 1)
       local index = 0
+      -- Match TCP/UDP packets
+      local flow_group_ip = hca:create_flow_group_ip(
+         rxtable, NIC_RX, index, index + #l3_protos * #l4_protos - 1
+      )
       for _, l3_proto in ipairs(l3_protos) do
          for _, l4_proto in ipairs(l4_protos) do
             local tir = hca:create_tir_indirect(rqt, tdomain,
@@ -375,18 +389,87 @@ function ConnectX:new (conf)
             -- If the header is incomplete, the packet will fall through
             -- to the wildcard match and end up in the first queue.
             hca:set_flow_table_entry_ip(rxtable, NIC_RX, flow_group_ip,
-                                        index, tir, l3_proto, l4_proto)
+                                        index, TIR, tir, l3_proto, l4_proto)
             index = index + 1
          end
       end
-
+      -- Fall-through for non-TCP/UDP IP packets
+      local flow_group_ip_l3 = hca:create_flow_group_ip(
+         rxtable, NIC_RX, index, index + #l3_protos - 1, "l3-only"
+      )
+      for _, l3_proto in ipairs(l3_protos) do
+         local tir = hca:create_tir_indirect(rqt, tdomain, l3_proto, nil)
+         hca:set_flow_table_entry_ip(rxtable, NIC_RX, flow_group_ip_l3,
+                                     index, TIR, tir, l3_proto, nil)
+         index = index + 1
+      end
+      -- Fall-through for non-IP packets
       local flow_group_wildcard =
          hca:create_flow_group_wildcard(rxtable, NIC_RX, index, index)
       local tir_q1 = hca:create_tir_direct(rqlist[1], tdomain)
       hca:set_flow_table_entry_wildcard(rxtable, NIC_RX,
-                                        flow_group_wildcard, index, tir_q1)
+                                        flow_group_wildcard, index, TIR, tir_q1)
+      return rxtable
    end
-   hca:set_flow_table_root(rxtable, NIC_RX)
+
+   local function setup_macvlan_rxtable (macvlan_rqlist, usevlan, tdomain, level)
+      -- Set up MAC+VLAN switching.
+      -- 
+      -- For Unicast switch [MAC+VLAN->RSS->TIR]. I.e., forward packets
+      -- destined for a MAC+VLAN tuple to a RSS table containing all queues
+      -- belonging to that tuple.
+      -- (See notes on RSS in setup_rss_rxtable above.)
+      -- 
+      -- For Multicast switch [VLAN->TIR+]. I.e., forward multicast packets
+      -- destined for a VLAN to the first queue of every MAC in that VLAN.
+      -- 
+      local macvlan_size, mcast_size = 0, 0
+      for vlan in pairs(macvlan_rqlist) do
+         mcast_size = mcast_size + 1
+         for mac in pairs(macvlan_rqlist[vlan]) do
+            macvlan_size = macvlan_size + 1
+         end
+      end
+      local rxtable = hca:create_flow_table(
+         NIC_RX, level, macvlan_size + mcast_size
+      )
+      local index = 0
+      -- Unicast flow table entries
+      local flow_group_macvlan = hca:create_flow_group_macvlan(
+         rxtable, NIC_RX, index, index + macvlan_size - 1, usevlan
+      )
+      for vlan in pairs(macvlan_rqlist) do
+         for mac, rqlist in pairs(macvlan_rqlist[vlan]) do
+            local tid = setup_rss_rxtable(rqlist, tdomain, 1)
+            hca:set_flow_table_entry_macvlan(rxtable, NIC_RX, flow_group_macvlan, index,
+                                             FLOW_TABLE, tid, ethernet:ptoi(mac), vlan)
+            index = index + 1
+         end
+      end
+      -- Multicast flow table entries
+      local flow_group_mcast = hca:create_flow_group_macvlan(
+         rxtable, NIC_RX, index, index + mcast_size - 1, usevlan, 'mcast'
+      )
+      local mac_mcast = ethernet:ptoi("01:00:00:00:00:00")
+      for vlan in pairs(macvlan_rqlist) do
+         local mcast_tirs = {}
+         for mac, rqlist in pairs(macvlan_rqlist[vlan]) do
+            mcast_tirs[#mcast_tirs+1] = hca:create_tir_direct(rqlist[1], tdomain)
+         end
+         hca:set_flow_table_entry_macvlan(rxtable, NIC_RX, flow_group_mcast, index,
+                                          TIR, mcast_tirs, mac_mcast, vlan, 'mcast')
+         index = index + 1
+      end
+      return rxtable
+   end
+
+   if usemac then
+      local rxtable = setup_macvlan_rxtable(macvlan_rqlist, usevlan, tdomain, 0)
+      hca:set_flow_table_root(rxtable, NIC_RX)
+   else
+      local rxtable = setup_rss_rxtable(rqlist, tdomain, 0)
+      hca:set_flow_table_root(rxtable, NIC_RX)
+   end
 
    self.shm = {
       mtu    = {counter, mtu},
@@ -926,8 +1009,8 @@ function HCA:create_tir_direct (rqn, transport_domain)
    return self:output(0x08, 23, 0)
 end
 
--- Create a TIR with indirect dispatching (hashing) for a particular
--- combination of IP protocol and TCP/UDP ports.
+-- Create a TIR with indirect dispatching (hashing) based on IPv4/IPv6
+-- addresses and optionally TCP/UDP ports.
 function HCA:create_tir_indirect (rqt, transport_domain, l3_proto, l4_proto)
    local l3_protos = {
       v4 = 0,
@@ -938,7 +1021,6 @@ function HCA:create_tir_indirect (rqt, transport_domain, l3_proto, l4_proto)
       udp = 1
    }
    local l3_proto = assert(l3_protos[l3_proto or 'v4'], "invalid l3 proto")
-   local l4_proto = assert(l4_protos[l4_proto or 'tcp'], "invalid l4 proto")
    self:command("CREATE_TIR", 0x10C, 0x0C)
       :input("opcode",           0x00,        31, 16, 0x900)
       :input("disp_type",        0x20 + 0x04, 31, 28, 1) -- indirect
@@ -950,8 +1032,13 @@ function HCA:create_tir_indirect (rqt, transport_domain, l3_proto, l4_proto)
       :input("rx_hash_fn",       0x20 + 0x24, 31, 28, 2) -- toeplitz
       :input("transport_domain", 0x20 + 0x24, 23,  0, transport_domain)
       :input("l3_prot_type",     0x20 + 0x50, 31, 31, l3_proto)
-      :input("l4_prot_type",     0x20 + 0x50, 30, 30, l4_proto)
-      :input("selected_fields",  0x20 + 0x50, 29,  0, 15) -- SRC/DST/SPORT/DPORT
+   if l4_proto == nil then
+      self:input("selected_fields",  0x20 + 0x50, 29,  0, 3) -- SRC/DST
+   else
+      l4_proto = assert(l4_protos[l4_proto or 'tcp'], "invalid l4 proto")
+      self:input("l4_prot_type",     0x20 + 0x50, 30, 30, l4_proto)
+	 :input("selected_fields",  0x20 + 0x50, 29,  0, 15) -- SRC/DST/SPORT/DPORT
+   end
    -- XXX Is random hash key a good solution?
    for i = 0x28, 0x4C, 4 do
       self:input("toeplitz_key["..((i-0x28)/4).."]", 0x20 + i, 31,  0, math.random(2^32))
@@ -1124,7 +1211,8 @@ function IO:new (conf)
    -- This is also done in Connectex4:new() but might not have
    -- happened yet.
    pci.unbind_device_from_linux(pciaddress)
-   local mmio, fd = pci.map_pci_memory(pciaddress, 0, false)
+   local fd = pci.open_pci_resource_unlocked(pciaddress, 0)
+   local mmio = pci.map_pci_memory(fd)
 
    local online = false      -- True when queue is up and running
    local cxq                 -- shm object containing queue control information
@@ -1342,8 +1430,8 @@ function SQ:new (cxq, mmio)
          wqe.u32[12] = bswap(p.length - ninline)
          wqe.u32[13] = bswap(cxq.rlkey)
          local phy = memory.virtual_to_physical(p.data + ninline)
-         wqe.u32[14] = bswap(tonumber(phy) / 2^32)
-         wqe.u32[15] = bswap(tonumber(phy) % 2^32)
+         wqe.u32[14] = bswap(tonumber(shr(phy, 32)))
+         wqe.u32[15] = bswap(tonumber(band(phy, 0xFFFFFFFF)))
          -- Advance counters
          cxq.next_tx_wqeid = cxq.next_tx_wqeid + 1
          next_slot = slot(cxq.next_tx_wqeid)
@@ -1379,12 +1467,16 @@ end
 NIC_RX = 0 -- Flow table type code for incoming packets
 NIC_TX = 1 -- Flow table type code for outgoing packets
 
--- Create the root flow table.
-function HCA:create_root_flow_table (table_type)
+FLOW_TABLE = 1 -- Flow table entry destination_type for FLOW_TABLE
+TIR = 2 -- Flow table entry destination_type for TIR
+
+-- Create a flow table.
+function HCA:create_flow_table (table_type, level, size)
    self:command("CREATE_FLOW_TABLE", 0x3C, 0x0C)
       :input("opcode",     0x00,        31, 16, 0x930)
       :input("table_type", 0x10,        31, 24, table_type)
-      :input("log_size",   0x18 + 0x00,  7,  0, 10) -- XXX make parameter
+      :input("level",      0x18 + 0x00, 23, 16, level or 0)
+      :input("log_size",   0x18 + 0x00,  7,  0, math.ceil(math.log(size or 1024, 2)))
       :execute()
    local table_id = self:output(0x08, 23, 0)
    return table_id
@@ -1415,7 +1507,7 @@ end
 
 -- Set a "wildcard" flow table entry that does not match on any fields.
 function HCA:set_flow_table_entry_wildcard (table_id, table_type, group_id,
-                                            flow_index, tir)
+                                            flow_index, dest_type, dest_id)
    self:command("SET_FLOW_TABLE_ENTRY", 0x40 + 0x300, 0x0C)
       :input("opcode",       0x00,         31, 16, 0x936)
       :input("opmod",        0x04,         15,  0, 0) -- new entry
@@ -1425,13 +1517,13 @@ function HCA:set_flow_table_entry_wildcard (table_id, table_type, group_id,
       :input("group_id",     0x40 + 0x04,  31,  0, group_id)
       :input("action",       0x40 + 0x0C,  15,  0, 4) -- action = FWD_DST
       :input("dest_list_sz", 0x40 + 0x10,  23,  0, 1) -- destination list size
-      :input("dest_type",    0x40 + 0x300, 31, 24, 2)
-      :input("dest_id",      0x40 + 0x300, 23,  0, tir)
+      :input("dest_type",    0x40 + 0x300, 31, 24, dest_type)
+      :input("dest_id",      0x40 + 0x300, 23,  0, dest_id)
       :execute()
 end
 
--- Create a flow group that inspects the ethertype and protocol fields.
-function HCA:create_flow_group_ip (table_id, table_type, start_ix, end_ix)
+-- Create a flow group that inspects the ethertype and optionally protocol fields.
+function HCA:create_flow_group_ip (table_id, table_type, start_ix, end_ix, l3_only)
    self:command("CREATE_FLOW_GROUP", 0x3FC, 0x0C)
       :input("opcode",                0x00, 31, 16, 0x933)
       :input("table_type",            0x10, 31, 24, table_type)
@@ -1440,16 +1532,18 @@ function HCA:create_flow_group_ip (table_id, table_type, start_ix, end_ix)
       :input("end_ix",                0x24, 31,  0, end_ix) -- (inclusive)
       :input("match_criteria_enable", 0x3C,  7,  0, 1) -- match outer headers
       :input("match_ether",           0x40 + 0x04, 15, 0, 0xFFFF)
-      :input("match_proto",           0x40 + 0x10, 31, 24, 0xFF)
-      :execute()
+   if l3_only == nil then
+      self:input("match_proto",           0x40 + 0x10, 31, 24, 0xFF)
+   end
+   self:execute()
    local group_id = self:output(0x08, 23, 0)
    return group_id
 end
 
 -- Set a flow table entry that matches on the ethertype for IPv4/IPv6
--- as well as TCP/UDP protocol/next-header.
+-- as well as optionally on TCP/UDP protocol/next-header.
 function HCA:set_flow_table_entry_ip (table_id, table_type, group_id,
-                                      flow_index, tir, l3_proto, l4_proto)
+                                      flow_index, dest_type, dest_id, l3_proto, l4_proto)
    local ethertypes = {
       v4 = 0x0800,
       v6 = 0x86dd
@@ -1459,7 +1553,6 @@ function HCA:set_flow_table_entry_ip (table_id, table_type, group_id,
       tcp = 6
    }
    local type = assert(ethertypes[l3_proto], "invalid l3 proto")
-   local proto = assert(l4_protos[l4_proto], "invalid l4 proto")
    self:command("SET_FLOW_TABLE_ENTRY", 0x40 + 0x300, 0x0C)
       :input("opcode",       0x00,         31, 16, 0x936)
       :input("opmod",        0x04,         15,  0, 0) -- new entry
@@ -1470,14 +1563,19 @@ function HCA:set_flow_table_entry_ip (table_id, table_type, group_id,
       :input("action",       0x40 + 0x0C,  15,  0, 4) -- action = FWD_DST
       :input("dest_list_sz", 0x40 + 0x10,  23,  0, 1) -- destination list size
       :input("match_ether",  0x40 + 0x40 + 0x04, 15, 0, type)
-      :input("match_proto",  0x40 + 0x40 + 0x10, 31, 24, proto)
-      :input("dest_type",    0x40 + 0x300, 31, 24, 2) -- TIR
-      :input("dest_id",      0x40 + 0x300, 23,  0, tir)
-      :execute()
+   if l4_proto ~= nil then
+      local proto = assert(l4_protos[l4_proto], "invalid l4 proto")
+      self:input("match_proto",  0x40 + 0x40 + 0x10, 31, 24, proto)
+   end
+   self:input("dest_type",    0x40 + 0x300, 31, 24, dest_type)
+       :input("dest_id",      0x40 + 0x300, 23,  0, dest_id)
+       :execute()
 end
 
 -- Create a DMAC+VLAN flow group.
-function HCA:create_flow_group_macvlan (table_id, table_type, start_ix, end_ix, usevlan)
+function HCA:create_flow_group_macvlan (table_id, table_type, start_ix, end_ix, usevlan, mcast)
+   local dmac = (mcast and ethernet:ptoi("01:00:00:00:00:00"))
+             or ethernet:ptoi("ff:ff:ff:ff:ff:ff")
    self:command("CREATE_FLOW_GROUP", 0x3FC, 0x0C)
       :input("opcode",         0x00,        31, 16, 0x933)
       :input("table_type",     0x10,        31, 24, table_type)
@@ -1485,8 +1583,8 @@ function HCA:create_flow_group_macvlan (table_id, table_type, start_ix, end_ix, 
       :input("start_ix",       0x1C,        31,  0, start_ix)
       :input("end_ix",         0x24,        31,  0, end_ix) -- (inclusive)
       :input("match_criteria", 0x3C,         7,  0, 1) -- match outer headers
-      :input("dmac0",          0x40 + 0x08, 31,  0, 0xFFFFFFFF)
-      :input("dmac1",          0x40 + 0x0C, 31, 16, 0xFFFF)
+      :input("dmac0",          0x40 + 0x08, 31,  0, shr(dmac, 16))
+      :input("dmac1",          0x40 + 0x0C, 31, 16, band(dmac, 0xFFFF))
    if usevlan then 
       self:input("vlanid",         0x40 + 0x0C, 11,  0, 0xFFF) 
    end
@@ -1496,8 +1594,10 @@ function HCA:create_flow_group_macvlan (table_id, table_type, start_ix, end_ix, 
 end
 
 -- Set a DMAC+VLAN flow table rule.
-function HCA:set_flow_table_entry_macvlan (table_id, table_type, group_id, flow_index, tir, dmac, vlanid)
-   self:command("SET_FLOW_TABLE_ENTRY", 0x40 + 0x300, 0x0C)
+function HCA:set_flow_table_entry_macvlan (table_id, table_type, group_id,
+                                           flow_index, dest_type, dest_id, dmac, vlanid, mcast)
+   local dest_ids = (mcast and dest_id) or {dest_id}
+   self:command("SET_FLOW_TABLE_ENTRY", 0x40 + 0x300 + 0x8*(#dest_ids-1), 0x0C)
       :input("opcode",       0x00,         31, 16, 0x936)
       :input("opmod",        0x04,         15,  0, 0) -- new entry
       :input("table_type",   0x10,         31, 24, table_type)
@@ -1505,13 +1605,15 @@ function HCA:set_flow_table_entry_macvlan (table_id, table_type, group_id, flow_
       :input("flow_index",   0x20,         31,  0, flow_index)
       :input("group_id",     0x40 + 0x04,  31,  0, group_id)
       :input("action",       0x40 + 0x0C,  15,  0, 4) -- action = FWD_DST
-      :input("dest_list_sz", 0x40 + 0x10,  23,  0, 1) -- destination list size
-      :input("dmac0",        0x40 + 0x48,  31,  0, math.floor(dmac/2^16))
+      :input("dest_list_sz", 0x40 + 0x10,  23,  0, #dest_ids) -- destination list size
+      :input("dmac0",        0x40 + 0x48,  31,  0, shr(dmac, 16))
       :input("dmac1",        0x40 + 0x4C,  31, 16, band(dmac, 0xFFFF))
       :input("vlan",         0x40 + 0x4C,  11,  0, vlanid or 0)
-      :input("dest_type",    0x40 + 0x300, 31, 24, 2)
-      :input("dest_id",      0x40 + 0x300, 23,  0, tir)
-      :execute()
+      for i, dest_id in ipairs(dest_ids) do
+         self:input("dest_type", 0x40 + 0x300 + 0x8*(i-1), 31, 24, dest_type)
+         self:input("dest_id",   0x40 + 0x300 + 0x8*(i-1), 23,  0, dest_id)
+      end
+      self:execute()
 end
 
 ---------------------------------------------------------------
@@ -2234,7 +2336,7 @@ function selftest ()
             for i = 1, each do
                local p = packet.allocate()
                ffi.fill(p.data, octets, 0)  -- zero packet
-               local header = lib.hexundump("000000000001 000000000002 0800", 16)
+               local header = lib.hexundump("000000000001 000000000002 0800", 14)
                ffi.copy(p.data, header, #header)
                p.data[12] = 0x08 -- ethertype = 0x0800
                p.length = octets
@@ -2257,17 +2359,17 @@ function selftest ()
    print("recv0", tonumber(counter.read(o0.stats.txpackets)), tonumber(counter.read(o0.stats.txbytes)), tonumber(counter.read(o0.stats.txdrop)))
    print("recv1", tonumber(counter.read(o1.stats.txpackets)), tonumber(counter.read(o1.stats.txbytes)), tonumber(counter.read(o1.stats.txdrop)))
 
-   print("payload snippets of first 5 packets")
-   print("port0")
-   for i = 1, 5 do
-      local p = link.receive(o0)
-      if p then print(p.length, lib.hexdump(ffi.string(p.data, math.min(32, p.length)))) end
-   end
-   print("port1")
-   for i = 1, 5 do
-      local p = link.receive(o1)
-      if p then print(p.length, lib.hexdump(ffi.string(p.data, math.min(32, p.length)))) end
-   end
+   -- print("payload snippets of first 5 packets")
+   -- print("port0")
+   -- for i = 1, 5 do
+   --    local p = link.receive(o0)
+   --    if p then print(p.length, lib.hexdump(ffi.string(p.data, math.min(32, p.length)))) end
+   -- end
+   -- print("port1")
+   -- for i = 1, 5 do
+   --    local p = link.receive(o1)
+   --    if p then print(p.length, lib.hexdump(ffi.string(p.data, math.min(32, p.length)))) end
+   -- end
 
    print()
    print(("%-16s  %20s  %20s"):format("hardware counter", pcidev0, pcidev1))
