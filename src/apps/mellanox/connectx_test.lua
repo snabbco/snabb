@@ -89,28 +89,40 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       local ip = require("lib.protocol.ipv4"):new{
          src = lib.random_bytes(4),
          dst = lib.random_bytes(4),
-         ttl = 64,
-         protocol = 17 -- UDP
+         ttl = 64
       }
+      if r < 0.50 then              -- 50% of packets are UDP (have L4 header)
+         ip:protocol(17) -- UDP
+      else                          -- rest have random payloads
+         ip:protocol(253)
+      end
       ip:copy(p.data+ip_ofs, 'relocate')
       ip:total_length(p.length-ip_ofs)
       ip:checksum()
 
-      -- UDP
-      local udp = require("lib.protocol.udp"):new{
-         src_port = math.random(30000),
-         dst_port = math.random(30000)
-      }
-      udp:copy(p.data+ip_ofs+ip:sizeof(), 'relocate')
-      udp:length(p.length-(ip_ofs+ip:sizeof()))
+      if ip:protocol() == 17 then
+         -- UDP
+         local udp = require("lib.protocol.udp"):new{
+            src_port = math.random(30000),
+            dst_port = math.random(30000)
+         }
+         udp:copy(p.data+ip_ofs+ip:sizeof(), 'relocate')
+         udp:length(p.length-(ip_ofs+ip:sizeof()))
 
-      -- Random payload
-      for i = ip_ofs+ip:sizeof()+udp:sizeof(), p.length-1 do
-         p.data[i] = math.random(256) - 1
+         -- Random payload
+         for i = ip_ofs+ip:sizeof()+udp:sizeof(), p.length-1 do
+            p.data[i] = math.random(256) - 1
+         end
+
+         -- UDP checksum
+         udp:checksum(p.data, p.length-(ip_ofs+ip:sizeof()+udp:sizeof()), ip)
+      
+      else
+         -- Random payload
+         for i = ip_ofs+ip:sizeof(), p.length-1 do
+            p.data[i] = math.random(256) - 1
+         end
       end
-
-      -- UDP checksum
-      udp:checksum(p.data, p.length-(ip_ofs+ip:sizeof()+udp:sizeof()), ip)
 
       --print(lib.hexdump(ffi.string(p.data, 32)))
    end
