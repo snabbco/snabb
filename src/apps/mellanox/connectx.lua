@@ -362,20 +362,23 @@ function ConnectX:new (conf)
 
    local function setup_rss_rxtable (rqlist, tdomain, level)
       -- Set up RSS accross all queues. Hashing is only performed for
-      -- IPv4/IPv6 and TCP/UDP, i.e. non-IP packets as well as non
-      -- TCP/UDP packets are mapped to Queue #1.  Hashing is done by
-      -- the TIR for a specific combination of protocols, hence
-      -- separate flows are needed to provide each TIR with the
-      -- appropriate types of packets.
+      -- IPv4/IPv6 with or without TCP/UDP. All non-IP packets are
+      -- mapped to Queue #1.  Hashing is done by the TIR for a
+      -- specific combination of header values, hence separate flows
+      -- are needed to provide each TIR with the appropriate types of
+      -- packets.
       local l3_protos = { 'v4', 'v6' }
       local l4_protos = { 'udp', 'tcp' }
-      local rxtable = hca:create_flow_table(NIC_RX, level,
-                                            #l3_protos * #l4_protos + 1)
+      local rxtable = hca:create_flow_table(
+         -- #rules = #l3*l4 rules + #l3 rules + 1 wildcard rule
+         NIC_RX, level, #l3_protos * #l4_protos + #l3_protos + 1
+      )
       local rqt = hca:create_rqt(rqlist)
-      local flow_group_ip =
-         hca:create_flow_group_ip(rxtable, NIC_RX, 0,
-                                  #l3_protos * #l4_protos - 1)
       local index = 0
+      -- Match TCP/UDP packets
+      local flow_group_ip = hca:create_flow_group_ip(
+         rxtable, NIC_RX, index, index + #l3_protos * #l4_protos - 1
+      )
       for _, l3_proto in ipairs(l3_protos) do
          for _, l4_proto in ipairs(l4_protos) do
             local tir = hca:create_tir_indirect(rqt, tdomain,
@@ -390,7 +393,17 @@ function ConnectX:new (conf)
             index = index + 1
          end
       end
-
+      -- Fall-through for non-TCP/UDP IP packets
+      local flow_group_ip_l3 = hca:create_flow_group_ip(
+         rxtable, NIC_RX, index, index + #l3_protos - 1, "l3-only"
+      )
+      for _, l3_proto in ipairs(l3_protos) do
+         local tir = hca:create_tir_indirect(rqt, tdomain, l3_proto, nil)
+         hca:set_flow_table_entry_ip(rxtable, NIC_RX, flow_group_ip_l3,
+                                     index, TIR, tir, l3_proto, nil)
+         index = index + 1
+      end
+      -- Fall-through for non-IP packets
       local flow_group_wildcard =
          hca:create_flow_group_wildcard(rxtable, NIC_RX, index, index)
       local tir_q1 = hca:create_tir_direct(rqlist[1], tdomain)
@@ -417,12 +430,14 @@ function ConnectX:new (conf)
             macvlan_size = macvlan_size + 1
          end
       end
-      local rxtable = hca:create_flow_table(NIC_RX, level, macvlan_size+mcast_size)
+      local rxtable = hca:create_flow_table(
+         NIC_RX, level, macvlan_size + mcast_size
+      )
       local index = 0
       -- Unicast flow table entries
-      local idx0, idx1 = 0, macvlan_size-1
-      local flow_group_macvlan =
-         hca:create_flow_group_macvlan(rxtable, NIC_RX, idx0, idx1, usevlan)
+      local flow_group_macvlan = hca:create_flow_group_macvlan(
+         rxtable, NIC_RX, index, index + macvlan_size - 1, usevlan
+      )
       for vlan in pairs(macvlan_rqlist) do
          for mac, rqlist in pairs(macvlan_rqlist[vlan]) do
             local tid = setup_rss_rxtable(rqlist, tdomain, 1)
@@ -432,9 +447,9 @@ function ConnectX:new (conf)
          end
       end
       -- Multicast flow table entries
-      local idx0, idx1 = idx0+macvlan_size, idx1+mcast_size
-      local flow_group_mcast =
-         hca:create_flow_group_macvlan(rxtable, NIC_RX, idx0, idx1, usevlan, 'mcast')
+      local flow_group_mcast = hca:create_flow_group_macvlan(
+         rxtable, NIC_RX, index, index + mcast_size - 1, usevlan, 'mcast'
+      )
       local mac_mcast = ethernet:ptoi("01:00:00:00:00:00")
       for vlan in pairs(macvlan_rqlist) do
          local mcast_tirs = {}
@@ -994,8 +1009,8 @@ function HCA:create_tir_direct (rqn, transport_domain)
    return self:output(0x08, 23, 0)
 end
 
--- Create a TIR with indirect dispatching (hashing) for a particular
--- combination of IP protocol and TCP/UDP ports.
+-- Create a TIR with indirect dispatching (hashing) based on IPv4/IPv6
+-- addresses and optionally TCP/UDP ports.
 function HCA:create_tir_indirect (rqt, transport_domain, l3_proto, l4_proto)
    local l3_protos = {
       v4 = 0,
@@ -1006,7 +1021,6 @@ function HCA:create_tir_indirect (rqt, transport_domain, l3_proto, l4_proto)
       udp = 1
    }
    local l3_proto = assert(l3_protos[l3_proto or 'v4'], "invalid l3 proto")
-   local l4_proto = assert(l4_protos[l4_proto or 'tcp'], "invalid l4 proto")
    self:command("CREATE_TIR", 0x10C, 0x0C)
       :input("opcode",           0x00,        31, 16, 0x900)
       :input("disp_type",        0x20 + 0x04, 31, 28, 1) -- indirect
@@ -1018,8 +1032,13 @@ function HCA:create_tir_indirect (rqt, transport_domain, l3_proto, l4_proto)
       :input("rx_hash_fn",       0x20 + 0x24, 31, 28, 2) -- toeplitz
       :input("transport_domain", 0x20 + 0x24, 23,  0, transport_domain)
       :input("l3_prot_type",     0x20 + 0x50, 31, 31, l3_proto)
-      :input("l4_prot_type",     0x20 + 0x50, 30, 30, l4_proto)
-      :input("selected_fields",  0x20 + 0x50, 29,  0, 15) -- SRC/DST/SPORT/DPORT
+   if l4_proto == nil then
+      self:input("selected_fields",  0x20 + 0x50, 29,  0, 3) -- SRC/DST
+   else
+      l4_proto = assert(l4_protos[l4_proto or 'tcp'], "invalid l4 proto")
+      self:input("l4_prot_type",     0x20 + 0x50, 30, 30, l4_proto)
+	 :input("selected_fields",  0x20 + 0x50, 29,  0, 15) -- SRC/DST/SPORT/DPORT
+   end
    -- XXX Is random hash key a good solution?
    for i = 0x28, 0x4C, 4 do
       self:input("toeplitz_key["..((i-0x28)/4).."]", 0x20 + i, 31,  0, math.random(2^32))
@@ -1503,8 +1522,8 @@ function HCA:set_flow_table_entry_wildcard (table_id, table_type, group_id,
       :execute()
 end
 
--- Create a flow group that inspects the ethertype and protocol fields.
-function HCA:create_flow_group_ip (table_id, table_type, start_ix, end_ix)
+-- Create a flow group that inspects the ethertype and optionally protocol fields.
+function HCA:create_flow_group_ip (table_id, table_type, start_ix, end_ix, l3_only)
    self:command("CREATE_FLOW_GROUP", 0x3FC, 0x0C)
       :input("opcode",                0x00, 31, 16, 0x933)
       :input("table_type",            0x10, 31, 24, table_type)
@@ -1513,14 +1532,16 @@ function HCA:create_flow_group_ip (table_id, table_type, start_ix, end_ix)
       :input("end_ix",                0x24, 31,  0, end_ix) -- (inclusive)
       :input("match_criteria_enable", 0x3C,  7,  0, 1) -- match outer headers
       :input("match_ether",           0x40 + 0x04, 15, 0, 0xFFFF)
-      :input("match_proto",           0x40 + 0x10, 31, 24, 0xFF)
-      :execute()
+   if l3_only == nil then
+      self:input("match_proto",           0x40 + 0x10, 31, 24, 0xFF)
+   end
+   self:execute()
    local group_id = self:output(0x08, 23, 0)
    return group_id
 end
 
 -- Set a flow table entry that matches on the ethertype for IPv4/IPv6
--- as well as TCP/UDP protocol/next-header.
+-- as well as optionally on TCP/UDP protocol/next-header.
 function HCA:set_flow_table_entry_ip (table_id, table_type, group_id,
                                       flow_index, dest_type, dest_id, l3_proto, l4_proto)
    local ethertypes = {
@@ -1532,7 +1553,6 @@ function HCA:set_flow_table_entry_ip (table_id, table_type, group_id,
       tcp = 6
    }
    local type = assert(ethertypes[l3_proto], "invalid l3 proto")
-   local proto = assert(l4_protos[l4_proto], "invalid l4 proto")
    self:command("SET_FLOW_TABLE_ENTRY", 0x40 + 0x300, 0x0C)
       :input("opcode",       0x00,         31, 16, 0x936)
       :input("opmod",        0x04,         15,  0, 0) -- new entry
@@ -1543,10 +1563,13 @@ function HCA:set_flow_table_entry_ip (table_id, table_type, group_id,
       :input("action",       0x40 + 0x0C,  15,  0, 4) -- action = FWD_DST
       :input("dest_list_sz", 0x40 + 0x10,  23,  0, 1) -- destination list size
       :input("match_ether",  0x40 + 0x40 + 0x04, 15, 0, type)
-      :input("match_proto",  0x40 + 0x40 + 0x10, 31, 24, proto)
-      :input("dest_type",    0x40 + 0x300, 31, 24, dest_type)
-      :input("dest_id",      0x40 + 0x300, 23,  0, dest_id)
-      :execute()
+   if l4_proto ~= nil then
+      local proto = assert(l4_protos[l4_proto], "invalid l4 proto")
+      self:input("match_proto",  0x40 + 0x40 + 0x10, 31, 24, proto)
+   end
+   self:input("dest_type",    0x40 + 0x300, 31, 24, dest_type)
+       :input("dest_id",      0x40 + 0x300, 23,  0, dest_id)
+       :execute()
 end
 
 -- Create a DMAC+VLAN flow group.
