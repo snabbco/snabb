@@ -171,16 +171,16 @@ local DEAD = 4
 function shutdown(pid)
    for _, pciaddr in ipairs(shm.children("/"..pid.."/mellanox")) do
       for _, queue in ipairs(shm.children("/"..pid.."/mellanox/"..pciaddr)) do
-	 local backlink = "/"..pid.."/mellanox/"..pciaddr.."/"..queue
-	 local shm_name = "/"..pid.."/group/pci/"..pciaddr.."/"..queue
-	 if shm.exists(shm_name) then
-	    local cxq = shm.open(shm_name, cxq_t)
-	    assert(sync.cas(cxq.state, IDLE, FREE) or
-		      sync.cas(cxq.state, BUSY, FREE),
-		   "ConnectX: failed to free "..shm_name..
-		      " during shutdown")
-	 end
-	 shm.unlink(backlink)
+         local backlink = "/"..pid.."/mellanox/"..pciaddr.."/"..queue
+         local shm_name = "/"..pid.."/group/pci/"..pciaddr.."/"..queue
+         if shm.exists(shm_name) then
+            local cxq = shm.open(shm_name, cxq_t)
+            assert(sync.cas(cxq.state, IDLE, FREE) or
+                      sync.cas(cxq.state, BUSY, FREE),
+                   "ConnectX: failed to free "..shm_name..
+                      " during shutdown")
+         end
+         shm.unlink(backlink)
       end
    end
 end
@@ -284,13 +284,13 @@ function ConnectX:new (conf)
       local cxq = shm.create("group/pci/"..pciaddress.."/"..queue.id, cxq_t)
 
       local function check_qsize (type, size)
-	 assert(check_pow2(size),
-		string.format("%s: %s queue size must be a power of 2: %d",
-			      conf.pciaddress, type, size))
-	 assert(log2size(size) <= max_cap['log_max_wq_sz'],
-		string.format("%s: %s queue size too big: requested %d, allowed %d",
-			      conf.pciaddress, type, size,
-			      math.pow(2, max_cap['log_max_wq_sz'])))
+         assert(check_pow2(size),
+                string.format("%s: %s queue size must be a power of 2: %d",
+                              conf.pciaddress, type, size))
+         assert(log2size(size) <= max_cap['log_max_wq_sz'],
+                string.format("%s: %s queue size too big: requested %d, allowed %d",
+                              conf.pciaddress, type, size,
+                              math.pow(2, max_cap['log_max_wq_sz'])))
       end
 
       check_qsize("Send", sendq_size)
@@ -309,7 +309,7 @@ function ConnectX:new (conf)
       local rq_stride = ffi.sizeof(ffi.typeof(cxq.rwq[0]))
       local sq_stride = ffi.sizeof(ffi.typeof(cxq.swq[0]))
       local workqueues = memory.dma_alloc(sq_stride * sendq_size +
-					     rq_stride *recvq_size, 4096)
+                                             rq_stride *recvq_size, 4096)
       cxq.rwq = cast(ffi.typeof(cxq.rwq), workqueues)
       cxq.swq = cast(ffi.typeof(cxq.swq), workqueues + rq_stride * recvq_size)
       -- Create the queue objects
@@ -321,9 +321,9 @@ function ConnectX:new (conf)
       end
       -- XXX order check
       cxq.sqn = hca:create_sq(scqn, pd, sq_stride, sendq_size,
-			      cxq.doorbell, cxq.swq, uar, tis)
+                              cxq.doorbell, cxq.swq, uar, tis)
       cxq.rqn = hca:create_rq(rcqn, pd, rq_stride, recvq_size,
-			      cxq.doorbell, cxq.rwq,
+                              cxq.doorbell, cxq.rwq,
                               counter_set_id)
       hca:modify_sq(cxq.sqn, 0, 1) -- RESET -> READY
       hca:modify_rq(cxq.rqn, 0, 1) -- RESET -> READY
@@ -1037,7 +1037,7 @@ function HCA:create_tir_indirect (rqt, transport_domain, l3_proto, l4_proto)
    else
       l4_proto = assert(l4_protos[l4_proto or 'tcp'], "invalid l4 proto")
       self:input("l4_prot_type",     0x20 + 0x50, 30, 30, l4_proto)
-	 :input("selected_fields",  0x20 + 0x50, 29,  0, 15) -- SRC/DST/SPORT/DPORT
+         :input("selected_fields",  0x20 + 0x50, 29,  0, 15) -- SRC/DST/SPORT/DPORT
    end
    -- XXX Is random hash key a good solution?
    for i = 0x28, 0x4C, 4 do
@@ -1233,7 +1233,7 @@ function IO:new (conf)
       local shmpath = "group/pci/"..pciaddress.."/"..queue
       self.backlink = "mellanox/"..pciaddress.."/"..queue
       if shm.exists(shmpath) then
-	 shm.alias(self.backlink, shmpath)
+         shm.alias(self.backlink, shmpath)
          cxq = shm.open(shmpath, cxq_t)
          if sync.cas(cxq.state, FREE, IDLE) then
             sq = SQ:new(cxq, mmio)
@@ -2396,4 +2396,3 @@ function selftest ()
       error("selftest failed: unexpected counter values")
    end
 end
-
