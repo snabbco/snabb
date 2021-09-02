@@ -701,18 +701,7 @@ local function compute_worker_configs(conf)
       for id, _ in pairs(queues.queue) do
          local worker_id = string.format('%s/%s', device, id)
          local worker_config = make_copy()
-         local instance = worker_config.softwire_config.instance
-         for other_device, queues in pairs(conf.softwire_config.instance) do
-            if other_device ~= device then
-               instance[other_device] = nil
-            else
-               for other_id, _ in pairs(queues.queue) do
-                  if other_id ~= id then
-                     instance[device].queue[other_id] = nil
-                  end
-               end
-            end
-         end
+         worker_config.worker_config = {device=device, queue_id=id}
          ret[worker_id] = worker_config
       end
    end

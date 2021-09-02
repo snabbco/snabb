@@ -886,5 +886,18 @@ module snabb-softwire-v2 {
     }
   }
 
+  container worker-config {
+    description
+    "Worker process configuration state. The contained leaves are used only
+     internally. Setting them has no effect.";
+     
+    leaf device {
+      type string;
+    }
+    leaf queue-id {
+      type uint8;
+    }
+  }
+
   uses state-counters;
 }

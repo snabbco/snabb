@@ -21,18 +21,9 @@ local ntohs = lib.ntohs
 
 -- Return device PCI address, queue ID, and queue configuration.
 function parse_instance(conf)
-   local device, instance
-   for k, v in pairs(conf.softwire_config.instance) do
-      assert(device == nil, "configuration has more than one instance")
-      device, instance = k, v
-   end
-   assert(device ~= nil, "configuration has no instance")
-   local id, queue
-   for k, v in pairs(instance.queue) do
-      assert(id == nil, "configuration has more than one RSS queue")
-      id, queue = k, v
-   end
-   assert(id ~= nil, "configuration has no RSS queues")
+   local device = conf.worker_config.device
+   local id = conf.worker_config.queue_id
+   local queue = conf.softwire_config.instance[device].queue[id]
    return device, id, queue
 end
 
