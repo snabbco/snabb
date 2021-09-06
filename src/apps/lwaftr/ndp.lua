@@ -220,18 +220,17 @@ local function make_na_packet(src_mac, dst_mac, src_ip, dst_ip, is_router)
 end
 
 -- Solicit a neighbor's address.
-local function make_ns_packet(src_mac, src_ip, dst_ip)
+local function make_ns_packet(src_mac, src_ip, dst_mac, dst_ip, target_ip)
    local message = ns_header_t()
    message.flags = 0
-   message.target_ip = dst_ip
+   message.target_ip = target_ip
 
    local option = ether_option_header_t()
    option.header.type = option_source_link_layer_address
    option.header.length = 1 -- One 8-byte unit.
    option.addr = src_mac
 
-   local broadcast_mac = ethernet:pton("ff:ff:ff:ff:ff:ff")
-   return make_ndp_packet(src_mac, broadcast_mac, src_ip, dst_ip, icmpv6_ns,
+   return make_ndp_packet(src_mac, dst_mac, src_ip, dst_ip, icmpv6_ns,
                           message, option)
 end
 
@@ -298,6 +297,21 @@ function NDP:new(conf)
       assert(o.next_ip, 'NDP needs next-hop IPv6 address to learn next-hop MAC')
       self.ns_interval = 3 -- Send a new NS every three seconds.
    end
+   if o.next_ip then
+      -- Construct Solicited-Node multicast address
+      -- https://datatracker.ietf.org/doc/html/rfc4861#section-2.3
+      o.solicited_node_mcast = ipv6:pton("ff02::1:ff00:0") -- /104
+      o.solicited_node_mcast[13] = o.next_ip[13]
+      o.solicited_node_mcast[14] = o.next_ip[14]
+      o.solicited_node_mcast[15] = o.next_ip[15]
+      -- Construct Ethernet multicast address
+      -- https://datatracker.ietf.org/doc/html/rfc2464#section-7
+      o.mac_mcast = ethernet:pton("33:33:00:00:00:00")
+      o.mac_mcast[2] = o.solicited_node_mcast[12]
+      o.mac_mcast[3] = o.solicited_node_mcast[13]
+      o.mac_mcast[4] = o.solicited_node_mcast[14]
+      o.mac_mcast[5] = o.solicited_node_mcast[15]
+   end
    return setmetatable(o, {__index=NDP})
 end
 
@@ -314,7 +328,9 @@ function NDP:maybe_send_ns_request (output)
    if self.next_ns_time <= engine.now() then
       self:ndp_resolving(self.next_ip)
       transmit(self.output.south,
-               make_ns_packet(self.self_mac, self.self_ip, self.next_ip))
+               make_ns_packet(self.self_mac, self.self_ip,
+                              self.mac_mcast, self.solicited_node_mcast,
+                              self.next_ip))
       self.next_ns_time = engine.now() + self.ns_interval
    end
 end
@@ -500,7 +516,9 @@ function selftest()
    config.link(c, "sink2.tx -> nd2.north")
    config.link(c, "nd2.north -> sink2.rx")
    engine.configure(c)
-   engine.main({ duration = 0.1 })
+   local breaths = counter.read(engine.breaths)
+   local function done() return counter.read(engine.breaths)-breaths > 1 end
+   engine.main({ done = done })
 
    local function mac_eq(a, b) return ffi.C.memcmp(a, b, 6) == 0 end
    local nd1, nd2 = engine.app_table.nd1, engine.app_table.nd2

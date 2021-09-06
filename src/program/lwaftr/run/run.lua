@@ -56,6 +56,10 @@ function parse_args(args)
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
    function handlers.t (arg) opts.trace = assert(arg) end
    function handlers.i () opts.virtio_net = true end
+   handlers['xdp'] = function(arg)
+      opts['xdp'] = true
+      scheduling.enable_xdp = {} -- XXX - maybe configure num_chunks here?
+   end
    function handlers.D (arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")
       assert(opts.duration >= 0, "duration can't be negative")
@@ -105,6 +109,7 @@ function parse_args(args)
    lib.dogetopt(args, handlers, "b:c:vD:yhir:n:t:",
      { conf = "c", name = "n", cpu = 1, v4 = 1, v6 = 1,
        ["on-a-stick"] = 1, virtio = "i", ["ring-buffer-size"] = "r",
+       ["xdp"] = 0,
        ["real-time"] = 0, mirror = 1, ["ingress-drop-monitor"] = 1,
        verbose = "v", trace = "t", ["bench-file"] = "b", ["profile"] = 0,
        duration = "D", hydra = "y", help = "h" })
@@ -147,10 +152,21 @@ function run(args)
    -- anything defined in the config.
    if opts.name then conf.softwire_config.name = opts.name end
 
+   -- If we’re using XDP, setup interfaces here
+   if opts.xdp then
+      setup.xdp_ifsetup(conf)
+   end
+
    local function setup_fn(graph, lwconfig)
       -- If --virtio has been specified, always use this.
       if opts.virtio_net then
          return setup_fn(graph, lwconfig, 'inetNic', 'b4sideNic')
+      end
+
+      -- If --xdp has been specified, always use this.
+      if opts.xdp then
+         return setup.load_xdp(graph, lwconfig, 'inetNic', 'b4sideNic',
+                               opts.ring_buffer_size)
       end
 
       -- If instance has external-interface.device configure as bump-in-the-wire

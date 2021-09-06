@@ -29,6 +29,8 @@ Optional arguments:
        -i, --virtio             Interpret PCI addresses as referring to
                                 virtio-net interfaces instead of
                                 auto-detecting the appropriate driver.
+       --xdp                    Use Linux interfaces via XDP.
+                                (Incompatible with --on-a-stick.)
        -r SIZE, --ring-buffer-size SIZE
                                 Set NIC receive buffer size.  The
                                 default is driver-dependent.  See

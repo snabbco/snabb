@@ -158,12 +158,20 @@ local function assert_irqbalanced_disabled (warn)
    end
 end
 
+local function read_cpu_performance_governor (cpu)
+   local path = '/sys/devices/system/cpu/cpu'..cpu..'/cpufreq/scaling_governor'
+   local f = io.open(path)
+   if not f then return "unknown" end
+   local gov = f:read()
+   f:close()
+   return gov
+end
+
 local function check_cpu_performance_tuning (cpu, strict)
    local warn = warn
    if strict then warn = die end
    assert_irqbalanced_disabled(warn)
-   local path = '/sys/devices/system/cpu/cpu'..cpu..'/cpufreq/scaling_governor'
-   local gov = assert(io.open(path)):read()
+   local gov = read_cpu_performance_governor(cpu)
    if not gov:match('performance') then
       warn('Expected performance scaling governor for CPU %s, but got "%s"',
            cpu, gov)

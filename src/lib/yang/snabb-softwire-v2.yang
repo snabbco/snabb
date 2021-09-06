@@ -11,6 +11,11 @@ module snabb-softwire-v2 {
   description
    "Configuration for the Snabb Switch lwAFTR.";
 
+  revision 2021-07-13 {
+    description
+      "Add default value for error-rate-limiting/packets.";
+  }
+
   revision 2019-09-17 {
     description
       "Add discontinuity time to softwire-state.";
@@ -508,6 +513,7 @@ module snabb-softwire-v2 {
       container error-rate-limiting {
         leaf packets {
           type uint32;
+          default 200;
           description
            "The number of ICMP error messages which can be sent within
             the specified time period.";
@@ -577,7 +583,7 @@ module snabb-softwire-v2 {
         key "id";
 
         leaf id {
-          type uint8 { range 0..1; }
+          type uint8;
           description
           "RSS queue on which to attach.  Traffic will be partitioned
            evenly between instances servicing queues on the same
@@ -585,12 +591,7 @@ module snabb-softwire-v2 {
            is a function of the TCP or UDP source and destination ports
            (if any) and the source and destination IPv4 or IPv6
            addresses.  Fragmented packets will be delivered to the
-           lowest-numbered queue.
-
-           Note that currently the lwAFTR is restricted to running at
-           most 2 RSS workers per device.  This limitation may be lifted
-           to 4 soon.  Raising it farther is possible but needs changes
-           to how the lwAFTR uses its PCI devices.";
+           lowest-numbered queue.";
         }
 
         container external-interface {
@@ -672,12 +673,12 @@ module snabb-softwire-v2 {
                 leaf ip {
                   type inet:ipv6-address;
                   description
-                  "IPv4 address of the next hop for the internet-facing NIC.
-                    The lwAFTR will resolve this to a MAC address using ARP.";
+                  "IPv6 address of the next hop for the internal-facing NIC.
+                    The lwAFTR will resolve this to a MAC address using NDP.";
                 }
                 leaf resolved-mac {
                   config false;
-                  description "Resolved next-hop mac address found by ARP.";
+                  description "Resolved next-hop mac address found by NDP.";
                   type yang:mac-address;
                 }
               }
@@ -686,7 +687,7 @@ module snabb-softwire-v2 {
                   type yang:mac-address;
                   description
                   "Statically configured MAC address of the next hop for the
-                    internet-facing NIC.";
+                    internal-facing NIC.";
                 }
               }
             }
