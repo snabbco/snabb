@@ -96,7 +96,43 @@ while true do
 	engine.main({ duration = 1, no_report = true })
 end
 engine.report_links()
+engine.report_apps()
 assert(rx("nic1.output", "sink.input") >= tosend,
        "packets received do not match packets sent")
+
+-- Test RSS queues
+local nqueues = 4
+local c = config.new()
+local sizes = {64,128,192,256,384,512,1024,1500}
+local packets = {}
+for _=1,1000 do packets[#packets+1] = sizes[(#packets%#sizes)+1] end
+config.app(c, "synth0", synth.Synth, {
+       sizes=packets,
+       src=src,
+       dst=dst,
+       random_payload=true
+})
+config.app(c, "synth1", synth.Synth, {
+       sizes=packets,
+       src=dst,
+       dst=src,
+       random_payload=true
+})
+config.app(c, "nic0", intel_avf.Intel_avf, { pciaddr = vf0, nqueues = nqueues })
+config.app(c, "nic1", intel_avf.Intel_avf, { pciaddr = vf1, nqueues = nqueues })
+config.app(c, "sink", basic.Sink)
+for qno=0, nqueues-1 do
+       config.app(c, "nic0_io"..qno, intel_avf.IO, {pciaddr = vf0, queue = qno})
+       config.link(c, "synth0.output"..qno.. " -> nic0_io"..qno..".input")
+       config.link(c, "nic0_io"..qno..".output -> sink.input_nic0_io"..qno)
+       config.app(c, "nic1_io"..qno, intel_avf.IO, {pciaddr = vf1, queue = qno})
+       config.link(c, "synth1.output"..qno.. " -> nic1_io"..qno..".input")
+       config.link(c, "nic1_io"..qno..".output -> sink.input_nic1_io"..qno)
+end
+engine.configure(c)
+engine.main({ duration = 1, no_report = true })
+engine.report_links()
+engine.report_apps()
+
 engine.stop()
 main.exit(0)
