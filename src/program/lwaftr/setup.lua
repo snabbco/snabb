@@ -222,6 +222,7 @@ end
 
 local intel_mp = require("apps.intel_mp.intel_mp")
 local connectx = require("apps.mellanox.connectx")
+local intel_avf = require("apps.intel_avf.intel_avf")
 
 function config_intel_mp(c, name, opt)
    config.app(c, name, intel_mp.driver, {
@@ -281,9 +282,35 @@ function config_connectx(c, name, opt, lwconfig)
    return input, output
 end
 
+function config_intel_avf(c, name, opt, lwconfig)
+   local nqueues = 0
+   local min_queue
+   for device, instance in pairs(lwconfig.softwire_config.instance) do
+      for id, queue in pairs(instance.queue) do
+         if device == opt.pci or queue.external_interface.device == opt.pci then
+            nqueues = nqueues + 1
+            min_queue = (not min_queue and id) or math.min(id, min_queue)
+         end
+      end
+   end
+   if opt.queue == min_queue then
+      config.app(c, "IntelAVF_"..opt.pci:gsub("[%.:]", "_"), intel_avf.Intel_avf, {
+         pciaddr = opt.pci,
+         vlan = opt.vlan,
+         nqueues = nqueues
+      })
+   end
+   config.app(c, name, intel_avf.IO, {
+      pciaddr = opt.pci,
+      queue = opt.queue
+   })
+   return name..'.input', name..'.output'
+end
+
 function config_nic(c, name, driver, opt, lwconfig)
    local config_fn = { [intel_mp.driver] = config_intel_mp,
-                       [connectx.driver] = config_connectx }
+                       [connectx.driver] = config_connectx,
+                       [intel_avf.driver] = config_intel_avf }
    local f = assert(config_fn[driver], "Unsupported device: "..opt.pci)
    return f(c, name, opt, lwconfig)
 end
