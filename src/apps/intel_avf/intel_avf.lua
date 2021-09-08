@@ -12,7 +12,7 @@ local macaddress  = require("lib.macaddress")
 local pci         = require("lib.hardware.pci")
 local register    = require("lib.hardware.register")
 local tophysical  = core.memory.virtual_to_physical
-local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
+local band, lshift, rshift, bor = bit.band, bit.lshift, bit.rshift, bit.bor
 local transmit, receive, empty = link.transmit, link.receive, link.empty
 local counter     = require("core.counter")
 local shm         = require("core.shm")
@@ -26,6 +26,7 @@ Intel_avf = {
    config = {
       pciaddr = { required=true },
       nqueues = {},
+      vlan = {},
       ring_buffer_size = {default=2048}
    }
 }
@@ -251,6 +252,15 @@ local virtchnl_rss_hena_t = ffi.typeof([[
 ]])
 local virtchnl_rss_hena_ptr_t = ffi.typeof('$*', virtchnl_rss_hena_t)
 
+local virtchnl_vlan_filter_list_t = ffi.typeof([[
+   struct {
+      uint16_t vsi_id;
+      uint16_t num_elements;
+      uint16_t vlan_id[1];
+   } __attribute__((packed))
+]])
+local virtchnl_vlan_filter_list_ptr_t = ffi.typeof('$*', virtchnl_vlan_filter_list_t)
+
 local mbox_q_t = ffi.typeof([[
       struct {
          uint8_t flags0;
@@ -340,6 +350,7 @@ local cxq_t = ffi.typeof([[
 
       // configuration information:
       uint32_t qno;       // queue number
+      uint16_t vlan;      // 802.1Q vlan tag
       uint32_t ring_size; // size of rx/tx rings
 
       // Transmit state
@@ -384,6 +395,7 @@ function Intel_avf:init_cxq (qno)
    -- Create a shared memory object for controlling the queue pair
    local cxq = shm.create("group/pci/"..self.pciaddress.."/"..qno, cxq_t)
    cxq.qno = qno
+   cxq.vlan = self.vlan or 0
    cxq.ring_size = self.ring_buffer_size
    self:init_tx_q(cxq)
    self:init_rx_q(cxq)
@@ -658,18 +670,19 @@ end
 function IO:transmit (li)
    if li == nil then return end
 
-   local RS_EOP = bits({ EOP = 4, RS = 5 })
+   local cxq = self.cxq
+   local RS_EOP = bor(bits({ EOP = 4, RS = 5, RSV = 6 }), (cxq.vlan>0 and bits{ IL2TAG1 = 7}) or 0)
+   local L2TAG1 = lshift(0ULL+cxq.vlan, 48)
    local SIZE_SHIFT = 34
 
    self:reclaim_txdesc()
-   local cxq = self.cxq
    while not empty(li) and cxq.tx_desc_free > 0 do
       local p = receive(li)
       -- NB: need to extend size for 4 byte CRC (not clear from the spec.)
       local size = lshift(4ULL+p.length, SIZE_SHIFT)
       cxq.txdesc[ cxq.tx_next ].address = tophysical(p.data)
       cxq.txqueue[ cxq.tx_next ] = p
-      cxq.txdesc[ cxq.tx_next ].cmd_type_offset_bsz = RS_EOP + size
+      cxq.txdesc[ cxq.tx_next ].cmd_type_offset_bsz = bor(RS_EOP, size, L2TAG1)
       cxq.tx_next = band(cxq.tx_next+1, cxq.ring_size-1)
       cxq.tx_desc_free = cxq.tx_desc_free - 1
    end
@@ -744,7 +757,7 @@ function Intel_avf:mbox_setup()
          VIRTCHNL_OP_DISABLE_QUEUES = 9,
          -- VIRTCHNL_OP_ADD_ETH_ADDR = 10,
          -- VIRTCHNL_OP_DEL_ETH_ADDR = 11,
-         -- VIRTCHNL_OP_ADD_VLAN = 12,
+         VIRTCHNL_OP_ADD_VLAN = 12,
          -- VIRTCHNL_OP_DEL_VLAN = 13,
          -- VIRTCHNL_OP_CONFIG_PROMISCUOUS_MODE = 14,
          VIRTCHNL_OP_GET_STATS = 15,
@@ -841,7 +854,7 @@ function Intel_avf:mbox_sr_caps()
    -- dpdk/drivers/net/avf/avf_vchnl.c
    local supported_caps = bits({
       VIRTCHNL_VF_OFFLOAD_L2 = 0,
-      VIRTCHNL_VF_OFFLOAD_VLAN = 16,
+      VIRTCHNL_VF_OFFLOAD_VLAN = 16, -- NB: Could leave this bit off and let PF handle VLANs
       VIRTCHNL_VF_OFFLOAD_RX_POLLING = 17,
       VIRTCHNL_VF_OFFLOAD_RSS_PF = 19
    })
@@ -925,6 +938,7 @@ function Intel_avf:new(conf)
    local self = {
       pciaddress = pci.qualified(conf.pciaddr),
       path = pci.path(conf.pciaddr),
+      vlan = conf.vlan,
       r = {},
       ring_buffer_size = conf.ring_buffer_size,
       shm = {
@@ -970,7 +984,10 @@ function Intel_avf:new(conf)
    self:mbox_setup()
    self:mbox_sr_version()
    self:mbox_sr_caps()
-   self:mbox_s_rss(conf.nqueues or 1)
+   self:mbox_sr_rss(conf.nqueues or 1)
+   if self.vlan then
+      self:mbox_sr_vlan()
+   end
    
    -- Queue setup
    self.cxqs = {}
@@ -1119,7 +1136,7 @@ function Intel_avf:mbox_sr_add_mac()
    self:mbox_sr('VIRTCHNL_OP_ADD_ETH_ADDR', ffi.sizeof(virtchnl_ether_addr_t) + 8)
 end
 
-function Intel_avf:mbox_s_rss(nqueues)
+function Intel_avf:mbox_sr_rss(nqueues)
    if nqueues == 1 then
       -- pg83
       -- Forcefully disable the NICs RSS features. Contrary to the spec, RSS
@@ -1144,7 +1161,15 @@ function Intel_avf:mbox_s_rss(nqueues)
    end
    self:mbox_sr('VIRTCHNL_OP_CONFIG_RSS_LUT',
                 ffi.sizeof(virtchnl_rss_lut_t) + self.rss_lut_size-1)
+end
 
+function Intel_avf:mbox_sr_vlan()
+   local tt = self:mbox_send_buf(virtchnl_vlan_filter_list_ptr_t)
+   tt.vsi_id = self.vsi_id
+   tt.num_elements = 1
+   tt.vlan_id[0] = self.vlan
+   self:mbox_sr('VIRTCHNL_OP_ADD_VLAN',
+                ffi.sizeof(virtchnl_vlan_filter_list_t) + ffi.sizeof("uint16_t")*1)
 end
 
 function Intel_avf:mbox_s_stats()
