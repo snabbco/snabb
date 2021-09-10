@@ -223,6 +223,17 @@ end
 local intel_mp = require("apps.intel_mp.intel_mp")
 local connectx = require("apps.mellanox.connectx")
 local intel_avf = require("apps.intel_avf.intel_avf")
+local intel_avf_pf = require("apps.intel_avf.intel_avf_pf")
+
+local function cmd(...)
+   local cmd
+   for _, part in ipairs({...}) do
+      if not cmd then cmd = part
+      else            cmd = cmd.." "..part end
+   end
+   print("shell:", cmd)
+   assert(os.execute(cmd))
+end
 
 function config_intel_mp(c, name, opt)
    config.app(c, name, intel_mp.driver, {
@@ -297,11 +308,56 @@ function config_intel_avf(c, name, opt, lwconfig)
    return name..'.input', name..'.output'
 end
 
+function config_intel_avf_pf(c, name, opt, lwconfig)
+   local path = "/sys/bus/pci/devices/"..pci.qualified(opt.pci)
+   local ifname = lib.firstfile(path.."/net")
+   assert(ifname and lib.can_write(path.."/sriov_numvfs"),
+          "Unsupported device: "..opt.pci)
+   local vf = 0    -- which vf should this interface be on?
+   local numvf = 1 -- how many vfs do we need to create on the pf?
+   local vfmac = {} -- MACs to assign to vfs
+   local device, _, queue = lwutil.parse_instance(lwconfig)
+   if lwutil.is_on_a_stick(device, queue) then
+      numvf = 2
+      vfmac[0] = queue.external_interface.mac
+      vfmac[1] = queue.internal_interface.mac
+      if ethernet:ntop(opt.mac) == ethernet:ntop(queue.internal_interface.mac) then
+         vf = 1
+      end
+   else
+      vfmac[0] = opt.mac
+   end
+   if lwutil.is_lowest_queue(lwconfig) then
+      print("Setting "..path.."/sriov_numvfs = "..numvf)
+      assert(lib.writefile(path.."/sriov_numvfs", numvf))
+      cmd('ip link set up', 'dev', ifname)
+      cmd('ip link set', ifname, 'vf', 0, 'mac', ethernet:ntop(vfmac[0]))
+      cmd('ip link set', ifname, 'vf', 0, 'spoofchk off')
+      pcall(cmd, 'ip link set', ifname, 'vf', 0, 'trust on')
+      if numvf == 2 then
+         cmd('ip link set', ifname, 'vf', 1, 'mac', ethernet:ntop(vfmac[1]))
+         cmd('ip link set', ifname, 'vf', 1, 'spoofchk off')
+         pcall(cmd, 'ip link set', ifname, 'vf', 1, 'trust on')
+      end
+   end
+   local vfpci = lib.basename(lib.readlink(path.."/virtfn"..vf))
+   local avf_opt = {
+      pci = vfpci,
+      queue = opt.queue,
+      mac = opt.mac,
+      vlan = opt.vlan,
+      ring_buffer_size = opt.ring_buffer_size
+   }
+   return config_intel_avf(c, name, avf_opt, lwconfig)
+end
+
 function config_nic(c, name, driver, opt, lwconfig)
    local config_fn = { [intel_mp.driver] = config_intel_mp,
                        [connectx.driver] = config_connectx,
-                       [intel_avf.driver] = config_intel_avf }
-   local f = assert(config_fn[driver], "Unsupported device: "..opt.pci)
+                       [intel_avf.driver] = config_intel_avf,
+                       ['maybe_avf?']     = config_intel_avf_pf}
+   local f = assert(config_fn[(driver and require(driver).driver) or 'maybe_avf?'],
+                    "Unsupported device: "..opt.pci)
    return f(c, name, opt, lwconfig)
 end
 
@@ -321,7 +377,7 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
       ring_buffer_size = ring_buffer_size
    }
    local v4_input, v4_output =
-      config_nic(c, v4_nic_name, require(v4_info.driver).driver, v4_nic_opt, conf)
+      config_nic(c, v4_nic_name, v4_info.driver, v4_nic_opt, conf)
    
    local v6_nic_opt = {
       pci = v6_pci,
@@ -331,7 +387,7 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
       ring_buffer_size = ring_buffer_size
    }
    local v6_input, v6_output =
-      config_nic(c, v6_nic_name, require(v6_info.driver).driver, v6_nic_opt, conf)
+      config_nic(c, v6_nic_name, v6_info.driver, v6_nic_opt, conf)
 
    link_source(c, v4_output, v6_output)
    link_sink(c,   v4_input, v6_input)
@@ -388,15 +444,6 @@ function xdp_ifsetup(conf)
       end
       for qid in pairs(instance.queue) do
          assert(qid < nqueues)
-      end
-      local function cmd(...)
-         local cmd
-         for _, part in ipairs({...}) do
-            if not cmd then cmd = part
-            else            cmd = cmd.." "..part end
-         end
-         print("shell:", cmd)
-         assert(os.execute(cmd))
       end
       local function ifsetup(ifname, cfg, opts, ip_ntop)
          cmd('ip link set down', 'dev', ifname)
@@ -457,7 +504,7 @@ end
 function load_on_a_stick(c, conf, args)
    local pciaddr, id, queue = lwutil.parse_instance(conf)
    local device = pci.device_info(pciaddr)
-   local driver = require(device.driver).driver
+   local driver = device.driver
    validate_pci_devices({pciaddr})
    lwaftr_app(c, conf, pciaddr)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
