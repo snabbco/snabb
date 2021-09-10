@@ -32,6 +32,23 @@ function is_on_a_stick(device, queue)
    return device == queue.external_interface.device
 end
 
+function is_lowest_queue(conf)
+   local device, id = parse_instance(conf)
+   for n in pairs(conf.softwire_config.instance[device].queue) do
+      if id > n then return false end
+   end
+   return true
+end
+
+function num_queues(conf)
+   local n = 0
+   local device, id = parse_instance(conf)
+   for _ in pairs(conf.softwire_config.instance[device].queue) do
+      n = n + 1
+   end
+   return n
+end
+
 function get_ihl_from_offset(pkt, offset)
    local ver_and_ihl = pkt.data[offset]
    return band(ver_and_ihl, 0xf) * 4

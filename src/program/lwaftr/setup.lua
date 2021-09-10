@@ -246,9 +246,9 @@ function config_connectx(c, name, opt, lwconfig)
                                  opt.vlan or opt.vlan_tag,
                                  queue or opt.queue)
    end
+   local device = lwutil.parse_instance(lwconfig)
    local queues = {}
-   local min_queue
-   for id, queue in pairs(lwconfig.softwire_config.instance[opt.pci].queue) do
+   for id, queue in pairs(lwconfig.softwire_config.instance[device].queue) do
       queues[#queues+1] = {
          id = queue_id(queue.external_interface, id),
          mac = ethernet:ntop(queue.external_interface.mac),
@@ -259,9 +259,8 @@ function config_connectx(c, name, opt, lwconfig)
          mac = ethernet:ntop(queue.internal_interface.mac),
          vlan = queue.internal_interface.vlan_tag
       }
-      min_queue = (not min_queue and id) or math.min(id, min_queue)
    end
-   if opt.queue == min_queue then
+   if lwutil.is_lowest_queue(lwconfig) then
       config.app(c, "ConnectX_"..opt.pci:gsub("[%.:]", "_"), connectx.ConnectX, {
          pciaddress = opt.pci,
          queues = queues
@@ -283,17 +282,8 @@ function config_connectx(c, name, opt, lwconfig)
 end
 
 function config_intel_avf(c, name, opt, lwconfig)
-   local nqueues = 0
-   local min_queue
-   for device, instance in pairs(lwconfig.softwire_config.instance) do
-      for id, queue in pairs(instance.queue) do
-         if device == opt.pci or queue.external_interface.device == opt.pci then
-            nqueues = nqueues + 1
-            min_queue = (not min_queue and id) or math.min(id, min_queue)
-         end
-      end
-   end
-   if opt.queue == min_queue then
+   local nqueues = lwutil.num_queues(lwconfig)
+   if lwutil.is_lowest_queue(lwconfig) then
       config.app(c, "IntelAVF_"..opt.pci:gsub("[%.:]", "_"), intel_avf.Intel_avf, {
          pciaddr = opt.pci,
          vlan = opt.vlan,
