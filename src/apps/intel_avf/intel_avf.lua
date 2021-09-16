@@ -652,9 +652,9 @@ function IO:deactivate ()
    assert(sync.cas(self.cxq.state, BUSY, IDLE))
 end
 
+local RS = bits({ RS = 5 })
+local COMPLETE = 15
 function IO:reclaim_txdesc ()
-   local RS = bits({ RS = 5 })
-   local COMPLETE = 15
 
    local cxq = self.cxq
    while band(cxq.txdesc[band(cxq.tx_cand+1, cxq.ring_size-1)].cmd_type_offset_bsz, COMPLETE) == COMPLETE
@@ -667,11 +667,13 @@ function IO:reclaim_txdesc ()
    end
 end
 
+local RS_EOP = bits{ EOP = 4, RS = 5, RSV = 6 }
+local IL2TAG1 = bits{ IL2TAG1 = 7}
 function IO:transmit (li)
    if li == nil then return end
 
    local cxq = self.cxq
-   local RS_EOP = bor(bits({ EOP = 4, RS = 5, RSV = 6 }), (cxq.vlan>0 and bits{ IL2TAG1 = 7}) or 0)
+   local RS_EOP_IL2TAG1 = bor(RS_EOP, (cxq.vlan>0 and IL2TAG1) or 0)
    local L2TAG1 = lshift(0ULL+cxq.vlan, 48)
    local SIZE_SHIFT = 34
 
@@ -682,7 +684,7 @@ function IO:transmit (li)
       local size = lshift(4ULL+p.length, SIZE_SHIFT)
       cxq.txdesc[ cxq.tx_next ].address = tophysical(p.data)
       cxq.txqueue[ cxq.tx_next ] = p
-      cxq.txdesc[ cxq.tx_next ].cmd_type_offset_bsz = bor(RS_EOP, size, L2TAG1)
+      cxq.txdesc[ cxq.tx_next ].cmd_type_offset_bsz = bor(RS_EOP_IL2TAG1, size, L2TAG1)
       cxq.tx_next = band(cxq.tx_next+1, cxq.ring_size-1)
       cxq.tx_desc_free = cxq.tx_desc_free - 1
    end
