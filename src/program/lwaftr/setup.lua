@@ -231,7 +231,8 @@ local function cmd(...)
       else            cmd = cmd.." "..part end
    end
    print("shell:", cmd)
-   assert(os.execute(cmd))
+   local status = os.execute(cmd)
+   assert(status == 0, ("Command failed with return code %d"):format(status))
 end
 
 function config_intel_mp(c, name, opt)
