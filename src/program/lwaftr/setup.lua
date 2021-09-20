@@ -223,7 +223,6 @@ end
 local intel_mp = require("apps.intel_mp.intel_mp")
 local connectx = require("apps.mellanox.connectx")
 local intel_avf = require("apps.intel_avf.intel_avf")
-local intel_avf_pf = require("apps.intel_avf.intel_avf_pf")
 
 local function cmd(...)
    local cmd
