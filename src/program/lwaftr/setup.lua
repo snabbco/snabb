@@ -329,7 +329,8 @@ function config_intel_avf_pf(c, name, opt, lwconfig)
    end
    if lwutil.is_lowest_queue(lwconfig) then
       print("Setting "..path.."/sriov_numvfs = "..numvf)
-      assert(lib.writefile(path.."/sriov_numvfs", numvf))
+      assert(lib.writefile(path.."/sriov_numvfs", numvf),
+             "Failed to allocate VFs.")
       cmd('ip link set up', 'dev', ifname)
       cmd('ip link set', ifname, 'vf', 0, 'mac', ethernet:ntop(vfmac[0]))
       cmd('ip link set', ifname, 'vf', 0, 'spoofchk off')
