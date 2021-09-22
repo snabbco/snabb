@@ -943,22 +943,25 @@ function Intel_avf:new(conf)
       vlan = conf.vlan,
       r = {},
       ring_buffer_size = conf.ring_buffer_size,
-      shm = {
-         rxbytes   = {counter},
-         rxpackets = {counter},
-         rxmcast   = {counter},
-         rxbcast   = {counter},
-         rxdrop    = {counter},
-         rx_unknown_protocol = {counter},
-         txbytes   = {counter},
-         txpackets = {counter},
-         txmcast   = {counter},
-         txbcast   = {counter},
-         txdrop    = {counter},
-         txerrors  = {counter}
-      },
       sync_stats_throttle = lib.throttle(1)
    }
+   -- PCI device statistics
+   local frame = {
+      macaddr   = {counter},
+      rxbytes   = {counter},
+      rxpackets = {counter},
+      rxmcast   = {counter},
+      rxbcast   = {counter},
+      rxdrop    = {counter},
+      rxerrors  = {counter},
+      txbytes   = {counter},
+      txpackets = {counter},
+      txmcast   = {counter},
+      txbcast   = {counter},
+      txdrop    = {counter},
+      txerrors  = {counter}
+   }
+   self.stats = shm.create_frame("pci/"..self.pciaddress, frame)
 
    -- pg79 /* number of descriptors, multiple of 32 */
    assert(self.ring_buffer_size % 32 == 0,
@@ -990,6 +993,9 @@ function Intel_avf:new(conf)
    if self.vlan then
       self:mbox_sr_vlan()
    end
+
+   -- publish device MAC address to SHM
+   counter.set(self.stats.macaddr, self.mac.bits)
    
    -- Queue setup
    self.cxqs = {}
@@ -1019,11 +1025,6 @@ function Intel_avf:new(conf)
 end
 
 function Intel_avf:link()
-   -- Alias SHM frame to canonical location.
-   if not shm.exists("pci/"..self.pciaddress) then
-      shm.alias("pci/"..self.pciaddress, "apps/"..self.appname)
-   end
-
    if self.io then
       self.io.input, self.io.output = self.input, self.output
    end
@@ -1056,7 +1057,7 @@ function Intel_avf:sync_stats ()
    end
 end
 
-function Intel_avf:flush_stats ()
+function Intel_avf:flush_stats ()      
    if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_GET_STATS'] then
       self:mbox_r_stats()
    end
@@ -1064,8 +1065,8 @@ function Intel_avf:flush_stats ()
    self:mbox_r_stats()
 end
 
-function Intel_avf:rxdrop () return counter.read(self.shm.rxdrop) end
-function Intel_avf:txdrop () return counter.read(self.shm.txdrop) end
+function Intel_avf:rxdrop () return counter.read(self.stats.rxdrop) end
+function Intel_avf:txdrop () return counter.read(self.stats.txdrop) end
 
 function Intel_avf:reset()
    -- From "Appendix A Virtual Channel Protocol":
@@ -1098,17 +1099,17 @@ function Intel_avf:stop()
       end)
       self:free_cxq(cxq)
    end
-   -- Unlink SHM alias.
+   -- Unlink stats frame.
    shm.unlink("pci/"..self.pciaddress)
 end
 
 function Intel_avf:report ()
    self:flush_stats()
    for _, c in ipairs{
-      'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast', 'rxdrop', 'rx_unknown_protocol',
+      'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast', 'rxdrop', 'rxdrop',
       'txbytes', 'txpackets', 'txmcast', 'txbcast', 'txdrop', 'txerrors'
    } do
-      print(("   %-20s %20s"):format(c, lib.comma_value(counter.read(self.shm[c]))))
+      print(("   %-20s %20s"):format(c, lib.comma_value(counter.read(self.stats[c]))))
    end
 end
 
@@ -1187,18 +1188,18 @@ function Intel_avf:mbox_r_stats(async)
    local stats = ffi.cast(eth_stats_ptr_t, ret)
    local set = counter.set
 
-   set(self.shm.rxbytes,   stats.rx_bytes)
-   set(self.shm.rxpackets, stats.rx_unicast)
-   set(self.shm.rxmcast,   stats.rx_multicast)
-   set(self.shm.rxbcast,   stats.rx_broadcast)
-   set(self.shm.rxdrop,    stats.rx_discards)
-   set(self.shm.rx_unknown_protocol,  stats.rx_unknown_protocol)
+   set(self.stats.rxbytes,   stats.rx_bytes)
+   set(self.stats.rxpackets, stats.rx_unicast)
+   set(self.stats.rxmcast,   stats.rx_multicast)
+   set(self.stats.rxbcast,   stats.rx_broadcast)
+   set(self.stats.rxdrop,    stats.rx_discards)
+   set(self.stats.rxdrop,    stats.rx_unknown_protocol)
 
-   set(self.shm.txbytes,   stats.tx_bytes)
-   set(self.shm.txpackets, stats.tx_unicast)
-   set(self.shm.txmcast,   stats.tx_multicast)
-   set(self.shm.txbcast,   stats.tx_broadcast)
-   set(self.shm.txdrop,    stats.tx_discards)
-   set(self.shm.txerrors,  stats.tx_errors)
+   set(self.stats.txbytes,   stats.tx_bytes)
+   set(self.stats.txpackets, stats.tx_unicast)
+   set(self.stats.txmcast,   stats.tx_multicast)
+   set(self.stats.txbcast,   stats.tx_broadcast)
+   set(self.stats.txdrop,    stats.tx_discards)
+   set(self.stats.txerrors,  stats.tx_errors)
 end
 
