@@ -573,8 +573,8 @@ module snabb-softwire-v2 {
         description
           "The PCI device the instance should use during lwAFTR operation. If
            device is configured in on-a-stick mode, the 'external-interface'
-           device should not be configured. If the 'external-interface is
-           specified this option should specify the PCI device of the
+           device should not be configured. If the 'external-interface'
+           device is specified this option should specify the PCI device of the
            'internal-interface' (IPv6 traffic only).";
       }
 
@@ -605,7 +605,7 @@ module snabb-softwire-v2 {
           }
           leaf device {
             description
-             "PCI device of the instance uses for external IPv6 traffic. If this
+             "PCI device of the instance uses for external IPv4 traffic. If this
               is left unspecified the lwAFTR configures itself in on-a-stick
               mode.";
             type string;
