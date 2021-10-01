@@ -21,6 +21,7 @@ local ntohs = lib.ntohs
 
 -- Return device PCI address, queue ID, and queue configuration.
 function parse_instance(conf)
+   assert(conf.worker_config, "conf missing instance/queue metadata.")
    local device = conf.worker_config.device
    local id = conf.worker_config.queue_id
    local queue = conf.softwire_config.instance[device].queue[id]
@@ -47,6 +48,25 @@ function num_queues(conf)
       n = n + 1
    end
    return n
+end
+
+function select_instance(conf)
+   local function table_merge(t1, t2)
+      local ret = {}
+      for k,v in pairs(t1) do ret[k] = v end
+      for k,v in pairs(t2) do ret[k] = v end
+      return ret
+   end
+   local device, id, queue = parse_instance(conf)
+   local copy = {softwire_config={}}
+   for k,v in pairs(conf.softwire_config) do
+      copy.softwire_config[k] = v
+   end
+   copy.softwire_config.external_interface = table_merge(
+      conf.softwire_config.external_interface, queue.external_interface)
+   copy.softwire_config.internal_interface = table_merge(
+      conf.softwire_config.internal_interface, queue.internal_interface)
+   return copy
 end
 
 function get_ihl_from_offset(pkt, offset)

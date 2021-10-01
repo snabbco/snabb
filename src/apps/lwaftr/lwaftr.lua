@@ -339,21 +339,6 @@ local function drop(pkt)
    packet.free(pkt)
 end
 
-local function select_instance(conf)
-   local function table_merge(t1, t2)
-      local ret = {}
-      for k,v in pairs(t1) do ret[k] = v end
-      for k,v in pairs(t2) do ret[k] = v end
-      return ret
-   end
-   local device, id, queue = lwutil.parse_instance(conf)
-   conf.softwire_config.external_interface = table_merge(
-      conf.softwire_config.external_interface, queue.external_interface)
-   conf.softwire_config.internal_interface = table_merge(
-      conf.softwire_config.internal_interface, queue.internal_interface)
-   return conf
-end
-
 LwAftr = { yang_schema = 'snabb-softwire-v2' }
 -- Fields:
 --   - direction: "in", "out", "hairpin", "drop";
@@ -420,9 +405,8 @@ LwAftr.shm = {
 function LwAftr:new(conf)
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})
-   conf = select_instance(conf).softwire_config
+   conf = conf.softwire_config
    o.conf = conf
-
    o.binding_table = bt.load(conf.binding_table)
    o.inet_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
    o.hairpin_lookup_queue = bt.BTLookupQueue.new(o.binding_table)

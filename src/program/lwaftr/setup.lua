@@ -87,7 +87,7 @@ function lwaftr_app(c, conf)
               { address = convert_ipv4(iexternal_interface.ip) })
    config.app(c, "icmpechov6", ipv6_echo.ICMPEcho,
               { address = iinternal_interface.ip })
-   config.app(c, "lwaftr", lwaftr.LwAftr, conf)
+   config.app(c, "lwaftr", lwaftr.LwAftr, lwutil.select_instance(conf))
    config.app(c, "fragmenterv4", ipv4_fragment.Fragmenter,
               { mtu=gexternal_interface.mtu })
    config.app(c, "fragmenterv6", ipv6_fragment.Fragmenter,
@@ -827,8 +827,8 @@ local function compute_worker_configs(conf)
       for id, _ in pairs(queues.queue) do
          local worker_id = string.format('%s/%s', device, id)
          local worker_config = make_copy()
-         worker_config.worker_config = {device=device, queue_id=id}
-         ret[worker_id] = worker_config
+         local meta = {worker_config = {device=device, queue_id=id}}
+         ret[worker_id] = setmetatable(worker_config, {__index=meta})
       end
    end
    return ret
