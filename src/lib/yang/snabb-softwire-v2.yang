@@ -678,12 +678,12 @@ module snabb-softwire-v2 {
                 leaf ip {
                   type inet:ipv6-address;
                   description
-                  "IPv6 address of the next hop for the internal-facing NIC.
-                    The lwAFTR will resolve this to a MAC address using NDP.";
+                  "IPv4 address of the next hop for the internet-facing NIC.
+                    The lwAFTR will resolve this to a MAC address using ARP.";
                 }
                 leaf resolved-mac {
                   config false;
-                  description "Resolved next-hop mac address found by NDP.";
+                  description "Resolved next-hop mac address found by ARP.";
                   type yang:mac-address;
                 }
               }
@@ -692,7 +692,7 @@ module snabb-softwire-v2 {
                   type yang:mac-address;
                   description
                   "Statically configured MAC address of the next hop for the
-                    internal-facing NIC.";
+                    internet-facing NIC.";
                 }
               }
             }
