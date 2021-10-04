@@ -145,7 +145,9 @@ local irqbalanced_checked = false
 local function assert_irqbalanced_disabled (warn)
    if irqbalanced_checked then return end
    irqbalanced_checked = true
-   for path in os.getenv('PATH'):split(':') do
+   local env_path = os.getenv('PATH')
+   if not env_path then return end
+   for path in env_path:split(':') do
       if S.stat(path..'/irqbalance') then
          if S.stat('/etc/default/irqbalance') then
             for line in io.lines('/etc/default/irqbalance') do
@@ -230,6 +232,7 @@ function bind_to_numa_node (node, policy)
 
       -- Migrate any pages that might have the wrong affinity.
       local from_mask = assert(S.get_mempolicy(nil, nil, nil, 'mems_allowed')).mask
+      from_mask[node] = false
       local ok, err = S.migrate_pages(0, from_mask, node)
       if not ok then
          warn("Failed to migrate pages to NUMA node %d: %s\n",
