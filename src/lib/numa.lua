@@ -145,7 +145,9 @@ local irqbalanced_checked = false
 local function assert_irqbalanced_disabled (warn)
    if irqbalanced_checked then return end
    irqbalanced_checked = true
-   for path in os.getenv('PATH'):split(':') do
+   local env_path = os.getenv('PATH')
+   if not env_path then return end
+   for path in env_path:split(':') do
       if S.stat(path..'/irqbalance') then
          if S.stat('/etc/default/irqbalance') then
             for line in io.lines('/etc/default/irqbalance') do
