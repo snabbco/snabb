@@ -70,12 +70,12 @@ end
 function ethernet:ptoi (p)
    local n = ethernet:pton(p)
    assert(ffi.abi("le"))
-   return bit.bor(bit.lshift(n[0], 40),
-                  bit.lshift(n[1], 32),
-                  bit.lshift(n[2], 24),
-                  bit.lshift(n[3], 16),
-                  bit.lshift(n[4],  8),
-                  bit.lshift(n[5],  0))
+   return bit.bor(bit.lshift(0ULL+n[0], 40),
+                  bit.lshift(0ULL+n[1], 32),
+                  bit.lshift(0ULL+n[2], 24),
+                  bit.lshift(0ULL+n[3], 16),
+                  bit.lshift(0ULL+n[4],  8),
+                  bit.lshift(0ULL+n[5],  0))
 end
 
 -- Mapping of an IPv6 multicast address to a MAC address per RFC2464,
