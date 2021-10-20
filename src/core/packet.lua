@@ -269,7 +269,8 @@ function account_free (p)
    counter.add(engine.freebytes, p.length)
    -- Calculate bits of physical capacity required for packet on 10GbE
    -- Account for minimum data size and overhead of CRC and inter-packet gap
-   counter.add(engine.freebits, (math.max(p.length, 46) + 4 + 5) * 8)
+   -- https://en.wikipedia.org/wiki/Ethernet_frame
+   counter.add(engine.freebits, (12 + 8 + math.max(p.length, 60) + 4) * 8)
 end
 
 function free (p)
