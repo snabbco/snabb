@@ -1004,7 +1004,7 @@ function Intel_avf:new(conf)
    end
 
    self:init_irq()
-   self:mbox_sr_irq()
+   self:mbox_sr_irq(conf.nqueues or 1)
 
    self:mbox_sr_q(self.cxqs)
    self:mbox_sr_enable_q(#self.cxqs)
@@ -1121,12 +1121,12 @@ function Intel_avf:init_irq()
    self.r.VFINT_DYN_CTLN[0](v)
 end
 
-function Intel_avf:mbox_sr_irq()
+function Intel_avf:mbox_sr_irq(nqueues)
    local tt = self:mbox_send_buf(virtchnl_irq_map_info_ptr_t)
    tt.num_vectors = 1
    tt.vsi_id = self.vsi_id
    tt.vector_id = 0
-   tt.rxq_map = 1
+   tt.rxq_map = 2^nqueues-1 -- disable interrupts for all queues
    self:mbox_sr("VIRTCHNL_OP_CONFIG_IRQ_MAP", ffi.sizeof(virtchnl_irq_map_info_t) + 12)
 end
 
