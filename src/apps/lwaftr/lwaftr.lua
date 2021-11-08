@@ -405,7 +405,7 @@ LwAftr.shm = {
 function LwAftr:new(conf)
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})
-   conf = conf.softwire_config
+   conf = lwutil.merge_instance(conf).softwire_config
    o.conf = conf
    o.binding_table = bt.load(conf.binding_table)
    o.inet_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
