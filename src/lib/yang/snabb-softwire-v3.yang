@@ -13,7 +13,8 @@ module snabb-softwire-v3 {
 
   revision 2021-11-08 {
     description
-      "Change module+namespace to v3. Update organization and contact.";
+      "Change module+namespace to v3. Update organization and contact.
+       Fix mistakes in leaf descriptions.";
   }
 
   revision 2019-09-17 {
@@ -572,7 +573,7 @@ module snabb-softwire-v3 {
         description
           "The PCI device the instance should use during lwAFTR operation. If
            device is configured in on-a-stick mode, the 'external-interface'
-           device should not be configured. If the 'external-interface is
+           device should not be configured. If 'external-interface' is
            specified this option should specify the PCI device of the
            'internal-interface' (IPv6 traffic only).";
       }
@@ -609,7 +610,7 @@ module snabb-softwire-v3 {
           }
           leaf device {
             description
-             "PCI device of the instance uses for external IPv6 traffic. If this
+             "PCI device of the instance used for external IPv4 traffic. If this
               is left unspecified the lwAFTR configures itself in on-a-stick
               mode.";
             type string;
@@ -677,12 +678,12 @@ module snabb-softwire-v3 {
                 leaf ip {
                   type inet:ipv6-address;
                   description
-                  "IPv4 address of the next hop for the internet-facing NIC.
-                    The lwAFTR will resolve this to a MAC address using ARP.";
+                  "IPv6 address of the next hop for the internal-facing NIC.
+                    The lwAFTR will resolve this to a MAC address using NDP.";
                 }
                 leaf resolved-mac {
                   config false;
-                  description "Resolved next-hop mac address found by ARP.";
+                  description "Resolved next-hop mac address found by NDP.";
                   type yang:mac-address;
                 }
               }
@@ -691,7 +692,7 @@ module snabb-softwire-v3 {
                   type yang:mac-address;
                   description
                   "Statically configured MAC address of the next hop for the
-                    internet-facing NIC.";
+                    internal-facing NIC.";
                 }
               }
             }
