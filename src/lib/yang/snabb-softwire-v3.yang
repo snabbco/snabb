@@ -14,7 +14,8 @@ module snabb-softwire-v3 {
   revision 2021-11-08 {
     description
       "Change module+namespace to v3. Update organization and contact.
-       Fix mistakes in leaf descriptions.";
+       Fix mistakes in leaf descriptions.
+       Add default value for error-rate-limiting/packets.";
   }
 
   revision 2019-09-17 {
@@ -514,6 +515,7 @@ module snabb-softwire-v3 {
       container error-rate-limiting {
         leaf packets {
           type uint32;
+          default 200;
           description
            "The number of ICMP error messages which can be sent within
             the specified time period.";
