@@ -267,6 +267,14 @@ end
 NDP = {}
 NDP.shm = {
    ["next-hop-macaddr-v6"] = {counter},
+   ["in-ndp-ns-bytes"]  = {counter},
+   ["in-ndp-ns-packets"]  = {counter},
+   ["out-ndp-ns-bytes"]  = {counter},
+   ["out-ndp-ns-packets"]  = {counter},
+   ["in-ndp-na-bytes"]  = {counter},
+   ["in-ndp-na-packets"]  = {counter},
+   ["out-ndp-na-bytes"]  = {counter},
+   ["out-ndp-na-packets"]  = {counter},
 }
 local ndp_config_params = {
    -- Source MAC address will default to a random address.
@@ -327,10 +335,12 @@ function NDP:maybe_send_ns_request (output)
    self.next_ns_time = self.next_ns_time or engine.now()
    if self.next_ns_time <= engine.now() then
       self:ndp_resolving(self.next_ip)
-      transmit(self.output.south,
-               make_ns_packet(self.self_mac, self.self_ip,
-                              self.mac_mcast, self.solicited_node_mcast,
-                              self.next_ip))
+      local ns = make_ns_packet(self.self_mac, self.self_ip,
+                                self.mac_mcast, self.solicited_node_mcast,
+                                self.next_ip)
+      counter.add(self.shm["out-ndp-ns-bytes"], ns.length)
+      counter.add(self.shm["out-ndp-ns-packets"])
+      transmit(self.output.south, ns)
       self.next_ns_time = engine.now() + self.ns_interval
    end
 end
@@ -390,6 +400,8 @@ function NDP:handle_ndp (pkt)
    if not verify_icmp_checksum(pkt) then return end
 
    if h.icmpv6.type == icmpv6_na then
+      counter.add(self.shm["in-ndp-na-bytes"], pkt.length)
+      counter.add(self.shm["in-ndp-na-packets"])
       -- Only process advertisements when we are looking for a
       -- next-hop MAC.
       if self.next_mac then return end
@@ -422,6 +434,8 @@ function NDP:handle_ndp (pkt)
       -- Advertisement Message Format.
       self:resolve_next_hop(copy_mac(h.ether.shost))
    elseif h.icmpv6.type == icmpv6_ns then
+      counter.add(self.shm["in-ndp-ns-bytes"], pkt.length)
+      counter.add(self.shm["in-ndp-ns-packets"])
       if pkt.length < ndp_header_len + ffi.sizeof(ns_header_t) then return end
       local ns = ffi.cast(ns_header_ptr_t, h.body)
       if is_address_multicast(ns.target_ip) then return end
@@ -449,9 +463,11 @@ function NDP:handle_ndp (pkt)
             end
          end
       end
-      link.transmit(self.output.south,
-                    make_na_packet(self.self_mac, h.ether.shost,
-                                   self.self_ip, dst_ip, self.is_router))
+      local na = make_na_packet(self.self_mac, h.ether.shost,
+                                self.self_ip, dst_ip, self.is_router)
+      counter.add(self.shm["out-ndp-na-bytes"], na.length)
+      counter.add(self.shm["out-ndp-na-packets"])
+      link.transmit(self.output.south, na)
    else
       -- Unhandled NDP packet; silently drop.
       return
