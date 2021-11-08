@@ -39,9 +39,7 @@ local function migrate_device_on_config(config, v4, v6)
    end
 
    if v6 then
-      for id, queue in pairs(instance.queue) do
-         queue.external_interface.device = v6
-      end
+      instance.external_device = v6
    end
 end
 
@@ -169,11 +167,12 @@ function run(args)
                                opts.ring_buffer_size)
       end
 
-      -- If instance has external-interface.device configure as bump-in-the-wire
+      -- If instance has external-device configure as bump-in-the-wire
       -- otherwise configure it in on-a-stick mode.
-      local device, id, queue = lwutil.parse_instance(lwconfig)
-      if not lwutil.is_on_a_stick(device, queue) then
-         if lib.is_iface(queue.external_interface.device) then
+      local device = lwutil.parse_instance(lwconfig)
+      local instance = lwconfig.softwire_config.instance[device]
+      if not lwutil.is_on_a_stick(lwconfig, device) then
+         if lib.is_iface(instance.external_device) then
             return setup.load_kernel_iface(graph, lwconfig, 'inetNic', 'b4sideNic')
          else
             return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',

@@ -41,9 +41,10 @@ function parse_instance(conf)
    end
 end
 
-function is_on_a_stick(device, queue)
-   if not queue.external_interface.device and device then return true end
-   return device == queue.external_interface.device
+function is_on_a_stick(conf, device)
+   local instance = conf.softwire_config.instance[device]
+   if not instance.external_device then return true end
+   return device == instance.external_device
 end
 
 function is_lowest_queue(conf)
@@ -64,7 +65,7 @@ function num_queues(conf)
 end
 
 function select_instance(conf)
-   local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v2')
+   local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v3')
    local device, id = parse_instance(conf)
    local copy = copier(conf)()
    local instance = copy.softwire_config.instance
@@ -89,7 +90,7 @@ function merge_instance (conf)
       for k,v in pairs(t2) do ret[k] = v end
       return ret
    end
-   local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v2')
+   local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v3')
    local copy = copier(conf)()
    local _, _, queue = parse_instance(conf)
    copy.softwire_config.external_interface = table_merge(

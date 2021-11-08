@@ -3,7 +3,7 @@ Usage: run --help
 
 Required arguments:
        -c CONF, --conf CONF     Use configuration from the file CONF.
-                                See the snabb-softwire-v2 YANG module
+                                See the snabb-softwire-v3 YANG module
                                 for full documentation.
 
 Optional arguments:

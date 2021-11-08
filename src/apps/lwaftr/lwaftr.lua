@@ -339,7 +339,7 @@ local function drop(pkt)
    packet.free(pkt)
 end
 
-LwAftr = { yang_schema = 'snabb-softwire-v2' }
+LwAftr = { yang_schema = 'snabb-softwire-v3' }
 -- Fields:
 --   - direction: "in", "out", "hairpin", "drop";
 --   If "direction" is "drop":
@@ -449,7 +449,7 @@ end
 
 -- The following two methods are called by lib.ptree.worker in reaction
 -- to binding table changes, via
--- lib/ptree/support/snabb-softwire-v2.lua.
+-- lib/ptree/support/snabb-softwire-v3.lua.
 function LwAftr:add_softwire_entry(entry_blob)
    self.binding_table:add_softwire_entry(entry_blob)
 end

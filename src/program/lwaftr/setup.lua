@@ -317,7 +317,7 @@ function config_intel_avf_pf(c, name, opt, lwconfig)
    local numvf = 1 -- how many vfs do we need to create on the pf?
    local vfmac = {} -- MACs to assign to vfs
    local device, _, queue = lwutil.parse_instance(lwconfig)
-   if lwutil.is_on_a_stick(device, queue) then
+   if lwutil.is_on_a_stick(lwconfig, device) then
       numvf = 2
       vfmac[0] = queue.external_interface.mac
       vfmac[1] = queue.internal_interface.mac
@@ -364,7 +364,7 @@ end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
    local v6_pci, id, queue = lwutil.parse_instance(conf)
-   local v4_pci = queue.external_interface.device
+   local v4_pci = conf.softwire_config.instance[v6_pci].external_device
    local v4_info = pci.device_info(v4_pci)
    local v6_info = pci.device_info(v6_pci)
    validate_pci_devices({v4_pci, v6_pci})
@@ -396,10 +396,10 @@ end
 
 function load_xdp(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
    local v6_device, id, queue = lwutil.parse_instance(conf)
-   local v4_device = queue.external_interface.device
+   local v4_device = conf.softwire_config.instance[v6_device].external_device
    assert(lib.is_iface(v4_device), v4_nic_name..": "..v4_device.." is not a Linux interface")
    assert(lib.is_iface(v6_device), v6_nic_name..": "..v6_device.." is not a Linux interface")
-   assert(not lwutil.is_on_a_stick(v6_device, queue),
+   assert(not lwutil.is_on_a_stick(conf, v6_device),
           "--xdp does not support on-a-stick configuration")
           
    lwaftr_app(c, conf)
@@ -434,6 +434,7 @@ end
 
 function xdp_ifsetup(conf)
    for idevice, instance in pairs(conf.softwire_config.instance) do
+      local edevice = instance.external_device
       local icfg, ecfg
       local nqueues = 0
       for _, queue in pairs(instance.queue) do
@@ -462,7 +463,7 @@ function xdp_ifsetup(conf)
       ifsetup(idevice, icfg, conf.softwire_config.internal_interface,
               function (ip) return ipv6:ntop(ip) end)
       print("Configuring external interface for XDP...")
-      ifsetup(ecfg.device, ecfg, conf.softwire_config.external_interface,
+      ifsetup(edevice, ecfg, conf.softwire_config.external_interface,
               ipv4_ntop)
    end
 end
@@ -577,7 +578,7 @@ end
 
 function load_virt(c, conf, v4_nic_name, v6_nic_name)
    local v6_pci, id, queue = lwutil.parse_instance(conf)
-   local v4_pci = queue.external_device.device
+   local v4_pci = conf.softwire_config.instance[v6_pci].external_device
    lwaftr_app(c, conf, device)
 
    validate_pci_devices({v4_pci, v6_pci})
@@ -821,7 +822,7 @@ end
 -- will get its own worker process.
 local function compute_worker_configs(conf)
    local ret = {}
-   local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v2')
+   local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v3')
    local make_copy = copier(conf)
    for device, queues in pairs(conf.softwire_config.instance) do
       for id, _ in pairs(queues.queue) do
@@ -866,7 +867,7 @@ function ptree_manager(f, conf, manager_opts)
    local initargs = {
       setup_fn = setup_fn,
       initial_configuration = conf,
-      schema_name = 'snabb-softwire-v2',
+      schema_name = 'snabb-softwire-v3',
       default_schema = 'ietf-softwire-br',
       -- log_level="DEBUG"
    }
