@@ -17,7 +17,12 @@ module snabb-softwire-v3 {
        Fix mistakes in leaf descriptions.
        Add default value for error-rate-limiting/packets.
        Allow more than two queues (lift id leaf range restriction).
-       Move leaf external-interface/device up as external-device.";
+       Move leaf external-interface/device up as external-device.
+       Add softwire-state/{in,out}-icmpv{4,6}-echo-{bytes,packets}, counters.
+       Add softwire-state/{in,out}-arp-{request,reply}-{bytes,packets}, counters.
+       Add softwire-state/{in,out}-ndp-{ns,na}-{bytes,packets}, counters.
+       Renamed softwire-state/{in,out}-icmpv{4,6}-{bytes,packets}
+       to softwire-state/{in,out}-icmpv{4,6}-error-{bytes,packets}.";
   }
 
   revision 2019-09-17 {
@@ -314,7 +319,7 @@ module snabb-softwire-v3 {
       }
       leaf in-ipv4-bytes {
         type yang:zero-based-counter64;
-        description "All valid outgoing IPv4 packets.";
+        description "Valid incoming IPv4 bytes.";
       }
       leaf in-ipv4-frag-needs-reassembly {
         type yang:zero-based-counter64;
@@ -332,11 +337,11 @@ module snabb-softwire-v3 {
       }
       leaf in-ipv4-packets {
         type yang:zero-based-counter64;
-        description "All valid outgoing IPv4 packets.";
+        description "Validalid incoming IPv4 packets.";
       }
       leaf in-ipv6-bytes {
         type yang:zero-based-counter64;
-        description "All valid outgoing IPv4 packets.";
+        description "Valid incoming IPv6 bytes.";
       }
       leaf in-ipv6-frag-needs-reassembly {
         type yang:zero-based-counter64;
@@ -354,7 +359,7 @@ module snabb-softwire-v3 {
       }
       leaf in-ipv6-packets {
         type yang:zero-based-counter64;
-        description "All valid outgoing IPv4 packets.";
+        description "Valid incoming IPv6 packets.";
       }
       leaf ingress-packet-drops {
         type yang:zero-based-counter64;
@@ -374,25 +379,121 @@ module snabb-softwire-v3 {
           for reassembling IPv6 fragments. This is directly proportional to the
           setting max_ipv6_reassembly_packets.";
       }
-      leaf out-icmpv4-bytes {
+      leaf in-arp-request-bytes {
         type yang:zero-based-counter64;
-        description "Internally generated ICMPv4 packets.";
+        description "Incoming ARP request bytes.";
       }
-      leaf out-icmpv4-packets {
+      leaf in-arp-request-packets {
         type yang:zero-based-counter64;
-        description "Internally generated ICMPv4 packets.";
+        description "Incoming ARP request packets.";
       }
-      leaf out-icmpv6-bytes {
+      leaf out-arp-request-bytes {
+        type yang:zero-based-counter64;
+        description "Internally generated ARP request bytes.";
+      }
+      leaf out-arp-request-packets {
+        type yang:zero-based-counter64;
+        description "Internally generated ARP request packets.";
+      }
+      leaf in-arp-reply-bytes {
+        type yang:zero-based-counter64;
+        description "Incoming ARP reply bytes.";
+      }
+      leaf in-arp-reply-packets {
+        type yang:zero-based-counter64;
+        description "Incoming ARP reply packets.";
+      }
+      leaf out-arp-reply-bytes {
+        type yang:zero-based-counter64;
+        description "Internally generated ARP reply bytes.";
+      }
+      leaf out-arp-reply-packets {
+        type yang:zero-based-counter64;
+        description "Internally generated ARP reply packets.";
+      }
+     leaf in-ndp-ns-bytes {
+        type yang:zero-based-counter64;
+        description "Incoming NDP neighbor solicitation bytes.";
+      }
+      leaf in-ndp-ns-packets {
+        type yang:zero-based-counter64;
+        description "Incoming NDP neighbor solicitation packets.";
+      }
+      leaf out-ndp-ns-bytes {
+        type yang:zero-based-counter64;
+        description "Internally generated NDP neighbor solicitation bytes.";
+      }
+      leaf out-ndp-ns-packets {
+        type yang:zero-based-counter64;
+        description "Internally generated NDP neighbor solicitation packets.";
+      }
+      leaf in-ndp-na-bytes {
+        type yang:zero-based-counter64;
+        description "Incoming NDP neighbot advertisement bytes.";
+      }
+      leaf in-ndp-na-packets {
+        type yang:zero-based-counter64;
+        description "Incoming NDP neighbot advertisement packets.";
+      }
+      leaf out-ndp-na-bytes {
+        type yang:zero-based-counter64;
+        description "Internally generated NDP neighbot advertisement bytes.";
+      }
+      leaf out-ndp-na-packets {
+        type yang:zero-based-counter64;
+        description "Internally generated NDP neighbot advertisement packets.";
+      }
+      leaf out-icmpv4-error-bytes {
+        type yang:zero-based-counter64;
+        description "Internally generated ICMPv4 error bytes.";
+      }
+      leaf out-icmpv4-error-packets {
+        type yang:zero-based-counter64;
+        description "Internally generated ICMPv4 error packets.";
+      }
+      leaf out-icmpv6-error-bytes {
+        type yang:zero-based-counter64;
+        description "Internally generted ICMPv6 error bytes.";
+      }
+      leaf out-icmpv6-error-packets {
         type yang:zero-based-counter64;
         description "Internally generted ICMPv6 error packets.";
       }
-      leaf out-icmpv6-packets {
+      leaf in-icmpv4-echo-bytes {
         type yang:zero-based-counter64;
-        description "Internally generted ICMPv6 error packets.";
+        description "Valid incoming ICMPv4 echo request bytes.";
+      }
+      leaf in-icmpv4-echo-packets {
+        type yang:zero-based-counter64;
+        description "Valid incoming ICMPv4 echo request packets.";
+      }
+      leaf out-icmpv4-echo-bytes {
+        type yang:zero-based-counter64;
+        description "Internally generated ICMPv4 echo reply bytes.";
+      }
+      leaf out-icmpv4-echo-packets {
+        type yang:zero-based-counter64;
+        description "Internally generated ICMPv4 echo reply packets.";
+      }
+      leaf in-icmpv6-echo-bytes {
+        type yang:zero-based-counter64;
+        description "Valid incoming ICMPv6 echo request bytes.";
+      }
+      leaf in-icmpv6-echo-packets {
+        type yang:zero-based-counter64;
+        description "Valid incoming ICMPv6 echo request packets.";
+      }
+      leaf out-icmpv6-echo-bytes {
+        type yang:zero-based-counter64;
+        description "Internally generted ICMPv6 echo reply bytes.";
+      }
+      leaf out-icmpv6-echo-packets {
+        type yang:zero-based-counter64;
+        description "Internally generted ICMPv6 echo reply packets.";
       }
       leaf out-ipv4-bytes {
         type yang:zero-based-counter64;
-        description "Valid outgoing IPv4 packets.";
+        description "Valid outgoing IPv4 bytes.";
       }
       leaf out-ipv4-frag {
         type yang:zero-based-counter64;
@@ -412,7 +513,7 @@ module snabb-softwire-v3 {
       }
       leaf out-ipv6-bytes {
         type yang:zero-based-counter64;
-        description "All valid outgoing IPv6 packets.";
+        description "Valid outgoing IPv6 bytes.";
       }
       leaf out-ipv6-frag {
         type yang:zero-based-counter64;
@@ -428,7 +529,7 @@ module snabb-softwire-v3 {
       }
       leaf out-ipv6-packets {
         type yang:zero-based-counter64;
-        description "All valid outgoing IPv6 packets.";
+        description "Valid outgoing IPv6 packets.";
       }
     }
   }

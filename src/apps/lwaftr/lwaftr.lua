@@ -392,10 +392,10 @@ LwAftr.shm = {
    ["in-ipv4-packets"]                                 = {counter},
    ["in-ipv6-bytes"]                                   = {counter},
    ["in-ipv6-packets"]                                 = {counter},
-   ["out-icmpv4-bytes"]                                = {counter},
-   ["out-icmpv4-packets"]                              = {counter},
-   ["out-icmpv6-bytes"]                                = {counter},
-   ["out-icmpv6-packets"]                              = {counter},
+   ["out-icmpv4-error-bytes"]                          = {counter},
+   ["out-icmpv4-error-packets"]                        = {counter},
+   ["out-icmpv6-error-bytes"]                          = {counter},
+   ["out-icmpv6-error-packets"]                        = {counter},
    ["out-ipv4-bytes"]                                  = {counter},
    ["out-ipv4-packets"]                                = {counter},
    ["out-ipv6-bytes"]                                  = {counter},
@@ -492,8 +492,8 @@ function LwAftr:transmit_icmpv6_reply (pkt)
    -- Send packet if limit not reached.
    if self.icmpv6_error_count < rate_limiting.packets then
       self.icmpv6_error_count = self.icmpv6_error_count + 1
-      counter.add(self.shm["out-icmpv6-bytes"], pkt.length)
-      counter.add(self.shm["out-icmpv6-packets"])
+      counter.add(self.shm["out-icmpv6-error-bytes"], pkt.length)
+      counter.add(self.shm["out-icmpv6-error-packets"])
       counter.add(self.shm["out-ipv6-bytes"], pkt.length)
       counter.add(self.shm["out-ipv6-packets"])
       return transmit(self.o6, pkt)
@@ -536,8 +536,8 @@ function LwAftr:transmit_icmpv4_reply(pkt, orig_pkt, orig_pkt_link)
    -- Send packet if limit not reached.
    if self.icmpv4_error_count < rate_limiting.packets then
       self.icmpv4_error_count = self.icmpv4_error_count + 1
-      counter.add(self.shm["out-icmpv4-bytes"], pkt.length)
-      counter.add(self.shm["out-icmpv4-packets"])
+      counter.add(self.shm["out-icmpv4-error-bytes"], pkt.length)
+      counter.add(self.shm["out-icmpv4-error-packets"])
       -- Only locally generated error packets are handled here.  We transmit
       -- them right away, instead of calling transmit_ipv4, because they are
       -- never hairpinned and should not be counted by the "out-ipv4" counter.
