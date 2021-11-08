@@ -135,6 +135,14 @@ end
 ARP = {}
 ARP.shm = {
    ["next-hop-macaddr-v4"] = {counter},
+   ["in-arp-request-bytes"]  = {counter},
+   ["in-arp-request-packets"]  = {counter},
+   ["out-arp-request-bytes"]  = {counter},
+   ["out-arp-request-packets"]  = {counter},
+   ["in-arp-reply-bytes"]  = {counter},
+   ["in-arp-reply-packets"]  = {counter},
+   ["out-arp-reply-bytes"]  = {counter},
+   ["out-arp-reply-packets"]  = {counter},
 }
 local arp_config_params = {
    -- Source MAC address will default to a random address.
@@ -186,6 +194,8 @@ function ARP:maybe_send_arp_request (output)
 end
 
 function ARP:send_arp_request (output)
+   counter.add(self.shm["out-arp-request-bytes"], self.arp_request_pkt.length)
+   counter.add(self.shm["out-arp-request-packets"])
    transmit(output, packet.clone(self.arp_request_pkt))
 end
 
@@ -239,11 +249,18 @@ function ARP:push()
              h.arp.hlen ~= 6 or h.arp.plen ~= 4) then
             -- Ignore invalid packet.
          elseif ntohs(h.arp.oper) == arp_oper_request then
+            counter.add(self.shm["in-arp-request-bytes"], p.length)
+            counter.add(self.shm["in-arp-request-packets"])
             if self.self_ip and ipv4_eq(h.arp.tpa, self.self_ip) then
-               transmit(osouth, make_arp_reply(self.self_mac, self.self_ip,
-                                               h.arp.sha, h.arp.spa))
+               local reply = make_arp_reply(self.self_mac, self.self_ip,
+                                            h.arp.sha, h.arp.spa)
+               counter.add(self.shm["out-arp-reply-bytes"], reply.length)
+               counter.add(self.shm["out-arp-reply-packets"])
+               transmit(osouth, reply)
             end
          elseif ntohs(h.arp.oper) == arp_oper_reply then
+            counter.add(self.shm["in-arp-reply-bytes"], p.length)
+            counter.add(self.shm["in-arp-reply-packets"])
             if self.next_ip and ipv4_eq(h.arp.spa, self.next_ip) then
                self:arp_resolved(self.next_ip, copy_mac(h.arp.sha), 'remote')
             end
