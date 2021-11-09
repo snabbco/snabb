@@ -27,6 +27,7 @@ Intel_avf = {
       pciaddr = { required=true },
       nqueues = {},
       vlan = {},
+      macs = {default={}},
       ring_buffer_size = {default=2048}
    }
 }
@@ -156,15 +157,20 @@ local virtchnl_queue_config_info_t = ffi.typeof([[
 
 local virtchnl_queue_config_info_ptr_t = ffi.typeof("$ *", virtchnl_queue_config_info_t)
 
-local virtchnl_ether_addr_t = ffi.typeof([[
+local virtchnl_ether_addr_t = ffi.typeof[[
    struct {
-      uint16_t vsi;
-      uint16_t num_elements;
       uint8_t addr[6]; // MAC_ADDR_BYTE_LEN
       uint8_t pad[2];
    } __attribute__((packed))
-]])
-local virtchnl_ether_addr_ptr_t = ffi.typeof("$ *", virtchnl_ether_addr_t)
+]]
+local virtchnl_ether_addr_list_t = ffi.typeof([[
+   struct {
+      uint16_t vsi;
+      uint16_t num_elements;
+      $ list[1];
+   } __attribute__((packed))
+]], virtchnl_ether_addr_t)
+local virtchnl_ether_addr_list_ptr_t = ffi.typeof("$ *", virtchnl_ether_addr_list_t)
 
 local eth_stats_t = ffi.typeof([[
    struct {
@@ -757,7 +763,7 @@ function Intel_avf:mbox_setup()
          VIRTCHNL_OP_CONFIG_IRQ_MAP = 7,
          VIRTCHNL_OP_ENABLE_QUEUES = 8,
          VIRTCHNL_OP_DISABLE_QUEUES = 9,
-         -- VIRTCHNL_OP_ADD_ETH_ADDR = 10,
+         VIRTCHNL_OP_ADD_ETH_ADDR = 10,
          -- VIRTCHNL_OP_DEL_ETH_ADDR = 11,
          VIRTCHNL_OP_ADD_VLAN = 12,
          -- VIRTCHNL_OP_DEL_VLAN = 13,
@@ -990,6 +996,9 @@ function Intel_avf:new(conf)
    self:mbox_sr_version()
    self:mbox_sr_caps()
    self:mbox_sr_rss(conf.nqueues or 1)
+   if #conf.macs > 0  then
+      self:mbox_sr_add_mac(conf.macs)
+   end
    if self.vlan then
       self:mbox_sr_vlan()
    end
@@ -1130,13 +1139,17 @@ function Intel_avf:mbox_sr_irq(nqueues)
    self:mbox_sr("VIRTCHNL_OP_CONFIG_IRQ_MAP", ffi.sizeof(virtchnl_irq_map_info_t) + 12)
 end
 
-function Intel_avf:mbox_sr_add_mac()
+function Intel_avf:mbox_sr_add_mac(macs)
    -- pg81
-   local tt = self:mbox_send_buf(virtchnl_ether_addr_ptr_t)
+   local tt = self:mbox_send_buf(virtchnl_ether_addr_list_ptr_t)
    tt.vsi = self.vsi_id
-   tt.num_elements = 1
-   ffi.copy(tt.addr, self.mac, MAC_ADDR_BYTE_LEN)
-   self:mbox_sr('VIRTCHNL_OP_ADD_ETH_ADDR', ffi.sizeof(virtchnl_ether_addr_t) + 8)
+   tt.num_elements = #macs
+   for i, mac in ipairs(macs) do
+      ffi.copy(tt.list[i-1].addr, mac, MAC_ADDR_BYTE_LEN)
+   end
+   self:mbox_sr('VIRTCHNL_OP_ADD_ETH_ADDR',
+                ffi.sizeof(virtchnl_ether_addr_list_t) +
+                ffi.sizeof(virtchnl_ether_addr_t) * #macs)
 end
 
 function Intel_avf:mbox_sr_rss(nqueues)
