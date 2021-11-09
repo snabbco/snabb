@@ -295,10 +295,14 @@ end
 function config_intel_avf(c, name, opt, lwconfig)
    local nqueues = lwutil.num_queues(lwconfig)
    if lwutil.is_lowest_queue(lwconfig) then
+      local _, _, queue = lwutil.parse_instance(lwconfig)
+      local v6_mcast = ipv6:solicited_node_mcast(queue.internal_interface.ip)
+      local mac_mcast = ethernet:ipv6_mcast(v6_mcast)
       config.app(c, "IntelAVF_"..opt.pci:gsub("[%.:]", "_"), intel_avf.Intel_avf, {
          pciaddr = opt.pci,
          vlan = opt.vlan,
-         nqueues = nqueues
+         nqueues = nqueues,
+         macs = {mac_mcast}
       })
    end
    config.app(c, name, intel_avf.IO, {
@@ -345,7 +349,6 @@ function config_intel_avf_pf(c, name, opt, lwconfig)
    local avf_opt = {
       pci = vfpci,
       queue = opt.queue,
-      mac = opt.mac,
       vlan = opt.vlan,
       ring_buffer_size = opt.ring_buffer_size
    }
