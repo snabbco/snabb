@@ -442,7 +442,7 @@ function ConnectX:new (conf)
          for mac, rqlist in pairs(macvlan_rqlist[vlan]) do
             local tid = setup_rss_rxtable(rqlist, tdomain, 1)
             hca:set_flow_table_entry_macvlan(rxtable, NIC_RX, flow_group_macvlan, index,
-                                             FLOW_TABLE, tid, ethernet:ptoi(mac), vlan)
+                                             FLOW_TABLE, tid, macaddress:new(mac), vlan)
             index = index + 1
          end
       end
@@ -450,7 +450,7 @@ function ConnectX:new (conf)
       local flow_group_mcast = hca:create_flow_group_macvlan(
          rxtable, NIC_RX, index, index + mcast_size - 1, usevlan, 'mcast'
       )
-      local mac_mcast = ethernet:ptoi("01:00:00:00:00:00")
+      local mac_mcast = macaddress:new("01:00:00:00:00:00")
       for vlan in pairs(macvlan_rqlist) do
          local mcast_tirs = {}
          for mac, rqlist in pairs(macvlan_rqlist[vlan]) do
@@ -486,8 +486,7 @@ function ConnectX:new (conf)
       status    = {counter, 2}, -- Link down
       type      = {counter, 0x1000}, -- ethernetCsmacd
       promisc   = {counter, vport_context.promisc_all},
-      macaddr   = {counter,
-                   macaddress:new(vport_context.permanent_address).bits},
+      macaddr   = {counter, vport_context.permanent_address.bits},
       rxbytes   = {counter},
       rxpackets = {counter},
       rxmcast   = {counter},
@@ -967,13 +966,13 @@ function HCA:query_nic_vport_context ()
       :execute()
    local mac_hi = self:output(0x10+0xF4, 31, 0)
    local mac_lo = self:output(0x10+0xF8, 31, 0)
-   local mac_hex = bit.tohex(mac_hi, 4) .. bit.tohex(mac_lo, 8)
+   local mac = macaddress:new(bit.tohex(mac_hi, 4) .. bit.tohex(mac_lo, 8))
    return { min_wqe_inline_mode = self:output(0x10+0x00, 26, 24),
             mtu = self:output(0x10+0x24, 15, 0),
             promisc_uc  = self:output(0x10+0xf0, 31, 31) == 1,
             promisc_mc  = self:output(0x10+0xf0, 30, 30) == 1,
             promisc_all = self:output(0x10+0xf0, 29, 29) == 1,
-            permanent_address = mac_hex }
+            permanent_address = mac }
 end
 
 function HCA:modify_nic_vport_context (mtu, promisc_uc, promisc_mc, promisc_all)
@@ -1574,8 +1573,8 @@ end
 
 -- Create a DMAC+VLAN flow group.
 function HCA:create_flow_group_macvlan (table_id, table_type, start_ix, end_ix, usevlan, mcast)
-   local dmac = (mcast and ethernet:ptoi("01:00:00:00:00:00"))
-             or ethernet:ptoi("ff:ff:ff:ff:ff:ff")
+   local dmac = (mcast and macaddress:new("01:00:00:00:00:00"))
+             or macaddress:new("ff:ff:ff:ff:ff:ff")
    self:command("CREATE_FLOW_GROUP", 0x3FC, 0x0C)
       :input("opcode",         0x00,        31, 16, 0x933)
       :input("table_type",     0x10,        31, 24, table_type)
@@ -1583,8 +1582,8 @@ function HCA:create_flow_group_macvlan (table_id, table_type, start_ix, end_ix, 
       :input("start_ix",       0x1C,        31,  0, start_ix)
       :input("end_ix",         0x24,        31,  0, end_ix) -- (inclusive)
       :input("match_criteria", 0x3C,         7,  0, 1) -- match outer headers
-      :input("dmac0",          0x40 + 0x08, 31,  0, shr(dmac, 16))
-      :input("dmac1",          0x40 + 0x0C, 31, 16, band(dmac, 0xFFFF))
+      :input("dmac0",          0x40 + 0x08, 31,  0, bswap(dmac:subbits(0,32)))
+      :input("dmac1",          0x40 + 0x0C, 31, 16, shr(bswap(dmac:subbits(32,48)), 16))
    if usevlan then 
       self:input("vlanid",         0x40 + 0x0C, 11,  0, 0xFFF) 
    end
@@ -1606,8 +1605,8 @@ function HCA:set_flow_table_entry_macvlan (table_id, table_type, group_id,
       :input("group_id",     0x40 + 0x04,  31,  0, group_id)
       :input("action",       0x40 + 0x0C,  15,  0, 4) -- action = FWD_DST
       :input("dest_list_sz", 0x40 + 0x10,  23,  0, #dest_ids) -- destination list size
-      :input("dmac0",        0x40 + 0x48,  31,  0, shr(dmac, 16))
-      :input("dmac1",        0x40 + 0x4C,  31, 16, band(dmac, 0xFFFF))
+      :input("dmac0",        0x40 + 0x48,  31,  0, bswap(dmac:subbits(0,32)))
+      :input("dmac1",        0x40 + 0x4C,  31, 16, shr(bswap(dmac:subbits(32,48)), 16))
       :input("vlan",         0x40 + 0x4C,  11,  0, vlanid or 0)
       for i, dest_id in ipairs(dest_ids) do
          self:input("dest_type", 0x40 + 0x300 + 0x8*(i-1), 31, 24, dest_type)
