@@ -705,7 +705,8 @@ function IO:receive (lo)
    local cxq = self.cxq
    while band(cxq.rxdesc[cxq.rx_tail].write.status_err_type_len, 0x01) == 1 and pkts < engine.pull_npackets do
       local p = cxq.rxqueue[cxq.rx_tail]
-      p.length = rshift(cxq.rxdesc[cxq.rx_tail].write.status_err_type_len, 38)
+      -- NB: truncate 4 byte CRC
+      p.length = rshift(cxq.rxdesc[cxq.rx_tail].write.status_err_type_len, 38) - 4
       transmit(lo, p)
 
       local np = packet.allocate()
