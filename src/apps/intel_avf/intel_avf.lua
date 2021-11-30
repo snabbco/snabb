@@ -1154,14 +1154,19 @@ function Intel_avf:mbox_sr_add_mac(macs)
 end
 
 function Intel_avf:mbox_sr_rss(nqueues)
+   -- Setup HENA
+   local tt = self:mbox_send_buf(virtchnl_rss_hena_ptr_t)
    if nqueues == 1 then
       -- pg83
       -- Forcefully disable the NICs RSS features. Contrary to the spec, RSS
       -- capabilites are turned on by default and need to be disabled (as least
       -- under Linux/some NICs.)
-      local tt = self:mbox_send_buf(virtchnl_rss_hena_ptr_t)
-      self:mbox_sr('VIRTCHNL_OP_SET_RSS_HENA', ffi.sizeof(virtchnl_rss_hena_t))
+      tt.hena = 0
+   else
+      -- Enable all
+      tt.hena = 0xffffffffffffffffULL
    end
+   self:mbox_sr('VIRTCHNL_OP_SET_RSS_HENA', ffi.sizeof(virtchnl_rss_hena_t))
    -- Set random RSS key
    local tt = self:mbox_send_buf(virtchnl_rss_key_ptr_t)
    tt.vsi_id = self.vsi_id
