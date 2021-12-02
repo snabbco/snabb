@@ -686,8 +686,7 @@ function IO:transmit (li)
    self:reclaim_txdesc()
    while not empty(li) and cxq.tx_desc_free > 0 do
       local p = receive(li)
-      -- NB: need to extend size for 4 byte CRC (not clear from the spec.)
-      local size = lshift(4ULL+p.length, SIZE_SHIFT)
+      local size = lshift(0ULL+p.length, SIZE_SHIFT) -- NB: extend to 64 bit before shift
       cxq.txdesc[ cxq.tx_next ].address = tophysical(p.data)
       cxq.txqueue[ cxq.tx_next ] = p
       cxq.txdesc[ cxq.tx_next ].cmd_type_offset_bsz = bor(RS_EOP_IL2TAG1, size, L2TAG1)
@@ -705,8 +704,7 @@ function IO:receive (lo)
    local cxq = self.cxq
    while band(cxq.rxdesc[cxq.rx_tail].write.status_err_type_len, 0x01) == 1 and pkts < engine.pull_npackets do
       local p = cxq.rxqueue[cxq.rx_tail]
-      -- NB: truncate 4 byte CRC
-      p.length = rshift(cxq.rxdesc[cxq.rx_tail].write.status_err_type_len, 38) - 4
+      p.length = rshift(cxq.rxdesc[cxq.rx_tail].write.status_err_type_len, 38)
       transmit(lo, p)
 
       local np = packet.allocate()
