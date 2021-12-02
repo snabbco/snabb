@@ -7,11 +7,12 @@ module(..., package.seeall)
 
 local ffi         = require("ffi")
 local lib         = require("core.lib")
+local sync     = require("core.sync")
 local macaddress  = require("lib.macaddress")
 local pci         = require("lib.hardware.pci")
 local register    = require("lib.hardware.register")
 local tophysical  = core.memory.virtual_to_physical
-local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
+local band, lshift, rshift, bor = bit.band, bit.lshift, bit.rshift, bit.bor
 local transmit, receive, empty = link.transmit, link.receive, link.empty
 local counter     = require("core.counter")
 local shm         = require("core.shm")
@@ -24,6 +25,9 @@ local MAC_ADDR_BYTE_LEN = 6
 Intel_avf = {
    config = {
       pciaddr = { required=true },
+      nqueues = {},
+      vlan = {},
+      macs = {default={}},
       ring_buffer_size = {default=2048}
    }
 }
@@ -107,43 +111,66 @@ local virtchnl_msg_t = ffi.typeof([[
 ]])
 local virtchnl_msg_ptr_t = ffi.typeof("$ *", virtchnl_msg_t)
 
-local virtchnl_q_pair_t = ffi.typeof([[
+local virtchnl_txq_info_t = ffi.typeof([[
+   struct {
+      uint16_t vsi_id;
+      uint16_t queue_id;
+      uint16_t ring_len;
+      uint16_t deprecated0;
+      uint64_t dma_ring_addr;
+      uint64_t deprecated1;
+   } __attribute__((packed))
+]])
+
+local virtchnl_rxq_info_t = ffi.typeof([[
+   struct {
+      uint16_t vsi_id;
+      uint16_t queue_id;
+      uint32_t ring_len;
+      uint16_t hdr_size;
+      uint16_t deprecated0;
+      uint32_t databuffer_size;
+      uint32_t max_pkt_size;
+      uint32_t pad0;
+      uint64_t dma_ring_addr;
+      uint32_t deprecated1;
+      uint32_t pad1;
+   } __attribute__((packed))
+]])
+
+local virtchnl_queue_pair_info_t = ffi.typeof([[
+   struct {
+      /* NOTE: vsi_id and queue_id should be indentical for both queues. */
+      $ txq;
+      $ rxq;
+   } __attribute__((packed))
+]], virtchnl_txq_info_t, virtchnl_rxq_info_t)
+
+local virtchnl_queue_config_info_t = ffi.typeof([[
    struct {
       uint16_t vsi_id;
       uint16_t num_queue_pairs;
       uint32_t pad;
-
-      uint16_t tx_vsi_id;
-      uint16_t tx_queue_id;
-      uint16_t tx_ring_len;
-      uint16_t tx_deprecated0;
-      uint64_t tx_dma_ring_addr;
-      uint64_t tx_deprecated1;
-
-      uint16_t rx_vsi_id;
-      uint16_t rx_queue_id;
-      uint32_t rx_ring_len;
-      uint16_t rx_hdr_size;
-      uint16_t rx_deprecated0;
-      uint32_t rx_databuffer_size;
-      uint32_t rx_max_pkt_size;
-      uint32_t rx_pad0;
-      uint64_t rx_dma_ring_addr;
-      uint32_t rx_deprecated1;
-      uint32_t rx_pad1;
+      $ qpair[1];
    } __attribute__((packed))
-]])
-local virtchnl_q_pair_ptr_t = ffi.typeof("$ *", virtchnl_q_pair_t)
+]], virtchnl_queue_pair_info_t)
 
-local virtchnl_ether_addr_t = ffi.typeof([[
+local virtchnl_queue_config_info_ptr_t = ffi.typeof("$ *", virtchnl_queue_config_info_t)
+
+local virtchnl_ether_addr_t = ffi.typeof[[
    struct {
-      uint16_t vsi;
-      uint16_t num_elements;
       uint8_t addr[6]; // MAC_ADDR_BYTE_LEN
       uint8_t pad[2];
    } __attribute__((packed))
-]])
-local virtchnl_ether_addr_ptr_t = ffi.typeof("$ *", virtchnl_ether_addr_t)
+]]
+local virtchnl_ether_addr_list_t = ffi.typeof([[
+   struct {
+      uint16_t vsi;
+      uint16_t num_elements;
+      $ list[1];
+   } __attribute__((packed))
+]], virtchnl_ether_addr_t)
+local virtchnl_ether_addr_list_ptr_t = ffi.typeof("$ *", virtchnl_ether_addr_list_t)
 
 local eth_stats_t = ffi.typeof([[
    struct {
@@ -209,6 +236,7 @@ local virtchnl_rss_key_t = ffi.typeof([[
       uint16_t vsi_id;
       uint16_t key_len;
       uint8_t key[1]; /* RSS hash key, packed bytes */
+      uint8_t pad;
    } __attribute__((packed))
 ]])
 local virtchnl_rss_key_ptr_t = ffi.typeof('$*', virtchnl_rss_key_t)
@@ -218,6 +246,7 @@ local virtchnl_rss_lut_t = ffi.typeof([[
       uint16_t vsi_id;
       uint16_t lut_entries;
       uint8_t lut[1]; /* RSS lookup table*/
+      uint8_t pad;
    } __attribute__((packed))
 ]])
 local virtchnl_rss_lut_ptr_t = ffi.typeof('$*', virtchnl_rss_lut_t)
@@ -228,6 +257,15 @@ local virtchnl_rss_hena_t = ffi.typeof([[
    } __attribute__((packed))
 ]])
 local virtchnl_rss_hena_ptr_t = ffi.typeof('$*', virtchnl_rss_hena_t)
+
+local virtchnl_vlan_filter_list_t = ffi.typeof([[
+   struct {
+      uint16_t vsi_id;
+      uint16_t num_elements;
+      uint16_t vlan_id[1];
+   } __attribute__((packed))
+]])
+local virtchnl_vlan_filter_list_ptr_t = ffi.typeof('$*', virtchnl_vlan_filter_list_t)
 
 local mbox_q_t = ffi.typeof([[
       struct {
@@ -246,28 +284,163 @@ local mbox_q_t = ffi.typeof([[
 ]])
 local mbox_q_ptr_t = ffi.typeof('$*', mbox_q_t)
 
-function Intel_avf:init_tx_q()
-   self.txdesc = ffi.cast(txdesc_ptr_t,
-   memory.dma_alloc(ffi.sizeof(txdesc_t) * self.ring_buffer_size))
-   ffi.fill(self.txdesc, ffi.sizeof(txdesc_t) * self.ring_buffer_size)
-   self.txqueue = ffi.new("struct packet *[?]", self.ring_buffer_size)
-   for i=0, self.ring_buffer_size - 1 do
-      self.txqueue[i] = nil
-      self.txdesc[i].cmd_type_offset_bsz = 0
+---------------------------------------------------------------
+-- CXQ (Queue pair control object):
+-- 
+-- A "CXQ" is an object that we define to represent a transmit/receive pair.
+-- 
+-- CXQs are created and deleted by a "Control" app (Intel_avf) and,
+-- in between, they are used by "IO" apps to send and receive packets.
+-- 
+-- The lifecycle of a CXQ is managed using a state machine. This is
+-- necessary because we allow Control and IO apps to start in any
+-- order, for Control and IO apps to start/stop/restart independently,
+-- for multiple IO apps to attempt to attach to the same CXQ, and even
+-- for apps to stop in one Snabb process and be started in another
+-- one.
+-- 
+-- (This design is lifted from the apps.mellanox.connectx driver.)
+--
+---------------------------------------------------------------
+
+-- CXQs can be in one of five states:
+--   INIT: CXQ is being initialized by the control app
+--   FREE: CXQ is ready and available for use by an IO app.
+--   IDLE: CXQ is owned by an app, but not actively processing right now.
+--   BUSY: CXQ is owned by an app and is currently processing (e.g. push/pull).
+--   DEAD: CXQ has been deallocated; IO app must try to open a new one.
+-- 
+-- Once a CXQ is closed it stays in the DEAD state forever. However, a
+-- replacement CXQ with the same name can be created and existing IO
+-- apps can reattach to that instead. This will rerun the state machine.
+--
+-- Here are the valid state transitions & when they occur:
+--
+-- App  Change      Why
+-- ---- ----------- --------------------------------------------------------
+-- CTRL none->INIT: Control app starts initialization.
+-- CTRL INIT->FREE: Control app completes initialization.
+-- IO   FREE->IDLE: IO app starts and becomes owner of the CXQ.
+-- IO   IDLE->FREE: IO app stops and releases the CXQ for future use.
+-- IO   IDLE->BUSY: IO app starts running a pull/push method.
+-- IO   BUSY->IDLE: IO app stops running a pull/push method.
+-- CTRL IDLE->DEAD: Control app closes the CXQ. (Replacement can be created.)
+-- 
+-- These state transitions are *PROHIBITED* for important reasons:
+--
+-- App    Change      Why *PROHIBITED*
+-- ------ ----------- --------------------------------------------------------
+-- CTRL   BUSY->DEAD  Cannot close a CXQ while it is busy (must wait.)
+-- IO     DEAD->BUSY  Cannot use a CXQ that is closed (must check.)
+-- *      DEAD->*     Cannot transition from DEAD (must create new CXQ.)
+--
+-- Further notes:
+-- 
+--   Packet buffers for pending DMA (transmit or receive) are freed by
+--   the Control app (which can disable DMA first) rather than by the IO
+--   app (which shuts down with DMA still active.)
+--
+--   Abnormal shutdown of the process hosting the Control app is *not*
+--   supported. We just don’t have anywhere to free packets to in that
+--   case.
+
+-- A CXQ is represented by one struct allocated in shared memory.
+-- 
+-- The struct defines the fields in very specific terms so that it can
+-- be used directly by the driver code (rather than copying back and
+-- forth between the shared memory object and a separate native
+-- format.)
+local cxq_t = ffi.typeof([[
+   struct {
+      int state[1];    // current state / availability
+
+      // configuration information:
+      uint32_t qno;       // queue number
+      uint16_t vlan;      // 802.1Q vlan tag
+      uint32_t ring_size; // size of rx/tx rings
+
+      // Transmit state
+      uint32_t tx_next;
+      uint32_t tx_cand;
+      uint32_t tx_desc_free;
+      $ txdesc;
+      struct packet *txqueue[64*1024];
+
+      // Receive state
+      uint32_t rx_tail;
+      $ rxdesc;
+      struct packet *rxqueue[64*1024];
+   } __attribute((packed))
+]], txdesc_ptr_t, rxdesc_ptr_t)
+
+-- CXQ states:
+local INIT = 0 -- Implicit initial state due to 0 value.
+local BUSY = 1
+local IDLE = 2
+local FREE = 3
+local DEAD = 4
+
+-- Release CXQ from IO apps after process termination.
+-- Called from core.main.shutdown
+function shutdown(pid)
+   for _, pciaddr in ipairs(shm.children("/"..pid.."/intel_avf")) do
+      for _, queue in ipairs(shm.children("/"..pid.."/intel_avf/"..pciaddr)) do
+         local backlink = "/"..pid.."/intel_avf/"..pciaddr.."/"..queue
+         local ok, cxq = pcall(shm.open, backlink, cxq_t)
+         if ok then
+            -- Allow reclaimation of CXQ
+            sync.cas(cxq.state, IDLE, FREE)
+            sync.cas(cxq.state, BUSY, FREE)
+            shm.unlink(backlink)
+         end
+      end
    end
 end
 
-function Intel_avf:init_rx_q()
-   self.rxqueue = ffi.new("struct packet *[?]", self.ring_buffer_size)
-   self.rxdesc = ffi.cast(rxdesc_ptr_t,
-   memory.dma_alloc(ffi.sizeof(rxdesc_t) * self.ring_buffer_size), 128)
+function Intel_avf:init_cxq (qno)
+   -- Create a shared memory object for controlling the queue pair
+   local cxq = shm.create("group/pci/"..self.pciaddress.."/"..qno, cxq_t)
+   cxq.qno = qno
+   cxq.vlan = self.vlan or 0
+   cxq.ring_size = self.ring_buffer_size
+   self:init_tx_q(cxq)
+   self:init_rx_q(cxq)
+   return cxq
+end
 
+function Intel_avf:free_cxq (cxq)
+   -- Free packets remaining in TX/RX queues.
+   for i = 0, cxq.ring_size-1 do
+      if cxq.txqueue[i] ~= nil then
+         packet.free(cxq.txqueue[i])
+      end
+      packet.free(cxq.rxqueue[i])
+   end
+   shm.unlink("group/pci/"..self.pciaddress.."/"..cxq.qno)
+   shm.unmap(cxq)
+end
+
+function Intel_avf:init_tx_q(cxq)
+   cxq.txdesc = ffi.cast(txdesc_ptr_t, memory.dma_alloc(ffi.sizeof(txdesc_t) * self.ring_buffer_size))
+   ffi.fill(cxq.txdesc, ffi.sizeof(txdesc_t) * self.ring_buffer_size)
+   for i=0, self.ring_buffer_size - 1 do
+      cxq.txqueue[i] = nil
+      cxq.txdesc[i].cmd_type_offset_bsz = 0
+   end
+   cxq.tx_next = 0
+   cxq.tx_cand = 0
+   cxq.tx_desc_free = self.ring_buffer_size - 1
+end
+
+function Intel_avf:init_rx_q(cxq)
+   cxq.rxdesc = ffi.cast(rxdesc_ptr_t, memory.dma_alloc(ffi.sizeof(rxdesc_t) * self.ring_buffer_size))
    for i = 0, self.ring_buffer_size-1 do
       local p = packet.allocate()
-      self.rxqueue[i] = p
-   self.rxdesc[i].read.address = tophysical(p.data)
-      self.rxdesc[i].write.status_err_type_len = 0
+      cxq.rxqueue[i] = p
+      cxq.rxdesc[i].read.address = tophysical(p.data)
+      cxq.rxdesc[i].write.status_err_type_len = 0
    end
+   cxq.rx_tail = 0
 end
 
 function Intel_avf:supported_hardware()
@@ -362,134 +535,203 @@ function Intel_avf:mbox_setup_txq()
    self.r.VF_ATQLEN(bits({ ENABLE = 31 }) + self.mbox.q_len)
 end
 
-function Intel_avf:mbox_sr_q()
-   local tt = self:mbox_send_buf(virtchnl_q_pair_ptr_t)
+function Intel_avf:mbox_sr_q(cxqs)
+   local tt = self:mbox_send_buf(virtchnl_queue_config_info_ptr_t)
 
    tt.vsi_id = self.vsi_id
-   tt.num_queue_pairs = 1
+   tt.num_queue_pairs = #cxqs
 
-   tt.tx_vsi_id = self.vsi_id
-   tt.tx_queue_id = self.qno
-   tt.tx_ring_len = self.ring_buffer_size
-   tt.tx_dma_ring_addr = tophysical(self.txdesc)
+   for i, cxq in ipairs(cxqs) do
+      tt.qpair[i-1].txq.vsi_id = self.vsi_id
+      tt.qpair[i-1].txq.queue_id = cxq.qno
+      tt.qpair[i-1].txq.ring_len = cxq.ring_size
+      tt.qpair[i-1].txq.dma_ring_addr = tophysical(cxq.txdesc)
 
-   tt.rx_vsi_id = self.vsi_id
-   tt.rx_queue_id = self.qno
-   tt.rx_ring_len = self.ring_buffer_size
-   -- Only 32 byte rxdescs are supported, at least by the PF driver in
-   -- centos 7 3.10.0-957.1.3.el7.x86_64
-   tt.rx_hdr_size = 32
-   tt.rx_databuffer_size = packet.max_payload
-   tt.rx_max_pkt_size = packet.max_payload
-   tt.rx_dma_ring_addr = tophysical(self.rxdesc)
+      tt.qpair[i-1].rxq.vsi_id = self.vsi_id
+      tt.qpair[i-1].rxq.queue_id = cxq.qno
+      tt.qpair[i-1].rxq.ring_len = cxq.ring_size
+      -- Only 32 byte rxdescs are supported, at least by the PF driver in
+      -- centos 7 3.10.0-957.1.3.el7.x86_64
+      tt.qpair[i-1].rxq.hdr_size = 32
+      tt.qpair[i-1].rxq.databuffer_size = packet.max_payload
+      tt.qpair[i-1].rxq.max_pkt_size = packet.max_payload
+      tt.qpair[i-1].rxq.dma_ring_addr = tophysical(cxq.rxdesc)
+   end
 
-   self:mbox_sr('VIRTCHNL_OP_CONFIG_VSI_QUEUES', ffi.sizeof(virtchnl_q_pair_t) + 64)
-
-   self.r.rx_tail = self.r.QRX_TAIL[self.qno]
-   self.r.tx_tail = self.r.QTX_TAIL[self.qno]
-   self.rx_tail = 0
-   self.r.rx_tail(self.ring_buffer_size - 1)
+   self:mbox_sr('VIRTCHNL_OP_CONFIG_VSI_QUEUES',
+                ffi.sizeof(virtchnl_queue_config_info_t) +
+                ffi.sizeof(virtchnl_queue_pair_info_t) * #cxqs)
 end
 
-function Intel_avf:mbox_sr_enable_q ()
+function Intel_avf:mbox_sr_enable_q (nqueues)
    local tt = self:mbox_send_buf(queue_select_ptr_t)
 
    tt.vsi_id = self.vsi_id
    tt.pad = 0
-   tt.rx_queues = bits({ ENABLE = self.qno })
-   tt.tx_queues = bits({ ENABLE = self.qno })
+   local q_enable_mask = lshift(1, nqueues) - 1
+   tt.rx_queues = q_enable_mask
+   tt.tx_queues = q_enable_mask
    self:mbox_sr('VIRTCHNL_OP_ENABLE_QUEUES', ffi.sizeof(queue_select_t))
 end
 
-function Intel_avf:ringnext (index)
-   return band(index+1, self.ring_buffer_size - 1)
+IO = {
+   config = {
+      pciaddr = {required=true},
+      queue = {required=true}
+   }
+}
+
+function IO:new (conf)
+   local self = setmetatable({}, { __index = IO })
+   self.pciaddr = pci.qualified(conf.pciaddr)
+   self.qno = conf.queue
+
+   -- This is also done in Intel_avf:new() but might not have
+   -- happened yet.
+   pci.unbind_device_from_linux(self.pciaddr)
+
+   self.fd = pci.open_pci_resource_unlocked(self.pciaddr, 0)
+   self.base = pci.map_pci_memory(self.fd)
+   self.r = {}
+   Intel_avf.load_registers(self) -- Initialize registers at (self.r.*)
+
+   self.online = false      -- True when queue is up and running
+   self.cxq = nil           -- shm object containing queue control information
+   self.open_throttle =     -- Timer to throttle shm open attempts (10ms)
+      lib.throttle(0.25)
+
+   return self
 end
 
-function Intel_avf:reclaim_txdesc ()
-   local RS = bits({ RS = 5 })
-   local COMPLETE = 15
-
-   while band(self.txdesc[ self:ringnext(self.tx_cand) ].cmd_type_offset_bsz, COMPLETE) == COMPLETE
-         and self.tx_desc_free < self.ring_buffer_size - 1 do
-      local c = self.tx_cand
-      packet.free(self.txqueue[c])
-      self.txqueue[c] = nil
-      self.tx_cand = self:ringnext(self.tx_cand)
-      self.tx_desc_free = self.tx_desc_free + 1
+function IO:stop()
+   if self.cxq then
+      assert(sync.cas(self.cxq.state, IDLE, FREE) or
+               self.cxq.state[0] == DEAD,
+            "illegal state detected")
+      self:close()
    end
 end
 
-function Intel_avf:push ()
-   local li = self.input.input
+-- Close the queue mapping.
+function IO:close ()
+   shm.unlink(self.backlink)
+   shm.unmap(self.cxq)
+   self.cxq = nil
+end
+
+-- Open the queue mapping.
+function IO:open ()
+   local shmpath = "group/pci/"..self.pciaddr.."/"..self.qno
+   self.backlink = "intel_avf/"..self.pciaddr.."/"..self.qno
+   if shm.exists(shmpath) then
+      shm.alias(self.backlink, shmpath)
+      self.cxq = shm.open(shmpath, cxq_t)
+      if sync.cas(self.cxq.state, FREE, IDLE) then
+         -- Select queue tail registers
+         self.r.rx_tail = self.r.QRX_TAIL[self.cxq.qno]
+         self.r.tx_tail = self.r.QTX_TAIL[self.cxq.qno]
+      else
+         close()             -- Queue was not FREE.
+      end
+   end
+end
+
+-- Return true on successful activation of the queue.
+function IO:activate ()
+   -- If not open then make a request on a regular schedule.
+   if self.cxq == nil and self.open_throttle() then
+      self:open()
+   end
+   if self.cxq then
+      -- Careful: Control app may have closed the CXQ.
+      if sync.cas(self.cxq.state, IDLE, BUSY) then
+         return true
+      else
+         assert(self.cxq.state[0] == DEAD, "illegal state detected")
+         self:close()
+      end
+   end
+end
+
+-- Enter the idle state.
+function IO:deactivate ()
+   assert(sync.cas(self.cxq.state, BUSY, IDLE))
+end
+
+local RS = bits({ RS = 5 })
+local COMPLETE = 15
+function IO:reclaim_txdesc ()
+
+   local cxq = self.cxq
+   while band(cxq.txdesc[band(cxq.tx_cand+1, cxq.ring_size-1)].cmd_type_offset_bsz, COMPLETE) == COMPLETE
+         and cxq.tx_desc_free < cxq.ring_size - 1 do
+      local c = cxq.tx_cand
+      packet.free(cxq.txqueue[c])
+      cxq.txqueue[c] = nil
+      cxq.tx_cand = band(cxq.tx_cand+1, cxq.ring_size-1)
+      cxq.tx_desc_free = cxq.tx_desc_free + 1
+   end
+end
+
+local RS_EOP = bits{ EOP = 4, RS = 5, RSV = 6 }
+local IL2TAG1 = bits{ IL2TAG1 = 7}
+function IO:transmit (li)
    if li == nil then return end
 
-   local RS_EOP = bits({ EOP = 4, RS = 5 })
+   local cxq = self.cxq
+   local RS_EOP_IL2TAG1 = bor(RS_EOP, (cxq.vlan>0 and IL2TAG1) or 0)
+   local L2TAG1 = lshift(0ULL+cxq.vlan, 48)
    local SIZE_SHIFT = 34
 
    self:reclaim_txdesc()
-   while not empty(li) and self.tx_desc_free > 0 do
+   while not empty(li) and cxq.tx_desc_free > 0 do
       local p = receive(li)
-      -- NB: need to extend size for 4 byte CRC (not clear from the spec.)
-      local size = lshift(4ULL+p.length, SIZE_SHIFT)
-      self.txdesc[ self.tx_next ].address = tophysical(p.data)
-      self.txqueue[ self.tx_next ] = p
-      self.txdesc[ self.tx_next ].cmd_type_offset_bsz = RS_EOP + size
-      self.tx_next = self:ringnext(self.tx_next)
-      self.tx_desc_free = self.tx_desc_free - 1
+      local size = lshift(0ULL+p.length, SIZE_SHIFT) -- NB: extend to 64 bit before shift
+      cxq.txdesc[ cxq.tx_next ].address = tophysical(p.data)
+      cxq.txqueue[ cxq.tx_next ] = p
+      cxq.txdesc[ cxq.tx_next ].cmd_type_offset_bsz = bor(RS_EOP_IL2TAG1, size, L2TAG1)
+      cxq.tx_next = band(cxq.tx_next+1, cxq.ring_size-1)
+      cxq.tx_desc_free = cxq.tx_desc_free - 1
    end
    C.full_memory_barrier()
-   self.r.tx_tail(band(self.tx_next, self.ring_buffer_size - 1))
-
-   if self.sync_stats_throttle() then
-      self:sync_stats()
-   end
+   self.r.tx_tail(band(cxq.tx_next, cxq.ring_size - 1))
 end
 
-function Intel_avf:pull()
-   local lo = self.output.output
+function IO:receive (lo)
    if lo == nil then return end
 
    local pkts = 0
-   while band(self.rxdesc[self.rx_tail].write.status_err_type_len, 0x01) == 1 and pkts < engine.pull_npackets do
-      local p = self.rxqueue[self.rx_tail]
-      p.length = rshift(self.rxdesc[self.rx_tail].write.status_err_type_len, 38)
+   local cxq = self.cxq
+   while band(cxq.rxdesc[cxq.rx_tail].write.status_err_type_len, 0x01) == 1 and pkts < engine.pull_npackets do
+      local p = cxq.rxqueue[cxq.rx_tail]
+      p.length = rshift(cxq.rxdesc[cxq.rx_tail].write.status_err_type_len, 38)
       transmit(lo, p)
 
       local np = packet.allocate()
-      self.rxqueue[self.rx_tail] = np
-      self.rxdesc[self.rx_tail].read.address = tophysical(np.data)
-      self.rxdesc[self.rx_tail].write.status_err_type_len = 0
-      self.rx_tail = band(self.rx_tail + 1, self.ring_buffer_size-1)
+      cxq.rxqueue[cxq.rx_tail] = np
+      cxq.rxdesc[cxq.rx_tail].read.address = tophysical(np.data)
+      cxq.rxdesc[cxq.rx_tail].write.status_err_type_len = 0
+      cxq.rx_tail = band(cxq.rx_tail+1, cxq.ring_size-1)
       pkts = pkts + 1
    end
    -- This avoids the queue being full / empty when HEAD=TAIL
    C.full_memory_barrier()
-   self.r.rx_tail(band(self.rx_tail - 1, self.ring_buffer_size - 1))
+   self.r.rx_tail(band(cxq.rx_tail-1, cxq.ring_size-1))
+end
 
-   if self.sync_stats_throttle() then
-      self:sync_stats()
+function IO:push ()
+   if self:activate() then
+      self:transmit(self.input.input)
+      self:deactivate()
    end
 end
 
-function Intel_avf:sync_stats ()
-   if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_GET_STATS'] then
-      self:mbox_r_stats('async')
-   end
-   if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_RESET_VF'] then
-      self:mbox_s_stats()
+function IO:pull ()
+   if self:activate() then
+      self:receive(self.output.output)
+      self:deactivate()
    end
 end
-
-function Intel_avf:flush_stats ()
-   if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_GET_STATS'] then
-      self:mbox_r_stats()
-   end
-   self:mbox_s_stats()
-   self:mbox_r_stats()
-end
-
-function Intel_avf:rxdrop () return counter.read(self.shm.rxdrop) end
-function Intel_avf:txdrop () return counter.read(self.shm.txdrop) end
 
 function Intel_avf:mbox_setup()
    local dlen = 4096
@@ -520,9 +762,9 @@ function Intel_avf:mbox_setup()
          VIRTCHNL_OP_CONFIG_IRQ_MAP = 7,
          VIRTCHNL_OP_ENABLE_QUEUES = 8,
          VIRTCHNL_OP_DISABLE_QUEUES = 9,
-         -- VIRTCHNL_OP_ADD_ETH_ADDR = 10,
+         VIRTCHNL_OP_ADD_ETH_ADDR = 10,
          -- VIRTCHNL_OP_DEL_ETH_ADDR = 11,
-         -- VIRTCHNL_OP_ADD_VLAN = 12,
+         VIRTCHNL_OP_ADD_VLAN = 12,
          -- VIRTCHNL_OP_DEL_VLAN = 13,
          -- VIRTCHNL_OP_CONFIG_PROMISCUOUS_MODE = 14,
          VIRTCHNL_OP_GET_STATS = 15,
@@ -548,7 +790,7 @@ function Intel_avf:mbox_sr(opcode, datalen)
    return self:mbox_recv(opcode)
 end
 
-function Intel_avf:mbox_send(opcode, datalen)
+function Intel_avf:mbox_send(opcode, datalen, timeout)
    assert(opcode == 'VIRTCHNL_OP_RESET_VF' or
              self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_RESET_VF'])
 
@@ -582,9 +824,11 @@ function Intel_avf:mbox_send(opcode, datalen)
    self.r.VF_ATQT(self.mbox.next_send_idx)
 
    lib.waitfor(function()
+      assert(not (timeout and timeout()), "timeout")
       return self.r.VF_ATQT() == self.mbox.next_send_idx
    end)
    lib.waitfor(function()
+      assert(not (timeout and timeout()), "timeout")
       -- 1 == bits({ DescriptorDone = 0 })
       -- 2 == bits({ Complete = 1 })
 
@@ -617,7 +861,7 @@ function Intel_avf:mbox_sr_caps()
    -- dpdk/drivers/net/avf/avf_vchnl.c
    local supported_caps = bits({
       VIRTCHNL_VF_OFFLOAD_L2 = 0,
-      VIRTCHNL_VF_OFFLOAD_VLAN = 16,
+      VIRTCHNL_VF_OFFLOAD_VLAN = 16, -- NB: Could leave this bit off and let PF handle VLANs
       VIRTCHNL_VF_OFFLOAD_RX_POLLING = 17,
       VIRTCHNL_VF_OFFLOAD_RSS_PF = 19
    })
@@ -685,12 +929,13 @@ function Intel_avf:mbox_recv(opcode, async)
    return ptr
 end
 
-function Intel_avf:wait_for_vfgen_rstat()
+function Intel_avf:wait_for_vfgen_rstat(timeout)
    -- Constant names stolen from DPDK drivers/net/avf/base/virtchnl.h
    -- Section 6.1 on page 51
    local mask0 = bits( { VIRTCHNL_VFR_COMPLETED = 1 })
    local mask1 = bits( { VIRTCHNL_VFR_VFACTIVE = 2 })
    lib.waitfor(function ()
+         assert(not (timeout and timeout()), "timeout")
          local v = self.r.VFGEN_RSTAT()
          return bit.band(mask0, v) == mask0 or bit.band(mask1, v) == mask1
    end)
@@ -698,31 +943,30 @@ end
 
 function Intel_avf:new(conf)
    local self = {
-      pciaddress = conf.pciaddr,
+      pciaddress = pci.qualified(conf.pciaddr),
       path = pci.path(conf.pciaddr),
+      vlan = conf.vlan,
       r = {},
       ring_buffer_size = conf.ring_buffer_size,
-
-      tx_next = 0,
-      tx_cand = 0,
-      tx_desc_free = conf.ring_buffer_size - 1,
-      qno = 0,
-      shm = {
-         rxbytes   = {counter},
-         rxpackets = {counter},
-         rxmcast   = {counter},
-         rxbcast   = {counter},
-         rxdrop    = {counter},
-         rx_unknown_protocol = {counter},
-         txbytes   = {counter},
-         txpackets = {counter},
-         txmcast   = {counter},
-         txbcast   = {counter},
-         txdrop    = {counter},
-         txerrors  = {counter}
-      },
       sync_stats_throttle = lib.throttle(1)
    }
+   -- PCI device statistics
+   local frame = {
+      macaddr   = {counter},
+      rxbytes   = {counter},
+      rxpackets = {counter},
+      rxmcast   = {counter},
+      rxbcast   = {counter},
+      rxdrop    = {counter},
+      rxerrors  = {counter},
+      txbytes   = {counter},
+      txpackets = {counter},
+      txmcast   = {counter},
+      txbcast   = {counter},
+      txdrop    = {counter},
+      txerrors  = {counter}
+   }
+   self.stats = shm.create_frame("pci/"..self.pciaddress, frame)
 
    -- pg79 /* number of descriptors, multiple of 32 */
    assert(self.ring_buffer_size % 32 == 0,
@@ -730,7 +974,7 @@ function Intel_avf:new(conf)
 
    self = setmetatable(self, { __index = Intel_avf })
    self:supported_hardware()
-   self.fd = pci.open_pci_resource_unlocked(self.pciaddress, 0)
+   self.fd = pci.open_pci_resource_locked(self.pciaddress, 0)
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
    self.base = pci.map_pci_memory(self.fd)
@@ -738,68 +982,143 @@ function Intel_avf:new(conf)
 
    -- wait for the nic to be ready, setup the mailbox and then reset it
    -- that way it doesn't matter what state you where given the card
-   self:wait_for_vfgen_rstat()
-   self:mbox_setup()
-   self:reset()
-
-   -- FIXME
-   -- I haven't worked out why the sleep is required but without it
-   -- self_mbox_set_version hangs indefinitely
-   --C.sleep(1)
-   -- See elaboration in Intel_avf:reset()
+   lib.waitfor(function ()
+      return pcall(function ()
+         self:wait_for_vfgen_rstat()
+         self:mbox_setup()
+         self:reset() -- reset can timeout
+      end)
+   end)
 
    -- setup the nic for real
    self:mbox_setup()
    self:mbox_sr_version()
    self:mbox_sr_caps()
-   self:mbox_s_rss()
-   self:init_tx_q()
-   self:init_rx_q()
+   self:mbox_sr_rss(conf.nqueues or 1)
+   if #conf.macs > 0  then
+      self:mbox_sr_add_mac(conf.macs)
+   end
+   if self.vlan then
+      self:mbox_sr_vlan()
+   end
+
+   -- publish device MAC address to SHM
+   counter.set(self.stats.macaddr, self.mac.bits)
+   
+   -- Queue setup
+   self.cxqs = {}
+   for qno=0, (conf.nqueues or 1) - 1 do
+      self.cxqs[#self.cxqs+1] = self:init_cxq(qno)
+   end
 
    self:init_irq()
-   self:mbox_sr_irq()
+   self:mbox_sr_irq(conf.nqueues or 1)
 
-   self:mbox_sr_q()
-   self:mbox_sr_enable_q()
+   self:mbox_sr_q(self.cxqs)
+   self:mbox_sr_enable_q(#self.cxqs)
+
+   for _, cxq in ipairs(self.cxqs) do      
+      -- CXQ is now fully initialized & ready for attach.
+      assert(sync.cas(cxq.state, INIT, FREE))
+   end
+
+   if not conf.nqueues then
+      -- If number of queues it not explicitly configured default to
+      -- old behavior and configure this app to do I/O on a single queue.
+      self.io = IO:new{pciaddr=self.pciaddress, queue=0}
+      self.io.input, self.io.output = {}, {}
+   end
+
    return self
 end
 
 function Intel_avf:link()
-   -- Alias SHM frame to canonical location.
-   if not shm.exists("pci/"..self.pciaddress) then
-      shm.alias("pci/"..self.pciaddress, "apps/"..self.appname)
+   if self.io then
+      self.io.input, self.io.output = self.input, self.output
    end
 end
+
+function Intel_avf:push ()
+   if self.io then
+      self.io:push()
+   end
+   if self.sync_stats_throttle() then
+      self:sync_stats()
+   end
+end
+
+function Intel_avf:pull ()
+   if self.io then
+      self.io:pull()
+   end
+   if self.sync_stats_throttle() then
+      self:sync_stats()
+   end
+end
+
+function Intel_avf:sync_stats ()
+   if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_GET_STATS'] then
+      self:mbox_r_stats('async')
+   end
+   if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_RESET_VF'] then
+      self:mbox_s_stats()
+   end
+end
+
+function Intel_avf:flush_stats ()      
+   if self.mbox.state == self.mbox.opcodes['VIRTCHNL_OP_GET_STATS'] then
+      self:mbox_r_stats()
+   end
+   self:mbox_s_stats()
+   self:mbox_r_stats()
+end
+
+function Intel_avf:rxdrop () return counter.read(self.stats.rxdrop) end
+function Intel_avf:txdrop () return counter.read(self.stats.txdrop) end
 
 function Intel_avf:reset()
    -- From "Appendix A Virtual Channel Protocol":
    -- VF sends this request to PF with no parameters PF does NOT respond! VF
    -- driver must delay then poll VFGEN_RSTAT register until reset completion
    -- is indicated. The admin queue must be reinitialized after this operation.
-   self:mbox_send('VIRTCHNL_OP_RESET_VF', 0)
+   self:mbox_send('VIRTCHNL_OP_RESET_VF', 0, lib.timeout(1))
    -- As per the above we (the VF driver) must "delay". Sadly, the spec does
    -- (as of this time / to my knowledge) not give further clues as to how to
    -- detect that the delay is sufficient. One second turned out to be not
    -- enough in some cases, two seconds has always worked so far.
    C.usleep(2e6)
-   self:wait_for_vfgen_rstat()
+   self:wait_for_vfgen_rstat(lib.timeout(1))
 end
 
 function Intel_avf:stop()
    self:reset()
    pci.set_bus_master(self.pciaddress, false)
    pci.close_pci_resource(self.fd, self.base)
+   -- If we have an embedded IO app, stop it.
+   if self.io then
+      self.io:stop()
+   end
    -- Free packets remaining in TX/RX queues.
-   for i = 0, self.ring_buffer_size-1 do
-      if self.txqueue[i] ~= nil then
-         packet.free(self.txqueue[i])
-      end
+   for _, cxq in ipairs(self.cxqs) do
+      local timeout = lib.timeout(3)
+      lib.waitfor(function ()
+         assert(not timeout(), "Intel_avf: failed to free queue "..tonumber(cxq.qno))
+         return sync.cas(cxq.state, FREE, DEAD) or sync.cas(cxq.state, IDLE, DEAD)
+      end)
+      self:free_cxq(cxq)
    end
-   for i = 0, self.ring_buffer_size-1 do
-      packet.free(self.rxqueue[i])
-   end
-   -- Unlink SHM alias.
+   -- Unlink stats frame.
    shm.unlink("pci/"..self.pciaddress)
+end
+
+function Intel_avf:report ()
+   self:flush_stats()
+   for _, c in ipairs{
+      'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast', 'rxdrop', 'rxdrop',
+      'txbytes', 'txpackets', 'txmcast', 'txbcast', 'txdrop', 'txerrors'
+   } do
+      print(("   %-20s %20s"):format(c, lib.comma_value(counter.read(self.stats[c]))))
+   end
 end
 
 function Intel_avf:init_irq()
@@ -810,31 +1129,67 @@ function Intel_avf:init_irq()
    self.r.VFINT_DYN_CTLN[0](v)
 end
 
-function Intel_avf:mbox_sr_irq()
+function Intel_avf:mbox_sr_irq(nqueues)
    local tt = self:mbox_send_buf(virtchnl_irq_map_info_ptr_t)
    tt.num_vectors = 1
    tt.vsi_id = self.vsi_id
    tt.vector_id = 0
-   tt.rxq_map = 1
+   tt.rxq_map = 2^nqueues-1 -- disable interrupts for all queues
    self:mbox_sr("VIRTCHNL_OP_CONFIG_IRQ_MAP", ffi.sizeof(virtchnl_irq_map_info_t) + 12)
 end
 
-function Intel_avf:mbox_sr_add_mac()
+function Intel_avf:mbox_sr_add_mac(macs)
    -- pg81
-   local tt = self:mbox_send_buf(virtchnl_ether_addr_ptr_t)
+   local tt = self:mbox_send_buf(virtchnl_ether_addr_list_ptr_t)
    tt.vsi = self.vsi_id
-   tt.num_elements = 1
-   ffi.copy(tt.addr, self.mac, MAC_ADDR_BYTE_LEN)
-   self:mbox_sr('VIRTCHNL_OP_ADD_ETH_ADDR', ffi.sizeof(virtchnl_ether_addr_t) + 8)
+   tt.num_elements = #macs
+   for i, mac in ipairs(macs) do
+      ffi.copy(tt.list[i-1].addr, mac, MAC_ADDR_BYTE_LEN)
+   end
+   self:mbox_sr('VIRTCHNL_OP_ADD_ETH_ADDR',
+                ffi.sizeof(virtchnl_ether_addr_list_t) +
+                ffi.sizeof(virtchnl_ether_addr_t) * #macs)
 end
 
-function Intel_avf:mbox_s_rss()
-   -- pg83
-   -- Forcefully disable the NICs RSS features. Contrary to the spec, RSS
-   -- capabilites are turned on by default and need to be disabled (as least
-   -- under Linux/some NICs.)
+function Intel_avf:mbox_sr_rss(nqueues)
+   -- Setup HENA
    local tt = self:mbox_send_buf(virtchnl_rss_hena_ptr_t)
+   if nqueues == 1 then
+      -- pg83
+      -- Forcefully disable the NICs RSS features. Contrary to the spec, RSS
+      -- capabilites are turned on by default and need to be disabled (as least
+      -- under Linux/some NICs.)
+      tt.hena = 0
+   else
+      -- Enable all
+      tt.hena = 0xffffffffffffffffULL
+   end
    self:mbox_sr('VIRTCHNL_OP_SET_RSS_HENA', ffi.sizeof(virtchnl_rss_hena_t))
+   -- Set random RSS key
+   local tt = self:mbox_send_buf(virtchnl_rss_key_ptr_t)
+   tt.vsi_id = self.vsi_id
+   tt.key_len = self.rss_key_size
+   ffi.copy(tt.key, lib.random_bytes(self.rss_key_size), self.rss_key_size)
+   self:mbox_sr('VIRTCHNL_OP_CONFIG_RSS_KEY',
+               ffi.sizeof(virtchnl_rss_key_t) + self.rss_key_size-1)
+   -- Setup LUT
+   local tt = self:mbox_send_buf(virtchnl_rss_lut_ptr_t)
+   tt.vsi_id = self.vsi_id
+   tt.lut_entries = self.rss_lut_size
+   for i=0, self.rss_lut_size-1 do
+      tt.lut[i] = i % nqueues -- fill LUT with configured queues
+   end
+   self:mbox_sr('VIRTCHNL_OP_CONFIG_RSS_LUT',
+                ffi.sizeof(virtchnl_rss_lut_t) + self.rss_lut_size-1)
+end
+
+function Intel_avf:mbox_sr_vlan()
+   local tt = self:mbox_send_buf(virtchnl_vlan_filter_list_ptr_t)
+   tt.vsi_id = self.vsi_id
+   tt.num_elements = 1
+   tt.vlan_id[0] = self.vlan
+   self:mbox_sr('VIRTCHNL_OP_ADD_VLAN',
+                ffi.sizeof(virtchnl_vlan_filter_list_t) + ffi.sizeof("uint16_t")*1)
 end
 
 function Intel_avf:mbox_s_stats()
@@ -850,18 +1205,18 @@ function Intel_avf:mbox_r_stats(async)
    local stats = ffi.cast(eth_stats_ptr_t, ret)
    local set = counter.set
 
-   set(self.shm.rxbytes,   stats.rx_bytes)
-   set(self.shm.rxpackets, stats.rx_unicast)
-   set(self.shm.rxmcast,   stats.rx_multicast)
-   set(self.shm.rxbcast,   stats.rx_broadcast)
-   set(self.shm.rxdrop,    stats.rx_discards)
-   set(self.shm.rx_unknown_protocol,  stats.rx_unknown_protocol)
+   set(self.stats.rxbytes,   stats.rx_bytes)
+   set(self.stats.rxpackets, stats.rx_unicast)
+   set(self.stats.rxmcast,   stats.rx_multicast)
+   set(self.stats.rxbcast,   stats.rx_broadcast)
+   set(self.stats.rxdrop,    stats.rx_discards)
+   set(self.stats.rxdrop,    stats.rx_unknown_protocol)
 
-   set(self.shm.txbytes,   stats.tx_bytes)
-   set(self.shm.txpackets, stats.tx_unicast)
-   set(self.shm.txmcast,   stats.tx_multicast)
-   set(self.shm.txbcast,   stats.tx_broadcast)
-   set(self.shm.txdrop,    stats.tx_discards)
-   set(self.shm.txerrors,  stats.tx_errors)
+   set(self.stats.txbytes,   stats.tx_bytes)
+   set(self.stats.txpackets, stats.tx_unicast)
+   set(self.stats.txmcast,   stats.tx_multicast)
+   set(self.stats.txbcast,   stats.tx_broadcast)
+   set(self.stats.txdrop,    stats.tx_discards)
+   set(self.stats.txerrors,  stats.tx_errors)
 end
 
