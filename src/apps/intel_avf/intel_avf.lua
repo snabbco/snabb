@@ -686,8 +686,7 @@ function IO:transmit (li)
    self:reclaim_txdesc()
    while not empty(li) and cxq.tx_desc_free > 0 do
       local p = receive(li)
-      -- NB: need to extend size for 4 byte CRC (not clear from the spec.)
-      local size = lshift(4ULL+p.length, SIZE_SHIFT)
+      local size = lshift(0ULL+p.length, SIZE_SHIFT) -- NB: extend to 64 bit before shift
       cxq.txdesc[ cxq.tx_next ].address = tophysical(p.data)
       cxq.txqueue[ cxq.tx_next ] = p
       cxq.txdesc[ cxq.tx_next ].cmd_type_offset_bsz = bor(RS_EOP_IL2TAG1, size, L2TAG1)
@@ -1153,14 +1152,19 @@ function Intel_avf:mbox_sr_add_mac(macs)
 end
 
 function Intel_avf:mbox_sr_rss(nqueues)
+   -- Setup HENA
+   local tt = self:mbox_send_buf(virtchnl_rss_hena_ptr_t)
    if nqueues == 1 then
       -- pg83
       -- Forcefully disable the NICs RSS features. Contrary to the spec, RSS
       -- capabilites are turned on by default and need to be disabled (as least
       -- under Linux/some NICs.)
-      local tt = self:mbox_send_buf(virtchnl_rss_hena_ptr_t)
-      self:mbox_sr('VIRTCHNL_OP_SET_RSS_HENA', ffi.sizeof(virtchnl_rss_hena_t))
+      tt.hena = 0
+   else
+      -- Enable all
+      tt.hena = 0xffffffffffffffffULL
    end
+   self:mbox_sr('VIRTCHNL_OP_SET_RSS_HENA', ffi.sizeof(virtchnl_rss_hena_t))
    -- Set random RSS key
    local tt = self:mbox_send_buf(virtchnl_rss_key_ptr_t)
    tt.vsi_id = self.vsi_id
