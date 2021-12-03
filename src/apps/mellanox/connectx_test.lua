@@ -67,8 +67,10 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
 
       -- MAC destination
       local r = math.random()
-      if     r < 0.10 then          -- 10% of packets are broadcast
+      if     r < 0.05 then          -- 5% of packets are broadcast
          ffi.fill(p.data, 6, 0xFF)
+      elseif r < 0.10 then          -- 5% of packets are multicast
+         p.data[0], p.data[1] = 0x33, 0x33 -- "locally administered" multicast
       elseif r < 0.20 then          -- 10% are unicast to random destinations
          for i = 1, 5 do p.data[i] = math.random(256) - 1 end
       else                          -- rest are unicast to known mac
@@ -185,22 +187,50 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       print(("%-16s  %20s  %20s"):format(k, lib.comma_value(stat0[k]), lib.comma_value(stat1[k])))
    end
 
+   local received = {[pci0]={}, [pci1]={}}
    print(("@@ %16s; %12s; %12s; %12s; %12s; %12s; %12s; %12s"):format(
          "nic", "link", "txpkt", "txbyte", "txdrop", "rxpkt", "rxbyte", "rxdrop"))
-   for id in pairs(io0) do
+   -- Sort into key order
+   local t = {}
+   for k in pairs(io0) do table.insert(t, k) end
+   table.sort(t)
+   for _, id in pairs(t) do
       local function prlink (nic, id, app)
          local function count (cnt) return tonumber(counter.read(cnt)) end
-         local srx = app.input.input.stats
-         local stx = app.output.output.stats
+         local stx = app.input.input.stats
+         local srx = app.output.output.stats
          print(("@@ %16s; %12s; %12d; %12d; %12d; %12d; %12d; %12d"):format(
                nic, id,
-               count(srx.txpackets), count(srx.txbytes), count(srx.txdrop),
-               count(stx.txpackets), count(stx.txbytes), count(stx.txdrop)))
+               count(stx.txpackets), count(stx.txbytes), count(stx.txdrop),
+               count(srx.txpackets), count(srx.txbytes), count(srx.txdrop)))
+         received[nic][#received[nic]+1] = count(srx.txpackets)
       end
       prlink(pci0, id, io0[id])
       prlink(pci1, id, io1[id])
    end
    print(("time: %.1fs - Mpps: %.3f per NIC"):format(finish-start, npackets/1e6/(finish-start)))
+
+   print("hardware counter check")
+   assert(stat0.tx_ucast_packets+stat0.tx_mcast_packets+stat0.tx_bcast_packets == npackets, "0: sent too little")
+   assert(stat1.tx_ucast_packets+stat1.tx_mcast_packets+stat1.tx_bcast_packets == npackets, "1: sent too little")
+   assert(stat0.tx_ucast_packets == stat1.rx_ucast_packets, "0.tx_ucast != 1.rx_ucast")
+   assert(stat1.tx_ucast_packets == stat0.rx_ucast_packets, "1.tx_ucast != 0.rx_ucast")
+   assert(stat0.tx_mcast_packets*macs == stat1.rx_mcast_packets, "0.tx_mcast*macs != 1.rx_mcast")
+   assert(stat1.tx_mcast_packets*macs == stat0.rx_mcast_packets, "1.tx_mcast*macs != 0.rx_mcast")
+   assert(stat0.tx_bcast_packets*macs == stat1.rx_bcast_packets, "0.tx_bcast*macs != 1.rx_bcast")
+   assert(stat1.tx_bcast_packets*macs == stat0.rx_bcast_packets, "1.tx_bcast*macs != 0.rx_bcast")
+
+   for _, nic in pairs{pci0, pci1} do
+      local sum, avg, sd = sum(received[nic]), mean(received[nic]), stdev(received[nic])
+      print(("RX check %s   sum=%d avg=%.1f sd=%.1f")
+         :format(nic, sum, avg, sd))
+      -- expect some slack because we send 10% to random MACs
+      assert(sum >= npackets*.8, "received too little")
+      -- expect more packets on queues 0 because we send 10% mcast,
+      -- but mostly even distribution of packets
+      assert(sd / avg < .2, "uneven packet distribution")
+   end
+
    print("selftest: done")
 end
 
@@ -211,6 +241,27 @@ function between (min, max)
    else
       return min + math.random(max-min+1) - 1
    end
+end
+
+function sum (values)
+   local sum = 0
+   for _, value in ipairs(values) do
+      sum = sum + value
+   end
+   return sum
+end
+
+function mean (values)
+   return sum(values) / #values
+end
+
+function stdev (values)
+   local avg = mean(values)
+   local var = {}
+   for _, value in ipairs(values) do
+      var[#var+1] = (value-avg)^2
+   end
+   return math.sqrt(mean(var))
 end
 
 function selftest ()
