@@ -199,6 +199,7 @@ local mlx_types = {
    ["0x1013" ] = 4, -- ConnectX4
    ["0x1017" ] = 5, -- ConnectX5
    ["0x1019" ] = 5, -- ConnectX5
+   ["0x101d" ] = 6, -- ConnectX6
 }
 
 function ConnectX:new (conf)
