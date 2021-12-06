@@ -275,6 +275,59 @@ function stdev (values)
    return math.sqrt(mean(var))
 end
 
+function basic_match (pci0, pci1)
+   print("selftest: connectx_test match")
+   
+   local packet_count = 1001
+   local src, dst = "00:00:00:00:00:01", "00:00:00:00:00:02"
+
+   local basic = require("apps.basic.basic_apps")
+   local match = require("apps.test.match")
+   local npackets = require("apps.test.npackets")
+   local synth = require("apps.test.synth")
+   local counter = require("core.counter")
+
+   local c = config.new()
+   config.app(c, "synth", synth.Synth, {
+      sizes={64,67,128,133,192,256,384,512,777,1024},
+      src=src,
+      dst=dst,
+      random_payload=true
+   })
+   config.app(c, "tee", basic.Tee)
+   config.app(c, "match", match.Match)
+   config.app(c, "npackets", npackets.Npackets, {npackets=packet_count})
+   config.app(c, "nic0", connectx.ConnectX, {
+      pciaddress=pci0,
+      queues={{id="io0", mac=src}}
+   })
+   config.app(c, "io0", connectx.IO, {pciaddress=pci0, queue="io0"})
+   config.app(c, "nic1", connectx.ConnectX, {
+      pciaddress=pci1,
+      queues={{id="io1", mac=dst}}
+   })
+   config.app(c, "io1", connectx.IO, {pciaddress=pci1, queue="io1"})
+
+   config.link(c, "synth.output -> npackets.input")
+   config.link(c, "npackets.output -> tee.input")
+   config.link(c, "tee.output1 -> io0.input")
+   config.link(c, "io1.output -> match.rx")
+   config.link(c, "tee.output2 -> match.comparator")
+
+   engine.configure(c)
+
+   engine.main({duration = 1, report = false})
+   engine.report_links()
+   engine.report_apps()
+
+   local m = engine.app_table['match']
+   assert(#m:errors() == 0, "Corrupt packets.")
+
+   engine.configure(config.new())
+
+   print("selftest: done")
+end
+
 function selftest ()
    local pci0 = os.getenv("SNABB_PCI_CONNECTX_0")
    local pci1 = os.getenv("SNABB_PCI_CONNECTX_1")
@@ -282,6 +335,7 @@ function selftest ()
       print("SNABB_PCI_CONNECTX_0 and SNABB_PCI_CONNECTX_1 must be set. Skipping selftest.")
       os.exit(engine.test_skipped_code)
    end
+   basic_match(pci0, pci1)
    switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 2, 2, 4)
    switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 1, 2, 8)
    switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 4, 1, 4)
