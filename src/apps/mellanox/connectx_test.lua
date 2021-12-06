@@ -215,10 +215,10 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
    assert(stat1.tx_ucast_packets+stat1.tx_mcast_packets+stat1.tx_bcast_packets == npackets, "1: sent too little")
    assert(stat0.tx_ucast_packets == stat1.rx_ucast_packets, "0.tx_ucast != 1.rx_ucast")
    assert(stat1.tx_ucast_packets == stat0.rx_ucast_packets, "1.tx_ucast != 0.rx_ucast")
-   assert(stat0.tx_mcast_packets*macs == stat1.rx_mcast_packets, "0.tx_mcast*macs != 1.rx_mcast")
-   assert(stat1.tx_mcast_packets*macs == stat0.rx_mcast_packets, "1.tx_mcast*macs != 0.rx_mcast")
-   assert(stat0.tx_bcast_packets*macs == stat1.rx_bcast_packets, "0.tx_bcast*macs != 1.rx_bcast")
-   assert(stat1.tx_bcast_packets*macs == stat0.rx_bcast_packets, "1.tx_bcast*macs != 0.rx_bcast")
+   assert(stat0.tx_mcast_packets*2 == stat1.rx_mcast_packets, "0.tx_mcast*2 != 1.rx_mcast")
+   assert(stat1.tx_mcast_packets*2 == stat0.rx_mcast_packets, "1.tx_mcast*2 != 0.rx_mcast")
+   assert(stat0.tx_bcast_packets*2 == stat1.rx_bcast_packets, "0.tx_bcast*2 != 1.rx_bcast")
+   assert(stat1.tx_bcast_packets*2 == stat0.rx_bcast_packets, "1.tx_bcast*2 != 0.rx_bcast")
 
    for _, nic in pairs{pci0, pci1} do
       local sum, avg, sd = sum(received[nic]), mean(received[nic]), stdev(received[nic])
@@ -229,6 +229,17 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       -- expect more packets on queues 0 because we send 10% mcast,
       -- but mostly even distribution of packets
       assert(sd / avg < .2, "uneven packet distribution")
+   end
+
+   nic0:stop()
+   nic1:stop()
+   for _, queue in ipairs(queues) do
+      io0[queue.id]:stop()
+      link.free(io0[queue.id].input.input, ("input-%s-%s" ):format(pci0, queue.id))
+      link.free(io0[queue.id].output.output, ("output-%s-%s" ):format(pci0, queue.id))
+      io1[queue.id]:stop()
+      link.free(io1[queue.id].input.input, ("input-%s-%s" ):format(pci1, queue.id))
+      link.free(io1[queue.id].output.output, ("output-%s-%s" ):format(pci1, queue.id))
    end
 
    print("selftest: done")
@@ -272,5 +283,7 @@ function selftest ()
       os.exit(engine.test_skipped_code)
    end
    switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 2, 2, 4)
+   switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 1, 2, 8)
+   switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 4, 1, 4)
 end
 
