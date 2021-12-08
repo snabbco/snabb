@@ -98,7 +98,8 @@ local rqt_max_size = 128
 -- IO   IDLE->FREE: IO app stops and releases the CXQ for future use.
 -- IO   IDLE->BUSY: IO app starts running a pull/push method.
 -- IO   BUSY->IDLE: IO app stops running a pull/push method.
--- CTRL IDLE->DEAD: Control app closes the CXQ. (Replacement can be created.) NYI
+-- CTRL IDLE->DEAD: Control app closes the CXQ. (Replacement can be created.)
+-- CTRL FREE->DEAD: Control app closes the CXQ. (Replacement can be created.)
 -- 
 -- These state transitions are *PROHIBITED* for important reasons:
 --
@@ -171,6 +172,12 @@ local DEAD = 4
 function shutdown(pid)
    for _, pciaddr in ipairs(shm.children("/"..pid.."/mellanox")) do
       for _, queue in ipairs(shm.children("/"..pid.."/mellanox/"..pciaddr)) do
+         -- NB: this iterates the backlinks created by IO apps!
+         -- Meaning, this cleans up CXQ attachments from dying IO apps.
+         -- The actual CXQ objects are cleaned up in the process running
+         -- the Control app (see ConnectX:stop()).
+         -- The code below is just to make sure crashing IO apps do not block
+         -- the Control app.
          local backlink = "/"..pid.."/mellanox/"..pciaddr.."/"..queue
          local shm_name = "/"..pid.."/group/pci/"..pciaddr.."/"..queue
          if shm.exists(shm_name) then
@@ -199,6 +206,7 @@ local mlx_types = {
    ["0x1013" ] = 4, -- ConnectX4
    ["0x1017" ] = 5, -- ConnectX5
    ["0x1019" ] = 5, -- ConnectX5
+   ["0x101d" ] = 6, -- ConnectX6
 }
 
 function ConnectX:new (conf)
@@ -265,6 +273,9 @@ function ConnectX:new (conf)
    local tdomain = hca:alloc_transport_domain()
    local rlkey = hca:query_rlkey()
 
+   -- CXQ objects managed by this control app
+   local cxq_shm = {}
+
    -- List of all receive queues for hashing traffic across
    local rqlist = {}
    local rqs = {}
@@ -281,7 +292,9 @@ function ConnectX:new (conf)
 
    for _, queue in ipairs(conf.queues) do
       -- Create a shared memory object for controlling the queue pair
-      local cxq = shm.create("group/pci/"..pciaddress.."/"..queue.id, cxq_t)
+      local shmpath = "group/pci/"..pciaddress.."/"..queue.id
+      local cxq = shm.create(shmpath, cxq_t)
+      cxq_shm[shmpath] = cxq
 
       local function check_qsize (type, size)
          assert(check_pow2(size),
@@ -567,11 +580,38 @@ function ConnectX:new (conf)
    end
    self.sync_timer = lib.throttle(1)
 
+   function free_cxq (cxq)
+      -- Force CXQ state -> DEAD
+      local timeout = lib.timeout(2)
+      lib.waitfor(function ()
+         assert(not timeout(), "ConnectX: failed to close CXQ.")
+         return sync.cas(cxq.state, IDLE, DEAD)
+             or sync.cas(cxq.state, FREE, DEAD)
+      end)
+      -- Reclaim packets
+      for idx=0, cxq.rqsize-1 do
+         if cxq.rx[idx] ~= nil then
+            packet.free(cxq.rx[idx])
+            cxq.rx[idx] = nil
+         end
+      end
+      for idx=0, cxq.sqsize-1 do
+         if cxq.tx[idx] ~= nil then
+            packet.free(cxq.tx[idx])
+            cxq.tx[idx] = nil
+         end
+      end
+   end
+
    function self:stop ()
       pci.set_bus_master(pciaddress, false)
       pci.reset_device(pciaddress)
       pci.close_pci_resource(fd, mmio)
       mmio, fd = nil
+      for shmpath, cxq in pairs(cxq_shm) do
+         free_cxq(cxq)
+         shm.unlink(shmpath)
+      end
    end
 
    function self:pull ()
@@ -1283,6 +1323,11 @@ function IO:new (conf)
       end
    end
 
+   -- Detach from the NIC.
+   function self:stop ()
+      close()
+   end
+
    return self
 end
 
@@ -1353,6 +1398,10 @@ function RQ:new (cxq)
             link.transmit(l, p)
             cxq.rx[idx] = nil
          elseif opcode == 13 or opcode == 14 then
+            -- Error on receive
+            assert(cxq.rx[idx] ~= nil)
+            packet.free(cxq.rx[idx])
+            cxq.rx[idx] = nil
             local syndromes = {
                [0x1] = "Local_Length_Error",
                [0x4] = "Local_Protection_Error",
@@ -1365,12 +1414,8 @@ function RQ:new (cxq)
                [0x14] = "Remote_Operation_Error"
             }
             local syndrome = c.u8[0x37]
-            print(("Got error. opcode=%d syndrome=0x%x message=%s"):format(
-                  opcode, syndrome, syndromes[syndromes])) -- XXX
-            -- Error on receive
-            assert(packets[idx] ~= nil)
-            packet.free(packets[idx])
-            packets[idx] = nil
+            error(("Got error. opcode=%d syndrome=0x%x message=%s")
+               :format(opcode, syndrome, syndromes[syndromes]))
          else
             error(("Unexpected CQE opcode: %d (0x%x)"):format(opcode, opcode))
          end
@@ -2387,6 +2432,8 @@ function selftest ()
 
    nic0:stop()
    nic1:stop()
+   io0:stop()
+   io1:stop()
 
    if (stat0.tx_ucast_packets == bursts*each and stat0.tx_ucast_octets == bursts*each*octets and
        stat1.tx_ucast_packets == bursts*each and stat1.tx_ucast_octets == bursts*each*octets) then
