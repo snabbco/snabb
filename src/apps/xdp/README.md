@@ -39,6 +39,12 @@ Due to a combination of how Snabb uses packet buffers and a limitation of
 
 *Required*. The name of the interface as shown in `ip link`.
 
+— Key **filter**
+
+*Optional*. A `pcap-filter(7)` expression. If given, packets that do not match
+the filter will we passed on to the host networking stack. Must be the same for
+all instances of the XDP app on a given interface!
+
 — Key **queue**
 
 *Optional*. Queue to bind to (zero based). The default is queue 0.
