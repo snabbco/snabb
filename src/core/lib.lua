@@ -71,8 +71,7 @@ function writefile (filename, value)
    local f = io.open(filename, "w")
    if f == nil then error("Unable to open file: " .. filename) end
    local result = f:write(value)
-   f:close()
-   return result
+   return f:close() and result
 end
 
 function readlink (path)

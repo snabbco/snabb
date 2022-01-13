@@ -110,9 +110,9 @@ function new_manager (conf)
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_', ret.trace)
 
-   ret:set_initial_configuration(conf.initial_configuration)
-
    ret:start()
+
+   ret:set_initial_configuration(conf.initial_configuration)
 
    return ret
 end

@@ -853,7 +853,7 @@ function selftest()
    local checker = consistency_checker_from_schema_by_name('ietf-alarms', false)
    assert(checker)
 
-   local scm = schema.load_schema_by_name('snabb-softwire-v2')
+   local scm = schema.load_schema_by_name('snabb-softwire-v3')
    local grammar = data.config_grammar_from_schema(scm)
    setter_for_grammar(grammar, "/softwire-config/instance[device=test]/"..
                                "queue[id=0]/external-interface/ip 208.118.235.148")

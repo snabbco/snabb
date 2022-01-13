@@ -16,6 +16,7 @@ local scheduling_opts = {
    cpu = {},                  -- CPU index (integer).
    real_time = {},            -- Boolean.
    ingress_drop_monitor = {}, -- Action string: one of 'flush' or 'warn'.
+   profile = {default=true},  -- Boolean.
    busywait = {default=true}, -- Boolean.
    enable_xdp = {},           -- Enable Snabb XDP mode (see apps.xdp.xdp).
    eval = {}                  -- String.
@@ -45,6 +46,12 @@ end
 
 function sched_apply.enable_xdp (opt)
    if opt then require('apps.xdp.xdp').snabb_enable_xdp(opt) end
+end
+
+function sched_apply.profile (profile)
+   engine.vmprofile_enabled = profile
+   local vmprofile = require('jit.vmprofile')
+   if profile then vmprofile.start() else vmprofile.stop() end
 end
 
 function sched_apply.eval (str)

@@ -66,7 +66,14 @@ local icmp_header_ptr_t = ffi.typeof('$*', icmp_header_t)
 
 local function ipv6_equals(a, b) return ffi.C.memcmp(a, b, 16) == 0 end
 
-ICMPEcho = {}
+ICMPEcho = {
+   shm = {
+      ['in-icmpv6-echo-bytes'] = {counter},
+      ['in-icmpv6-echo-packets'] = {counter},
+      ['out-icmpv6-echo-bytes'] = {counter},
+      ['out-icmpv6-echo-packets'] = {counter},
+   }
+}
 
 function ICMPEcho:new(conf)
    local addresses = {}
@@ -130,6 +137,12 @@ function ICMPEcho:respond_to_echo_request(pkt)
             bit.bnot(ipsum(ffi.cast('char*', pseudoheader),
                            ffi.sizeof(ipv6_pseudo_header_t),
                            0))))
+
+   -- Update counters
+   counter.add(self.shm['in-icmpv6-echo-bytes'], pkt.length)
+   counter.add(self.shm['in-icmpv6-echo-packets'])
+   counter.add(self.shm['out-icmpv6-echo-bytes'], out.length)
+   counter.add(self.shm['out-icmpv6-echo-packets'])
 
    link.transmit(self.output.south, out)
 

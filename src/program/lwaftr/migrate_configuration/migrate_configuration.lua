@@ -442,7 +442,7 @@ local function multiprocess_migration(src, conf_file)
 
    -- We should build up a hybrid schema from parts of v1 and v2.
    local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
-   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v3")
    local v1_external = v1_schema.body["softwire-config"].body["external-interface"]
    local v1_internal = v1_schema.body["softwire-config"].body["internal-interface"]
    local external = hybridscm.body["softwire-config"].body["external-interface"]
@@ -521,7 +521,7 @@ local function multiprocess_migration(src, conf_file)
    conf.softwire_config.external_interface.next_hop = nil
    conf.softwire_config.external_interface.vlan_tag = nil
 
-   return config_to_string('snabb-softwire-v2', conf)
+   return config_to_string('snabb-softwire-v3', conf)
 end
 
 local function v2_migration(src, conf_file)
@@ -529,7 +529,7 @@ local function v2_migration(src, conf_file)
    -- switch over to v2 of snabb-softwire config.
    local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
    local v1_binding_table = v1_schema.body["softwire-config"].body["binding-table"]
-   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v3")
    local binding_table = hybridscm.body["softwire-config"].body["binding-table"]
 
    -- Add the schema from v1 that we need to convert them.

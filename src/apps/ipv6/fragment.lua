@@ -80,7 +80,7 @@ local fragment_header_ptr_t = ffi.typeof('$*', fragment_header_t)
 -- Precondition: packet already has IPv6 ethertype.
 local function ipv6_packet_has_valid_length(h, len)
    if len < ether_ipv6_header_len then return false end
-   return ntohs(h.ipv6.payload_length) == len - ether_ipv6_header_len
+   return ntohs(h.ipv6.payload_length) <= len - ether_ipv6_header_len
 end
 
 Fragmenter = {}

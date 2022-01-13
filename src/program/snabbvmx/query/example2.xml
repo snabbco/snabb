@@ -83,10 +83,10 @@
        <ingress-packet-drops>0</ingress-packet-drops>
        <memuse-ipv4-frag-reassembly-buffer>0</memuse-ipv4-frag-reassembly-buffer>
        <memuse-ipv6-frag-reassembly-buffer>0</memuse-ipv6-frag-reassembly-buffer>
-       <out-icmpv4-bytes>0</out-icmpv4-bytes>
-       <out-icmpv4-packets>0</out-icmpv4-packets>
-       <out-icmpv6-bytes>0</out-icmpv6-bytes>
-       <out-icmpv6-packets>0</out-icmpv6-packets>
+       <out-icmpv4-error-bytes>0</out-icmpv4-error-bytes>
+       <out-icmpv4-error-packets>0</out-icmpv4-error-packets>
+       <out-icmpv6-error-bytes>0</out-icmpv6-error-bytes>
+       <out-icmpv6-error-packets>0</out-icmpv6-error-packets>
        <out-ipv4-bytes>0</out-ipv4-bytes>
        <out-ipv4-frag>0</out-ipv4-frag>
        <out-ipv4-frag-not>0</out-ipv4-frag-not>
@@ -320,10 +320,10 @@
        <ingress-packet-drops>0</ingress-packet-drops>
        <memuse-ipv4-frag-reassembly-buffer>0</memuse-ipv4-frag-reassembly-buffer>
        <memuse-ipv6-frag-reassembly-buffer>0</memuse-ipv6-frag-reassembly-buffer>
-       <out-icmpv4-bytes>0</out-icmpv4-bytes>
-       <out-icmpv4-packets>0</out-icmpv4-packets>
-       <out-icmpv6-bytes>0</out-icmpv6-bytes>
-       <out-icmpv6-packets>0</out-icmpv6-packets>
+       <out-icmpv4-error-bytes>0</out-icmpv4-error-bytes>
+       <out-icmpv4-error-packets>0</out-icmpv4-error-packets>
+       <out-icmpv6-error-bytes>0</out-icmpv6-error-bytes>
+       <out-icmpv6-error-packets>0</out-icmpv6-error-packets>
        <out-ipv4-bytes>0</out-ipv4-bytes>
        <out-ipv4-frag>0</out-ipv4-frag>
        <out-ipv4-frag-not>0</out-ipv4-frag-not>
