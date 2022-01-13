@@ -349,6 +349,19 @@ local nr = {
   kcmp                  = 354,
   sched_setattr         = 355,
   sched_getattr         = 356,
+  renameat2             = 357,
+  seccomp               = 358,
+  getrandom             = 359,
+  memfd_create          = 360,
+  bpf                   = 361,
+  execveat              = 362,
+  switch_endian         = 363,
+  userfaultfd           = 364,
+  membarrier            = 365,
+  mlock2                = 378,
+  copy_file_range       = 379,
+  preadv2               = 380,
+  pwritev2              = 381,
 }
 }
 

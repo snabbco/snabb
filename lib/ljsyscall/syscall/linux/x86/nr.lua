@@ -350,6 +350,7 @@ local nr = {
   seccomp         = 354,
   getrandom       = 355,
   memfd_create    = 356,
+  bpf             = 357,
 }
 }
 

@@ -42,25 +42,29 @@ function Synth:new (conf)
          packets[i] = dgram:packet()
       end
    end
-   return setmetatable({packets=packets}, {__index=Synth})
+   return setmetatable(
+      {cursor=0, pktid=(conf.packet_id and 0), packets=packets},
+      {__index=Synth}
+   )
 end
 
 function Synth:pull ()
+   local burst = engine.pull_npackets
+   local packets, npackets = self.packets, #self.packets
    for _, o in ipairs(self.output) do
-      local n = 0
-      while n < engine.pull_npackets do
-         for _, p in ipairs(self.packets) do
-            local c = packet.clone(p)
-            if self.packet_id then
-               -- 14 == sizeof(dstmac srcmac type)
-               ffi.cast("uint32_t *", clone.data+14)[0] = lib.htonl(self.pktid)
-               self.pktid = self.pktid + 1
-            end
-	    transmit(o, c)
-            n = n + 1
-	 end
+      local cursor = self.cursor
+      for _ = 1, burst do
+         local p = packet.clone(packets[1+cursor])
+         if self.packet_id then
+            -- 14 == sizeof(dstmac srcmac type)
+            ffi.cast("uint32_t *", p.data+14)[0] = lib.htonl(self.pktid)
+            self.pktid = self.pktid + 1
+         end
+         transmit(o, p)
+         cursor = (cursor + 1) % npackets
       end
    end
+   self.cursor = (self.cursor + burst) % npackets
 end
 
 function Synth:stop ()

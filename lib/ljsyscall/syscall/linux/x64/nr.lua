@@ -323,6 +323,7 @@ local nr = {
   getrandom    = 318,
   memfd_create = 319,
   kexec_file_load = 320,
+  bpf          = 321,
 }
 }
 
