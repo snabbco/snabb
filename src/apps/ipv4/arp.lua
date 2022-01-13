@@ -293,9 +293,14 @@ end
 function selftest()
    print('selftest: arp')
 
-   local arp = ARP:new({ self_ip = ipv4:pton('1.2.3.4'),
-                         next_ip = ipv4:pton('5.6.7.8'),
-                         shared_next_mac_key = "foo" })
+   local c = config.new()
+   config.app(c, 'arp', ARP, {
+      self_ip = ipv4:pton('1.2.3.4'),
+      next_ip = ipv4:pton('5.6.7.8'),
+      shared_next_mac_key = "foo"
+   })
+   engine.configure(c)
+   local arp = engine.app_table.arp
    arp.input  = { south=link.new('south in'),  north=link.new('north in') }
    arp.output = { south=link.new('south out'), north=link.new('north out') }
 
