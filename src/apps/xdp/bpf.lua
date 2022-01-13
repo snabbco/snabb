@@ -3,7 +3,7 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
-local bor = bit.bor
+local band, bor = bit.band, bit.bor
 
 -- BPF: just enough eBPF to assemble trivial XDP programs.
 --
@@ -33,15 +33,16 @@ c = { -- Op class
    ALU = 0x04,
    JMP = 0x05,
    RET = 0x06,
-   MISC = 0x07,
-   ALU64 = 0x07 -- alu mode in double word width
+   ALU64 = 0x07, -- alu mode in double word width
+   mask = 0x07
 }
 
 f = { -- Load/store width
    W  = 0x00,  -- 32-bit
    H  = 0x08,  -- 16-bit
    B  = 0x10,  -- 8-bit
-   DW = 0x18   -- 64-bit
+   DW = 0x18,  -- 64-bit
+   mask = 0x18
 }
 
 m = { -- Op mode
@@ -51,7 +52,8 @@ m = { -- Op mode
    MEM = 0x60,
    LEN = 0x80,
    MSH = 0xa0,
-   XADD = 0xc0 -- exclusive add
+   XADD = 0xc0, -- exclusive add
+   mask = 0xe0
 }
 
 a = { -- ALU mode
@@ -66,13 +68,18 @@ a = { -- ALU mode
    NEG = 0x80,
    MOD = 0x90,
    XOR = 0xa0,
-   MOV = 0xb0
+   MOV = 0xb0,
+   END = 0xd0, -- Endianness conversion:
+   LE = 0x00,  --  * to little endian
+   BE = 0x08,  --  * to big endian
+   mask = 0xf0
 }
 
 s = { -- Src mode
    K = 0x00,
    X = 0x08,
-   MAP_FD = 0x01
+   MAP_FD = 0x01,
+   mask = 0x08
 }
 
 j = { -- JMP mode
@@ -89,7 +96,8 @@ j = { -- JMP mode
    JSLT = 0xc0,
    JSLE = 0xd0,
    CALL = 0x80,
-   EXIT = 0x90
+   EXIT = 0x90,
+   mask = 0xf0
 }
 
 fn = { -- Built-in helpers
@@ -180,3 +188,113 @@ fn = { -- Built-in helpers
 }
 
 function asm (insn) return ffi.typeof("$[?]", ins)(#insn, insn) end
+
+function dis (insn)
+   local pc = 0
+   local function which (v, typ)
+      return band(v, typ.mask)
+   end
+   local function name (x, typ)
+      for k, v in pairs(typ) do
+         if k ~= "mask" and x == v then
+            return k
+         end
+      end
+   end
+   local function dis_ins (ins)
+      local str = ""
+      -- Class
+      local class = which(ins.op, c)
+      str = str..name(class, c)
+      if class <= c.STX then
+         -- Load/store
+         local width = which(ins.op, f)
+         str = str.." "..name(width, f)
+         local mode = which(ins.op, m)
+         --str = str.." "..name(mode, m)
+         str = str..("\tr%d"):format(ins.dst)
+         if class > c.LDX then
+            -- Store offset.
+            str = str..("+%d"):format(ins.off)
+         end
+         if mode == m.IMM then
+            str = str..(" %d %s"):format(ins.imm, name(ins.src, s))
+         else
+            str = str..(" r%d"):format(ins.src)
+            if class <= c.LDX then
+               -- Load offset.
+               str = str..("+%d"):format(ins.off)
+            end
+         end
+         if mode == m.ABS then
+            str = str..("+%d"):format(ins.imm)
+         end
+      elseif class == c.ALU or class == c.ALU64 then
+         -- ALU
+         local alu = which(ins.op, a)
+         str = str.." "..name(alu, a)
+         local src = which(ins.op, s)
+         str = str..("\tr%d"):format(ins.dst)
+         if src == s.K then
+            -- Immediate operand
+            str = str..(" %d"):format(ins.imm)
+         else
+            -- Register operand
+            str = str..(" r%d"):format(ins.src)
+         end
+      elseif class == c.JMP then
+         -- Jump
+         local jmp = which(ins.op, j)
+         str = str.." "..name(jmp, j)
+         if jmp == j.EXIT then
+         elseif jmp == j.CALL then
+            -- Call
+            str = str.."\t"..(name(ins.imm, fn) or ("%x"):format(ins.imm))
+         else
+            -- Relative jump
+            str = str.."\t"
+            if jmp > j.JA then
+               -- Conditional
+               str = str..("r%d"):format(ins.dst)
+               if which(ins.op, s) == s.K then
+                  -- Immediate operand
+                  str = str..(" %d"):format(ins.imm)
+               else
+                  -- Register operand
+                  str = str..(" r%d"):format(ins.src)
+               end
+            end
+            str = str..("\t=> %d"):format(pc + 1 + ins.off)
+         end
+      else
+         -- Return
+         local mode = which(ins.op, m)
+         if mode == m.IMM then
+            str = str.." "..name(mode, m)
+            str = str..("\t%d"):format(ins.imm)
+         end
+      end
+      return str
+   end
+   while pc < ffi.sizeof(insn) / ffi.sizeof(ins) do
+      print(pc, dis_ins(insn[pc]))
+      pc = pc + 1
+   end
+end
+
+function selftest ()
+   local insns = asm{
+      -- r3 = XDP_ABORTED
+      { op=bor(c.ALU, a.MOV, s.K), dst=3, imm=0 },
+      -- r2 = ((struct xdp_md *)ctx)->rx_queue_index
+      { op=bor(c.LDX, f.W, m.MEM), dst=2, src=1, off=16 },
+      -- r1 = xskmap
+      { op=bor(c.LD, f.DW, m.IMM), dst=1, src=s.MAP_FD, imm=4 },
+      { imm=0 }, -- nb: upper 32 bits of 64-bit (DW) immediate
+      -- r0 = redirect_map(r1, r2, r3)
+      { op=bor(c.JMP, j.CALL), imm=fn.redirect_map },
+      -- EXIT:
+      { op=bor(c.JMP, j.EXIT) }
+   }
+   dis(insns)
+end
