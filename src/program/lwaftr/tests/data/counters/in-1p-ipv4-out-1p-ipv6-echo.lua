@@ -8,4 +8,8 @@ return {
    ["out-ipv6-bytes"] = 106,
    ["out-ipv6-frag-not"] = 1,
    ["out-ipv6-packets"] = 1,
+   ["in-icmpv4-echo-packets"] = 1,
+   ["in-icmpv4-echo-bytes"] = 54,
+   ["out-icmpv4-echo-packets"] = 1,
+   ["out-icmpv4-echo-bytes"] = 54,
 }
