@@ -84,6 +84,8 @@ $(cat $mdroot/lib/README.checksum.md)
 
 $(cat $mdroot/lib/README.ctable.md)
 
+$(cat $mdroot/lib/README.poptrie.md)
+
 $(cat $mdroot/lib/README.pmu.md)
 
 $(cat $mdroot/lib/yang/README.md)

@@ -1,5 +1,26 @@
 # Change Log
 
+## [2022.01.13]
+
+### Notable changes
+
+ * Support for XDP, AVF, and Mellanox drivers
+
+ * Restore support for bump-in-the-wire operation
+
+ * New updated lwAFTR YANG schema: `snabb-softwire-v3.yang`.
+   lwAFTR can now operate on >2 CPU cores
+
+ * Add statistics counters for ICMP, ARP, and NDP
+
+ * Fragmenter/defragmenter can now handle padded packets (bug fix)
+
+ * NDP app now sends correct neighbot advertisements (bug fix)
+
+ * Fix a parsing bug in `lib.yang` where nested default values of leaves where not set
+
+ * Fix a bug in `lib.numa` where it could not gracefully handle the inability to read a CPU performance governor
+
 ## [2019.06.02]
 
 ### Notable changes

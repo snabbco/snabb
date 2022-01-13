@@ -1,0 +1,6 @@
+# test this watch file using:
+# uscan --watchfile debian/watch --upstream-version 0.1 --package lua-ljsyscall
+#
+version=3
+opts=filenamemangle=s/.+\/v?(\d\S*)\.tar\.gz/ljsyscall-$1\.tar\.gz/ \
+  https://github.com/justincormack/ljsyscall/releases .*/v?(\d\S*)\.tar\.gz

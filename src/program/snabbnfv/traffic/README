@@ -61,7 +61,7 @@ CONFIG FILE FORMAT:
   apps.ipsec.esp:
 
       crypto := { type          = "esp-aes-128-gcm", -- The only type (for now)
-                  spi           = <spi>,             -- As for AES128gcm
+                  spi           = <spi>,             -- As for apps.ipsec.esp
                   transmit_key  = <key>,
                   transmit_salt = <salt>,
                   receive_key   = <key>,

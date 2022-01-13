@@ -64,7 +64,7 @@ end
 local function ipv4_packet_has_valid_length(h, len)
    if len < ffi.sizeof(ether_ipv4_header_t) then return false end
    if ipv4_header_length(h.ipv4) < 20 then return false end
-   return ntohs(h.ipv4.total_length) == len - ether_header_len
+   return ntohs(h.ipv4.total_length) <= len - ether_header_len
 end
 
 Fragmenter = {}

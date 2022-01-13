@@ -19,7 +19,7 @@ local path_data = require('lib.yang.path_data')
 local generic = require('lib.ptree.support').generic_schema_config_support
 local binding_table = require("apps.lwaftr.binding_table")
 
--- Packs snabb-softwire-v2 softwire entry into softwire and PSID blob
+-- Packs snabb-softwire-v3 softwire entry into softwire and PSID blob
 --
 -- The data plane stores a separate table of psid maps and softwires. It
 -- requires that we give it a blob it can quickly add. These look rather
@@ -65,7 +65,7 @@ end
 local softwire_grammar
 local function get_softwire_grammar()
    if not softwire_grammar then
-      local schema = yang.load_schema_by_name('snabb-softwire-v2')
+      local schema = yang.load_schema_by_name('snabb-softwire-v3')
       local grammar = data.config_grammar_from_schema(schema)
       softwire_grammar =
          assert(grammar.members['softwire-config'].
@@ -156,11 +156,15 @@ local function memoize1(f)
    end
 end
 
-local function cltable_for_grammar(grammar)
-   assert(grammar.key_ctype)
-   assert(not grammar.value_ctype)
-   local key_t = data.typeof(grammar.key_ctype)
-   return cltable.new({key_type=key_t}), key_t
+local function table_for_grammar(grammar)
+   if grammar.native_key then
+      return {}, function (key) return key[grammar.native_key] end
+   elseif grammar.key_ctype and not grammar.value_ctype then
+      local key_t = data.typeof(grammar.key_ctype)
+      return cltable.new({key_type=key_t}), key_t
+   else
+      error("Unsupported table type")
+   end
 end
 
 local ietf_bind_instance_grammar
@@ -189,7 +193,7 @@ local function get_ietf_softwire_grammar()
 end
 
 local function ietf_binding_table_from_native(bt)
-   local ret, key_t = cltable_for_grammar(get_ietf_softwire_grammar())
+   local ret, key_t = table_for_grammar(get_ietf_softwire_grammar())
    local warn_lossy = false
    for softwire in bt.softwire:iterate() do
       local k = key_t({ binding_ipv6info = softwire.value.b4_ipv6 })
@@ -230,7 +234,7 @@ local function schema_getter(schema_name, path)
 end
 
 local function snabb_softwire_getter(path)
-   return schema_getter('snabb-softwire-v2', path)
+   return schema_getter('snabb-softwire-v3', path)
 end
 
 local function ietf_softwire_br_getter(path)
@@ -319,7 +323,7 @@ local function ietf_softwire_br_translator ()
          softwire_payload_mtu = int.mtu,
          softwire_path_mru = ext.mtu,
          -- FIXME: There's no equivalent of softwire-num-max in
-         -- snabb-softwire-v2.
+         -- snabb-softwire-v3.
          softwire_num_max = 0xffffffff,
          enable_hairpinning = int.hairpinning,
          binding_table = {
@@ -419,7 +423,7 @@ local function ietf_softwire_br_translator ()
          }
          local path_tail = path_tails[leaf]
          if path_tail then
-            return {{'set', {schema='snabb-softwire-v2',
+            return {{'set', {schema='snabb-softwire-v3',
                              path='/softwire-config/'..path_tail,
                              config=tostring(arg)}}}
          else
@@ -435,15 +439,15 @@ local function ietf_softwire_br_translator ()
          }
          local path_tail = path_tails[leaf]
          if path_tail then
-            return {{'set', {schema='snabb-softwire-v2',
+            return {{'set', {schema='snabb-softwire-v3',
                              path='/softwire-config/'..path_tail,
                              config=tostring(arg)}}}
          elseif leaf == 'icmpv4-rate' then
             local head = '/softwire-config/external-interface/error-rate-limiting'
             return {
-               {'set', {schema='snabb-softwire-v2', path=head..'/packets',
+               {'set', {schema='snabb-softwire-v3', path=head..'/packets',
                         config=tostring(arg * 2)}},
-               {'set', {schema='snabb-softwire-v2', path=head..'/period',
+               {'set', {schema='snabb-softwire-v3', path=head..'/period',
                         config='2'}}}
          else
             error('unrecognized leaf: '..leaf)
@@ -453,15 +457,15 @@ local function ietf_softwire_br_translator ()
       then
          local leaf = path[#path].name
          if leaf == 'generate-icmpv6-errors' then
-            return {{'set', {schema='snabb-softwire-v2',
+            return {{'set', {schema='snabb-softwire-v3',
                              path='/softwire-config/internal-interface/generate-icmp-errors',
                              config=tostring(arg)}}}
          elseif leaf == 'icmpv6-rate' then
             local head = '/softwire-config/internal-interface/error-rate-limiting'
             return {
-               {'set', {schema='snabb-softwire-v2', path=head..'/packets',
+               {'set', {schema='snabb-softwire-v3', path=head..'/packets',
                         config=tostring(arg * 2)}},
-               {'set', {schema='snabb-softwire-v2', path=head..'/period',
+               {'set', {schema='snabb-softwire-v3', path=head..'/period',
                         config='2'}}}
          else
             error('unrecognized leaf: '..leaf)
@@ -476,7 +480,7 @@ local function ietf_softwire_br_translator ()
             not path_has_query(path, #path)
          then
             local bt = native_binding_table_from_ietf(arg)
-            return {{'set', {schema='snabb-softwire-v2',
+            return {{'set', {schema='snabb-softwire-v3',
                              path='/softwire-config/binding-table',
                              config=serialize_binding_table(bt)}}}
          else
@@ -532,7 +536,7 @@ local function ietf_softwire_br_translator ()
             -- to add a check here that the IPv4/PSID is not present in the
             -- binding table.
             table.insert(updates,
-                         {'remove', {schema='snabb-softwire-v2',
+                         {'remove', {schema='snabb-softwire-v3',
                                      path=softwire_path..old_query}})
 
             local config_str = string.format([[{
@@ -549,7 +553,7 @@ local function ietf_softwire_br_translator ()
                path[entry_path_len].query['binding-ipv6info'],
                new.port_set.psid_len, new.port_set.psid_offset)
             table.insert(updates,
-                         {'add', {schema='snabb-softwire-v2',
+                         {'add', {schema='snabb-softwire-v3',
                                   path=softwire_path,
                                   config=config_str}})
             return updates
@@ -609,7 +613,7 @@ local function ietf_softwire_br_translator ()
          table.insert(additions, config_str)
       end
       table.insert(updates,
-                   {'add', {schema='snabb-softwire-v2',
+                   {'add', {schema='snabb-softwire-v3',
                             path=softwire_path,
                             config=table.concat(additions, '\n')}})
       return updates
@@ -638,7 +642,7 @@ local function ietf_softwire_br_translator ()
             return string.format('[ipv4=%s][psid=%s]', ipv4_ntop(ipv4), psid)
          end
          local query = q(entry.binding_ipv4_addr, entry.port_set.psid)
-         return {{'remove', {schema='snabb-softwire-v2',
+         return {{'remove', {schema='snabb-softwire-v3',
                              path=softwire_path..query}}}
       else
          return error('unsupported path: '..path_str)

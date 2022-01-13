@@ -643,7 +643,7 @@ function compute_display_tree.interface(tree, prev, dt, t)
               rchars('%s:', tag:upper()),
               lchars('%.3f %sPPS', scale(pps)),
               lchars('%.3f %sbps', scale(bps)),
-              lchars('%.2f%%', bps/max*100),
+              max > 0 and lchars('%.2f%%', bps/max*100) or nil,
               drops > 0 and rchars('%.3f %sPPS dropped', scale(drops)) or nil)
    end
    local function show_pci(addr, pci, prev)
@@ -651,7 +651,8 @@ function compute_display_tree.interface(tree, prev, dt, t)
       gridrow(rchars('| '), lchars(''))
       gridrow(rchars('\\-'),
               rchars('%s:', addr),
-              lchars('%d %sbE, MAC: %s', bps, tag,
+              lchars('%sMAC: %s',
+                     (bps > 0 and ("%d %sbE, "):format(bps, tag)) or '',
                      macaddr_string(tonumber(pci.macaddr and pci.macaddr.value) or 0)))
       show_traffic('rx', pci, prev)
       show_traffic('tx', pci, prev)

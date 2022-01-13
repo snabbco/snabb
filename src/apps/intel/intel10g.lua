@@ -91,9 +91,10 @@ function new_sf (conf)
 end
 
 function M_sf:open ()
+   self.fd = pci.open_pci_resource_locked(self.pciaddress, 0)
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
-   self.base, self.fd = pci.map_pci_memory_locked(self.pciaddress, 0)
+   self.base = pci.map_pci_memory(self.fd)
    register.define(config_registers_desc, self.r, self.base)
    register.define(transmit_registers_desc, self.r, self.base)
    register.define(receive_registers_desc, self.r, self.base)
@@ -497,9 +498,10 @@ function new_pf (conf)
 end
 
 function M_pf:open ()
+   self.fd = pci.open_pci_resource_locked(self.pciaddress, 0)
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
-   self.base, self.fd = pci.map_pci_memory_locked(self.pciaddress, 0)
+   self.base = pci.map_pci_memory(self.fd)
    register.define(config_registers_desc, self.r, self.base)
    register.define_array(switch_config_registers_desc, self.r, self.base)
    register.define_array(packet_filter_desc, self.r, self.base)

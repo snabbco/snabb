@@ -21,7 +21,7 @@ An OPERATOR-STATE can take the following values: 'none', 'ack', 'closed',
 
 Typical usage:
 
-$ snabb alarms set-operator-state --schema snabb-softwire-v2 lwaftr resource arp-resolution ack
+$ snabb alarms set-operator-state --schema snabb-softwire-v3 lwaftr resource arp-resolution ack
 
 See https://github.com/Igalia/snabb/blob/lwaftr/src/program/alarms/README.md
 for full documentation.

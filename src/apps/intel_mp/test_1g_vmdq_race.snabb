@@ -1,0 +1,68 @@
+#!../../snabb snsh
+
+-- Snabb test script that tests against race conditions in setting
+-- VMDq parameters like MAC and VLAN
+
+local C      = require("ffi").C
+local intel  = require("apps.intel_mp.intel_mp")
+local lib    = require("core.lib")
+local worker = require("core.worker")
+
+local pciaddr0 = lib.getenv("SNABB_PCI_INTEL1G0")
+
+-- launch two worker processes each using VMDq with MAC addresses
+-- and different VLAN tags and ensure that the chosen indices for
+-- MAC & VLAN do not overlap.
+--
+-- It's difficult for this test to fail unless delays are introduced
+-- to deliberately trigger race conditions in the driver code (and
+-- the locks disabled).
+worker.start("worker0", [[
+   local intel = require("apps.intel_mp.intel_mp")
+   local lib   = require("core.lib")
+   local pciaddr0 = lib.getenv("SNABB_PCI_INTEL1G0")
+   local c = config.new()
+   config.app(c, "nic0", intel.Intel,
+              { pciaddr = pciaddr0,
+                vmdq = true,
+                poolnum = 0,
+                rxq = 0, txq = 0,
+                vlan = 0,
+                macaddr = "00:11:22:33:44:55" })
+   engine.configure(c)
+   engine.main({ duration = 1 })
+   assert(engine.app_table.nic0.r.RAH[1]:bits(31, 1) == 1)
+   assert(engine.app_table.nic0.r.VLVF[0]:bits(31, 1) == 1)
+]])
+
+worker.start("worker1", [[
+   local intel = require("apps.intel_mp.intel_mp")
+   local lib   = require("core.lib")
+   local pciaddr0 = lib.getenv("SNABB_PCI_INTEL1G0")
+   local c = config.new()
+   config.app(c, "nic1", intel.Intel,
+              { pciaddr = pciaddr0,
+                vmdq = true,
+                poolnum = 1,
+                rxq = 0, txq = 0,
+                vlan = 1,
+                macaddr = "55:44:33:22:11:00" })
+   engine.configure(c)
+   engine.main({ duration = 1 })
+   assert(engine.app_table.nic1.r.RAH[2]:bits(31, 1) == 1)
+   assert(engine.app_table.nic1.r.VLVF[1]:bits(31, 1) == 1)
+]])
+
+-- loop until all workers are done
+while true do
+   local live = false
+   for w, s in pairs(worker.status()) do
+      live = live or s.alive
+   end
+
+   if live then
+      C.sleep(0.1)
+   else
+      break
+   end
+end

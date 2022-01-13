@@ -1,4 +1,7 @@
-module(..., package.seeall)
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(...,package.seeall)
+
 local ffi = require("ffi")
 
 -- Sequence number type with accessors for lower/upper order 32 bits

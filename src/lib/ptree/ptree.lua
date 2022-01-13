@@ -110,9 +110,9 @@ function new_manager (conf)
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_', ret.trace)
 
-   ret:set_initial_configuration(conf.initial_configuration)
-
    ret:start()
+
+   ret:set_initial_configuration(conf.initial_configuration)
 
    return ret
 end
@@ -154,6 +154,7 @@ function Manager:state_change_event(event, ...)
 end
 
 function Manager:set_initial_configuration (configuration)
+   path_data.consistency_checker_from_schema_by_name(self.schema_name, true)(configuration)
    self.current_configuration = configuration
    self.current_in_place_dependencies = {}
 
@@ -373,6 +374,14 @@ function Manager:monitor_worker_stats(id)
                counters.archived[0] = counters.archived[0] + val
                counter.delete(qualified_name)
                S.unlink(strip_suffix(qualified_name, ".counter")..".rrd")
+               local last_in_set = true
+               for _ in pairs(counters.active) do
+                  last_in_set = false
+                  break
+               end
+               if last_in_set then
+                  self:cleanup_aggregated_stats(name, 'counter')
+               end
             end
          elseif has_suffix(ev.name, '.gauge') then
             local gauges = self.gauges[name]
@@ -389,6 +398,14 @@ function Manager:monitor_worker_stats(id)
                gauges.active[pid] = nil
                gauges.rrd[pid] = nil
                S.unlink(strip_suffix(qualified_name, ".gauge")..".rrd")
+               local last_in_set = true
+               for _ in pairs(gauges.active) do
+                  last_in_set = false
+                  break
+               end
+               if last_in_set then
+                  self:cleanup_aggregated_stats(name, 'gauge')
+               end
             end
          end
       end
@@ -421,6 +438,20 @@ function Manager:sample_active_stats()
       end
       fiber_sleep(1)
    end
+end
+
+function Manager:cleanup_aggregated_stats(name, typ)
+   shm.unlink(name)
+   shm.unlink(strip_suffix(name, "."..typ)..".rrd")
+   self:cleanup_parent_directories(name)
+end
+
+function Manager:cleanup_parent_directories(name)
+   local parent = name:match("(.*)/[^/]+$")
+   if not parent then return end
+   for _ in pairs(shm.children(parent)) do return end
+   shm.unlink(parent)
+   self:cleanup_parent_directories(parent)
 end
 
 function Manager:start_worker_for_graph(id, graph)

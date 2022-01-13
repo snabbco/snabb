@@ -71,8 +71,7 @@ function writefile (filename, value)
    local f = io.open(filename, "w")
    if f == nil then error("Unable to open file: " .. filename) end
    local result = f:write(value)
-   f:close()
-   return result
+   return f:close() and result
 end
 
 function readlink (path)
@@ -200,13 +199,16 @@ function hexdump(s)
    return string.format(frm, s:byte(1, #s))
 end
 
-function hexundump(h, n)
+function hexundump(h, n, error)
    local buf = ffi.new('char[?]', n)
    local i = 0
-   for b in h:gmatch('%x%x') do
+   for b in h:gmatch('%s*(%x%x)') do
       buf[i] = tonumber(b, 16)
       i = i+1
       if i >= n then break end
+   end
+   if error ~= false then
+      assert(i == n, error or "Wanted "..n.." bytes, but only got "..i)
    end
    return ffi.string(buf, n)
 end

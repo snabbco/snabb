@@ -69,3 +69,36 @@ Source and destination MAC addresses in human readable from. The default is
 
 An array of numbers designating the packet payload sizes. The default is
 `{64}`.
+
+— Key **random_payload**
+
+Generate a random payload for each packet in `sizes`.
+
+— Key **packet_id**
+
+Insert the packet number (32bit uint) directly after the ethertype. The packet
+number starts at 0 and is sequential on each output link.
+
+— Key **packets**
+
+Emit *packets* (an array of *packets*) instead of synthesizing packets. When
+this option is used *src*, *dst*, *sizes*, and *random_payload* are ignored.
+
+## Npackets (apps.test.npackets)
+
+The `Npackets` app allows are most N packets to flow through it. Any further
+packets are never dequeued from input.
+
+    DIAGRAM: Npackets
+    		+-----------+
+input ->     	| Npackets  | -> output
+    		+-----------+
+
+### Configuration
+
+The `Npackets` app accepts a table as its configuration argument. The following
+keys are defined:
+
+— Key **npackets**
+The number of packets to forward, further packets are never dequeued from
+input.

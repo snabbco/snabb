@@ -5,16 +5,25 @@ operations on PCI devices on Linux. In order to drive a PCI device using
 [Direct memory access (DMA)](https://en.wikipedia.org/wiki/Direct_memory_access)
 one must:
 
-1. Unbind the PCI device using `pci.unbind_device_from_linux`.
-2. Enable PCI bus mastering for device using `pci.set_bus_master` in
+1. Open the PCI device using `pci.open_pci_resource_locked` or
+   `pci.open_pci_resource_unlocked`.
+2. Unbind the PCI device using `pci.unbind_device_from_linux`.
+3. Enable PCI bus mastering for device using `pci.set_bus_master` in
    order to enable DMA.
-3. Memory map PCI device configuration space using `pci.map_pci_memory`.
-4. Control the PCI device by manipulating the memory referenced by the
+4. Memory map PCI device configuration space using `pci.map_pci_memory`.
+5. Control the PCI device by manipulating the memory referenced by the
    pointer returned by `pci.map_pci_memory`.
-5. Disable PCI bus master for device using `pci.set_bus_master`.
-6. Unmap PCI device configuration space using `pci.close_pci_resource`.
+6. Disable PCI bus master for device using `pci.set_bus_master`.
+7. Unmap PCI device configuration space using `pci.close_pci_resource`.
 
 The correct ordering of these steps is absolutely critical.
+
+Users of `lib.hardware.pci` can rely on steps 6/7 being performed automatically
+in the event unorderly shutdown. However, to ensure that bus mastering for the
+PCI device in use is not disabled due to another worker’s shutdown (see
+`core.worker`) they must keep a `flock(2)` on resource 0. This can be achieved
+either implicitly via `pci.open_pci_resource_locked` or by manual calls to
+`flock(2)`.
 
 
 — Variable **pci.devices**
@@ -62,6 +71,11 @@ Returns a table containing information about the PCI device by
 Returns the module name for a suitable device driver (if available) for a
 device of *model* from *vendor*.
 
+— Function **pci.reset_device** *pciaddress*
+
+Reset a PCI device (function). Can be useful for returning the device
+to a clean initial state.
+
 — Function **pci.unbind_device_from_linux** *pciaddress*
 
 Forces Linux to unbind the device identified by *pciaddress* from any
@@ -74,15 +88,20 @@ Enables or disables PCI bus mastering for device identified by
 value. PCI bus mastering must be enabled in order to perform DMA on the
 PCI device.
 
-— Function **pci.map_pci_memory_unlocked** *pciaddress*, *n*
-— Function **pci.map_pci_memory_locked** *pciaddress*, *n*
+— Function **pci.open_pci_resource_unlocked** *pciaddress*, *n*
+— Function **pci.open_pci_resource_locked** *pciaddress*, *n*
 
-Memory maps configuration space *n* of PCI device identified by
-*pciaddress*. Returns a pointer to the memory mapped region and a file
-descriptor of the opened sysfs resource file. PCI bus mastering must be
-enabled on the device identified by *pciaddress* before calling this function.
-The 2 variants indicate if the underlying memory mapped file should be
+Opens configuration space *n* of PCI device identified by *pciaddress*. Returns
+a file descriptor of the opened sysfs resource file.
+
+The two variants indicate if the underlying memory mapped file should be
 exclusively `flocked` or not.
+
+— Function **pci.map_pci_memory** *fd*
+
+Memory maps configuration space of PCI device identified by *fd*. Returns a
+pointer to the memory mapped region. The device must be unbound from linux and
+PCI bus mastering must be enabled on the device before calling this function.
 
 — Function **pci.close_pci_resource** *file_descriptor*, *pointer*
 

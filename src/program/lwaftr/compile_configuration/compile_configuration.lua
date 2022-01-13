@@ -19,7 +19,7 @@ end
 function run(args)
    local filein, fileout = parse_args(args)
    local success, err = pcall(yang.load_configuration, filein,
-                              {schema_name='snabb-softwire-v2', compiled_filename=fileout})
+                              {schema_name='snabb-softwire-v3', compiled_filename=fileout})
    if not success then
       print(tostring(err))
       main.exit(1)
