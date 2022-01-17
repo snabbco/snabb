@@ -265,6 +265,9 @@ function ConnectX:new (conf)
    hca:set_port_mtu(mtu)
    hca:modify_nic_vport_context(mtu, true, true, true)
 
+   hca:set_port_flow_control(conf.fc_rx_enable == nil and false or conf.fc_rx_enable,
+                             conf.fc_tx_enable == nil and false or conf.fc_tx_enable)
+
    -- Create basic objects that we need
    --
    local uar = hca:alloc_uar()
@@ -1741,6 +1744,7 @@ end
 PMTU  = 0x5003
 PTYS  = 0x5004 -- Port Type and Speed
 PAOS  = 0x5006 -- Port Administrative & Operational Status
+PFCC  = 0x5007 -- Port Flow Control Configuration
 PPCNT = 0x5008 -- Ports Performance Counters
 PPLR  = 0x5018 -- Port Physical Loopback Register
 
@@ -1908,6 +1912,37 @@ function HCA:get_port_stats_finish ()
    port_stats.txdrop = self:output64(0x18 + 0x38)
    port_stats.txerrors = self:output64(0x18 + 0x40)
    return port_stats
+end
+
+function HCA:set_port_flow_control (rx_enable, tx_enable)
+   self:command("ACCESS_REGISTER", 0x1C, 0x1C)
+      :input("opcode", 0x00, 31, 16, 0x805)
+      :input("opmod",  0x04, 15,  0, 0) -- write
+      :input("register_id", 0x08, 15,  0, PFCC)
+      :input("local_port", 0x10, 23, 16, 1)
+      :input("pptx",       0x10 + 0x08, 31, 31, tx_enable and 1 or 0)
+      :input("pprx",       0x10 + 0x0C, 31, 31, rx_enable and 1 or 0)
+      :execute()
+end
+
+local fc_status = {}
+function HCA:get_port_flow_control ()
+   self:command("ACCESS_REGISTER", 0x10, 0x1C)
+      :input("opcode", 0x00, 31, 16, 0x805)
+      :input("opmod",  0x04, 15,  0, 1) -- read
+      :input("register_id", 0x08, 15,  0, PFCC)
+      :input("local_port", 0x10, 23, 16, 1)
+      :execute()
+   fc_status.pptx = self:output(0x10 + 0x08, 31, 31)
+   fc_status.aptx = self:output(0x10 +0x08, 30, 30)
+   fc_status.pfctx = self:output(0x10 + 0x08, 23, 16)
+   fc_status.fctx_disabled = self:output(0x10 +0x08, 8, 8)
+   fc_status.pprx = self:output(0x10 + 0x0c, 31, 31)
+   fc_status.aprx = self:output(0x10 + 0x0c, 30, 30)
+   fc_status.pfcrx = self:output(0x10 +0x0c, 23, 16)
+   fc_status.stall_minor_watermark = self:output(0x10 +0x10, 31, 16)
+   fc_status.stall_crit_watermark = self:output(0x10 +0x10, 15, 0)
+   return fc_status
 end
 
 function HCA:alloc_q_counter()
