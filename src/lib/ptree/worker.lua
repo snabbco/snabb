@@ -47,7 +47,6 @@ function new_worker (conf)
    if conf.measure_memory then
       timer.activate(memory_info.HeapSizeMonitor.new():timer())
    end
-   engine.vmprofile_enabled = conf.profile
    return ret
 end
 

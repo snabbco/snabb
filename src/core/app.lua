@@ -95,19 +95,17 @@ local function getvmprofile (name)
 end
 
 function setvmprofile (name)
-   if vmprofile_enabled then
-      C.vmprofile_set_profile(getvmprofile(name))
-   end
+   C.vmprofile_set_profile(getvmprofile(name))
 end
 
 function clearvmprofiles ()
+   jit.vmprofile.stop()
+   for name, profile in pairs(vmprofiles) do
+      shm.unmap(profile)
+      shm.unlink("vmprofile/"..name..".vmprofile")
+      vmprofiles[name] = nil
+   end
    if vmprofile_enabled then
-      jit.vmprofile.stop()
-      for name, profile in pairs(vmprofiles) do
-         shm.unmap(profile)
-         shm.unlink("vmprofile/"..name..".vmprofile")
-         vmprofiles[name] = nil
-      end
       jit.vmprofile.start()
    end
 end
