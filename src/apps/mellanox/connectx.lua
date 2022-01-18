@@ -154,9 +154,8 @@ local cxq_t = ffi.typeof([[
 
     // Receive state
     struct packet *rx[64*1024]; // packets queued for receive
-    uint16_t next_rx_wqeid;           // work queue ID for next receive descriptor
-    uint16_t next_rx_cqeid;          // completion queue ID of next completed packet
-    int rx_mine;                // CQE ownership value that means software-owned
+    uint16_t next_rx_wqeid;     // work queue ID for next receive descriptor
+    uint32_t rx_cqcc;           // consumer counter of RX CQ
   }
 ]])
 
@@ -1388,9 +1387,11 @@ function RQ:new (cxq)
    local rq = {}
 
    local mask = cxq.rqsize - 1
-   -- Return the transmit queue slot for the given WQE ID.
-   local function slot (wqeid)
-      return band(wqeid, mask)
+   -- Return the queue slot for the given consumer counter for either
+   -- the CQ or the WQ. This assumes that both queues have the same
+   -- size.
+   local function slot (cc)
+      return band(cc, mask)
    end
 
    -- Refill with buffers
@@ -1414,25 +1415,29 @@ function RQ:new (cxq)
       end
    end
 
+   local log2_rqsize = log2size(cxq.rqsize)
+   local function sw_owned ()
+      -- The value of the ownership flag that indicates owned by SW for
+      -- the current consumer counter is flipped every time the counter
+      -- wraps around the receive queue.
+      return band(shr(cxq.rx_cqcc, log2_rqsize), 1)
+   end
+
    local function have_input ()
-      local c = cxq.rcq[cxq.next_rx_cqeid]
+      local c = cxq.rcq[slot(cxq.rx_cqcc)]
       local owner = bit.band(1, c.u8[0x3F])
-      return owner == cxq.rx_mine
+      return owner == sw_owned()
    end
 
    function rq:receive (l)
       local limit = engine.pull_npackets
       while limit > 0 and have_input() do
          -- Find the next completion entry.
-         local c = cxq.rcq[cxq.next_rx_cqeid]
+         local c = cxq.rcq[slot(cxq.rx_cqcc)]
          limit = limit - 1
          -- Advance to next completion.
          -- Note: assumes sqsize == cqsize
-         cxq.next_rx_cqeid = slot(cxq.next_rx_cqeid + 1)
-         -- Toggle the ownership value if the CQ wraps around.
-         if cxq.next_rx_cqeid == 0 then
-            cxq.rx_mine = band(cxq.rx_mine + 1, 1)
-         end
+         cxq.rx_cqcc = cxq.rx_cqcc + 1
          -- Decode the completion entry.
          local opcode = shr(c.u8[0x3F], 4)
          local len = bswap(c.u32[0x2C/4])
