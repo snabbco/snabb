@@ -21,7 +21,6 @@ local worker_config_spec = {
    duration = {},
    measure_latency = {default=true},
    measure_memory = {default=true},
-   profile = {default=true},
    no_report = {default=false},
    report = {default={showapps=true,showlinks=true}},
    Hz = {default=1000},
