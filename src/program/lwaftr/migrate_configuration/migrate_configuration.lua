@@ -442,7 +442,7 @@ local function multiprocess_migration(src, conf_file)
 
    -- We should build up a hybrid schema from parts of v1 and v2.
    local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
-   local hybridscm = yang.load_schema_by_name("snabb-softwire-v3")
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
    local v1_external = v1_schema.body["softwire-config"].body["external-interface"]
    local v1_internal = v1_schema.body["softwire-config"].body["internal-interface"]
    local external = hybridscm.body["softwire-config"].body["external-interface"]
@@ -521,7 +521,7 @@ local function multiprocess_migration(src, conf_file)
    conf.softwire_config.external_interface.next_hop = nil
    conf.softwire_config.external_interface.vlan_tag = nil
 
-   return config_to_string('snabb-softwire-v3', conf)
+   return config_to_string('snabb-softwire-v2', conf)
 end
 
 local function v2_migration(src, conf_file)
@@ -529,7 +529,7 @@ local function v2_migration(src, conf_file)
    -- switch over to v2 of snabb-softwire config.
    local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
    local v1_binding_table = v1_schema.body["softwire-config"].body["binding-table"]
-   local hybridscm = yang.load_schema_by_name("snabb-softwire-v3")
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
    local binding_table = hybridscm.body["softwire-config"].body["binding-table"]
 
    -- Add the schema from v1 that we need to convert them.
@@ -546,6 +546,9 @@ local function v2_migration(src, conf_file)
 
    -- Remove the mandatory requirement on softwire.br-address for the migration
    binding_table.body["softwire"].body["br-address"].mandatory = false
+
+   -- Remove the mandatory requirement on softwire.port-set.psid-length for the migration
+   binding_table.body["softwire"].body["port-set"].body["psid-length"].mandatory = false
 
    local conf = yang.load_config_for_schema(
       hybridscm, mem.open_input_string(src, conf_file))
@@ -596,7 +599,7 @@ local migrations = {
    {version='3.0.1',     migrator=migrate_3_0_1},
    {version='3.0.1.1',   migrator=migrate_3_0_1bis},
    {version='3.2.0',     migrator=migrate_3_2_0},
-   {version='2017.07.01',migrator=migrate_2017_07_01}
+   {version='2017.07.01',migrator=migrate_2017_07_01},
 }
 
 
