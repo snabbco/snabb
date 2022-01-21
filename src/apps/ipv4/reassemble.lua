@@ -75,7 +75,7 @@ local function ipv4_packet_has_valid_length(h, len)
    if len < ffi.sizeof(ether_ipv4_header_t) then return false end
    local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    if ihl < 5 then return false end
-   return ntohs(h.ipv4.total_length) == len - ether_header_len
+   return ntohs(h.ipv4.total_length) <= len - ether_header_len
 end
 
 -- IPv4 requires recalculating an embedded checksum.

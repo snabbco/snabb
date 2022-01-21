@@ -161,9 +161,12 @@ c.F = strflag(arch.F or {
   SETLEASE    = 1024,
   GETLEASE    = 1025,
   NOTIFY      = 1026,
+  CANCELLK    = 1029,
+  DUPFD_CLOEXEC = 1030,
   SETPIPE_SZ  = 1031,
   GETPIPE_SZ  = 1032,
-  DUPFD_CLOEXEC = 1030,
+  ADD_SEALS   = 1033,
+  GET_SEALS   = 1034,
 })
 
 -- messy
@@ -206,6 +209,14 @@ c.LOCK = multiflags {
   READ      = 64,
   WRITE     = 128,
   RW        = 192,
+}
+
+-- for memfd
+c.F_SEAL = multiflags {
+  SEAL     = 0x0001,
+  SHRINK   = 0x0002,
+  GROW     = 0x0004,
+  WRITE    = 0x0008,
 }
 
 --mmap
@@ -300,6 +311,8 @@ c.SEEK = strflag {
   SET = 0,
   CUR = 1,
   END = 2,
+  DATA = 3,
+  HOLE = 4,
 }
 
 -- exit
@@ -393,6 +406,12 @@ c.SOCK = multiflags(arch.SOCK or {
 c.SCM = strflag {
   RIGHTS = 0x01,
   CREDENTIALS = 0x02,
+
+  TSTAMP_SND   = 0,
+  TSTAMP_SCHED = 1,
+  TSTAMP_ACK   = 2,
+
+  TIMESTAMPING_OPT_STATS = 54,
 }
 
 -- setsockopt
@@ -407,6 +426,7 @@ c.SOL = strflag {
   ATM        = 264,
   AAL        = 265,
   IRDA       = 266,
+  XDP        = 283
 }
 
 if arch.SOLSOCKET then c.SOL.SOCKET = arch.SOLSOCKET else c.SOL.SOCKET = 1 end
@@ -426,7 +446,7 @@ c.SO = strflag(arch.SO or {
   PRIORITY    = 12,
   LINGER      = 13,
   BSDCOMPAT   = 14,
---REUSEPORT   = 15, -- new, may not be defined yet
+  REUSEPORT   = 15, -- new, may not be defined yet
   PASSCRED    = 16,
   PEERCRED    = 17,
   RCVLOWAT    = 18,
@@ -455,12 +475,56 @@ c.SO = strflag(arch.SO or {
   WIFI_STATUS        = 41,
   PEEK_OFF           = 42,
   NOFCS              = 43,
+  LOCK_FILTER        = 44,
+  SELECT_ERR_QUEUE   = 45,
+  BUSY_POLL          = 46,
+  MAX_PACING_RATE    = 47,
+  BPF_EXTENSIONS     = 48,
+  INCOMING_CPU       = 49,
+  ATTACH_BPF         = 50,
+  ATTACH_REUSEPORT_CBPF = 51,
+  ATTACH_REUSEPORT_EBPF = 52,
+  XDP_MMAP_OFFSETS = 1,
+  XDP_RX_RING = 2,
+  XDP_TX_RING = 3,
+  XDP_UMEM_REG = 4,
+  XDP_UMEM_FILL_RING = 5,
+  XDP_UMEM_COMPLETION_RING = 6,
+  XDP_STATISTICS = 7,
+  XDP_OPTIONS = 8
 })
 
 c.SO.GET_FILTER = c.SO.ATTACH_FILTER
+c.SO.DETACH_BPF = c.SO.DETACH_FILTER
+
+c.SCM.TIMESTAMP    = c.SO.TIMESTAMP
+c.SCM.TIMESTAMPNS  = c.SO.TIMESTAMPNS
+c.SCM.TIMESTAMPING = c.SO.TIMESTAMPING
 
 -- Maximum queue length specifiable by listen.
 c.SOMAXCONN = 128
+
+c.SOF = strflag {
+  TIMESTAMPING_TX_HARDWARE  = bit.lshift(1, 0),
+  TIMESTAMPING_TX_SOFTWARE  = bit.lshift(1, 1),
+  TIMESTAMPING_RX_HARDWARE  = bit.lshift(1, 2),
+  TIMESTAMPING_RX_SOFTWARE  = bit.lshift(1, 3),
+  TIMESTAMPING_SOFTWARE     = bit.lshift(1, 4),
+  TIMESTAMPING_SYS_HARDWARE = bit.lshift(1, 5),
+  TIMESTAMPING_RAW_HARDWARE = bit.lshift(1, 6),
+  TIMESTAMPING_OPT_ID       = bit.lshift(1, 7),
+  TIMESTAMPING_TX_SCHED     = bit.lshift(1, 8),
+  TIMESTAMPING_TX_ACK       = bit.lshift(1, 9),
+  TIMESTAMPING_OPT_CMSG     = bit.lshift(1, 10),
+  TIMESTAMPING_OPT_TSONLY   = bit.lshift(1, 11),
+  TIMESTAMPING_OPT_STATS    = bit.lshift(1, 12),
+  TIMESTAMPING_OPT_PKTINFO  = bit.lshift(1, 13),
+  TIMESTAMPING_OPT_TX_SWHW  = bit.lshift(1, 14),
+}
+
+c.SOF.TIMESTAMPING_LAST = c.SOF.TIMESTAMPING_OPT_TX_SWHW
+c.SOF.TIMESTAMPING_MASK = bit.bor(c.SOF.TIMESTAMPING_LAST - 1,
+                                  c.SOF.TIMESTAMPING_LAST)
 
 -- shutdown
 c.SHUT = strflag {
@@ -1162,6 +1226,10 @@ c.RTA = strflag {
   MP_ALGO = 14,
   TABLE = 15,
   MARK = 16,
+  MFC_STATS = 17,
+  VIA = 18,
+  NEWDST = 19,
+  PREF = 20,
 }
 
 -- route flags
@@ -1374,6 +1442,7 @@ c.AF = strflag {
   CAIF       = 37,
   ALG        = 38,
   NFC        = 39,
+  XDP        = 44
 }
 
 c.AF.UNIX       = c.AF.LOCAL
@@ -1954,6 +2023,7 @@ c.EM = strflag {
   MN10300     = 89,
   BLACKFIN    = 106,
   TI_C6000    = 140,
+  AARCH64     = 183,
   FRV         = 0x5441,
   AVR32       = 0x18ad,
   ALPHA       = 0x9026,
@@ -1970,6 +2040,7 @@ local __AUDIT_ARCH_64BIT = 0x80000000
 local __AUDIT_ARCH_LE    = 0x40000000
 
 c.AUDIT_ARCH = strflag {
+  AARCH64 = c.EM.AARCH64 + __AUDIT_ARCH_64BIT + __AUDIT_ARCH_LE,
   ALPHA = c.EM.ALPHA + __AUDIT_ARCH_64BIT + __AUDIT_ARCH_LE,
   ARM = c.EM.ARM + __AUDIT_ARCH_LE,
   ARMEB = c.EM.ARM,
@@ -2007,6 +2078,7 @@ c.BPF = multiflags {
   ST         = 0x02,
   STX        = 0x03,
   ALU        = 0x04,
+  ALU64      = 0x07,
   JMP        = 0x05,
   RET        = 0x06,
   MISC       = 0x07,
@@ -2014,6 +2086,7 @@ c.BPF = multiflags {
   W          = 0x00,
   H          = 0x08,
   B          = 0x10,
+  DW         = 0x18,
 -- mode
   IMM        = 0x00,
   ABS        = 0x20,
@@ -2030,12 +2103,23 @@ c.BPF = multiflags {
   AND        = 0x50,
   LSH        = 0x60,
   RSH        = 0x70,
+  ARSH       = 0xc0,
   NEG        = 0x80,
+  MOD        = 0x90,
+  XOR        = 0xa0,
+  MOV        = 0xb0,
+  XADD       = 0xc0,
+  END        = 0xd0,
   JA         = 0x00,
   JEQ        = 0x10,
   JGT        = 0x20,
   JGE        = 0x30,
   JSET       = 0x40,
+  JNE        = 0x50,
+  JSGT       = 0x60,
+  JSGE       = 0x70,
+  CALL       = 0x80,
+  EXIT       = 0x90,
 -- src
   K          = 0x00,
   X          = 0x08,
@@ -2044,6 +2128,245 @@ c.BPF = multiflags {
 -- miscop
   TAX        = 0x00,
   TXA        = 0x80,
+  TO_LE      = 0x00,
+  TO_BE      = 0x08,
+-- flags
+  ANY        = 0,
+  NOEXIST    = 1,
+  EXIST      = 2,
+}
+
+-- BPF map type
+c.BPF_MAP = strflag {
+  UNSPEC           = 0,
+  HASH             = 1,
+  ARRAY            = 2,
+  PROG_ARRAY       = 3,
+  PERF_EVENT_ARRAY = 4,
+  PERCPU_HASH      = 5,
+  PERCPU_ARRAY     = 6,
+  STACK_TRACE      = 7,
+  CGROUP_ARRAY     = 8,
+  LRU_HASH         = 9,
+  LRU_PERCPU_HASH  = 10,
+  LPM_TRIE         = 11,
+  ARRAY_OF_MAPS    = 12,
+  HASH_OF_MAPS     = 13,
+  DEVMAP           = 14,
+  SOCKMAP          = 15,
+  CPUMAP           = 16,
+  XSKMAP           = 17
+}
+
+-- BPF syscall commands
+c.BPF_CMD = strflag {
+  MAP_CREATE          = 0,
+  MAP_LOOKUP_ELEM     = 1,
+  MAP_UPDATE_ELEM     = 2,
+  MAP_DELETE_ELEM     = 3,
+  MAP_GET_NEXT_KEY    = 4,
+  PROG_LOAD           = 5,
+  OBJ_PIN             = 6,
+  OBJ_GET             = 7,
+  PROG_ATTACH         = 8,
+  PROG_DETACH         = 9,
+  PROG_TEST_RUN       = 10,
+  PROG_GET_NEXT_ID    = 11,
+  MAP_GET_NEXT_ID     = 12,
+  PROG_GET_FD_BY_ID   = 13,
+  MAP_GET_FD_BY_ID    = 14,
+  OBJ_GET_INFO_BY_FD  = 15,
+  PROG_QUERY          = 16,
+  RAW_TRACEPOINT_OPEN = 17,
+}
+
+-- BPF program types
+c.BPF_PROG = strflag {
+  UNSPEC           = 0,
+  SOCKET_FILTER    = 1,
+  KPROBE           = 2,
+  SCHED_CLS        = 3,
+  SCHED_ACT        = 4,
+  TRACEPOINT       = 5,
+  XDP              = 6,
+  PERF_EVENT       = 7,
+  CGROUP_SKB       = 8,
+  CGROUP_SOCK      = 9,
+  LWT_IN           = 10,
+  LWT_OUT          = 11,
+  LWT_XMIT         = 12,
+  SOCK_OPS         = 13,
+  SK_SKB           = 14,
+  CGROUP_DEVICE    = 15,
+  SK_MSG           = 16,
+  RAW_TRACEPOINT   = 17,
+  CGROUP_SOCK_ADDR = 18,
+}
+
+-- BPF attach type
+c.BPF_ATTACH_TYPE = strflag {
+  CGROUP_INET_INGRESS     = 0,
+  CGROUP_INET_EGRESS      = 1,
+  CGROUP_INET_SOCK_CREATE = 2,
+  CGROUP_SOCK_OPS         = 3,
+  SK_SKB_STREAM_PARSER    = 4,
+  SK_SKB_STREAM_VERDICT   = 5,
+  CGROUP_DEVICE           = 6,
+  SK_MSG_VERDICT          = 7,
+  CGROUP_INET4_BIND       = 8,
+  CGROUP_INET6_BIND       = 9,
+  CGROUP_INET4_CONNECT    = 10,
+  CGROUP_INET6_CONNECT    = 11,
+  CGROUP_INET4_POST_BIND  = 12,
+  CGROUP_INET6_POST_BIND  = 13,
+}
+
+-- Linux performance monitoring
+-- perf_event_attr.type
+c.PERF_TYPE = strflag {
+  HARDWARE   = 0,
+  SOFTWARE   = 1,
+  TRACEPOINT = 2,
+  HW_CACHE   = 3,
+  RAW        = 4,
+  BREAKPOINT = 5,
+}
+
+-- perf_event_attr.event_id
+c.PERF_COUNT = strflag {
+  -- Generalized performance event event_id types
+  HW_CPU_CYCLES                = 0,
+  HW_INSTRUCTIONS              = 1,
+  HW_CACHE_REFERENCES          = 2,
+  HW_CACHE_MISSES              = 3,
+  HW_BRANCH_INSTRUCTIONS       = 4,
+  HW_BRANCH_MISSES             = 5,
+  HW_BUS_CYCLES                = 6,
+  HW_STALLED_CYCLES_FRONTEND   = 7,
+  HW_STALLED_CYCLES_BACKEND    = 8,
+  HW_REF_CPU_CYCLES            = 9,
+  -- Generalized hardware cache events
+  HW_CACHE_L1D                 = 0,
+  HW_CACHE_L1I                 = 1,
+  HW_CACHE_LL                  = 2,
+  HW_CACHE_DTLB                = 3,
+  HW_CACHE_ITLB                = 4,
+  HW_CACHE_BPU                 = 5,
+  HW_CACHE_NODE                = 6,
+  HW_CACHE_OP_READ             = 0,
+  HW_CACHE_OP_WRITE            = 1,
+  HW_CACHE_OP_PREFETCH         = 2,
+  HW_CACHE_RESULT_ACCESS       = 0,
+  HW_CACHE_RESULT_MISS         = 1,
+  -- Special "software" events provided by the kernel
+  SW_CPU_CLOCK                 = 0,
+  SW_TASK_CLOCK                = 1,
+  SW_PAGE_FAULTS               = 2,
+  SW_CONTEXT_SWITCHES          = 3,
+  SW_CPU_MIGRATIONS            = 4,
+  SW_PAGE_FAULTS_MIN           = 5,
+  SW_PAGE_FAULTS_MAJ           = 6,
+  SW_ALIGNMENT_FAULTS          = 7,
+  SW_EMULATION_FAULTS          = 8,
+  SW_DUMMY                     = 9,
+  SW_BPF_OUTPUT                = 10,
+}
+
+-- Bits that can be set in perf_event_attr.sample_type to request information
+c.PERF_SAMPLE = multiflags {
+  IP                          = bit.lshift(1, 0),
+  TID                         = bit.lshift(1, 1),
+  TIME                        = bit.lshift(1, 2),
+  ADDR                        = bit.lshift(1, 3),
+  READ                        = bit.lshift(1, 4),
+  CALLCHAIN                   = bit.lshift(1, 5),
+  ID                          = bit.lshift(1, 6),
+  CPU                         = bit.lshift(1, 7),
+  PERIOD                      = bit.lshift(1, 8),
+  STREAM_ID                   = bit.lshift(1, 9),
+  RAW                         = bit.lshift(1, 10),
+  BRANCH_STACK                = bit.lshift(1, 11),
+  REGS_USER                   = bit.lshift(1, 12),
+  STACK_USER                  = bit.lshift(1, 13),
+  WEIGHT                      = bit.lshift(1, 14),
+  DATA_SRC                    = bit.lshift(1, 15),
+  IDENTIFIER                  = bit.lshift(1, 16),
+  TRANSACTION                 = bit.lshift(1, 17),
+  REGS_INTR                   = bit.lshift(1, 18),
+}
+
+-- values to program into perf_event_attr.branch_sample_type when PERF_SAMPLE_BRANCH is set
+c.PERF_SAMPLE_BRANCH = multiflags {
+  USER_SHIFT           = 0,
+  KERNEL_SHIFT         = 1,
+  HV_SHIFT             = 2,
+  ANY_SHIFT            = 3,
+  ANY_CALL_SHIFT       = 4,
+  ANY_RETURN_SHIFT     = 5,
+  IND_CALL_SHIFT       = 6,
+  ABORT_TX_SHIFT       = 7,
+  IN_TX_SHIFT          = 8,
+  NO_TX_SHIFT          = 9,
+  COND_SHIFT           = 10,
+  CALL_STACK_SHIFT     = 11,
+  IND_JUMP_SHIFT       = 12,
+  CALL_SHIFT           = 13,
+  NO_FLAGS_SHIFT       = 14,
+  NO_CYCLES_SHIFT      = 15,
+}
+c.PERF_SAMPLE_BRANCH.USER          = bit.lshift(1, c.PERF_SAMPLE_BRANCH.USER_SHIFT)
+c.PERF_SAMPLE_BRANCH.KERNEL        = bit.lshift(1, c.PERF_SAMPLE_BRANCH.KERNEL_SHIFT)
+c.PERF_SAMPLE_BRANCH.HV            = bit.lshift(1, c.PERF_SAMPLE_BRANCH.HV_SHIFT)
+c.PERF_SAMPLE_BRANCH.ANY           = bit.lshift(1, c.PERF_SAMPLE_BRANCH.ANY_SHIFT)
+c.PERF_SAMPLE_BRANCH.ANY_CALL      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.ANY_CALL_SHIFT)
+c.PERF_SAMPLE_BRANCH.ANY_RETURN    = bit.lshift(1, c.PERF_SAMPLE_BRANCH.ANY_RETURN_SHIFT)
+c.PERF_SAMPLE_BRANCH.IND_CALL      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.IND_CALL_SHIFT)
+c.PERF_SAMPLE_BRANCH.ABORT_TX      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.ABORT_TX_SHIFT)
+c.PERF_SAMPLE_BRANCH.IN_TX         = bit.lshift(1, c.PERF_SAMPLE_BRANCH.IN_TX_SHIFT)
+c.PERF_SAMPLE_BRANCH.NO_TX         = bit.lshift(1, c.PERF_SAMPLE_BRANCH.NO_TX_SHIFT)
+c.PERF_SAMPLE_BRANCH.COND          = bit.lshift(1, c.PERF_SAMPLE_BRANCH.COND_SHIFT)
+c.PERF_SAMPLE_BRANCH.CALL_STACK    = bit.lshift(1, c.PERF_SAMPLE_BRANCH.CALL_STACK_SHIFT)
+c.PERF_SAMPLE_BRANCH.IND_JUMP      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.IND_JUMP_SHIFT)
+c.PERF_SAMPLE_BRANCH.CALL          = bit.lshift(1, c.PERF_SAMPLE_BRANCH.CALL_SHIFT)
+c.PERF_SAMPLE_BRANCH.NO_FLAGS      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.NO_FLAGS_SHIFT)
+c.PERF_SAMPLE_BRANCH.NO_CYCLES     = bit.lshift(1, c.PERF_SAMPLE_BRANCH.NO_CYCLES_SHIFT)
+
+-- Flags for perf_attr.read_format
+c.PERF_READ_FORMAT = multiflags {
+  TOTAL_TIME_ENABLED = bit.lshift(1, 0),
+  TOTAL_TIME_RUNNING = bit.lshift(1, 1),
+  ID                 = bit.lshift(1, 2),
+  GROUP              = bit.lshift(1, 3),
+}
+
+-- Flags for perf_event_open
+c.PERF_FLAG = multiflags {
+  FD_NO_GROUP    = bit.lshift(1, 0),
+  FD_OUTPUT      = bit.lshift(1, 1),
+  PID_CGROUP     = bit.lshift(1, 2),
+  FD_CLOEXEC     = bit.lshift(1, 3),
+}
+
+
+-- If perf_event_attr.sample_id_all is set then all event types will
+-- have the sample_type selected fields related to where/when
+-- (identity) an event took place (TID, TIME, ID, STREAM_ID, CPU, IDENTIFIER)
+c.PERF_RECORD = strflag {
+  MMAP           = 1,
+  LOST           = 2,
+  COMM           = 3,
+  EXIT           = 4,
+  THROTTLE       = 5,
+  UNTHROTTLE     = 6,
+  FORK           = 7,
+  READ           = 8,
+  SAMPLE         = 9,
+  MMAP2          = 10,
+  AUX            = 11,
+  ITRACE_START   = 12,
+  LOST_SAMPLES   = 13,
+  SWITCH         = 14,
+  SWITCH_CPU_WIDE= 15,
 }
 
 -- termios - c_cc characters

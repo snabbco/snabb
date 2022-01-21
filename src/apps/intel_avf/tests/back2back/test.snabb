@@ -68,8 +68,8 @@ assert_eq(s, r, "packets_sr_1")
 
 n0:flush_stats()
 n1:flush_stats()
-assert_eq(counter.read(n0.shm.txpackets), counter.read(n1.shm.rxpackets), "mxbox_sr_stats_1")
-assert_eq(counter.read(n0.shm.txpackets), packet_count, "mbox_sr_stats_2")
+assert_eq(counter.read(n0.stats.txpackets), counter.read(n1.stats.rxpackets), "mxbox_sr_stats_1")
+assert_eq(counter.read(n0.stats.txpackets), packet_count, "mbox_sr_stats_2")
 
 local m = engine.app_table['match']
 assert(#m:errors() == 0, "Corrupt packets.")
@@ -96,7 +96,9 @@ while true do
 	engine.main({ duration = 1, no_report = true })
 end
 engine.report_links()
+engine.report_apps()
 assert(rx("nic1.output", "sink.input") >= tosend,
        "packets received do not match packets sent")
+
 engine.stop()
 main.exit(0)

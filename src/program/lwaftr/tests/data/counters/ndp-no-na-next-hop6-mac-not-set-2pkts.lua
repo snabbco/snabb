@@ -12,4 +12,6 @@ return {
    ["out-ipv6-bytes"] = 106,
    ["out-ipv6-frag-not"] = 1,
    ["out-ipv6-packets"] = 1,
+   ["out-ndp-ns-packets"] = 1,
+   ["out-ndp-ns-bytes"] = 86,
 }

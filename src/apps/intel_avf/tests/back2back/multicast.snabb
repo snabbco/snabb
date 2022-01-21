@@ -1,0 +1,116 @@
+#!../../../../snabb snsh
+local vf0 = os.getenv("SNABB_AVF_PF0_VF0")
+local vf1 = os.getenv("SNABB_AVF_PF1_VF0") or os.getenv("SNABB_AVF_PF0_VF1")
+
+assert(vf0 ~= nil, "SNABB_AVF_PF0_VF0 is nil")
+assert(vf1 ~= nil, "SNABB_AVF_PF1_VF0 is nil")
+
+local src = os.getenv("SNABB_AVF_PF0_SRC0")
+local dst = os.getenv("SNABB_AVF_PF1_DST0") or os.getenv("SNABB_AVF_PF0_DST1")
+
+assert(src ~= nil, "SNABB_AVF_SRC0 is nil")
+assert(dst ~= nil, "SNABB_AVF_DST1 is nil")
+
+local packet_count = 1001
+
+local basic = require("apps.basic.basic_apps")
+local intel_avf = require("apps.intel_avf.intel_avf")
+local match = require("apps.test.match")
+local npackets = require("apps.test.npackets")
+local synth = require("apps.test.synth")
+local counter = require("core.counter")
+
+-- Broadcast
+
+local c = config.new()
+config.app(c, "synth", synth.Synth, {
+       sizes = {64,67,128,133,192,256,384,512,777,1024},
+       src=src,
+       dst="ff:ff:ff:ff:ff:ff",
+       random_payload = true
+} )
+config.app(c, "tee", basic.Tee)
+config.app(c, "match", match.Match)
+
+config.app(c, "npackets", npackets.Npackets, { npackets = packet_count })
+config.app(c, "nic0", intel_avf.Intel_avf, { pciaddr = vf0 })
+config.app(c, "nic1", intel_avf.Intel_avf, { pciaddr = vf1 })
+
+config.link(c, "synth.output -> npackets.input")
+config.link(c, "npackets.output -> tee.input")
+config.link(c, "tee.output1 -> nic0.input")
+config.link(c, "nic1.output -> match.rx")
+config.link(c, "tee.output2 -> match.comparator")
+
+engine.configure(c)
+
+local n0 = engine.app_table['nic0']
+local n1 = engine.app_table['nic1']
+n0:flush_stats()
+n1:flush_stats()
+
+engine.main({duration = 1, report = false})
+engine.report_links()
+engine.report_apps()
+
+function rx(l1, l2)
+   return counter.read(engine.link_table[l1 .. " -> " .. l2].stats.rxpackets)
+end
+function assert_eq(a,b,msg)
+	local an = tonumber(a)
+	local bn = tonumber(b)
+	assert(an == bn, msg .. " " .. an .. " ~= " .. bn)
+end
+
+local s = rx("tee.output1", "nic0.input")
+local r = rx("nic1.output", "match.rx")
+assert_eq(s, r, "packets_sr_1")
+
+n0:flush_stats()
+n1:flush_stats()
+assert_eq(counter.read(n0.stats.txbcast), counter.read(n1.stats.rxbcast), "mxbox_sr_stats_1")
+assert_eq(counter.read(n0.stats.txbcast), packet_count, "mbox_sr_stats_2")
+
+local m = engine.app_table['match']
+assert(#m:errors() == 0, "Corrupt packets.")
+
+engine.configure(config.new())
+
+-- Multicast
+
+local ethernet = require("lib.protocol.ethernet")
+local ipv6 = require("lib.protocol.ipv6")
+
+local v6_mcast = ipv6:solicited_node_mcast(ipv6:pton("fd10::1"))
+local mac_mcast = ethernet:ipv6_mcast(v6_mcast)
+
+config.app(c, "synth", synth.Synth, {
+       sizes = {64,67,128,133,192,256,384,512,777,1024},
+       src=src,
+       dst=ethernet:ntop(mac_mcast),
+       random_payload = true
+} )
+config.app(c, "nic1", intel_avf.Intel_avf, { pciaddr = vf1, macs = {mac_mcast} })
+
+engine.configure(c)
+
+local n0 = engine.app_table['nic0']
+local n1 = engine.app_table['nic1']
+n0:flush_stats()
+n1:flush_stats()
+
+engine.main({duration = 1, report = false})
+engine.report_links()
+engine.report_apps()
+
+local s = rx("tee.output1", "nic0.input")
+local r = rx("nic1.output", "match.rx")
+assert_eq(s, r, "packets_sr_1")
+
+n0:flush_stats()
+n1:flush_stats()
+assert_eq(counter.read(n0.stats.txmcast), counter.read(n1.stats.rxmcast), "mxbox_sr_stats_1")
+assert_eq(counter.read(n0.stats.txmcast), packet_count, "mbox_sr_stats_2")
+
+local m = engine.app_table['match']
+assert(#m:errors() == 0, "Corrupt packets.")

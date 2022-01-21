@@ -76,13 +76,15 @@ busywait = false
 
 -- Profiling with vmprofile --------------------------------
 
+vmprofile_enabled = true
+
 -- Low-level FFI
 ffi.cdef[[
 int vmprofile_get_profile_size();
 void vmprofile_set_profile(void *counters);
 ]]
 
-local vmprofile_t = ffi.new("uint8_t["..C.vmprofile_get_profile_size().."]")
+local vmprofile_t = ffi.typeof("uint8_t["..C.vmprofile_get_profile_size().."]")
 
 local vmprofiles = {}
 local function getvmprofile (name)
@@ -94,6 +96,18 @@ end
 
 function setvmprofile (name)
    C.vmprofile_set_profile(getvmprofile(name))
+end
+
+function clearvmprofiles ()
+   jit.vmprofile.stop()
+   for name, profile in pairs(vmprofiles) do
+      shm.unmap(profile)
+      shm.unlink("vmprofile/"..name..".vmprofile")
+      vmprofiles[name] = nil
+   end
+   if vmprofile_enabled then
+      jit.vmprofile.start()
+   end
 end
 
 -- True when the engine is running the breathe loop.

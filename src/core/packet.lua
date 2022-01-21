@@ -24,11 +24,15 @@ max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 -- For operations that add or remove headers from the beginning of a
 -- packet, instead of copying around the payload we just move the
 -- packet structure as a whole around.
-local packet_alignment = 512
-local default_headroom = 256
+packet_alignment = 512
+default_headroom = 256
 -- The Intel82599 driver requires even-byte alignment, so let's keep
 -- things aligned at least this much.
-local minimum_alignment = 2
+minimum_alignment = 2
+
+-- Copy read-only constants to locals
+local max_payload, packet_alignment, default_headroom, minimum_alignment =
+   max_payload, packet_alignment, default_headroom, minimum_alignment
 
 local function get_alignment (addr, alignment)
    -- Precondition: alignment is a power of 2.
@@ -257,7 +261,7 @@ end
 function from_string (d)         return from_pointer(d, #d) end
 
 -- Free a packet that is no longer in use.
-local function free_internal (p)
+function free_internal (p)
    local ptr = ffi.cast("char*", p)
    p = ffi.cast(packet_ptr_t, ptr - get_headroom(ptr) + default_headroom)
    p.length = 0
@@ -269,9 +273,12 @@ function account_free (p)
    counter.add(engine.freebytes, p.length)
    -- Calculate bits of physical capacity required for packet on 10GbE
    -- Account for minimum data size and overhead of CRC and inter-packet gap
-   counter.add(engine.freebits, (math.max(p.length, 46) + 4 + 5) * 8)
+   -- https://en.wikipedia.org/wiki/Ethernet_frame
+   counter.add(engine.freebits, (12 + 8 + math.max(p.length, 60) + 4) * 8)
 end
 
+local free_internal, account_free =
+   free_internal, account_free
 function free (p)
    account_free(p)
    free_internal(p)
