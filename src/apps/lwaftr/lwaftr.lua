@@ -339,22 +339,7 @@ local function drop(pkt)
    packet.free(pkt)
 end
 
-local function select_instance(conf)
-   local function table_merge(t1, t2)
-      local ret = {}
-      for k,v in pairs(t1) do ret[k] = v end
-      for k,v in pairs(t2) do ret[k] = v end
-      return ret
-   end
-   local device, id, queue = lwutil.parse_instance(conf)
-   conf.softwire_config.external_interface = table_merge(
-      conf.softwire_config.external_interface, queue.external_interface)
-   conf.softwire_config.internal_interface = table_merge(
-      conf.softwire_config.internal_interface, queue.internal_interface)
-   return conf
-end
-
-LwAftr = { yang_schema = 'snabb-softwire-v2' }
+LwAftr = { yang_schema = 'snabb-softwire-v3' }
 -- Fields:
 --   - direction: "in", "out", "hairpin", "drop";
 --   If "direction" is "drop":
@@ -407,10 +392,10 @@ LwAftr.shm = {
    ["in-ipv4-packets"]                                 = {counter},
    ["in-ipv6-bytes"]                                   = {counter},
    ["in-ipv6-packets"]                                 = {counter},
-   ["out-icmpv4-bytes"]                                = {counter},
-   ["out-icmpv4-packets"]                              = {counter},
-   ["out-icmpv6-bytes"]                                = {counter},
-   ["out-icmpv6-packets"]                              = {counter},
+   ["out-icmpv4-error-bytes"]                          = {counter},
+   ["out-icmpv4-error-packets"]                        = {counter},
+   ["out-icmpv6-error-bytes"]                          = {counter},
+   ["out-icmpv6-error-packets"]                        = {counter},
    ["out-ipv4-bytes"]                                  = {counter},
    ["out-ipv4-packets"]                                = {counter},
    ["out-ipv6-bytes"]                                  = {counter},
@@ -420,9 +405,8 @@ LwAftr.shm = {
 function LwAftr:new(conf)
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})
-   conf = select_instance(conf).softwire_config
+   conf = lwutil.merge_instance(conf).softwire_config
    o.conf = conf
-
    o.binding_table = bt.load(conf.binding_table)
    o.inet_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
    o.hairpin_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
@@ -465,7 +449,7 @@ end
 
 -- The following two methods are called by lib.ptree.worker in reaction
 -- to binding table changes, via
--- lib/ptree/support/snabb-softwire-v2.lua.
+-- lib/ptree/support/snabb-softwire-v3.lua.
 function LwAftr:add_softwire_entry(entry_blob)
    self.binding_table:add_softwire_entry(entry_blob)
 end
@@ -508,8 +492,8 @@ function LwAftr:transmit_icmpv6_reply (pkt)
    -- Send packet if limit not reached.
    if self.icmpv6_error_count < rate_limiting.packets then
       self.icmpv6_error_count = self.icmpv6_error_count + 1
-      counter.add(self.shm["out-icmpv6-bytes"], pkt.length)
-      counter.add(self.shm["out-icmpv6-packets"])
+      counter.add(self.shm["out-icmpv6-error-bytes"], pkt.length)
+      counter.add(self.shm["out-icmpv6-error-packets"])
       counter.add(self.shm["out-ipv6-bytes"], pkt.length)
       counter.add(self.shm["out-ipv6-packets"])
       return transmit(self.o6, pkt)
@@ -552,8 +536,8 @@ function LwAftr:transmit_icmpv4_reply(pkt, orig_pkt, orig_pkt_link)
    -- Send packet if limit not reached.
    if self.icmpv4_error_count < rate_limiting.packets then
       self.icmpv4_error_count = self.icmpv4_error_count + 1
-      counter.add(self.shm["out-icmpv4-bytes"], pkt.length)
-      counter.add(self.shm["out-icmpv4-packets"])
+      counter.add(self.shm["out-icmpv4-error-bytes"], pkt.length)
+      counter.add(self.shm["out-icmpv4-error-packets"])
       -- Only locally generated error packets are handled here.  We transmit
       -- them right away, instead of calling transmit_ipv4, because they are
       -- never hairpinned and should not be counted by the "out-ipv4" counter.

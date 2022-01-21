@@ -145,7 +145,9 @@ local irqbalanced_checked = false
 local function assert_irqbalanced_disabled (warn)
    if irqbalanced_checked then return end
    irqbalanced_checked = true
-   for path in os.getenv('PATH'):split(':') do
+   local env_path = os.getenv('PATH')
+   if not env_path then return end
+   for path in env_path:split(':') do
       if S.stat(path..'/irqbalance') then
          if S.stat('/etc/default/irqbalance') then
             for line in io.lines('/etc/default/irqbalance') do
@@ -158,12 +160,20 @@ local function assert_irqbalanced_disabled (warn)
    end
 end
 
+local function read_cpu_performance_governor (cpu)
+   local path = '/sys/devices/system/cpu/cpu'..cpu..'/cpufreq/scaling_governor'
+   local f = io.open(path)
+   if not f then return "unknown" end
+   local gov = f:read()
+   f:close()
+   return gov
+end
+
 local function check_cpu_performance_tuning (cpu, strict)
    local warn = warn
    if strict then warn = die end
    assert_irqbalanced_disabled(warn)
-   local path = '/sys/devices/system/cpu/cpu'..cpu..'/cpufreq/scaling_governor'
-   local gov = assert(io.open(path)):read()
+   local gov = read_cpu_performance_governor(cpu)
    if not gov:match('performance') then
       warn('Expected performance scaling governor for CPU %s, but got "%s"',
            cpu, gov)
@@ -222,6 +232,7 @@ function bind_to_numa_node (node, policy)
 
       -- Migrate any pages that might have the wrong affinity.
       local from_mask = assert(S.get_mempolicy(nil, nil, nil, 'mems_allowed')).mask
+      from_mask[node] = false
       local ok, err = S.migrate_pages(0, from_mask, node)
       if not ok then
          warn("Failed to migrate pages to NUMA node %d: %s\n",

@@ -39,9 +39,7 @@ local function migrate_device_on_config(config, v4, v6)
    end
 
    if v6 then
-      for id, queue in pairs(instance.queue) do
-         queue.external_interface.device = v6
-      end
+      instance.external_device = v6
    end
 end
 
@@ -50,12 +48,16 @@ function parse_args(args)
    local conf_file, v4, v6
    local ring_buffer_size
    local opts = { verbosity = 0 }
-   local scheduling = { ingress_drop_monitor = 'flush' }
+   local scheduling = { ingress_drop_monitor = 'flush', profile = false }
    local handlers = {}
    function handlers.n (arg) opts.name = assert(arg) end
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
    function handlers.t (arg) opts.trace = assert(arg) end
    function handlers.i () opts.virtio_net = true end
+   handlers['xdp'] = function(arg)
+      opts['xdp'] = true
+      scheduling.enable_xdp = {} -- XXX - maybe configure num_chunks here?
+   end
    function handlers.D (arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")
       assert(opts.duration >= 0, "duration can't be negative")
@@ -100,13 +102,14 @@ function parse_args(args)
                   .." (valid values: flush, warn, off)")
       end
    end
-   function handlers.j(arg) scheduling.j = arg end
+   function handlers.profile() scheduling.profile = true end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:j:t:",
+   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:t:",
      { conf = "c", name = "n", cpu = 1, v4 = 1, v6 = 1,
        ["on-a-stick"] = 1, virtio = "i", ["ring-buffer-size"] = "r",
+       ["xdp"] = 0,
        ["real-time"] = 0, mirror = 1, ["ingress-drop-monitor"] = 1,
-       verbose = "v", trace = "t", ["bench-file"] = "b",
+       verbose = "v", trace = "t", ["bench-file"] = "b", ["profile"] = 0,
        duration = "D", hydra = "y", help = "h" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
@@ -147,17 +150,29 @@ function run(args)
    -- anything defined in the config.
    if opts.name then conf.softwire_config.name = opts.name end
 
+   -- If we’re using XDP, setup interfaces here
+   if opts.xdp then
+      setup.xdp_ifsetup(conf)
+   end
+
    local function setup_fn(graph, lwconfig)
       -- If --virtio has been specified, always use this.
       if opts.virtio_net then
          return setup_fn(graph, lwconfig, 'inetNic', 'b4sideNic')
       end
 
-      -- If instance has external-interface.device configure as bump-in-the-wire
+      -- If --xdp has been specified, always use this.
+      if opts.xdp then
+         return setup.load_xdp(graph, lwconfig, 'inetNic', 'b4sideNic',
+                               opts.ring_buffer_size)
+      end
+
+      -- If instance has external-device configure as bump-in-the-wire
       -- otherwise configure it in on-a-stick mode.
-      local device, id, queue = lwutil.parse_instance(lwconfig)
-      if not lwutil.is_on_a_stick(device, queue) then
-         if lib.is_iface(queue.external_interface.device) then
+      local device = lwutil.parse_instance(lwconfig)
+      local instance = lwconfig.softwire_config.instance[device]
+      if not lwutil.is_on_a_stick(lwconfig, device) then
+         if lib.is_iface(instance.external_device) then
             return setup.load_kernel_iface(graph, lwconfig, 'inetNic', 'b4sideNic')
          else
             return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',

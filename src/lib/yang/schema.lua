@@ -1303,7 +1303,7 @@ function selftest()
 
    load_schema_by_name('ietf-softwire-common')
    load_schema_by_name('ietf-softwire-br')
-   load_schema_by_name('snabb-softwire-v2')
+   load_schema_by_name('snabb-softwire-v3')
 
    local br = load_schema_by_name('ietf-softwire-br')
    local binding = br.body['br-instances'].body['br-type'].body['binding']

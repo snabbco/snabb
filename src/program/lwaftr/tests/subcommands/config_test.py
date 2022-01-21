@@ -68,7 +68,7 @@ class TestConfigGet(BaseTestCase):
     """
 
     daemon_args = DAEMON_ARGS
-    config_args = (str(SNABB_CMD), 'config', 'get', '--schema=snabb-softwire-v2', DAEMON_PROC_NAME)
+    config_args = (str(SNABB_CMD), 'config', 'get', '--schema=snabb-softwire-v3', DAEMON_PROC_NAME)
 
     @classmethod
     def setUpClass(cls):
@@ -130,7 +130,7 @@ class TestConfigMultiproc(BaseTestCase):
     daemon = None
     daemon_args = DAEMON_ARGS
     ps_args = (str(SNABB_CMD), 'ps')
-    config_args = (str(SNABB_CMD), 'config', 'XXX', '--schema=snabb-softwire-v2', DAEMON_PROC_NAME)
+    config_args = (str(SNABB_CMD), 'config', 'XXX', '--schema=snabb-softwire-v3', DAEMON_PROC_NAME)
 
     @classmethod
     def setUpClass(cls):
@@ -396,7 +396,7 @@ class TestConfigMisc(BaseTestCase):
             cls.reportAndFail('Config manager socket not present', None)
 
     def get_cmd_args(self, action):
-        cmd_args = list((str(SNABB_CMD), 'config', 'XXX', '--schema=snabb-softwire-v2', DAEMON_PROC_NAME))
+        cmd_args = list((str(SNABB_CMD), 'config', 'XXX', '--schema=snabb-softwire-v3', DAEMON_PROC_NAME))
         cmd_args[2] = action
         return cmd_args
 

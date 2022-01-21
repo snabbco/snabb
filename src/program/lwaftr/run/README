@@ -3,7 +3,7 @@ Usage: run --help
 
 Required arguments:
        -c CONF, --conf CONF     Use configuration from the file CONF.
-                                See the snabb-softwire-v2 YANG module
+                                See the snabb-softwire-v3 YANG module
                                 for full documentation.
 
 Optional arguments:
@@ -29,6 +29,8 @@ Optional arguments:
        -i, --virtio             Interpret PCI addresses as referring to
                                 virtio-net interfaces instead of
                                 auto-detecting the appropriate driver.
+       --xdp                    Use Linux interfaces via XDP.
+                                (Incompatible with --on-a-stick.)
        -r SIZE, --ring-buffer-size SIZE
                                 Set NIC receive buffer size.  The
                                 default is driver-dependent.  See
@@ -49,11 +51,10 @@ Optional arguments:
 
 Optional arguments for debugging and profiling:
        -v                       Verbose (repeat for more verbosity).
+       --profile                Enable the low-overhead sampling
+                                profiler.
        -t FILE, --trace FILE    Record a trace of any run-time "snabb
                                 config" commands to FILE.
-       -jv, -jv=FILE            Print out when traces are recorded.
-       -jp, -jp=MODE,FILE       Profile the system by method.
-       -jtprof                  Profile the system by trace.
        -b FILENAME, --bench-file FILENAME
                                 Write any benchmarking data to FILENAME.
        -D SECONDS               Stop after SECONDS, for debugging

@@ -18,20 +18,55 @@ The links are named `input` and `output`.
 
 *Required*. The PCI address of the NIC as a string.
 
+— Key **vlan**
+
+*Optional*. VLAN id used for filtering packets. If specified, VLAN tags are
+stripped for incoming packets and inserted for outgoing packets.
+
+— Key **macs**
+
+*Optional*. Additional unicast or multicast MACs to listen to.
+The default is the empty array `{}`.
+
+— Key **nqueues**
+
+*Optional*. Number of RSS queues to configure. If specified you need to use
+the `intel_avf.IO` app to attach for I/O for each respective queue.
+
 — Key **ring_buffer_size**
 
 *Optional*. Number of DMA descriptors to use i.e. size of the DMA
 transmit and receive queues. Must be a multiple of 128. Default is not
 specified but assumed to be broadly applicable.
 
+## IO app
+
+The `intel_avf.IO` app provides a driver for a single RSS queue of a
+Virtual Function (see *nqueues*).
+
+The links are names `input` and `output`.
+
+    DIAGRAM: Intel_avf_IO
+                 +-----------+
+                 |           |
+      input ---->*    IO     *----> output
+                 |           |
+                 +-----------+
+### Configuration
+
+— Key **pciaddr**
+
+*Required*. The PCI address of the NIC as a string.
+
+— Key **queue**
+
+*Required*. The queue number of the respective RSS queue, starting from zero.
+
 ## Supported Hardware
 Ethernet controller [0200]: Intel Corporation Ethernet Virtual Function 700 Series [8086:154c] (rev 02)
 
 ## Unsupported features
-* Multiple queues per VF. This driver supports a single queue. The spec allows for up to 4 queues.
-* RSS with only 1 queue RSS doesn't make sense.
-* Multiple vlans are unsupported, `ip link` can be used to map all traffic to a single vlan.
-* Multiple MAC addresses are unsupported, `ip link` can be used to set the mac before snabb startup.
+* Multiple vlans are unsupported, `vlan` can be used to strip/insert a single vlan ID.
 * All of the advanced offload features are unsupported.
 * 16 byte RX descriptors are unsupported.
 

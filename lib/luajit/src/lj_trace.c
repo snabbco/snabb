@@ -6,6 +6,8 @@
 #define lj_trace_c
 #define LUA_CORE
 
+#include <time.h>
+
 #include "lj_obj.h"
 
 
@@ -46,6 +48,45 @@ void lj_trace_err_info(jit_State *J, TraceError e)
   setintV(J->L->top++, (int32_t)e);
   lj_err_throw(J->L, LUA_ERRRUN);
 }
+
+/* -- Hotcount decay ------------------------------------------------------ */
+
+/* We reset all hotcounts every second. This is a rough way to establish a
+** relation with elapsed time so that hotcounts provide a measure of frequency.
+**
+** The concrete goal is to ensure that the JIT will trace code that becomes hot
+** over a short duration, but not code that becomes hot over, say, the course
+** of an hour.
+**
+** The "one second" constant is certainly tunable.
+** */
+
+static void trace_clearsnapcounts(jit_State *J); /* Forward decl. */
+
+static inline uint64_t gettime_ns (void)
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec * 1000000000LL + ts.tv_nsec;
+}
+
+/* Timestamp (ns) of last hotcount reset. */
+static uint64_t hotcount_decay_ts;
+
+/* Decay hotcounts every second. */
+int hotcount_decay (jit_State *J)
+{
+  uint64_t ts = gettime_ns();
+  int decay = (ts - hotcount_decay_ts) > 1000000000LL; /* 1s elapsed? */
+  if (decay) {
+    /* Reset hotcounts. */
+    lj_dispatch_init_hotcount(J2G(J));
+    trace_clearsnapcounts(J);
+    hotcount_decay_ts = ts;
+  }
+  return decay;
+}
+
 
 /* -- Trace management ---------------------------------------------------- */
 
@@ -277,6 +318,8 @@ int lj_trace_flushall(lua_State *L)
   memset(J->penalty, 0, sizeof(J->penalty));
   /* Reset hotcounts. */
   lj_dispatch_init_hotcount(J2G(J));
+  /* Initialize hotcount decay timestamp. */
+  hotcount_decay_ts = gettime_ns();
   /* Free the whole machine code and invalidate all exit stub groups. */
   lj_mcode_free(J);
   memset(J->exitstubgroup, 0, sizeof(J->exitstubgroup));
@@ -316,6 +359,21 @@ void lj_trace_freestate(global_State *g)
   }
 #endif
   lj_mcode_free(J);
+}
+
+/* Clear all trace snap counts (side-exit hot counters). */
+static void trace_clearsnapcounts(jit_State *J)
+{
+  int i, s;
+  GCtrace *t;
+  /* Clear hotcounts for all snapshots of all traces. */
+  for (i = 1; i < TRACE_MAX; i++) {
+    t = traceref(J, i);
+    if (t != NULL)
+      for (s = 0; s < t->nsnap; s++)
+        if (t->snap[s].count != SNAPCOUNT_DONE)
+          t->snap[s].count = 0;
+  }
 }
 
 /* -- Penalties and blacklisting ------------------------------------------ */
@@ -655,6 +713,9 @@ void lj_trace_ins(jit_State *J, const BCIns *pc)
 void lj_trace_hot(jit_State *J, const BCIns *pc)
 {
   /* Note: pc is the interpreter bytecode PC here. It's offset by 1. */
+  if (hotcount_decay(J))
+    /* Check for hotcount decay, do nothing if hotcounts have decayed. */
+    return;
   ERRNO_SAVE
   /* Reset hotcount. */
   hotcount_set(J2GG(J), pc, J->param[JIT_P_hotloop]*HOTCOUNT_LOOP);
@@ -671,6 +732,9 @@ void lj_trace_hot(jit_State *J, const BCIns *pc)
 /* Check for a hot side exit. If yes, start recording a side trace. */
 static void trace_hotside(jit_State *J, const BCIns *pc)
 {
+  if (hotcount_decay(J))
+    /* Check for hotcount decay, do nothing if hotcounts have decayed. */
+    return;
   SnapShot *snap = &traceref(J, J->parent)->snap[J->exitno];
   if (!(J2G(J)->hookmask & HOOK_GC) &&
       isluafunc(curr_func(J->L)) &&

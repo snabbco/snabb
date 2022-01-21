@@ -6,7 +6,7 @@ Usage: compile-configuration LWAFTR.CONF [LWAFTR.O]
 Validate and compile a configuration file.
 
 A lwAFTR configuration file follows the schema described in
-`lib/yang/snabb-softwire-v2.yang`.  It consists of several containers
+`lib/yang/snabb-softwire-v3.yang`.  It consists of several containers
 such as `binding-table`, `external-interface` and `internal-interface` and
 `instance`.
 

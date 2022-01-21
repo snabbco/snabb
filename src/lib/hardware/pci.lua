@@ -67,6 +67,7 @@ model = {
    ["X520"]      = 'Intel X520',
    ["i350"]      = 'Intel 350',
    ["i210"]      = 'Intel 210',
+   ["X710"]      = 'Intel X710',
    ["XL710_VF"]  = 'Intel XL710/X710 Virtual Function',
    ["AVF"]       = 'Intel AVF'
 }
@@ -85,17 +86,24 @@ local cards = {
       ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x154c"] = {model = model["XL710_VF"],  driver = 'apps.intel_avf.intel_avf'},
       ["0x1889"] = {model = model["AVF"],       driver = 'apps.intel_avf.intel_avf'},
+      ["0x1572"] = {model = model["X710"],     driver = nil},
    },
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
    },
+	["0x15b3"] = {
+           ["0x1013" ] = {model = 'MT27700', driver = 'apps.mellanox.connectx'},
+           ["0x1017" ] = {model = 'MT27800', driver = 'apps.mellanox.connectx'},
+           ["0x1019" ] = {model = 'MT28800', driver = 'apps.mellanox.connectx'},
+           ["0x101d" ] = {model = 'MT2892',  driver = 'apps.mellanox.connectx'},
+	},
 }
 
 local link_names = {
    ['apps.solarflare.solarflare'] = { "rx", "tx" },
    ['apps.intel_mp.intel_mp']     = { "input", "output" },
    ['apps.intel_avf.intel_avf']   = { "input", "output" },
-   ['apps.intel.intel_app']       = { "rx", "tx" }
+   ['apps.mellanox.connectx']     = { "input", "output" },
 }
 
 -- Return the name of the Lua module that implements support for this device.
@@ -119,6 +127,18 @@ end
 --- the operating systems to be using it.
 function is_usable (info)
    return info.driver and (info.interface == nil or info.status == 'down')
+end
+
+-- Reset a PCI function.
+-- See https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-bus-pci
+function reset_device (pciaddress)
+   root_check()
+   local p = path(pciaddress).."/reset"
+   if lib.can_write(p) then
+      lib.writefile(p, "1")
+   else
+      error("Cannot write: "..p)
+   end
 end
 
 --- Force Linux to release the device with `pciaddress`.
