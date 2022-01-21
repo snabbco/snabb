@@ -40,8 +40,10 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       end
    end
    -- Instantiate app network
-   local nic0 = connectx.ConnectX:new({pciaddress=pci0, queues=queues})
-   local nic1 = connectx.ConnectX:new({pciaddress=pci1, queues=queues})
+   local nic0 = connectx.ConnectX:new(lib.parse({pciaddress=pci0, queues=queues},
+                                                connectx.ConnectX.config))
+   local nic1 = connectx.ConnectX:new(lib.parse({pciaddress=pci1, queues=queues},
+                                                connectx.ConnectX.config))
    local io0 = {}               -- io apps on nic0
    local io1 = {}               -- io apps on nic1
    print(("creating %d queues per device..."):format(#queues))

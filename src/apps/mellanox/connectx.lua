@@ -209,17 +209,38 @@ local mlx_types = {
    ["0x101d" ] = 6, -- ConnectX6
 }
 
+ConnectX.config = {
+   pciaddress   = { required = true },
+   sendq_size   = { default  = 1024 },
+   recvq_size   = { default  = 1024 },
+   mtu          = { default  = 9500 },
+   fc_rx_enable = { default  = false },
+   fc_tx_enable = { default  = false },
+   queues       = { required = true },
+   macvlan      = { default  = false },
+}
+local queue_config = {
+   id   = { required = true },
+   mac  = { default = nil },
+   vlan = { default = nil },
+}
+
 function ConnectX:new (conf)
    local self = setmetatable({}, self)
+   local queues = {}
+   for _, queue in ipairs(conf.queues) do
+      table.insert(queues, lib.parse(queue, queue_config))
+   end
+
    local pciaddress = pci.qualified(conf.pciaddress)
    local device_info = pci.device_info(pciaddress)
    self.mlx = assert(mlx_types[device_info.device],
                      "Unsupported device "..device_info.device)
 
-   local sendq_size = conf.sendq_size or 1024
-   local recvq_size = conf.recvq_size or 1024
+   local sendq_size = conf.sendq_size
+   local recvq_size = conf.recvq_size
 
-   local mtu = conf.mtu or 9500
+   local mtu = conf.mtu
 
    -- Perform a hard reset of the device to bring it into a blank state.
    --
@@ -265,8 +286,7 @@ function ConnectX:new (conf)
    hca:set_port_mtu(mtu)
    hca:modify_nic_vport_context(mtu, true, true, true)
 
-   hca:set_port_flow_control(conf.fc_rx_enable == nil and false or conf.fc_rx_enable,
-                             conf.fc_tx_enable == nil and false or conf.fc_tx_enable)
+   hca:set_port_flow_control(conf.fc_rx_enable, conf.fc_tx_enable)
 
    -- Create basic objects that we need
    --
@@ -1252,6 +1272,12 @@ IO.__index = IO
 -- The IO module is the device driver in the sense of
 -- lib.hardware.pci.device_info
 driver = IO
+
+IO.config = {
+   pciaddress = {required=true},
+   queue = {required=true},
+   packetblaster = {default=false}
+}
 
 function IO:new (conf)
    local self = setmetatable({}, self)
@@ -2475,8 +2501,8 @@ function selftest ()
    io1.output = { output = link.new('output1') }
    -- Exercise the IO apps before the NIC is initialized.
    io0:pull() io0:push() io1:pull() io1:push()
-   local nic0 = ConnectX:new{pciaddress = pcidev0, queues = {{id='a'}}}
-   local nic1 = ConnectX:new{pciaddress = pcidev1, queues = {{id='b'}}}
+   local nic0 = ConnectX:new(lib.parse({pciaddress = pcidev0, queues = {{id='a'}}}, ConnectX.config))
+   local nic1 = ConnectX:new(lib.parse({pciaddress = pcidev1, queues = {{id='b'}}}, ConnectX.config))
 
    print("selftest: waiting for both links up")
    while (nic0.hca:query_vport_state().oper_state ~= 1) or
