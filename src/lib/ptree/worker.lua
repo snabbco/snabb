@@ -21,7 +21,6 @@ local worker_config_spec = {
    duration = {},
    measure_latency = {default=true},
    measure_memory = {default=true},
-   profile = {default=true},
    no_report = {default=false},
    report = {default={showapps=true,showlinks=true}},
    Hz = {default=1000},
@@ -47,7 +46,6 @@ function new_worker (conf)
    if conf.measure_memory then
       timer.activate(memory_info.HeapSizeMonitor.new():timer())
    end
-   engine.vmprofile_enabled = conf.profile
    return ret
 end
 

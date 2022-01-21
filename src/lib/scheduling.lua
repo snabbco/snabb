@@ -50,8 +50,8 @@ end
 
 function sched_apply.profile (profile)
    engine.vmprofile_enabled = profile
-   local vmprofile = require('jit.vmprofile')
-   if profile then vmprofile.start() else vmprofile.stop() end
+   local jit = require('jit')
+   if profile then jit.vmprofile.start() else jit.vmprofile.stop() end
 end
 
 function sched_apply.eval (str)

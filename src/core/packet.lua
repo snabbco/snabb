@@ -30,6 +30,10 @@ default_headroom = 256
 -- things aligned at least this much.
 minimum_alignment = 2
 
+-- Copy read-only constants to locals
+local max_payload, packet_alignment, default_headroom, minimum_alignment =
+   max_payload, packet_alignment, default_headroom, minimum_alignment
+
 local function get_alignment (addr, alignment)
    -- Precondition: alignment is a power of 2.
    return bit.band(addr, alignment - 1)
@@ -273,6 +277,8 @@ function account_free (p)
    counter.add(engine.freebits, (12 + 8 + math.max(p.length, 60) + 4) * 8)
 end
 
+local free_internal, account_free =
+   free_internal, account_free
 function free (p)
    account_free(p)
    free_internal(p)
