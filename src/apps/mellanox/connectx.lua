@@ -647,6 +647,7 @@ function ConnectX:new (conf)
    function self:pull ()
       if self.sync_timer() then
          self:sync_stats()
+         eq:poll()
       end
    end
 
@@ -821,6 +822,17 @@ function HCA:alloc_pages (num_pages)
    self:execute()
 end
 
+function HCA:free_pages (num_pages)
+   assert(num_pages > 0)
+   self:command("MANAGE_PAGES", 0x0C, 0x10 + num_pages*8)
+      :input("opcode",            0x00, 31, 16, 0x108)
+      :input("opmod",             0x04, 15, 0, 2) -- return pages
+      :input("input_num_entries", 0x0C, 31, 0, num_pages, "input_num_entries")
+      :execute()
+   local num_entries = self:output(0x08, 31, 0)
+   -- TODO: deallocate DMA pages
+end
+
 -- Query the NIC capabilities (maximum or current setting).
 function HCA:query_hca_general_cap (max_or_current)
    local opmod = assert(({max=0, current=1})[max_or_current])
@@ -914,67 +926,145 @@ end
 -- Event queues
 ---------------------------------------------------------------
 
+-- Event Queue Entry (EQE)
+local eqe_t = ffi.typeof([[
+  struct {
+    uint8_t  reserved1;
+    uint8_t  event_type;
+    uint8_t  reserved2;
+    uint8_t  event_sub_type;
+    uint32_t reserved3[7];
+    uint32_t event_data[7];
+    uint16_t reserved4;
+    uint8_t  signature;
+    uint8_t  owner;
+  }
+]])
+
 -- Create an event queue that can be accessed via the given UAR page number.
 function HCA:create_eq (uar)
    local numpages = 1
    local log_eq_size = 7 -- 128 entries
-   local ptr, phy = memory.dma_alloc(4096, 4096) -- memory for entries
+   local byte_size = 2^log_eq_size * ffi.sizeof(eqe_t)
+   local ptr, phy = memory.dma_alloc(byte_size, 4096) -- memory for entries
+   events = bits({
+         CQError         = 0x04,
+         PortStateChange = 0x09,
+         PageRequest     = 0x0B,
+   })
    self:command("CREATE_EQ", 0x10C + numpages*8, 0x0C)
       :input("opcode",        0x00,        31, 16, 0x301)
+      :input("oi",            0x10 + 0x00, 17, 17, 1)   -- overrun ignore
       :input("log_eq_size",   0x10 + 0x0C, 28, 24, log_eq_size)
       :input("uar_page",      0x10 + 0x0C, 23,  0, uar)
       :input("log_page_size", 0x10 + 0x18, 28, 24, 2) -- XXX best value? 0 or max?
-      :input("event bitmask", 0x10 + 0x5C, 31,  0, bits({PageRequest=0xB})) -- XXX more events?
+      :input("event bitmask", 0x5C, 31,  0, events)
       :input("pas[0] high",   0x110,       31,  0, ptrbits(phy, 63, 32))
       :input("pas[0] low",    0x114,       31,  0, ptrbits(phy, 31,  0))
       :execute()
    local eqn = self:output(0x08, 7, 0)
-   return eq:new(eqn, ptr, 2^log_eq_size)
+   return eq:new(eqn, ptr, log_eq_size, self)
 end
-
--- Event Queue Entry (EQE)
-local eqe_t = ffi.typeof([[
-  struct {
-    uint16_t event_type;
-    uint16_t event_sub_type;
-    uint32_t event_data;
-    uint16_t pad;
-    uint8_t signature;
-    uint8_t owner;
-  } ]] )
 
 eq = {}
 eq.__index = eq
 
 -- Create event queue object.
-function eq:new (eqn, pointer, nentries)
+function eq:new (eqn, pointer, log_size, hca)
+   local nentries = 2^log_size
    local ring = ffi.cast(ffi.typeof("$*", eqe_t), pointer)
-   for i = 0, nentries-1 do
+   for i = 0, nentries - 1 do
+      -- Owner = HW
       ring[i].owner = 1
    end
+   local mask = nentries - 1
    return setmetatable({eqn = eqn,
                         ring = ring,
                         index = 0,
-                        n = nentries},
+                        log_size = log_size,
+                        mask = nentries - 1,
+                        hca = hca,
+                       },
       self)
 end
 
+function eq:sw_value ()
+   return band(shr(self.index, self.log_size), 1)
+end
+
+function eq:entry ()
+   local slot = band(self.index, self.mask)
+   return self.ring[slot]
+end
+
 -- Poll the queue for events.
-function eq:poll()
-   print("Polling EQ")
-   local eqe = self.ring[self.index]
-   while eqe.owner == 0 and eqe.event_type ~= 0xFF do
+function eq:poll ()
+   local eqe = self:entry()
+   while eqe.owner == self:sw_value() do
+      self:handle_event(eqe)
       self.index = self.index + 1
-      eqe = self.ring[self.index % self.n]
-      self:event(eqe)
+      eqe = self:entry()
    end
-   print("done polling EQ")
 end
 
 -- Handle an event.
-function eq:event ()
-   print(("Got event %s.%s"):format(eqe.event_type, eqe.event_sub_type))
-   error("Event handling not yet implemented")
+local event_page_req = ffi.cdef([[
+   struct event_page_req {
+     uint16_t reserved1;
+     uint16_t function_id;
+     uint32_t num_pages;
+     uint32_t reserved2[5];
+   }
+]])
+local event_port_change = ffi.cdef([[
+   struct event_port_change {
+     uint32_t reserved1[2];
+     uint8_t  port_num;
+     uint8_t  reserved2[3];
+     uint32_t reserved2[4];
+   }
+]])
+local port_status = {
+   [1] = "down",
+   [4] = "up"
+}
+local event_cq_error = ffi.cdef([[
+   struct event_cq_error {
+     uint32_t cqn;
+     uint32_t reserved1;
+     uint8_t  reserved2[3];
+     uint8_t  syndrome;
+     uint32_t reserved3[4];
+   }
+]])
+local cq_errors = {
+   [1] = "overrun",
+   [2] = "access violation"
+}
+function eq:handle_event (eqe)
+   if eqe.event_type == 0x04 then
+      local cq_error = cast(typeof("struct event_cq_error *"), eqe.event_data)
+      local cqn = bswap(cq_error.cqn)
+      error(("Error on completion queue #%d: %s"):format(cqn, cq_errors[cq_error.syndrome]))
+   elseif eqe.event_type == 0x09 then
+      local port_change = cast(typeof("struct event_port_change *"), eqe.event_data)
+      local port = shr(port_change.port_num, 4)
+      print(("Port %d changed state to %s"):format(port, port_status[eqe.event_sub_type]))
+   elseif eqe.event_type == 0xB then
+      local page_req = cast(typeof("struct event_page_req *"), eqe.event_data)
+      local num_pages = bswap(page_req.num_pages)
+      if num_pages < 0 then
+         num_pages = -num_pages
+         print(("Reclaiming %d pages from HW"):format(num_pages))
+         self.hca:free_pages(num_pages)
+      else
+         print(("Allocating %d pages to HW"):format(num_pages))
+         self.hca:alloc_pages(num_pages)
+      end
+   else
+      error(("Received unexpected event type 0x%02x, subtype 0x%02x"):format(eqe.event_type,
+                                                                             eqe.event_sub_type))
+   end
 end
 
 ---------------------------------------------------------------
