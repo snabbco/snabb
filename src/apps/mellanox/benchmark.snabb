@@ -1,0 +1,60 @@
+#!../../snabb snsh
+
+local worker = require("core.worker")
+local lib = require("core.lib")
+
+local mode = 'tx-only'
+local pci0, pci1
+local cores0, cores1
+local nworkers = 1
+local nqueues = 1
+local npackets = 100e6
+local pktsize = 64
+
+local long_opts = {
+   mode = "m",
+   ['pci-a'] = "a",
+   ['pci-b'] = "b",
+   ['cores-a'] = "A",
+   ['cores-b'] = "B",
+   nworkers = "w",
+   nqueues = "q",
+   npackets = "n",
+   pktsize = "s",
+   help = "h",
+}
+local opts = "m:a:b:A:B:w:q:n:s:h"
+local function print_usage ()
+   for long, short in pairs(long_opts) do
+      print("--"..long, "-"..short)
+   end
+end
+
+local opt = {}
+function opt.m (arg) mode = arg end
+function opt.a (arg) pci0 = arg end
+function opt.b (arg) pci1 = arg end
+function opt.A (arg) cores0 = arg end
+function opt.B (arg) cores1 = arg end
+function opt.w (arg) nworkers = tonumber(arg) end
+function opt.q (arg) nqueues = tonumber(arg) end
+function opt.n (arg) npackets = tonumber(arg) end
+function opt.s (arg) pktsize = arg end
+function opt.h (arg) print_usage() main.exit(0) end
+
+main.parameters = lib.dogetopt(main.parameters, opt, opts, long_opts)
+
+assert(nworkers >= 1, "nworkers < 1")
+assert(nqueues >= 1, "nqueues < 1")
+assert(npackets >= 1, "npackets < 1")
+assert(mode == 'tx-only', "NYI")
+
+worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d)')
+   :format(pci0, cores0, nworkers, nqueues))
+
+worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, nil, %d, %d)')
+   :format(pci1, cores1, nworkers, nqueues, npackets, pktsize))
+
+engine.main{done = function ()
+   return not worker.status()["source"].alive
+end}

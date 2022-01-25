@@ -8,12 +8,15 @@ local lib = require("core.lib")
 local numa = require("lib.numa")
 local ffi = require("ffi")
 local band = bit.band
+local counter = require("core.counter")
 
 
 function sink (pci, cores, nworkers, nqueues, macs, vlans, opt)
-   local cfg = mlxconf(pci, nworkers*nqueues, macs, vlans, opt)
+   local cores = cpu_set(cores)
+   local macs = make_set(macs)
+   local vlans = make_set(vlans)
 
-   local cores = cores or {}
+   local cfg = mlxconf(pci, nworkers*nqueues, macs, vlans, opt)
 
    local c = config.new()
    config.app(c, "ConnectX", connectx.ConnectX, cfg)
@@ -22,8 +25,8 @@ function sink (pci, cores, nworkers, nqueues, macs, vlans, opt)
    for w=1, nworkers do
       worker.start(
          "sink"..w,
-         ('require("apps.mellanox.benchmark").sink_worker(%q, %d, %d, %d)')
-            :format(pci, cores[w], nqueues, 1+(w-1)*nqueues)
+         ('require("apps.mellanox.benchmark").sink_worker(%q, %s, %d, %d)')
+            :format(pci, take(cores), nqueues, 1+(w-1)*nqueues)
       )
    end
 
@@ -32,6 +35,7 @@ end
 
 function sink_worker (pci, core, nqueues, idx)
    if core then numa.bind_to_cpu(core, 'skip') end
+   engine.busywait = true
 
    local c = config.new()
    config.app(c, "Sink", basic_apps.Sink)
@@ -48,11 +52,10 @@ end
 
 
 function source (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets, pktsize, dmacs, dips, sips)
-   local cores = cores or {}
+   local cores = cpu_set(cores)
    local macs = make_set(macs)
-   local vlans = make_set(vlans)
    local dmacs = make_set(dmacs)
-   local dvlans = make_set(dvlans)
+   local vlans = make_set(vlans)
    local dips = make_set(dips)
    local sips = make_set(sips)
    
@@ -65,10 +68,10 @@ function source (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets, pkts
    for w=1, nworkers do
       worker.start(
          "source"..w,
-         ('require("apps.mellanox.benchmark").source_worker(%q, %d, %d, %d, '
+         ('require("apps.mellanox.benchmark").source_worker(%q, %s, %d, %d, '
             ..'%q, ' -- pktsize
             ..'%s, %s, %s, %s, %s)') -- dst/src mac/vlan/ip
-            :format(pci, cores[w], nqueues, 1+(w-1)*nqueues,
+            :format(pci, take(cores), nqueues, 1+(w-1)*nqueues,
                     pktsize,
                     give(dmacs, nqueues), give(macs, nqueues),
                     give(vlans, nqueues),
@@ -76,15 +79,32 @@ function source (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets, pkts
       )
    end
 
-   engine.main{done=function ()
+   local throttle = lib.throttle(0.1)
+   engine.main{duration=2, no_report=true} -- warmup
+
+   local initial_stats = engine.app_table.ConnectX.hca:query_vport_counter()
+   local goal = initial_stats.tx_ucast_packets + npackets
+   local start = engine.now()
+
+   engine.main{no_report=true, done=function ()
+      if not throttle() then return false end
       local stats = engine.app_table.ConnectX.hca:query_vport_counter()
-      return stats.tx_ucast_packets >= npackets end
+      return stats.tx_ucast_packets >= goal
    end}
-   print(("Transmitted %s packets"):format(lib.comma_value(npackets)))
+
+   local duration = engine.now() - start
+   local stats = engine.app_table.ConnectX.hca:query_vport_counter()
+   local tx = stats.tx_ucast_packets - initial_stats.tx_ucast_packets
+   local rx = stats.rx_ucast_packets - initial_stats.rx_ucast_packets
+   print(("Transmitted %s packets in %.2f seconds"):format(lib.comma_value(tx), duration))
+   print(("Tx Rate is %.3f Mpps"):format(tx / duration / 1e6))
+   print(("Received %s packets"):format(lib.comma_value(rx)))
+   print(("Rx Rate is %.3f Mpps"):format(rx / duration / 1e6))
 end
 
 function source_worker (pci, core, nqueues, idx, pktsize, dmacs, smacs, vlans, dips, sips)
    if core then numa.bind_to_cpu(core, 'skip') end
+   engine.busywait = true
 
    local c = config.new()
    config.app(c, "Source", Source, {
@@ -104,6 +124,13 @@ function source_worker (pci, core, nqueues, idx, pktsize, dmacs, smacs, vlans, d
    engine.configure(c)
 
    engine.main()
+   -- local last_frees = counter.read(engine.frees)
+   -- while true do
+   --    engine.main{duration=1, no_report=true}
+   --    local frees = counter.read(engine.frees)
+   --    print("source_worker", math.floor(idx/nqueues), lib.comma_value(frees-last_frees), "fps")
+   --    last_frees = frees
+   -- end
 end
 
 Source = {
@@ -122,8 +149,8 @@ Source = {
    } __attribute__((packed))]]
 }
 
-function Source:default_dmacs () return {"02:00:00:00:01"} end
-function Source:default_smacs () return {"02:00:00:00:02"} end
+function Source:default_dmacs () return {"02:00:00:00:00:01"} end
+function Source:default_smacs () return {"02:00:00:00:00:02"} end
 function Source:default_vlans () return {0} end
 function Source:default_dips ()
    local ips = {}
@@ -144,10 +171,10 @@ function Source:new (conf)
    self.smacs = make_set(#conf.smacs > 0 and conf.smacs or self:default_smacs())
    self.vlans = make_set(#conf.vlans > 0 and conf.vlans or self:default_vlans())
    self.dips = make_set(#conf.dips > 0 and conf.dips or self:default_dips())
-   self.smacs = make_set(#conf.sips > 0 and conf.sips or self:default_sips())
+   self.sips = make_set(#conf.sips > 0 and conf.sips or self:default_sips())
    self.buffersize = conf.buffersize
    self.packets = ffi.new("struct packet *[?]", self.buffersize)
-   for i=0, self.buffersize do
+   for i=0, self.buffersize-1 do
       self.packets[i] = self:make_packet()
    end
    self.cursor = 0
@@ -157,7 +184,8 @@ end
 function Source:make_packet ()
    local ethernet = require("lib.protocol.ethernet")
    local ipv4 = require("lib.protocol.ipv4")
-   local size = take(self.sizes)
+   local size = take(self.sizes) - 4 -- minus (4 byte CRC)
+   assert(size > (ethernet:sizeof() + ffi.sizeof(self.dot1q_t) + ipv4:sizeof()))
    local eth = ethernet:new{
       dst = ethernet:pton(take(self.dmacs)),
       src = ethernet:pton(take(self.smacs)),
@@ -169,21 +197,21 @@ function Source:make_packet ()
    local ip = ipv4:new{
       dst = ipv4:pton(take(self.dips)),
       src = ipv4:pton(take(self.sips)),
-      ttl = 64
+      ttl = 64,
       total_length = size - (eth:sizeof() + ffi.sizeof(dot1q))
    }
    ip:checksum()
    local p = packet.allocate()
-   packet.append(eth, eth:sizeof())
-   packet.append(dot1q, ffi.sizeof(dot1q))
-   packet.append(ip, ip:sizeof())
+   packet.append(p, eth:header(), eth:sizeof())
+   packet.append(p, dot1q, ffi.sizeof(dot1q))
+   packet.append(p, ip:header(), ip:sizeof())
    packet.resize(p, size)
    return p
 end
 
 function Source:pull ()
    local cursor = self.cursor
-   local mask = self.buffersize
+   local mask = self.buffersize-1
    local packets = self.packets
    for _, output in pairs(self.output) do
       while not link.full(output) do
@@ -200,7 +228,7 @@ function mlxconf (pci, nqueues, macs, vlans, opt)
 
    local queues = {}
    for q=1, nqueues do
-      queues[q] = {"q"..q, mac=take(macs), vlan=take(vlans)}
+      queues[q] = {id="q"..q, mac=take(macs), vlan=take(vlans)}
    end
 
    local cfg = {}
@@ -237,4 +265,12 @@ function give (set, n)
       end
    end
    return a.."}"
+end
+
+function cpu_set (s)
+   local cores = {}
+   for core in pairs(numa.parse_cpuset(s or "")) do
+      cores[#cores+1] = core
+   end
+   return make_set(cores)
 end
