@@ -140,7 +140,7 @@ function source_worker (pci, core, nqueues, idx, pktsize, dmacs, smacs, vlans, d
    })
    local q = idx
    for _=1, nqueues do
-      config.app(c, "IO"..q, connectx.IO, {pciaddress=pci, queue="q"..q})
+      config.app(c, "IO"..q, connectx.IO, {pciaddress=pci, queue="q"..q, packetblaster=true})
       config.link(c, "Source.output"..q.." -> IO"..q..".input")
       q = q + 1
    end
@@ -282,6 +282,7 @@ function Source:pull ()
    for _, output in pairs(self.output) do
       while not link.full(output) do
          link.transmit(output, packet.clone(packets[band(cursor,mask)]))
+         --link.transmit(output, packets[band(cursor,mask)])
          cursor = cursor + 1
       end
    end
