@@ -50,8 +50,8 @@ assert(npackets >= 1, "npackets < 1")
 
 if mode == 'source-sink' then
 
-   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d)')
-      :format(pci0, cores0, nworkers, nqueues))
+   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, nil, nil, nil, %d)')
+      :format(pci0, cores0, nworkers, nqueues, npackets))
 
    worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, nil, %d, %d)')
       :format(pci1, cores1, nworkers, nqueues, npackets, pktsize))

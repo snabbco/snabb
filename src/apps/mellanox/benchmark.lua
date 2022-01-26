@@ -11,7 +11,7 @@ local band = bit.band
 local counter = require("core.counter")
 
 
-function sink (pci, cores, nworkers, nqueues, macs, vlans, opt)
+function sink (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets)
    local cores = cpu_set(cores)
    local macs = make_set(macs)
    local vlans = make_set(vlans)
@@ -30,6 +30,26 @@ function sink (pci, cores, nworkers, nqueues, macs, vlans, opt)
       )
    end
 
+   local startline = npackets/10
+   engine.main{no_report=true, done=function () -- warmup
+      local stats = engine.app_table.ConnectX.hca:query_vport_counter()
+      return stats.rx_ucast_packets >= startline
+   end}
+
+   local initial_stats = engine.app_table.ConnectX.hca:query_vport_counter()
+   local goal = initial_stats.rx_ucast_packets + npackets
+   local start = engine.now()
+   engine.main{no_report=true, done=function ()
+      local stats = engine.app_table.ConnectX.hca:query_vport_counter()
+      return stats.rx_ucast_packets >= npackets
+   end}
+
+   local duration = engine.now() - start
+   local stats = engine.app_table.ConnectX.hca:query_vport_counter()
+   local rx = stats.rx_ucast_packets - initial_stats.rx_ucast_packets
+   print(("Received %s packets in %.2f seconds"):format(lib.comma_value(rx), duration))
+   print(("Rx Rate is %.3f Mpps"):format(rx / duration / 1e6))
+
    engine.main()
 end     
 
@@ -47,7 +67,9 @@ function sink_worker (pci, core, nqueues, idx)
    end
    engine.configure(c)
 
-   engine.main()
+   while true do
+      engine.main{no_report=false, duration=1}
+   end
 end
 
 
@@ -79,15 +101,17 @@ function source (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets, pkts
       )
    end
 
-   local throttle = lib.throttle(0.1)
-   engine.main{duration=2, no_report=true} -- warmup
+   local startline = npackets/10
+   engine.main{no_report=true, done=function () -- warmup
+      local stats = engine.app_table.ConnectX.hca:query_vport_counter()
+      return stats.tx_ucast_packets >= startline
+   end}
 
    local initial_stats = engine.app_table.ConnectX.hca:query_vport_counter()
    local goal = initial_stats.tx_ucast_packets + npackets
    local start = engine.now()
 
    engine.main{no_report=true, done=function ()
-      if not throttle() then return false end
       local stats = engine.app_table.ConnectX.hca:query_vport_counter()
       return stats.tx_ucast_packets >= goal
    end}
@@ -95,11 +119,10 @@ function source (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets, pkts
    local duration = engine.now() - start
    local stats = engine.app_table.ConnectX.hca:query_vport_counter()
    local tx = stats.tx_ucast_packets - initial_stats.tx_ucast_packets
-   local rx = stats.rx_ucast_packets - initial_stats.rx_ucast_packets
    print(("Transmitted %s packets in %.2f seconds"):format(lib.comma_value(tx), duration))
    print(("Tx Rate is %.3f Mpps"):format(tx / duration / 1e6))
-   print(("Received %s packets"):format(lib.comma_value(rx)))
-   print(("Rx Rate is %.3f Mpps"):format(rx / duration / 1e6))
+
+   engine.main{no_report=true, duration=1}
 end
 
 function source_worker (pci, core, nqueues, idx, pktsize, dmacs, smacs, vlans, dips, sips)
@@ -123,14 +146,9 @@ function source_worker (pci, core, nqueues, idx, pktsize, dmacs, smacs, vlans, d
    end
    engine.configure(c)
 
-   engine.main()
-   -- local last_frees = counter.read(engine.frees)
-   -- while true do
-   --    engine.main{duration=1, no_report=true}
-   --    local frees = counter.read(engine.frees)
-   --    print("source_worker", math.floor(idx/nqueues), lib.comma_value(frees-last_frees), "fps")
-   --    last_frees = frees
-   -- end
+   while true do
+      engine.main{no_report=true, duration=1}
+   end
 end
 
 function source_softtest (cores, nqueues, smacs, vlans, npackets, pktsize, dmacs, dips, sips)
