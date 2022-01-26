@@ -1328,6 +1328,17 @@ function IO:new (conf)
       close()
    end
 
+   -- Configure self as packetblaster?
+   if conf.packetblaster then
+      self.push = nil
+      self.pull = function (self)
+         if activate() then
+            sq:blast(self.input.input or self.input.rx)
+            deactivate()
+         end
+      end
+   end
+
    return self
 end
 
@@ -1502,6 +1513,72 @@ function SQ:new (cxq, mmio)
             cxq.tx[next_reclaim] = nil
             next_reclaim = tonumber(slot(next_reclaim + 1))
          end
+      end
+   end
+
+   -- Packetblaster: blast packets from link out of send queue.
+   function sq:blast (l)
+      local kickoff = sq:blast_load(l)
+
+      -- Get current send queue tail (hardware controlled)
+      local opcode = cxq.scq[0].u8[0x38]
+      if opcode == 0x0A then
+         local wqeid = shr(bswap(cxq.scq[0].u32[0x3C/4]), 16)
+
+         -- Keep send queue topped up
+         local next_slot = slot(cxq.next_tx_wqeid)
+         while next_slot ~= slot(wqeid) do
+            local wqe = cxq.swq[next_slot]
+            -- Update control segment
+            wqe.u32[0] = bswap(shl(cxq.next_tx_wqeid, 8) + 0x0A)
+            -- Advance counters
+            cxq.next_tx_wqeid = cxq.next_tx_wqeid + 1
+            next_slot = slot(cxq.next_tx_wqeid)
+            ring = true
+         end
+      end
+
+      if opcode == 0x0A or kickoff then
+         -- Ring the doorbell
+         local current_packet = slot(cxq.next_tx_wqeid + mask)
+         cxq.doorbell.send = bswap(cxq.next_tx_wqeid)
+         cxq.bf_next[0] = cxq.swq[current_packet].u64[0]
+         -- Switch next/alternate blue flame register for next time
+         cxq.bf_next, cxq.bf_alt = cxq.bf_alt, cxq.bf_next
+      end
+   end
+
+   -- Packetblaster: load packets from link into send queue.
+   local loaded = 0
+   function sq:blast_load (l)
+      while loaded < cxq.sqsize and not link.empty(l) do
+         local p = link.receive(l)
+         local next_slot = slot(cxq.next_tx_wqeid)
+         local wqe = cxq.swq[next_slot]
+
+         -- Construct a 64-byte transmit descriptor.
+         -- This is in three parts: Control, Ethernet, Data.
+         -- The Ethernet part includes some inline data.
+
+         -- Control segment
+         wqe.u32[0] = bswap(shl(cxq.next_tx_wqeid, 8) + 0x0A)
+         wqe.u32[1] = bswap(shl(cxq.sqn, 8) + 4)
+         wqe.u32[2] = bswap(shl(2, 2)) -- completion always
+         -- Ethernet segment
+         local ninline = 16
+         wqe.u32[7] = bswap(shl(ninline, 16))
+         ffi.copy(wqe.u8 + 0x1E, p.data, ninline)
+         -- Send Data Segment (inline data)
+         wqe.u32[12] = bswap(p.length - ninline)
+         wqe.u32[13] = bswap(cxq.rlkey)
+         local phy = memory.virtual_to_physical(p.data + ninline)
+         wqe.u32[14] = bswap(tonumber(shr(phy, 32)))
+         wqe.u32[15] = bswap(tonumber(band(phy, 0xFFFFFFFF)))
+         -- Advance counters
+         cxq.next_tx_wqeid = cxq.next_tx_wqeid + 1
+         loaded = loaded + 1
+         -- Kickoff?
+         return loaded == cxq.sqsize
       end
    end
 
