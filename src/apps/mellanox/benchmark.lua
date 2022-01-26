@@ -133,6 +133,54 @@ function source_worker (pci, core, nqueues, idx, pktsize, dmacs, smacs, vlans, d
    -- end
 end
 
+function source_softtest (cores, nqueues, smacs, vlans, npackets, pktsize, dmacs, dips, sips)
+   local core = take(cpu_set(cores))
+   local smacs = make_set(smacs)
+   local dmacs = make_set(dmacs)
+   local vlans = make_set(vlans)
+   local dips = make_set(dips)
+   local sips = make_set(sips)
+   if core then numa.bind_to_cpu(core, 'skip') end
+   engine.busywait = true
+
+   local c = config.new()
+   config.app(c, "Source", Source, {
+      packetsize = pktsize,
+      dmacs = dmacs,
+      smacs = smacs,
+      vlans = vlans,
+      dips = dips,
+      sips = sips
+   })
+   config.app(c, "Sink", basic_apps.Sink)
+   for q=1, nqueues do
+      config.link(c, "Source.output"..q.." -> Sink.input"..q)
+   end
+
+   engine.configure(c)
+
+   local outputs = {}
+   for _, link in pairs(engine.app_table.Source.output) do
+      outputs[#outputs+1] = link
+   end
+   local function tx ()
+      local tx = 0ULL
+      for _, link in ipairs(outputs) do
+         tx = tx + counter.read(link.stats.txpackets)
+      end
+      return tonumber(tx)
+   end
+
+   local start = engine.now()
+   engine.main{done=function ()
+      return tx() >= npackets
+   end}
+
+   local duration = engine.now() - start
+   print(("Transmitted %s packets in %.2f seconds"):format(lib.comma_value(tx()), duration))
+   print(("Tx Rate is %.3f Mpps"):format(tx() / duration / 1e6))
+end
+
 Source = {
    config = {
       packetsize = {required=true},

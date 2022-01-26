@@ -3,7 +3,7 @@
 local worker = require("core.worker")
 local lib = require("core.lib")
 
-local mode = 'tx-only'
+local mode = 'source-sink'
 local pci0, pci1
 local cores0, cores1
 local nworkers = 1
@@ -47,14 +47,32 @@ main.parameters = lib.dogetopt(main.parameters, opt, opts, long_opts)
 assert(nworkers >= 1, "nworkers < 1")
 assert(nqueues >= 1, "nqueues < 1")
 assert(npackets >= 1, "npackets < 1")
-assert(mode == 'tx-only', "NYI")
 
-worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d)')
-   :format(pci0, cores0, nworkers, nqueues))
+if mode == 'source-sink' then
 
-worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, nil, %d, %d)')
-   :format(pci1, cores1, nworkers, nqueues, npackets, pktsize))
+   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d)')
+      :format(pci0, cores0, nworkers, nqueues))
 
-engine.main{done = function ()
-   return not worker.status()["source"].alive
-end}
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, nil, %d, %d)')
+      :format(pci1, cores1, nworkers, nqueues, npackets, pktsize))
+
+   engine.main{done = function ()
+      return not worker.status()["source"].alive
+   end}
+
+elseif mode == 'source' then
+
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, nil, %d, %d)')
+      :format(pci0, cores0, nworkers, nqueues, npackets, pktsize))
+
+   engine.main{done = function ()
+      return not worker.status()["source"].alive
+   end}
+
+elseif mode == 'source-softtest' then
+
+   require("apps.mellanox.benchmark").source_softtest(cores0, nqueues, nil, nil, npackets, pktsize)
+
+else
+   error("NYI: mode "..mode)
+end
