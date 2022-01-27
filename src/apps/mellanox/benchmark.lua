@@ -30,25 +30,31 @@ function sink (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets)
       )
    end
 
+   local stats = engine.app_table.ConnectX.stats
+
    local startline = npackets/10
    engine.main{no_report=true, done=function () -- warmup
-      local stats = engine.app_table.ConnectX.hca:query_vport_counter()
-      return stats.rx_ucast_packets >= startline
+      return counter.read(stats.rxpackets) >= startline
    end}
 
-   local initial_stats = engine.app_table.ConnectX.hca:query_vport_counter()
-   local goal = initial_stats.rx_ucast_packets + npackets
+   local rxpackets_start = counter.read(stats.rxpackets)
+   local rxdrop_start = counter.read(stats.rxdrop)
+   local rxerrors_start = counter.read(stats.rxerrors)
+
+   local goal = rxpackets_start + npackets
    local start = engine.now()
    engine.main{no_report=true, done=function ()
-      local stats = engine.app_table.ConnectX.hca:query_vport_counter()
-      return stats.rx_ucast_packets >= npackets
+      return counter.read(stats.rxpackets) >= goal
    end}
 
    local duration = engine.now() - start
-   local stats = engine.app_table.ConnectX.hca:query_vport_counter()
-   local rx = stats.rx_ucast_packets - initial_stats.rx_ucast_packets
-   print(("Received %s packets in %.2f seconds"):format(lib.comma_value(rx), duration))
-   print(("Rx Rate is %.3f Mpps"):format(rx / duration / 1e6))
+   local rxpackets = counter.read(stats.rxpackets) - rxpackets_start
+   local rxdrop = counter.read(stats.rxdrop) - rxdrop_start
+   local rxerrors = counter.read(stats.rxerrors) - rxerrors_start
+   print(("Received %s packets in %.2f seconds"):format(lib.comma_value(rxpackets), duration))
+   print(("Rx Rate is %.3f Mpps"):format(tonumber(rxpackets) / duration / 1e6))
+   print(("Rx Drop Rate is %.3f Mpps"):format(tonumber(rxdrop) / duration / 1e6))
+   print(("Rx Error Rate is %.3f Mpps"):format(tonumber(rxerrors) / duration / 1e6))
 
    engine.main()
 end     
@@ -101,26 +107,31 @@ function source (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets, pkts
       )
    end
 
+   local stats = engine.app_table.ConnectX.stats
+
    local startline = npackets/10
    engine.main{no_report=true, done=function () -- warmup
-      local stats = engine.app_table.ConnectX.hca:query_vport_counter()
-      return stats.tx_ucast_packets >= startline
+      return counter.read(stats.txpackets) >= startline
    end}
 
-   local initial_stats = engine.app_table.ConnectX.hca:query_vport_counter()
-   local goal = initial_stats.tx_ucast_packets + npackets
-   local start = engine.now()
+   local txpackets_start = counter.read(stats.txpackets)
+   local txdrop_start = counter.read(stats.txdrop)
+   local txerrors_start = counter.read(stats.txerrors)
 
+   local goal = txpackets_start + npackets
+   local start = engine.now()
    engine.main{no_report=true, done=function ()
-      local stats = engine.app_table.ConnectX.hca:query_vport_counter()
-      return stats.tx_ucast_packets >= goal
+      return counter.read(stats.txpackets) >= goal
    end}
 
    local duration = engine.now() - start
-   local stats = engine.app_table.ConnectX.hca:query_vport_counter()
-   local tx = stats.tx_ucast_packets - initial_stats.tx_ucast_packets
-   print(("Transmitted %s packets in %.2f seconds"):format(lib.comma_value(tx), duration))
-   print(("Tx Rate is %.3f Mpps"):format(tx / duration / 1e6))
+   local txpackets = counter.read(stats.txpackets) - txpackets_start
+   local txdrop = counter.read(stats.txdrop) - txdrop_start
+   local txerrors = counter.read(stats.txerrors) - txerrors_start
+   print(("Transmitted %s packets in %.2f seconds"):format(lib.comma_value(txpackets), duration))
+   print(("Tx Rate is %.3f Mpps"):format(tonumber(txpackets) / duration / 1e6))
+   print(("Tx Drop Rate is %.3f Mpps"):format(tonumber(txdrop) / duration / 1e6))
+   print(("Tx Error Rate is %.3f Mpps"):format(tonumber(txerrors) / duration / 1e6))
 
    engine.main{no_report=true, duration=1}
 end
