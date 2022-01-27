@@ -55,6 +55,7 @@ function sink (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets)
    print(("Rx Rate is %.3f Mpps"):format(tonumber(rxpackets) / duration / 1e6))
    print(("Rx Drop Rate is %.3f Mpps"):format(tonumber(rxdrop) / duration / 1e6))
    print(("Rx Error Rate is %.3f Mpps"):format(tonumber(rxerrors) / duration / 1e6))
+   io.stdout:flush()
 
    engine.main()
 end     
@@ -74,7 +75,7 @@ function sink_worker (pci, core, nqueues, idx)
    engine.configure(c)
 
    while true do
-      engine.main{no_report=false, duration=1}
+      engine.main{no_report=true, duration=1}
    end
 end
 
@@ -132,6 +133,7 @@ function source (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets, pkts
    print(("Tx Rate is %.3f Mpps"):format(tonumber(txpackets) / duration / 1e6))
    print(("Tx Drop Rate is %.3f Mpps"):format(tonumber(txdrop) / duration / 1e6))
    print(("Tx Error Rate is %.3f Mpps"):format(tonumber(txerrors) / duration / 1e6))
+   io.stdout:flush()
 
    engine.main{no_report=true, duration=1}
 end
