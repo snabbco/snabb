@@ -10,6 +10,7 @@ local nworkers = 1
 local nqueues = 1
 local npackets = 100e6
 local pktsize = 64
+local mlxopts
 
 local long_opts = {
    mode = "m",
@@ -21,9 +22,10 @@ local long_opts = {
    nqueues = "q",
    npackets = "n",
    pktsize = "s",
+   opt = "o",
    help = "h",
 }
-local opts = "m:a:b:A:B:w:q:n:s:h"
+local opts = "m:a:b:A:B:w:q:n:s:o:h"
 local function print_usage ()
    for long, short in pairs(long_opts) do
       print("--"..long, "-"..short)
@@ -40,6 +42,7 @@ function opt.w (arg) nworkers = tonumber(arg) end
 function opt.q (arg) nqueues = tonumber(arg) end
 function opt.n (arg) npackets = tonumber(arg) end
 function opt.s (arg) pktsize = arg end
+function opt.o (arg) mlxopts = arg end
 function opt.h (arg) print_usage() main.exit(0) end
 
 main.parameters = lib.dogetopt(main.parameters, opt, opts, long_opts)
@@ -50,11 +53,11 @@ assert(npackets >= 1, "npackets < 1")
 
 if mode == 'source-sink' then
 
-   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, nil, nil, nil, %d)')
-      :format(pci0, cores0, nworkers, nqueues, npackets))
+   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, nil, nil, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, mlxopts, npackets))
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, nil, %d, %d)')
-      :format(pci1, cores1, nworkers, nqueues, npackets, pktsize))
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, %s, %d, %d)')
+      :format(pci1, cores1, nworkers, nqueues, mlxopts, npackets, pktsize))
 
    engine.main{done = function ()
       return not worker.status()["source"].alive
@@ -62,8 +65,8 @@ if mode == 'source-sink' then
 
 elseif mode == 'source' then
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, nil, %d, %d)')
-      :format(pci0, cores0, nworkers, nqueues, npackets, pktsize))
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, %s, %d, %d)')
+      :format(pci0, cores0, nworkers, nqueues, mlxopts, npackets, pktsize))
 
    engine.main{done = function ()
       return not worker.status()["source"].alive
