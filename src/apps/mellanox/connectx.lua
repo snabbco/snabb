@@ -1529,7 +1529,6 @@ function SQ:new (cxq, mmio)
             -- Advance counters
             cxq.next_tx_wqeid = cxq.next_tx_wqeid + 1
             next_slot = slot(cxq.next_tx_wqeid)
-            ring = true
          end
       end
 
