@@ -302,6 +302,118 @@ function Source:pull ()
    self.cursor = band(cursor, mask)
 end
 
+function fwd (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets)
+   local cores = cpu_set(cores)
+   local macs = make_set(macs)
+   local vlans = make_set(vlans)
+
+   local cfg = mlxconf(pci, nworkers*nqueues, macs, vlans, opt)
+
+   local c = config.new()
+   config.app(c, "ConnectX", connectx.ConnectX, cfg)
+   engine.configure(c)
+
+   for w=1, nworkers do
+      worker.start(
+         "sink"..w,
+         ('require("apps.mellanox.benchmark").fwd_worker(%q, %s, %d, %d)')
+            :format(pci, take(cores), nqueues, 1+(w-1)*nqueues)
+      )
+   end
+
+   local stats = engine.app_table.ConnectX.stats
+
+   local startline = npackets/10
+   engine.main{no_report=true, done=function () -- warmup
+      return counter.read(stats.rxpackets) >= startline
+   end}
+
+   local rxpackets_start = counter.read(stats.rxpackets)
+   local rxdrop_start = counter.read(stats.rxdrop)
+   local rxerrors_start = counter.read(stats.rxerrors)
+   local txpackets_start = counter.read(stats.txpackets)
+   local txdrop_start = counter.read(stats.txdrop)
+   local txerrors_start = counter.read(stats.txerrors)
+
+   local goal = rxpackets_start + npackets
+   local start = engine.now()
+   engine.main{no_report=true, done=function ()
+      return counter.read(stats.rxpackets) >= goal
+   end}
+
+   local duration = engine.now() - start
+   local rxpackets = counter.read(stats.rxpackets) - rxpackets_start
+   local rxdrop = counter.read(stats.rxdrop) - rxdrop_start
+   local rxerrors = counter.read(stats.rxerrors) - rxerrors_start
+   print(("Received %s packets in %.2f seconds"):format(lib.comma_value(rxpackets), duration))
+   print(("Rx Rate is %.3f Mpps"):format(tonumber(rxpackets) / duration / 1e6))
+   print(("Rx Drop Rate is %.3f Mpps"):format(tonumber(rxdrop) / duration / 1e6))
+   print(("Rx Error Rate is %.3f Mpps"):format(tonumber(rxerrors) / duration / 1e6))
+   local txpackets = counter.read(stats.txpackets) - txpackets_start
+   local txdrop = counter.read(stats.txdrop) - txdrop_start
+   local txerrors = counter.read(stats.txerrors) - txerrors_start
+   print(("Forwarded %s packets in %.2f seconds"):format(lib.comma_value(txpackets), duration))
+   print(("Fw Rate is %.3f Mpps"):format(tonumber(txpackets) / duration / 1e6))
+   print(("Fw Drop Rate is %.3f Mpps"):format(tonumber(txdrop) / duration / 1e6))
+   print(("Fw Error Rate is %.3f Mpps"):format(tonumber(txerrors) / duration / 1e6))
+   io.stdout:flush()
+
+   engine.main()
+end     
+
+function fwd_worker (pci, core, nqueues, idx)
+   if core then numa.bind_to_cpu(core, 'skip') end
+   engine.busywait = true
+
+   local c = config.new()
+   config.app(c, "Forward", Forward)
+   local q = idx
+   for _=1, nqueues do
+      config.app(c, "IO"..q, connectx.IO, {pciaddress=pci, queue="q"..q})
+      config.link(c, "IO"..q..".output -> Forward.input"..q)
+      config.link(c, "Forward.output"..q.." -> IO"..q..".input")
+      q = q + 1
+   end
+   engine.configure(c)
+
+   while true do
+      engine.main{no_report=true, duration=1}
+   end
+end
+
+Forward = {}
+
+local ethernet = require("lib.protocol.ethernet")
+
+function Forward:new (conf)
+   local self = setmetatable({}, {__index=Forward})
+   self.eth = ethernet:new{}
+   return self
+end
+
+function Forward:link ()
+   self.input_links, self.output_links = {}, {}
+   for name, input in pairs(self.input) do
+      if type(name) == 'string' then
+         local q = name:match("input([0-9]+)")
+         self.input_links[#self.input_links+1] = input
+         self.output_links[#self.output_links+1] = self.output["output"..q]
+      end
+   end
+end
+
+function Forward:push ()
+   for i = 1, #self.input_links do
+      local input, output = self.input_links[i], self.output_links[i]
+      while not link.empty(input) do
+         local p = link.receive(input)
+         local eth = self.eth:new_from_mem(p.data, p.length)
+         eth:swap()
+         link.transmit(output, p)
+      end
+   end
+end
+
 
 function mlxconf (pci, nqueues, macs, vlans, opt)
    local opt = opt or {}

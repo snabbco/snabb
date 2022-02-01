@@ -63,6 +63,18 @@ if mode == 'source-sink' then
       return not worker.status()["source"].alive
    end}
 
+elseif mode == 'source-fwd' then
+
+   worker.start("forward", ('require("apps.mellanox.benchmark").fwd(%q, %q, %d, %d, nil, nil, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, mlxopts, npackets))
+
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, %s, %d, %d)')
+      :format(pci1, cores1, nworkers, nqueues, mlxopts, npackets, pktsize))
+
+   engine.main{done = function ()
+      return not worker.status()["source"].alive
+   end}
+
 elseif mode == 'source' then
 
    worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, %s, %d, %d)')
