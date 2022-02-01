@@ -83,6 +83,7 @@ function parse_command_line(args, opts)
    function handlers.s(arg) ret.schema_name = arg end
    function handlers.r(arg) ret.revision_date = arg end
    function handlers.c(arg) ret.socket = arg end
+   function handlers.v(arg) ret.verbose = true end
    function handlers.f(arg)
       assert(arg == "yang" or arg == "xpath" or arg == "influxdb", "Not valid output format")
       ret.format = arg
@@ -90,30 +91,50 @@ function parse_command_line(args, opts)
    handlers['print-default'] = function ()
       ret.print_default = true
    end
-   args = lib.dogetopt(args, handlers, "hs:r:c:f:",
-                       {help="h", ['schema-name']="s", schema="s",
+   args = lib.dogetopt(args, handlers, "hvs:r:c:f:",
+                       {help="h", verbose="v", ['schema-name']="s", schema="s",
                         ['revision-date']="r", revision="r", socket="c",
                         ['print-default']=0, format="f"})
+
    if #args == 0 then err() end
-   ret.instance_id = table.remove(args, 1)
-   local descr = call_leader(ret.instance_id, 'describe', {})
-   if not ret.schema_name then
-      if opts.require_schema then err("missing --schema arg") end
-      ret.schema_name = descr.default_schema
+
+   if opts.command == 'test' then
+      if #args > 1 then
+         ret.instance_id = table.remove(args, 1)
+      end
+   else
+      ret.instance_id = table.remove(args, 1)
    end
-   require('lib.yang.schema').set_default_capabilities(descr.capability)
+
+   -- If instance ID was given, then load description from instance
+   if ret.instance_id then
+      local descr = call_leader(ret.instance_id, 'describe', {})
+      -- If schema name was not explicitly passed, load from instance 
+      if not ret.schema_name then
+         if opts.require_schema then err("missing --schema arg") end
+         ret.schema_name = descr.default_schema
+      end
+      require('lib.yang.schema').set_default_capabilities(descr.capability)
+   end
+
    if not pcall(yang.load_schema_by_name, ret.schema_name) then
-      local response = call_leader(
-         ret.instance_id, 'get-schema',
-         {schema=ret.schema_name, revision=ret.revision_date})
-      assert(not response.error, response.error)
-      yang.add_schema(response.source, ret.schema_name)
+      local schema_file = S.lstat(ret.schema_name)
+      if schema_file and schema_file.isreg then
+            ret.schema_name = yang.add_schema_file(ret.schema_name)
+      else
+         if not ret.instance_id then err("no schema loaded and instance id not given") end
+         local response = call_leader(
+            ret.instance_id, 'get-schema',
+            {schema=ret.schema_name, revision=ret.revision_date})
+         assert(not response.error, response.error)
+         yang.add_schema(response.source, ret.schema_name)
+      end
    end
    if opts.with_config_file then
       if #args == 0 then err("missing config file argument") end
       local file = table.remove(args, 1)
       local opts = {schema_name=ret.schema_name,
-                    revision_date=ret.revision_date}
+                    revision_date=ret.revision_date, verbose=ret.verbose}
       ret.config_file = file
       ret.config = yang.load_configuration(file, opts)
    end
