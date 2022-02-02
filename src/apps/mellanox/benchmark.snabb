@@ -10,6 +10,8 @@ local nworkers = 1
 local nqueues = 1
 local npackets = 100e6
 local pktsize = 64
+local nmacs
+local nvlans
 local mlxopts
 
 local long_opts = {
@@ -22,10 +24,12 @@ local long_opts = {
    nqueues = "q",
    npackets = "n",
    pktsize = "s",
+   nmacs = "e",
+   nvlans = "v",
    opt = "o",
    help = "h",
 }
-local opts = "m:a:b:A:B:w:q:n:s:o:h"
+local opts = "m:a:b:A:B:w:q:n:s:e:v:o:h"
 local function print_usage ()
    for long, short in pairs(long_opts) do
       print("--"..long, "-"..short)
@@ -42,22 +46,45 @@ function opt.w (arg) nworkers = tonumber(arg) end
 function opt.q (arg) nqueues = tonumber(arg) end
 function opt.n (arg) npackets = tonumber(arg) end
 function opt.s (arg) pktsize = arg end
+function opt.e (arg) nmacs = tonumber(arg) end
+function opt.v (arg) nvlans = tonumber(arg) end
 function opt.o (arg) mlxopts = arg end
 function opt.h (arg) print_usage() main.exit(0) end
 
 main.parameters = lib.dogetopt(main.parameters, opt, opts, long_opts)
 
+assert(pci0 and pci1, "need --pci-a and --pci-b")
 assert(nworkers >= 1, "nworkers < 1")
 assert(nqueues >= 1, "nqueues < 1")
 assert(npackets >= 1, "npackets < 1")
 
+local macs, dmacs, vlans
+if nmacs and nmacs > 0 then
+   assert(nmacs <= 0xff, "nmacs too large")
+   macs = '{'
+   dmacs = '{'
+   for mac=1, nmacs do
+      macs = ("%s'02:01:00:00:00:%02X',"):format(macs, mac)
+      dmacs = ("%s'02:02:00:00:00:%02X',"):format(dmacs, mac)
+   end
+   macs = macs..'}'
+   dmacs = dmacs..'}'
+end
+if nvlans and nvlans > 0 then
+   vlans = '{'
+   for vlan=1, nvlans do
+      vlans = ("%s%d,"):format(vlans, vlan)
+   end
+   vlans = vlans..'}'
+end
+
 if mode == 'source-sink' then
 
-   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, nil, nil, %s, %d)')
-      :format(pci0, cores0, nworkers, nqueues, mlxopts, npackets))
+   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, %s, %s, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, %s, %d, %d)')
-      :format(pci1, cores1, nworkers, nqueues, mlxopts, npackets, pktsize))
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %d, %s)')
+      :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
 
    engine.main{done = function ()
       return not worker.status()["source"].alive
@@ -65,11 +92,11 @@ if mode == 'source-sink' then
 
 elseif mode == 'source-fwd' then
 
-   worker.start("forward", ('require("apps.mellanox.benchmark").fwd(%q, %q, %d, %d, nil, nil, %s, %d)')
-      :format(pci0, cores0, nworkers, nqueues, mlxopts, npackets))
+   worker.start("forward", ('require("apps.mellanox.benchmark").fwd(%q, %q, %d, %d, %s, %s, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, %s, %d, %d)')
-      :format(pci1, cores1, nworkers, nqueues, mlxopts, npackets, pktsize))
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %d, %s)')
+      :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
 
    engine.main{done = function ()
       return not worker.status()["source"].alive
@@ -77,16 +104,12 @@ elseif mode == 'source-fwd' then
 
 elseif mode == 'source' then
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, nil, nil, %s, %d, %d)')
-      :format(pci0, cores0, nworkers, nqueues, mlxopts, npackets, pktsize))
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %d, %s)')
+      :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
 
    engine.main{done = function ()
       return not worker.status()["source"].alive
    end}
-
-elseif mode == 'source-softtest' then
-
-   require("apps.mellanox.benchmark").source_softtest(cores0, nqueues, nil, nil, npackets, pktsize)
 
 else
    error("NYI: mode "..mode)
