@@ -53,7 +53,6 @@ function opt.h (arg) print_usage() main.exit(0) end
 
 main.parameters = lib.dogetopt(main.parameters, opt, opts, long_opts)
 
-assert(pci0 and pci1, "need --pci-a and --pci-b")
 assert(nworkers >= 1, "nworkers < 1")
 assert(nqueues >= 1, "nqueues < 1")
 assert(npackets >= 1, "npackets < 1")
@@ -105,7 +104,7 @@ elseif mode == 'source-fwd' then
 elseif mode == 'source' then
 
    worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %d, %s)')
-      :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
+      :format(pci0, cores0, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
 
    engine.main{done = function ()
       return not worker.status()["source"].alive
