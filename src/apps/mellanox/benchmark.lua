@@ -57,7 +57,7 @@ function sink (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets)
    print(("Rx Error Rate is %.3f Mpps"):format(tonumber(rxerrors) / duration / 1e6))
    io.stdout:flush()
 
-   engine.main()
+   engine.main{duration=1}
 end     
 
 function sink_worker (pci, core, nqueues, idx)
@@ -310,7 +310,7 @@ function fwd (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets)
    print(("Fw Error Rate is %.3f Mpps"):format(tonumber(txerrors) / duration / 1e6))
    io.stdout:flush()
 
-   engine.main()
+   engine.main{duration=1}
 end     
 
 function fwd_worker (pci, core, nqueues, idx)

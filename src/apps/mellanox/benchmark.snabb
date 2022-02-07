@@ -110,6 +110,24 @@ elseif mode == 'source' then
       return not worker.status()["source"].alive
    end}
 
+elseif mode == 'sink' then
+
+   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, %s, %s, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
+
+   engine.main{done = function ()
+      return not worker.status()["sink"].alive
+   end}
+
+elseif mode == 'fwd' then
+
+   worker.start("forward", ('require("apps.mellanox.benchmark").fwd(%q, %q, %d, %d, %s, %s, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
+
+   engine.main{done = function ()
+      return not worker.status()["forward"].alive
+   end}
+
 else
    error("NYI: mode "..mode)
 end
