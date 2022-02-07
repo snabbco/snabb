@@ -57,6 +57,10 @@ assert(nworkers >= 1, "nworkers < 1")
 assert(nqueues >= 1, "nqueues < 1")
 assert(npackets >= 1, "npackets < 1")
 
+if type(pktsize) == 'string' then
+   pktsize = ("%q"):format(pktsize)
+end
+
 local macs, dmacs, vlans
 if nmacs and nmacs > 0 then
    assert(nmacs <= 0xff, "nmacs too large")
@@ -82,7 +86,7 @@ if mode == 'source-sink' then
    worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, %s, %s, %s, %d)')
       :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %d, %s)')
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
       :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
 
    engine.main{done = function ()
@@ -94,7 +98,7 @@ elseif mode == 'source-fwd' then
    worker.start("forward", ('require("apps.mellanox.benchmark").fwd(%q, %q, %d, %d, %s, %s, %s, %d)')
       :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %d, %s)')
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
       :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
 
    engine.main{done = function ()
@@ -103,7 +107,7 @@ elseif mode == 'source-fwd' then
 
 elseif mode == 'source' then
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %d, %s)')
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
       :format(pci0, cores0, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
 
    engine.main{done = function ()

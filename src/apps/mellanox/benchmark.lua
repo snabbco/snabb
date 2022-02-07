@@ -196,8 +196,14 @@ end
 
 function Source:new (conf)
    local self = setmetatable({}, {__index=Source})
-   local size = tonumber(conf.packetsize) or error("NYI")
-   self.sizes = make_set{size}
+   local size = tonumber(conf.packetsize)
+   if size then
+      self.sizes = make_set{size}
+   elseif conf.packetsize == 'IMIX' then
+      self.sizes = make_set{64, 64, 64, 64, 64, 64, 64, 576, 576, 576, 576, 1500}
+   else
+      error("NYI")
+   end
    self.dmacs = make_set(#conf.dmacs > 0 and conf.dmacs or self:default_dmacs())
    self.smacs = make_set(#conf.smacs > 0 and conf.smacs or self:default_smacs())
    self.vlans = make_set(#conf.vlans > 0 and conf.vlans or self:default_vlans())
