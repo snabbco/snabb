@@ -138,6 +138,11 @@ function source (pci, cores, nworkers, nqueues, macs, vlans, opt, npackets, pkts
    engine.main{no_report=true, duration=1}
 end
 
+function source_linger (...)
+   source(...)
+   engine.main()
+end
+
 function source_worker (pci, core, nqueues, idx, pktsize, dmacs, smacs, vlans, dips, sips)
    if core then numa.bind_to_cpu(core, 'skip') end
    engine.busywait = true
@@ -373,9 +378,7 @@ function Forward:push ()
 end
 
 
-function mlxconf (pci, nqueues, macs, vlans, opt)
-   local opt = opt or {}
-
+function mlxconf (pci, nqueues, macs, vlans, opt, force_opt)
    local queues = {}
    for q=1, nqueues do
       queues[q] = {id="q"..q, mac=take(macs), vlan=take(vlans)}
@@ -383,7 +386,10 @@ function mlxconf (pci, nqueues, macs, vlans, opt)
    end
 
    local cfg = {}
-   for k,v in pairs(opt) do
+   for k,v in pairs(opt or {}) do
+      cfg[k] = v
+   end
+   for k,v in pairs(force_opt or {}) do
       cfg[k] = v
    end
    cfg.pciaddress = pci

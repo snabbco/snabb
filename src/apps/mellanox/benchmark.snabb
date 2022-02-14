@@ -86,11 +86,11 @@ if mode == 'source-sink' then
    worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, %s, %s, %s, %d)')
       :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
+   worker.start("source", ('require("apps.mellanox.benchmark").source_linger(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
       :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
 
    engine.main{done = function ()
-      return not worker.status()["source"].alive
+      return not worker.status()["sink"].alive
    end}
 
 elseif mode == 'source-fwd' then
@@ -98,11 +98,11 @@ elseif mode == 'source-fwd' then
    worker.start("forward", ('require("apps.mellanox.benchmark").fwd(%q, %q, %d, %d, %s, %s, %s, %d)')
       :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
 
-   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
+   worker.start("source", ('require("apps.mellanox.benchmark").source_linger(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
       :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
 
    engine.main{done = function ()
-      return not worker.status()["source"].alive
+      return not worker.status()["forward"].alive
    end}
 
 elseif mode == 'source' then
