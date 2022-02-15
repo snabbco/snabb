@@ -1,0 +1,33 @@
+#!snabb snsh
+
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+local worker = require("core.worker")
+local numa = require("lib.numa")
+
+-- Test wait times caused by group freelist rebalancing
+-- Synopsis: wait_test.snabb [duration] [nconsumers]
+local DURATION = tonumber(main.parameters[1]) or 10
+local NCONSUMERS = tonumber(main.parameters[2]) or 10
+local CPUS = numa.parse_cpuset(main.parameters[3] or "")
+
+local cores = {}
+for core in pairs(CPUS) do
+   table.insert(cores, core)
+end
+
+for i=1,NCONSUMERS do
+   worker.start("sink", ([[require("apps.interlink.test_sink").start_instrument(%q, %d, %s)]])
+      :format("test"..i, DURATION, cores[i]))
+end
+
+worker.start("source", ([[require("apps.interlink.test_source").startn_instrument(%q, %d, %d, %s)]])
+   :format("test", DURATION, NCONSUMERS, cores[NCONSUMERS+1]))
+
+engine.main{done = function ()
+   for w, s in pairs(worker.status()) do
+      if s.alive then return false end
+   end
+   return true
+end}
+engine.main{duration=1, no_report=true}
