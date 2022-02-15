@@ -12,9 +12,10 @@ local lib      = require("core.lib")
 local memory   = require("core.memory")
 local shm      = require("core.shm")
 local counter  = require("core.counter")
-local sync     = require("core.sync")
 
 require("core.packet_h")
+
+local group_freelist = require("core.group_freelist")
 
 local packet_t = ffi.typeof("struct packet")
 local packet_ptr_t = ffi.typeof("struct packet *")
@@ -55,9 +56,8 @@ local max_packets = 1e6
 
 ffi.cdef([[
 struct freelist {
-    int32_t lock[1];
-    uint64_t nfree;
-    uint64_t max;
+    int nfree;
+    int max;
     struct packet *list[]]..max_packets..[[];
 };
 ]])
@@ -98,14 +98,6 @@ local function freelist_nfree(freelist)
    return freelist.nfree
 end
 
-local function freelist_lock(freelist)
-   sync.lock(freelist.lock)
-end
-
-local function freelist_unlock(freelist)
-   sync.unlock(freelist.lock)
-end
-
 local packet_allocation_step = 1000
 local packets_allocated = 0
  -- Initialized on demand.
@@ -119,31 +111,32 @@ end
 -- Call to ensure group freelist is enabled.
 function enable_group_freelist ()
    if not group_fl then
-      group_fl = freelist_create("group/packets.freelist")
+      group_fl = group_freelist.freelist_create("group/packets.freelist")
    end
 end
 
 -- Return borrowed packets to group freelist.
 function rebalance_freelists ()
-   if group_fl and freelist_nfree(packets_fl) > packets_allocated then
-      freelist_lock(group_fl)
-      while freelist_nfree(packets_fl) > packets_allocated
-      and not freelist_full(group_fl) do
-         freelist_add(group_fl, freelist_remove(packets_fl))
+   local to_return = freelist_nfree(packets_fl) - packets_allocated
+   if to_return > 0 and group_fl then
+      local head = group_freelist.start_add(group_fl, to_return)
+      for i=0, to_return-1 do
+         group_freelist.add(group_fl, head, i, freelist_remove(packets_fl))
       end
-      freelist_unlock(group_fl)
+      group_freelist.finish_add(group_fl, head, to_return)
    end
 end
 
 -- Reclaim packets from group freelist.
 function reclaim_step ()
    if group_fl then
-      freelist_lock(group_fl)
-      while freelist_nfree(group_fl) > 0 and
-            freelist_nfree(packets_fl) < packets_allocated do
-         freelist_add(packets_fl, freelist_remove(group_fl))
+      local tail, to_reclaim = group_freelist.start_remove(group_fl, packets_allocated)
+      if to_reclaim > 0 then
+         for i=0, to_reclaim-1 do
+            freelist_add(packets_fl, group_freelist.remove(group_fl, tail, i))
+         end
+         group_freelist.finish_remove(group_fl, tail, to_reclaim)
       end
-      freelist_unlock(group_fl)
    end
 end
 
@@ -154,7 +147,7 @@ shm.register(
    {open = function (name) return shm.open(name, "struct freelist") end}
 )
 ffi.metatype("struct freelist", {__tostring = function (freelist)
-   return ("%d/%d"):format(tonumber(freelist.nfree), tonumber(freelist.max))
+   return ("%d/%d"):format(freelist.nfree, freelist.max)
 end})
 
 -- Return an empty packet.
@@ -174,15 +167,16 @@ end
 -- process termination.
 function shutdown (pid)
    local in_group, group_fl = pcall(
-      freelist_open, "/"..pid.."/group/packets.freelist"
+      group_freelist.freelist_open, "/"..pid.."/group/packets.freelist"
    )
    if in_group then
       local packets_fl = freelist_open("/"..pid.."/engine/packets.freelist")
-      freelist_lock(group_fl)
-      while freelist_nfree(packets_fl) > 0 do
-         freelist_add(group_fl, freelist_remove(packets_fl))
+      local to_return = freelist_nfree(packets_fl)
+      local head = group_freelist.start_add(group_fl, to_return)
+      for i=0, to_return-1 do
+         group_freelist.add(group_fl, head, i, freelist_remove(packets_fl))
       end
-      freelist_unlock(group_fl)
+      group_freelist.finish_add(group_fl, head, to_return)
    end
 end
 
