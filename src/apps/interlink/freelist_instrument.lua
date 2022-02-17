@@ -3,24 +3,38 @@
 module(...,package.seeall)
 
 local histogram = require("core.histogram")
-local rdtsc = require("lib.tsc").rdtsc
+local tsc = require("lib.tsc")
 
 function instrument_freelist ()
-   local rebalance_latency = histogram.create('engine/rebalance_latency.histogram', 1, 1e9)
-   local allocate_latency = histogram.create('engine/allocate_latency.histogram', 1, 1e9)
+   local ts = tsc.new()
+   local rebalance_latency = histogram.create('engine/rebalance_latency.histogram', 1, 100e6)
+   local reclaim_latency = histogram.create('engine/reclaim_latency.histogram', 1, 100e6)
    
-   local rebalance_freelists, allocate = packet.rebalance_freelists, packet.allocate
+   local rebalance_freelists, reclaim_step = packet.rebalance_freelists, packet.reclaim_step
    packet.rebalance_freelists = function ()
-      local start = rdtsc()
+      local start = ts:stamp()
       rebalance_freelists()
-      rebalance_latency:add(tonumber(rdtsc()-start))
+      rebalance_latency:add(tonumber(ts:to_ns(ts:stamp()-start)))
    end
-   packet.allocate = function ()
-      local start = rdtsc()
-      local p = allocate()
-      allocate_latency:add(tonumber(rdtsc()-start))
-      return p
+   packet.reclaim_step = function ()
+      local start = ts:stamp()
+      reclaim_step()
+      reclaim_latency:add(tonumber(ts:to_ns(ts:stamp()-start)))
    end
    
-   return rebalance_latency, allocate_latency
+   return rebalance_latency, reclaim_latency
+end
+
+function histogram_csv_header (out)
+   out = out or io.stdout
+   out:write("histogram,lo,hi,count\n")
+end
+
+function histogram_csv (histogram, name, out)
+   out = out or io.stdout
+   name = name or 'untitled'
+   for count, lo, hi in histogram:iterate() do
+      out:write(("%s,%f,%f,%d\n"):format(name, lo, hi, tonumber(count)))
+      out:flush()
+   end
 end

@@ -41,15 +41,18 @@ local instr = require("apps.interlink.freelist_instrument")
 
 function startn_instrument (name, duration, n, core)
    numa.bind_to_cpu(core, 'skip')
-   local _, allocate_latency = instr.instrument_freelist()
+   local _, reclaim_latency = instr.instrument_freelist()
    startn(name, duration, n)
    local txpackets = txpackets()
-   local min, avg, max = allocate_latency:summarize()
+   instr.histogram_csv(reclaim_latency, "reclaim")
+   local min, avg, max = reclaim_latency:summarize()
    engine.main{duration=1, no_report=true}
-   print(("allocate latency (ns)     min:%16s    avg:%16s    max:%16s")
+   io.stderr:write(("reclaim latency (ns)     min:%16s    avg:%16s    max:%16s\n")
       :format(lib.comma_value(math.floor(min)),
               lib.comma_value(math.floor(avg)),
               lib.comma_value(math.floor(max))))
-   print(txpackets / 1e6 / duration .. " Mpps")
-   io.stdout:flush()
+   io.stderr:write(("%.3f Mpps\n"):format(txpackets / 1e6 / duration))
+   io.stderr:flush()
+
+   --engine.report_links()
 end

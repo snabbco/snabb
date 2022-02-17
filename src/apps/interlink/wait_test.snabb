@@ -16,6 +16,9 @@ for core in pairs(CPUS) do
    table.insert(cores, core)
 end
 
+require("apps.interlink.freelist_instrument").histogram_csv_header()
+io.stdout:flush()
+
 for i=1,NCONSUMERS do
    worker.start("sink", ([[require("apps.interlink.test_sink").start_instrument(%q, %d, %s)]])
       :format("test"..i, DURATION, cores[i]))

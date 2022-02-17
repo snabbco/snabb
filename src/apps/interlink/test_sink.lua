@@ -26,11 +26,12 @@ function start_instrument (name, duration, core)
    numa.bind_to_cpu(core, 'skip')
    local rebalance_latency = instr.instrument_freelist()
    start(name, duration)
+   instr.histogram_csv(rebalance_latency, "rebalance")
    local min, avg, max = rebalance_latency:summarize()
-   print(("rebalance latency (ns)    min:%16s    avg:%16s    max:%16s")
+   io.stderr:write(("rebalance latency (ns)    min:%16s    avg:%16s    max:%16s\n")
       :format(lib.comma_value(math.floor(min)),
               lib.comma_value(math.floor(avg)),
               lib.comma_value(math.floor(max))))
-   io.stdout:flush()
+   io.stderr:flush()
 end
 
