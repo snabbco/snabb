@@ -135,6 +135,18 @@ function rebalance_freelists ()
    end
 end
 
+-- Reclaim packets from group freelist.
+function reclaim_step ()
+   if group_fl then
+      freelist_lock(group_fl)
+      while freelist_nfree(group_fl) > 0 and
+            freelist_nfree(packets_fl) < packets_allocated do
+         freelist_add(packets_fl, freelist_remove(group_fl))
+      end
+      freelist_unlock(group_fl)
+   end
+end
+
 -- Register struct freelist as an abstract SHM object type so that the group
 -- freelist can be recognized by shm.open_frame and described with tostring().
 shm.register(
@@ -148,14 +160,7 @@ end})
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
-      if group_fl then
-         freelist_lock(group_fl)
-         while freelist_nfree(group_fl) > 0
-         and freelist_nfree(packets_fl) < packets_allocated do
-            freelist_add(packets_fl, freelist_remove(group_fl))
-         end
-         freelist_unlock(group_fl)
-      end
+      reclaim_step()
       if freelist_nfree(packets_fl) == 0 then
          preallocate_step()
       end
