@@ -8,6 +8,78 @@ local ffi  = require("ffi")
 local band = bit.band
 local min  = math.min
 
+-- Group freelist: lock-free multi-producer multi-consumer ring buffer
+-- (mpmc queue)
+--
+-- NB: assumes 32-bit wide loads/stores are atomic (as is the fact on x86_64)!
+--
+-- Logically, the group freelist is a simple ring buffer with
+-- 32-bit head and tail cursors, just like core.link (and lib.interlink).
+--
+-- However, producers and consumers operate in parallel in two phases:
+--
+--  * start_add and start_remove reserve a "ticket" to produce or consume
+--    the next N head or tail positions.
+--
+--  * finish_add and finish_remove "redeem" a ticket to advance the
+--    head or tail cursors accordingly.
+--
+-- To avoid false sharing, cursors and copies thereof are arranged in
+-- distinct cachelines:
+--
+--  * head_remove is the head cursor visible to consumers.
+--    It is updated by finish_add, and copied into head_cache in start_remove.
+--
+--  * tail_remove is the tail cursor visible to consumers,
+--    head_cache is a copy of head_remove intended to avoid invalidation
+--    of this cacheline.
+--    They are updated in start_remove.
+--
+--  * tail_add is the tail cursor visible to producers.
+--    It is updated by finish_remove, and copied into tail_cache in start_add.
+--
+--  * head_add is the head cursor visible to producers,
+--    tail_cache is a copy of tail_add intended to avoid invalidation
+--    of this cacheline.
+--    They are updated in start_add.
+--
+-- Let's walk through what happens in a producer between
+-- start_add and finish_add (consumer behavior is symmetric):
+--
+--  1. We fetch the value head=head_add (this will incur a cache miss if
+--     another consumer updated head_add).
+--
+--  2. We make sure there is enough capacity to add N packets
+--     (head < tail_add):
+--     fetching tail_cache might be sufficient, otherwise we have to
+--     update it by fetching tail_add (this will incur a cache miss if
+--     a consumer updated tail_add).
+--
+--  3. We attempt to CAS head_add = head -> head+N.
+--     If this fails we have to start over.
+--     If the CAS succeds we obtaine a ticket (head) to add N packets to
+--     the freelist (and have invalidated any caches of head_add).
+--
+--  4. We can now add N packets to list[head..head+N] without
+--     synchronizing with other producers or consumers.
+--
+--  5. We update head_remove, the head cursor visible to consumers,
+--     redeeming our ticket.
+--     We do this by repeating CAS head_remove = head -> head+N
+--     until it succeeds.
+--     This will fail for as long as we are waiting for another
+--     producer to redeem their earlier ticket by calling finish_add
+--     (we incur a cache miss any time another producer updated head_remove).
+--
+-- The consumer side works in just the same way, the only difference being
+-- that in (4.) consumers will incur cache misses when fetching
+-- list[tail..tail+N] to remove packets, naturally.
+--
+-- NB: this design is not crash safe! If a producer or consumer halts
+-- in between start_add/start_remove and finish_add/finish_remove other
+-- producers or consumers will deadlock in their attempts to
+-- redeem their tickets (finish_add/finish_remove).
+
 local SIZE = 1048576 -- 2^20, roughly one million
 local MAX = SIZE - 1
 
@@ -16,17 +88,17 @@ local INT = ffi.sizeof("uint32_t")
 
 ffi.cdef([[
 struct group_freelist {
-   uint32_t h_remove[1];
-   uint8_t pad_h_remove[]]..CACHELINE-1*INT..[[];
+   uint32_t head_remove[1];
+   uint8_t pad_head_remove[]]..CACHELINE-1*INT..[[];
 
-   uint32_t t_remove[1];
-   uint8_t pad_t_remove[]]..CACHELINE-1*INT..[[];
+   uint32_t head_cache[1], tail_remove[1];
+   uint8_t pad_tail_remove[]]..CACHELINE-2*INT..[[];
 
-   uint32_t h_add[1];
-   uint8_t pad_h_add[]]..CACHELINE-1*INT..[[];
+   uint32_t tail_add[1];
+   uint8_t pad_tail_add[]]..CACHELINE-1*INT..[[];
 
-   uint32_t t_add[1];
-   uint8_t pad_t_add[]]..CACHELINE-1*INT..[[];
+   uint32_t tail_cache[1], head_add[1];
+   uint8_t pad_head_add[]]..CACHELINE-2*INT..[[];
 
    struct packet *list[]]..SIZE..[[];
 } __attribute__((packed, aligned(]]..CACHELINE..[[)))]])
@@ -44,11 +116,23 @@ local function mask (i)
    return band(i, MAX)
 end
 
+local function nfree (head, tail)
+   return mask(head - tail)
+end
+
+local function capacity (head, tail)
+   return MAX - nfree(head, tail)
+end
+
 function start_add (fl, n)
    while true do
-      local head = fl.h_add[0]
-      assert(MAX-mask(head - fl.t_add[0]) >= n, "group freelist overflow")
-      if sync.cas(fl.h_add, head, mask(head + n)) then
+      local head = fl.head_add[0]
+      if capacity(head, fl.tail_cache[0]) < n then
+         fl.tail_cache[0] = fl.tail_add[0]
+         assert(capacity(head, fl.tail_cache[0]) >= n,
+                "group freelist overflow")
+      end
+      if sync.cas(fl.head_add, head, mask(head + n)) then
          return head
       end
    end
@@ -59,7 +143,7 @@ function add (fl, head, i, p)
 end
 
 local function finish_add1 (fl, head, n)
-   return sync.cas(fl.h_remove, head, mask(head + n))
+   return sync.cas(fl.head_remove, head, mask(head + n))
 end
 function finish_add (fl, head, n)
    while not finish_add1(fl, head, n) do end
@@ -67,9 +151,12 @@ end
 
 function start_remove (fl, n)
    while true do
-      local tail = fl.t_remove[0]
-      local n = min(n, mask(fl.h_remove[0] - tail))
-      if n == 0 or sync.cas(fl.t_remove, tail, mask(tail + n)) then
+      local tail = fl.tail_remove[0]
+      if nfree(fl.head_cache[0], tail) < n then
+         fl.head_cache[0] = fl.head_remove[0]
+      end
+      local n = min(n, nfree(fl.head_cache[0], tail))
+      if n == 0 or sync.cas(fl.tail_remove, tail, mask(tail + n)) then
          return tail, n
       end
    end
@@ -82,7 +169,7 @@ function remove (fl, tail, i)
 end
 
 local function finish_remove1 (fl, tail, n)
-   return sync.cas(fl.t_add, tail, mask(tail + n))
+   return sync.cas(fl.tail_add, tail, mask(tail + n))
 end
 function finish_remove (fl, tail, n)
    while not finish_remove1(fl, tail, n) do end
