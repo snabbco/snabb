@@ -33,4 +33,3 @@ engine.main{done = function ()
    end
    return true
 end}
-engine.main{duration=1, no_report=true}
