@@ -10,10 +10,10 @@ function instrument_freelist ()
    local rebalance_latency = histogram.create('engine/rebalance_latency.histogram', 1, 100e6)
    local reclaim_latency = histogram.create('engine/reclaim_latency.histogram', 1, 100e6)
    
-   local rebalance_freelists, reclaim_step = packet.rebalance_freelists, packet.reclaim_step
-   packet.rebalance_freelists = function ()
+   local rebalance_step, reclaim_step = packet.rebalance_step, packet.reclaim_step
+   packet.rebalance_step = function ()
       local start = ts:stamp()
-      rebalance_freelists()
+      rebalance_step()
       rebalance_latency:add(tonumber(ts:to_ns(ts:stamp()-start)))
    end
    packet.reclaim_step = function ()

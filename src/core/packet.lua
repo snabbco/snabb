@@ -115,28 +115,35 @@ function enable_group_freelist ()
    end
 end
 
+-- Cache group_freelist.chunksize
+local group_fl_chunksize = group_freelist.chunksize
+
 -- Return borrowed packets to group freelist.
-function rebalance_freelists ()
-   local to_return = freelist_nfree(packets_fl) - packets_allocated
-   if to_return > 0 and group_fl then
-      local head = group_freelist.start_add(group_fl, to_return)
-      for i=0, to_return-1 do
-         group_freelist.add(group_fl, head, i, freelist_remove(packets_fl))
+function rebalance_step ()
+   local chunk, seq = group_freelist.start_add(group_fl)
+   if chunk then
+      chunk.nfree = group_fl_chunksize
+      for i=0, chunk.nfree-1 do
+         chunk.list[i] = freelist_remove(packets_fl)
       end
-      group_freelist.finish_add(group_fl, head, to_return)
+      group_freelist.finish(chunk, seq)
+   else
+      error("group freelist overflow")
    end
+end
+
+function need_rebalance ()
+   return freelist_nfree(packets_fl) >= (packets_allocated + group_fl_chunksize)
 end
 
 -- Reclaim packets from group freelist.
 function reclaim_step ()
-   if group_fl then
-      local tail, to_reclaim = group_freelist.start_remove(group_fl, packets_allocated)
-      if to_reclaim > 0 then
-         for i=0, to_reclaim-1 do
-            freelist_add(packets_fl, group_freelist.remove(group_fl, tail, i))
-         end
-         group_freelist.finish_remove(group_fl, tail, to_reclaim)
+   local chunk, seq = group_freelist.start_remove(group_fl)
+   if chunk then
+      for i=0, chunk.nfree-1 do
+         freelist_add(packets_fl, chunk.list[i])
       end
+      group_freelist.finish(chunk, seq)
    end
 end
 
@@ -153,7 +160,9 @@ end})
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
-      reclaim_step()
+      if group_fl then
+         reclaim_step()
+      end
       if freelist_nfree(packets_fl) == 0 then
          preallocate_step()
       end
@@ -171,12 +180,15 @@ function shutdown (pid)
    )
    if in_group then
       local packets_fl = freelist_open("/"..pid.."/engine/packets.freelist")
-      local to_return = freelist_nfree(packets_fl)
-      local head = group_freelist.start_add(group_fl, to_return)
-      for i=0, to_return-1 do
-         group_freelist.add(group_fl, head, i, freelist_remove(packets_fl))
+      while freelist_nfree(packets_fl) > 0 do
+         local chunk, seq = group_freelist.start_add(group_fl)
+         assert(chunk, "group freelist overflow")
+         chunk.nfree = math.min(group_fl_chunksize, freelist_nfree(packets_fl))
+         for i=0, chunk.nfree-1 do
+            chunk.list[i] = freelist_remove(packets_fl)
+         end
+         group_freelist.finish(chunk, seq)
       end
-      group_freelist.finish_add(group_fl, head, to_return)
    end
 end
 
@@ -281,6 +293,9 @@ local free_internal, account_free =
 function free (p)
    account_free(p)
    free_internal(p)
+   if group_fl and need_rebalance() then
+      rebalance_step()
+   end
 end
 
 -- Set packet data length.
