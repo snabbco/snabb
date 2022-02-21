@@ -6,6 +6,8 @@ local sync = require("core.sync")
 local shm  = require("core.shm")
 local lib  = require("core.lib")
 local ffi  = require("ffi")
+
+local waitfor, compiler_barrier = lib.waitfor, lib.compiler_barrier
 local band = bit.band
 
 -- Group freelist: lock-free multi-producer multi-consumer ring buffer
@@ -55,14 +57,14 @@ function freelist_create (name)
       end
       fl.state[0] = READY
    else
-      lib.waitfor(function () return fl.state[0] == READY end)
+      waitfor(function () return fl.state[0] == READY end)
    end
    return fl
 end
 
 function freelist_open (name, readonly)
    local fl = shm.open(name, "struct group_freelist", readonly)
-   lib.waitfor(function () return fl.state[0] == READY end)
+   waitfor(function () return fl.state[0] == READY end)
    return fl
 end
 
@@ -83,6 +85,7 @@ function start_add (fl)
       elseif dif < 0 then
          return
       else
+         compiler_barrier() -- ensure fresh load of enqueue_pos
          pos = fl.enqueue_pos[0]
       end
    end
@@ -101,6 +104,7 @@ function start_remove (fl)
       elseif dif < 0 then
          return
       else
+         compiler_barrier() -- ensure fresh load of dequeue_pos
          pos = fl.dequeue_pos[0]
       end
    end
