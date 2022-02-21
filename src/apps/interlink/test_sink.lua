@@ -28,8 +28,9 @@ function start_instrument (name, duration, core)
    start(name, duration)
    instr.histogram_csv(rebalance_latency, "rebalance")
    local min, avg, max = rebalance_latency:summarize()
-   io.stderr:write(("rebalance latency (ns)    min:%16s    avg:%16s    max:%16s\n")
-      :format(lib.comma_value(math.floor(min)),
+   io.stderr:write(("(%d) rebalance latency (ns)    min:%16s    avg:%16s    max:%16s\n")
+      :format(core,
+              lib.comma_value(math.floor(min)),
               lib.comma_value(math.floor(avg)),
               lib.comma_value(math.floor(max))))
    io.stderr:flush()

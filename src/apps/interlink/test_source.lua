@@ -47,8 +47,9 @@ function startn_instrument (name, duration, n, core)
    instr.histogram_csv(reclaim_latency, "reclaim")
    local min, avg, max = reclaim_latency:summarize()
    engine.main{duration=1, no_report=true}
-   io.stderr:write(("reclaim latency (ns)     min:%16s    avg:%16s    max:%16s\n")
-      :format(lib.comma_value(math.floor(min)),
+   io.stderr:write(("(%d) reclaim latency (ns)     min:%16s    avg:%16s    max:%16s\n")
+      :format(core,
+              lib.comma_value(math.floor(min)),
               lib.comma_value(math.floor(avg)),
               lib.comma_value(math.floor(max))))
    io.stderr:write(("%.3f Mpps\n"):format(txpackets / 1e6 / duration))
