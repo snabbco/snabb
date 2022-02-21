@@ -20,8 +20,8 @@ local band = bit.band
 -- Group freelist holds up to SIZE chunks of chunksize packets each
 chunksize = 2048
 
--- (SIZE=1024)*(chunksize=2048) == roughly two million packets
-local SIZE = 1024 -- must be a power of two
+-- (SIZE=512)*(chunksize=2048) == roughly one million packets
+local SIZE = 512 -- must be a power of two
 local MAX = SIZE - 1
 
 local CACHELINE = 64 -- XXX - make dynamic
