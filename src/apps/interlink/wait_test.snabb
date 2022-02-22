@@ -14,6 +14,7 @@ local CPUS = numa.parse_cpuset(main.parameters[3] or "")
 local cores = {}
 for core in pairs(CPUS) do
    table.insert(cores, core)
+   table.sort(cores)
 end
 
 require("apps.interlink.freelist_instrument").histogram_csv_header()
