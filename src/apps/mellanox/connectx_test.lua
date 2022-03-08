@@ -316,6 +316,12 @@ function basic_match (pci0, pci1)
 
    engine.configure(c)
 
+   print("waiting for linkup...")
+   lib.waitfor(function ()
+      return engine.app_table.nic0.hca:linkup()
+         and engine.app_table.nic1.hca:linkup()
+   end)
+
    engine.main({duration = 1, report = false})
    engine.report_links()
    engine.report_apps()
