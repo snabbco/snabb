@@ -50,6 +50,7 @@ local band, bor, shl, shr, bswap, bnot =
    bit.band, bit.bor, bit.lshift, bit.rshift, bit.bswap, bit.bnot
 local cast, typeof = ffi.cast, ffi.typeof
 
+local debug_info    = false     -- Print into messages
 local debug_trace   = false     -- Print trace messages
 local debug_hexdump = false     -- Print hexdumps (in Linux mlx5 format)
 
@@ -810,6 +811,9 @@ end
 -- Provide the NIC with freshly allocated memory.
 function HCA:alloc_pages (num_pages)
    assert(num_pages > 0)
+   if debug_info then
+      print(("Allocating %d pages to HW"):format(num_pages))
+   end
    self:command("MANAGE_PAGES", 0x14 + num_pages*8, 0x0C)
       :input("opcode",            0x00, 31, 16, 0x108)
       :input("opmod",             0x04, 15, 0, 1) -- allocate mode
@@ -824,6 +828,9 @@ end
 
 function HCA:free_pages (num_pages)
    assert(num_pages > 0)
+   if debug_info then
+      print(("Reclaiming %d pages from HW"):format(num_pages))
+   end
    self:command("MANAGE_PAGES", 0x0C, 0x10 + num_pages*8)
       :input("opcode",            0x00, 31, 16, 0x108)
       :input("opmod",             0x04, 15, 0, 2) -- return pages
@@ -1047,18 +1054,18 @@ function eq:handle_event (eqe)
       local cqn = bswap(cq_error.cqn)
       error(("Error on completion queue #%d: %s"):format(cqn, cq_errors[cq_error.syndrome]))
    elseif eqe.event_type == 0x09 then
-      local port_change = cast(typeof("struct event_port_change *"), eqe.event_data)
-      local port = shr(port_change.port_num, 4)
-      print(("Port %d changed state to %s"):format(port, port_status[eqe.event_sub_type]))
+      if debug_info then
+         local port_change = cast(typeof("struct event_port_change *"), eqe.event_data)
+         local port = shr(port_change.port_num, 4)
+         print(("Port %d changed state to %s"):format(port, port_status[eqe.event_sub_type]))
+      end
    elseif eqe.event_type == 0xB then
       local page_req = cast(typeof("struct event_page_req *"), eqe.event_data)
       local num_pages = bswap(page_req.num_pages)
       if num_pages < 0 then
          num_pages = -num_pages
-         print(("Reclaiming %d pages from HW"):format(num_pages))
          self.hca:free_pages(num_pages)
       else
-         print(("Allocating %d pages to HW"):format(num_pages))
          self.hca:alloc_pages(num_pages)
       end
    else
