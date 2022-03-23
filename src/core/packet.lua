@@ -307,7 +307,8 @@ function resize (p, len)
 end
 
 function preallocate_step()
-   assert(packets_allocated + packet_allocation_step <= max_packets,
+   assert(packets_allocated + packet_allocation_step
+            <= max_packets - group_fl_chunksize,
           "packet allocation overflow")
 
    for i=1, packet_allocation_step do
