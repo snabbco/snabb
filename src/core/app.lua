@@ -604,10 +604,9 @@ function breathe ()
    end
    ::PUSH_EXIT::
    counter.add(breaths)
-   -- Commit counters and rebalance freelists at a reasonable frequency
+   -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then
       counter.commit()
-      packet.rebalance_freelists()
    end
    running = false
 end
