@@ -149,7 +149,7 @@ local cxq_t = ffi.typeof([[
 
     // Transmit state
     struct packet *tx[64*1024]; // packets queued for transmit
-    uint16_t next_tx_wqeid;           // work queue ID for next transmit descriptor
+    uint16_t next_tx_wqeid;     // work queue ID for next transmit descriptor
     uint64_t *bf_next, *bf_alt; // "blue flame" to ring doorbell (alternating)
 
     // Receive state
@@ -567,8 +567,7 @@ function ConnectX:new (conf)
                       process_fn = function(r, stats)
                          -- Incremental update relies on query_q_counter to
                          -- clear the counter after read.
-                         counter.set(stats.rxdrop,
-                                     counter.read(stats.rxdrop) + r.out_of_buffer)
+                         counter.add(stats.rxdrop, r.out_of_buffer)
                       end
       })
    end
@@ -1328,6 +1327,17 @@ function IO:new (conf)
       close()
    end
 
+   -- Configure self as packetblaster?
+   if conf.packetblaster then
+      self.push = nil
+      self.pull = function (self)
+         if activate() then
+            sq:blast(self.input.input or self.input.rx)
+            deactivate()
+         end
+      end
+   end
+
    return self
 end
 
@@ -1374,7 +1384,7 @@ function RQ:new (cxq)
 
    function rq:receive (l)
       local limit = engine.pull_npackets
-      while have_input() and limit > 0 and not link.full(l) do
+      while limit > 0 and have_input() do
          -- Find the next completion entry.
          local c = cxq.rcq[cxq.next_rx_cqeid]
          limit = limit - 1
@@ -1383,23 +1393,23 @@ function RQ:new (cxq)
          cxq.next_rx_cqeid = slot(cxq.next_rx_cqeid + 1)
          -- Toggle the ownership value if the CQ wraps around.
          if cxq.next_rx_cqeid == 0 then
-            cxq.rx_mine = (cxq.rx_mine + 1) % 2
+            cxq.rx_mine = band(cxq.rx_mine + 1, 1)
          end
          -- Decode the completion entry.
          local opcode = shr(c.u8[0x3F], 4)
          local len = bswap(c.u32[0x2C/4])
          local wqeid = shr(bswap(c.u32[0x3C/4]), 16)
          local idx = slot(wqeid)
-         if opcode == 0 or opcode == 2 then
+         if band(opcode, 0xfd) == 0 then -- opcode == 0 or opcode == 2
             -- Successful receive
             local p = cxq.rx[idx]
-            assert(p ~= nil)
+            -- assert(p ~= nil)
             p.length = len
             link.transmit(l, p)
             cxq.rx[idx] = nil
          elseif opcode == 13 or opcode == 14 then
             -- Error on receive
-            assert(cxq.rx[idx] ~= nil)
+            -- assert(cxq.rx[idx] ~= nil)
             packet.free(cxq.rx[idx])
             cxq.rx[idx] = nil
             local syndromes = {
@@ -1420,10 +1430,6 @@ function RQ:new (cxq)
             error(("Unexpected CQE opcode: %d (0x%x)"):format(opcode, opcode))
          end
       end
-   end
-
-   function rq:ring_doorbell ()
-      doorbell[0].receive = bswap(next_buffer)
    end
 
    return rq
@@ -1482,7 +1488,7 @@ function SQ:new (cxq, mmio)
       end
       -- Ring the doorbell if we enqueued new packets.
       if cxq.next_tx_wqeid ~= start_wqeid then
-         local current_packet = slot(cxq.next_tx_wqeid + cxq.sqsize-1)
+         local current_packet = slot(cxq.next_tx_wqeid + mask)
          cxq.doorbell.send = bswap(cxq.next_tx_wqeid)
          cxq.bf_next[0] = cxq.swq[current_packet].u64[0]
          -- Switch next/alternate blue flame register for next time
@@ -1496,12 +1502,77 @@ function SQ:new (cxq, mmio)
       local opcode = cxq.scq[0].u8[0x38]
       if opcode == 0x0A then
          local wqeid = shr(bswap(cxq.scq[0].u32[0x3C/4]), 16)
-         while next_reclaim ~= wqeid % cxq.sqsize do
-            assert(cxq.tx[next_reclaim] ~= nil)
+         while next_reclaim ~= slot(wqeid) do
+            -- assert(cxq.tx[next_reclaim] ~= nil)
             packet.free(cxq.tx[next_reclaim])
             cxq.tx[next_reclaim] = nil
-            next_reclaim = tonumber(slot(next_reclaim + 1))
+            next_reclaim = slot(next_reclaim + 1)
          end
+      end
+   end
+
+   -- Packetblaster: blast packets from link out of send queue.
+   function sq:blast (l)
+      local kickoff = sq:blast_load(l)
+
+      -- Get current send queue tail (hardware controlled)
+      local opcode = cxq.scq[0].u8[0x38]
+      if opcode == 0x0A then
+         local wqeid = shr(bswap(cxq.scq[0].u32[0x3C/4]), 16)
+
+         -- Keep send queue topped up
+         local next_slot = slot(cxq.next_tx_wqeid)
+         while next_slot ~= slot(wqeid) do
+            local wqe = cxq.swq[next_slot]
+            -- Update control segment
+            wqe.u32[0] = bswap(shl(cxq.next_tx_wqeid, 8) + 0x0A)
+            -- Advance counters
+            cxq.next_tx_wqeid = cxq.next_tx_wqeid + 1
+            next_slot = slot(cxq.next_tx_wqeid)
+         end
+      end
+
+      if opcode == 0x0A or kickoff then
+         -- Ring the doorbell
+         local current_packet = slot(cxq.next_tx_wqeid + mask)
+         cxq.doorbell.send = bswap(cxq.next_tx_wqeid)
+         cxq.bf_next[0] = cxq.swq[current_packet].u64[0]
+         -- Switch next/alternate blue flame register for next time
+         cxq.bf_next, cxq.bf_alt = cxq.bf_alt, cxq.bf_next
+      end
+   end
+
+   -- Packetblaster: load packets from link into send queue.
+   local loaded = 0
+   function sq:blast_load (l)
+      while loaded < cxq.sqsize and not link.empty(l) do
+         local p = link.receive(l)
+         local next_slot = slot(cxq.next_tx_wqeid)
+         local wqe = cxq.swq[next_slot]
+
+         -- Construct a 64-byte transmit descriptor.
+         -- This is in three parts: Control, Ethernet, Data.
+         -- The Ethernet part includes some inline data.
+
+         -- Control segment
+         wqe.u32[0] = bswap(shl(cxq.next_tx_wqeid, 8) + 0x0A)
+         wqe.u32[1] = bswap(shl(cxq.sqn, 8) + 4)
+         wqe.u32[2] = bswap(shl(2, 2)) -- completion always
+         -- Ethernet segment
+         local ninline = 16
+         wqe.u32[7] = bswap(shl(ninline, 16))
+         ffi.copy(wqe.u8 + 0x1E, p.data, ninline)
+         -- Send Data Segment (inline data)
+         wqe.u32[12] = bswap(p.length - ninline)
+         wqe.u32[13] = bswap(cxq.rlkey)
+         local phy = memory.virtual_to_physical(p.data + ninline)
+         wqe.u32[14] = bswap(tonumber(shr(phy, 32)))
+         wqe.u32[15] = bswap(tonumber(band(phy, 0xFFFFFFFF)))
+         -- Advance counters
+         cxq.next_tx_wqeid = cxq.next_tx_wqeid + 1
+         loaded = loaded + 1
+         -- Kickoff?
+         return loaded == cxq.sqsize
       end
    end
 
