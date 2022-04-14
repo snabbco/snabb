@@ -73,6 +73,9 @@ maxsleep = 100
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
 busywait = false
 
+-- tick_Hz: Frequency at which to execute tick() methods (<n> per second)
+tick_Hz = 1000
+
 -- Profiling with vmprofile --------------------------------
 
 vmprofile_enabled = true
@@ -396,11 +399,15 @@ end
 
 local breathe_pull_order = {}
 local breathe_push_order = {}
+local breathe_ticks, tick_throttle = {}, nil
 
 -- Sort the links in the app graph, and arrange to run push() on the
 -- apps on the receiving ends of those links.  This will run app:push()
 -- once for each link, which for apps with multiple links may cause the
 -- app's push function to run multiple times in a breath.
+--
+-- Also collect tick methods that need to be run on tick breaths in
+-- deterministic order.
 function compute_breathe_order ()
    breathe_pull_order, breathe_push_order = {}, {}
    local pull_links, inputs, successors = {}, {}, {}
@@ -455,6 +462,13 @@ function compute_breathe_order ()
          table.insert(breathe_push_order, inputs[link])
       end
    end
+   breathe_ticks = {}
+   for _,app in pairs(app_table) do
+      if app.tick then
+         table.insert(breathe_ticks, app)
+      end
+   end
+   table.sort(breathe_ticks, cmp_apps)
 end
 
 -- Call this to "run snabb switch".
@@ -479,6 +493,12 @@ function main (options)
    if options.measure_latency or options.measure_latency == nil then
       local latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)
       breathe = latency:wrap_thunk(breathe, now)
+   end
+
+   if tick_Hz > 0 then
+      tick_throttle = lib.throttle(1/tick_Hz)
+   else
+      tick_throttle = function () return false end
    end
 
    monotonic_now = C.get_monotonic_time()
@@ -552,6 +572,12 @@ function breathe ()
       goto PUSH_LOOP
    end
    ::PUSH_EXIT::
+   -- Tick: call tick() methods at tick_Hz frequency
+   if tick_throttle() then
+      for _, app in ipairs(breathe_ticks) do
+         app:tick()
+      end
+   end
    setvmprofile("engine")
    counter.add(breaths)
    -- Commit counters and rebalance freelists at a reasonable frequency
@@ -708,6 +734,20 @@ function selftest ()
    assert(not lib.equal(app_table, {}))
    engine.stop()
    assert(lib.equal(app_table, {}))
+
+   -- Test tick()
+   local TickApp = {}
+   function TickApp:new () return setmetatable({ticks=0}, {__index = TickApp}) end
+   function TickApp:tick () self.ticks = self.ticks + 1 end
+   local c5 = config.new()
+   config.app(c5, "app_tick", TickApp)
+   engine.configure(c5)
+   local t = 0.1
+   engine.main{duration=t}
+   local expected_ticks = t * tick_Hz
+   local ratio = app_table.app_tick.ticks / expected_ticks
+   assert(ratio >= 0.9 and ratio <= 1.1)
+   print("ticks: actual/expected = "..ratio)
 
    -- Check one can't unclaim a name if no name is claimed.
    assert(not pcall(unclaim_name))
