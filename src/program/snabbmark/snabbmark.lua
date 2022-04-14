@@ -22,7 +22,11 @@ end
 function run (args)
    local command = table.remove(args, 1)
    if command == 'basic1' and #args == 1 then
-      basic1(unpack(args))
+      basic1(unpack(args), {timer=true})
+   elseif command == 'basic1_events' and #args == 1 then
+      basic1(unpack(args), {events=true, nevents=10})
+   elseif command == 'basic1_tick' and #args == 1 then
+      basic1(unpack(args), {events=true, nevents=10, use_tick=true})
    elseif command == 'nfvconfig' and #args == 3 then
       nfvconfig(unpack(args))
    elseif command == 'solarflare' and #args >= 2 and #args <= 3 then
@@ -47,7 +51,7 @@ function gbits (bps)
    return (bps * 8) / (1024^3)
 end
 
-function basic1 (npackets)
+function basic1 (npackets, opt)
    npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
    local c = config.new()
    -- Simple topology:
@@ -62,18 +66,36 @@ function basic1 (npackets)
    config.link(c, "Source.tx -> Tee.rx")
    config.link(c, "Tee.tx1 -> Sink.rx1")
    config.link(c, "Tee.tx2 -> Sink.rx2")
+   basic1_opts(c, opt)
    engine.configure(c)
    local start = C.get_monotonic_time()
-   timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
-   while link.stats(engine.app_table.Source.output.tx).txpackets < npackets do
-      engine.main({duration = 0.01, no_report = true})
-   end
+   engine.main{no_report = true, done = function ()
+      return link.stats(engine.app_table.Source.output.tx).txpackets >= npackets
+   end}
    local finish = C.get_monotonic_time()
    local runtime = finish - start
    local packets = link.stats(engine.app_table.Source.output.tx).txpackets
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps)."):format(packets / 1e6, runtime, packets / runtime / 1e6))
+end
+
+function basic1_opts (c, opt)
+   if opt.timer then
+      timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
+   end
+   if opt.events then
+      local EventApp = {}
+      function EventApp:new ()
+         return setmetatable({n=0, t=lib.throttle(1)}, {__index = EventApp})
+      end
+      EventApp[(opt.use_tick and 'tick') or 'pull'] = function (self)
+         if self.t() then self.n = self.n+1 end
+      end
+      for i = 1, opt.nevents do
+         config.app(c, "Event"..i, EventApp)
+      end
+   end
 end
 
 function nfvconfig (confpath_x, confpath_y, nloads)
