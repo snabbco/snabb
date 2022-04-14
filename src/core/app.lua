@@ -21,7 +21,6 @@ pull_npackets = math.floor(link.max / 10)
 
 -- Set to true to enable logging
 log = false
-local use_restart = false
 
 test_skipped_code = 43
 
@@ -119,56 +118,6 @@ monotonic_now = false
 function now ()
    -- Return cached time only if it is fresh
    return (running and monotonic_now) or C.get_monotonic_time()
-end
-
--- Run app:methodname() in protected mode (pcall). If it throws an
--- error app will be marked as dead and restarted eventually.
-function with_restart (app, method)
-   local status, result
-   setvmprofile(app.zone)
-   if use_restart then
-      -- Run fn in protected mode using pcall.
-      status, result = pcall(method, app)
-
-      -- If pcall caught an error mark app as "dead" (record time and cause
-      -- of death).
-      if not status then
-         app.dead = { error = result, time = now() }
-      end
-   else
-      status, result = true, method(app)
-   end
-   setvmprofile("engine")
-   return status, result
-end
-
--- Restart dead apps.
-function restart_dead_apps ()
-   if not use_restart then return end
-   local restart_delay = 2 -- seconds
-   local actions = {}
-
-   for name, app in pairs(app_table) do
-      if app.dead and (now() - app.dead.time) >= restart_delay then
-         io.stderr:write(("Restarting %s (died at %f: %s)\n")
-                         :format(name, app.dead.time, app.dead.error))
-         local info = configuration.apps[name]
-         table.insert(actions, {'stop_app', {name}})
-         table.insert(actions, {'start_app', {name, info.class, info.arg}})
-         for linkspec in pairs(configuration.links) do
-            local fa, fl, ta, tl = config.parse_link(linkspec)
-            if fa == name then
-               table.insert(actions, {'link_output', {fa, fl, linkspec}})
-            end
-            if ta == name then
-               table.insert(actions, {'link_input', {ta, tl, linkspec}})
-            end
-         end
-      end
-   end
-
-   -- Restart dead apps if necessary.
-   if #actions > 0 then apply_config_actions(actions) end
 end
 
 -- Configure the running app network to match new_configuration.
@@ -575,16 +524,15 @@ end
 function breathe ()
    running = true
    monotonic_now = C.get_monotonic_time()
-   -- Restart: restart dead apps
-   restart_dead_apps()
    -- Inhale: pull work into the app network
    local i = 1
    ::PULL_LOOP::
    do
       if i > #breathe_pull_order then goto PULL_EXIT end
       local app = breathe_pull_order[i]
-      if app.pull and not app.dead then
-         with_restart(app, app.pull)
+      if app.pull then
+         setvmprofile(app.zone)
+         app:pull()
       end
       i = i+1
       goto PULL_LOOP
@@ -596,13 +544,15 @@ function breathe ()
    do
       if i > #breathe_push_order then goto PUSH_EXIT end
       local app = breathe_push_order[i]
-      if app.push and not app.dead then
-         with_restart(app, app.push)
+      if app.push then
+         setvmprofile(app.zone)
+         app:push()
       end
       i = i+1
       goto PUSH_LOOP
    end
    ::PUSH_EXIT::
+   setvmprofile("engine")
    counter.add(breaths)
    -- Commit counters and rebalance freelists at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then
@@ -686,22 +636,13 @@ end
 function report_apps ()
    print ("apps report:")
    for name, app in pairs(app_table) do
-      if app.dead then
-         print(name, ("[dead: %s]"):format(app.dead.error))
-      elseif app.report then
+      if app.report then
+         setvmprofile(app.zone)
          print(name)
-         if use_restart then
-            with_restart(app, app.report)
-         else
-            -- Restarts are disabled, still we want to not die on
-            -- errors during app reports, thus this workaround:
-            local status, err = pcall(app.report, app)
-            if not status then
-               print("Warning: "..name.." threw an error during report: "..err)
-            end
-         end
+         app:report()
       end
    end
+   setvmprofile("engine")
 end
 
 function selftest ()
@@ -759,41 +700,11 @@ function selftest ()
    assert(not pcall(config.app, c3, "app_invalid", AppC))
    assert(not pcall(config.app, c3, "app_invalid", AppC, {b="bar"}))
    assert(not pcall(config.app, c3, "app_invalid", AppC, {a="bar", c="foo"}))
--- Test app restarts on failure.
-   use_restart = true
-   print("c_fail")
-   local App1 = {zone="test"}
-   function App1:new () return setmetatable({}, {__index = App1}) end
-   function App1:pull () error("Pull error.") end
-   function App1:push () return true end
-   function App1:report () return true end
-   local App2 = {zone="test"}
-   function App2:new () return setmetatable({}, {__index = App2}) end
-   function App2:pull () return true end
-   function App2:push () error("Push error.") end
-   function App2:report () return true end
-   local App3 = {zone="test"}
-   function App3:new () return setmetatable({}, {__index = App3}) end
-   function App3:pull () return true end
-   function App3:push () return true end
-   function App3:report () error("Report error.") end
-   local c_fail = config.new()
-   config.app(c_fail, "app1", App1)
-   config.app(c_fail, "app2", App2)
-   config.app(c_fail, "app3", App3)
-   config.link(c_fail, "app1.x -> app2.x")
-   configure(c_fail)
-   local orig_app1 = app_table.app1
-   local orig_app2 = app_table.app2
-   local orig_app3 = app_table.app3
-   main({duration = 4, report = {showapps = true}})
-   assert(app_table.app1 ~= orig_app1) -- should be restarted
-   assert(app_table.app2 ~= orig_app2) -- should be restarted
-   assert(app_table.app3 == orig_app3) -- should be the same
-   main({duration = 4, report = {showapps = true}})
-   assert(app_table.app3 ~= orig_app3) -- should be restarted
 
    -- Check engine stop
+   local c4 = config.new()
+   config.app(c4, "app1", App)
+   engine.configure(c4)
    assert(not lib.equal(app_table, {}))
    engine.stop()
    assert(lib.equal(app_table, {}))
