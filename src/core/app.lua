@@ -301,14 +301,16 @@ function apply_config_actions (actions)
       local link = app.output[linkname]
       app.output[linkname] = nil
       remove_link_from_array(app.output, link)
-      if app.link then app:link() end
+      if app.unlink then app:unlink('output', linkname)
+      elseif app.link then app:link('output', linkname) end
    end
    function ops.unlink_input (appname, linkname)
       local app = app_table[appname]
       local link = app.input[linkname]
       app.input[linkname] = nil
       remove_link_from_array(app.input, link)
-      if app.link then app:link() end
+      if app.unlink then app:unlink('input', linkname)
+      elseif app.link then app:link('input', linkname) end
    end
    function ops.free_link (linkspec)
       link.free(link_table[linkspec], linkspec)
@@ -322,16 +324,22 @@ function apply_config_actions (actions)
    function ops.link_output (appname, linkname, linkspec)
       local app = app_table[appname]
       local link = assert(link_table[linkspec])
+      assert(not app.output[linkname],
+             appname..": duplicate output link "..linkname)
       app.output[linkname] = link
       table.insert(app.output, link)
-      if app.link then app:link() end
+      if app.link then app:link('output', linkname) end
    end
    function ops.link_input (appname, linkname, linkspec)
       local app = app_table[appname]
       local link = assert(link_table[linkspec])
+      assert(not app.input[linkname],
+             appname..": duplicate input link "..linkname)
       app.input[linkname] = link
       table.insert(app.input, link)
-      if app.link then app:link() end
+      if app.link then
+         app:link('input', linkname)
+      end
    end
    function ops.stop_app (name)
       local app = app_table[name]
@@ -424,11 +432,19 @@ function compute_breathe_order ()
          end
       end
       for linkname,link in pairs(app.input) do
-         linknames[link] = appname..'.'..linkname
-         inputs[link] = app
+         -- NB: each link is indexed by number and by name.
+         if type(linkname) == 'string' then
+            linknames[link] = appname..'.'..linkname
+            local push_link = app.push_link and app.push_link[linkname]
+            local push = push_link or app.push
+            if push then
+               inputs[link] = { app = app, push = push, link = link }
+            end
+         end
       end
    end
-   for link,app in pairs(inputs) do
+   for link,spec in pairs(inputs) do
+      local app = spec.app
       successors[link] = {}
       if not app.pull then
          for _,succ in pairs(app.output) do
@@ -456,10 +472,11 @@ function compute_breathe_order ()
       table.sort(successors[link], cmp_links)
    end
    local link_order = tsort(nodes, entry_nodes, successors)
-   local i = 1
    for _,link in ipairs(link_order) do
-      if breathe_push_order[#breathe_push_order] ~= inputs[link] then
-         table.insert(breathe_push_order, inputs[link])
+      local spec = inputs[link]
+      local prev = breathe_push_order[#breathe_push_order]
+      if not prev or prev.app ~= spec.app or prev.push ~= spec.push then
+         table.insert(breathe_push_order, spec)
       end
    end
    breathe_ticks = {}
@@ -548,9 +565,8 @@ function breathe ()
    local i = 1
    ::PULL_LOOP::
    do
-      if i > #breathe_pull_order then goto PULL_EXIT end
-      local app = breathe_pull_order[i]
-      if app.pull then
+      if i > #breathe_pull_order then goto PULL_EXIT else
+         local app = breathe_pull_order[i]
          setvmprofile(app.zone)
          app:pull()
       end
@@ -562,11 +578,11 @@ function breathe ()
    i = 1
    ::PUSH_LOOP::
    do
-      if i > #breathe_push_order then goto PUSH_EXIT end
-      local app = breathe_push_order[i]
-      if app.push then
+      if i > #breathe_push_order then goto PUSH_EXIT else
+         local spec = breathe_push_order[i]
+         local app, push, link = spec.app, spec.push, spec.link
          setvmprofile(app.zone)
-         app:push()
+         push(app, link)
       end
       i = i+1
       goto PUSH_LOOP
@@ -673,15 +689,17 @@ end
 
 function selftest ()
    print("selftest: app")
-   local App = { push = true }
+   local App = {}
    function App:new () return setmetatable({}, {__index = App}) end
+   function App:pull () end
+   function App:push () end
    local c1 = config.new()
    config.app(c1, "app1", App)
    config.app(c1, "app2", App)
    config.link(c1, "app1.x -> app2.x")
    print("empty -> c1")
    configure(c1)
-   assert(#breathe_pull_order == 0)
+   assert(#breathe_pull_order == 2)
    assert(#breathe_push_order == 1)
    assert(app_table.app1 and app_table.app2)
    local orig_app1 = app_table.app1
@@ -699,7 +717,7 @@ function selftest ()
    config.link(c2, "app2.x -> app1.x")
    print("c1 -> c2")
    configure(c2)
-   assert(#breathe_pull_order == 0)
+   assert(#breathe_pull_order == 2)
    assert(#breathe_push_order == 2)
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
@@ -709,7 +727,7 @@ function selftest ()
    configure(c1) -- c2 -> c1
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
-   assert(#breathe_pull_order == 0)
+   assert(#breathe_pull_order == 2)
    assert(#breathe_push_order == 1)
    print("c1 -> empty")
    configure(config.new())
@@ -748,6 +766,83 @@ function selftest ()
    local ratio = app_table.app_tick.ticks / expected_ticks
    assert(ratio >= 0.9 and ratio <= 1.1)
    print("ticks: actual/expected = "..ratio)
+
+   -- Test link() 3.0
+   local LinkApp = {push_link={}}
+   function LinkApp:new ()
+      local self = {linked={input={}, output={}}, called={}, pushed=false}
+      return setmetatable(self, {__index = LinkApp})
+   end
+   function LinkApp:link (dir, name)
+      print('link', dir, name)
+      self.linked[dir][name] = assert(self[dir][name])
+      if dir == 'input' then
+         self.push_link[name] = function (self, input)
+            print('push_link', name, input)
+            self.called[name] = true
+         end
+      end
+   end
+   function LinkApp:unlink (dir, name)
+      print('unlink', dir, name)
+      assert(not self[dir][name])
+      self.linked[dir][name] = nil
+   end
+   function LinkApp:push ()
+      self.pushed = true
+   end
+   local c6 = config.new()
+   config.app(c6, "app_pull", App)
+   config.app(c6, "link_app", LinkApp)
+   config.link(c6, "app_pull.output -> link_app.input")
+   engine.configure(c6)
+   assert(#breathe_pull_order == 1)
+   assert(#breathe_push_order == 1)
+   engine.main{done=function () return true end}
+   assert(app_table.link_app.linked.input.input)
+   assert(app_table.link_app.called.input)
+   assert(not app_table.link_app.pushed)
+   local c7 = config.new()
+   config.app(c7, "app_pull", App)
+   config.app(c7, "link_app", LinkApp)
+   engine.configure(c7)
+   assert(not app_table.link_app.linked.input.input)
+   -- Backwards compatible?
+   local LegacyApp = {push_link={}}
+   function LegacyApp:new ()
+      local self = {linked={input={}, output={}}, called={}, pushed=false}
+      return setmetatable(self, {__index = LegacyApp})
+   end
+   function LegacyApp:link (dir, name)
+      print('link', dir, name)
+      self.linked[dir][name] = self[dir][name]
+   end
+   function LegacyApp.push_link:newstyle (input)
+      print('push_link', 'newstyle', input)
+      self.called.newstyle = true
+   end
+   function LegacyApp:push ()
+      self.pushed = true
+   end
+   local c8 = config.new()
+   config.app(c8, "app_pull", App)
+   config.app(c8, "link_app", LegacyApp)
+   config.link(c8, "app_pull.output -> link_app.input")
+   config.link(c8, "app_pull.output2 -> link_app.newstyle")
+   engine.configure(c8)
+   assert(#breathe_pull_order == 1)
+   assert(#breathe_push_order == 2)
+   engine.main{done=function () return true end}
+   assert(app_table.link_app.linked.input.input)
+   assert(app_table.link_app.linked.input.newstyle)
+   assert(app_table.link_app.called.newstyle)
+   assert(app_table.link_app.pushed)
+   local c9 = config.new()
+   config.app(c9, "app_pull", App)
+   config.app(c9, "link_app", LegacyApp)
+   engine.configure(c9)
+   assert(not app_table.link_app.linked.input.input)
+   assert(not app_table.link_app.linked.input.newstyle)
 
    -- Check one can't unclaim a name if no name is claimed.
    assert(not pcall(unclaim_name))
