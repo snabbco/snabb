@@ -394,8 +394,8 @@ function tsort (nodes, entries, successors)
    return ret
 end
 
-breathe_pull_order = {}
-breathe_push_order = {}
+local breathe_pull_order = {}
+local breathe_push_order = {}
 
 -- Sort the links in the app graph, and arrange to run push() on the
 -- apps on the receiving ends of those links.  This will run app:push()
