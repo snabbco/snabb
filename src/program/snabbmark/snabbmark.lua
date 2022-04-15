@@ -27,6 +27,8 @@ function run (args)
       basic1(unpack(args), {events=true, nevents=10})
    elseif command == 'basic1_tick' and #args == 1 then
       basic1(unpack(args), {events=true, nevents=10, use_tick=true})
+   elseif command == 'basic1_push_link' and #args == 1 then
+      basic1(unpack(args), {push_link=true})
    elseif command == 'nfvconfig' and #args == 3 then
       nfvconfig(unpack(args))
    elseif command == 'solarflare' and #args >= 2 and #args <= 3 then
@@ -95,6 +97,28 @@ function basic1_opts (c, opt)
       for i = 1, opt.nevents do
          config.app(c, "Event"..i, EventApp)
       end
+   end
+   if opt.push_link then
+      local PushLinkSink = {push_link={}}
+      function PushLinkSink:new ()
+         return setmetatable({}, {__index = PushLinkSink})
+      end
+      function PushLinkSink:discard (input)
+         while not link.empty(input) do
+            packet.free(link.receive(input))
+         end
+      end
+      function PushLinkSink:link (dir, name)
+         if dir == 'input' then
+            local input = self[dir][name] -- capture in closure
+            self.push_link[name] = function (self)
+               -- use input from closure instead of argument
+               -- to exercise upvalue access performance
+               self:discard(input)
+            end
+         end
+      end
+      config.app(c, "Sink", PushLinkSink)
    end
 end
 
