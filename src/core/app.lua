@@ -76,6 +76,19 @@ busywait = false
 -- tick_Hz: Frequency at which to execute tick() methods (<n> per second)
 tick_Hz = 1000
 
+local tick, tick_current_freq
+function enable_tick (freq)
+   freq = freq or tick_Hz
+   if freq == tick_current_freq then
+      return
+   end
+   if freq > 0 then
+      tick = lib.throttle(1/freq)
+   else
+      tick = function () return false end
+   end
+end
+
 -- Profiling with vmprofile --------------------------------
 
 vmprofile_enabled = true
@@ -407,7 +420,7 @@ end
 
 local breathe_pull_order = {}
 local breathe_push_order = {}
-local breathe_ticks, tick_throttle = {}, nil
+local breathe_ticks = {}
 
 -- Sort the links in the app graph, and arrange to run push() on the
 -- apps on the receiving ends of those links.  This will run app:push()
@@ -512,11 +525,8 @@ function main (options)
       breathe = latency:wrap_thunk(breathe, now)
    end
 
-   if tick_Hz > 0 then
-      tick_throttle = lib.throttle(1/tick_Hz)
-   else
-      tick_throttle = function () return false end
-   end
+   -- Enable tick
+   enable_tick()
 
    monotonic_now = C.get_monotonic_time()
    repeat
@@ -589,7 +599,7 @@ function breathe ()
    end
    ::PUSH_EXIT::
    -- Tick: call tick() methods at tick_Hz frequency
-   if tick_throttle() then
+   if tick() then
       for _, app in ipairs(breathe_ticks) do
          app:tick()
       end
