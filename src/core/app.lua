@@ -450,9 +450,7 @@ function compute_breathe_order ()
             linknames[link] = appname..'.'..linkname
             local push_link = app.push_link and app.push_link[linkname]
             local push = push_link or app.push
-            if push then
-               inputs[link] = { app = app, push = push, link = link }
-            end
+            inputs[link] = { app = app, push = push, link = link }
          end
       end
    end
@@ -488,8 +486,10 @@ function compute_breathe_order ()
    for _,link in ipairs(link_order) do
       local spec = inputs[link]
       local prev = breathe_push_order[#breathe_push_order]
-      if not prev or prev.app ~= spec.app or prev.push ~= spec.push then
-         table.insert(breathe_push_order, spec)
+      if spec.push then
+         if not prev or prev.app ~= spec.app or prev.push ~= spec.push then
+            table.insert(breathe_push_order, spec)
+         end
       end
    end
    breathe_ticks = {}
