@@ -148,11 +148,7 @@ function selftest ()
       local snapshot = rl:get_stat_snapshot()
 
       -- push some packets through it
-      while seconds_to_run > 0 do
-         app.breathe()
-         timer.run()
-         C.usleep(10) -- avoid busy loop
-      end
+      app.main{duration=seconds_to_run}
       -- print final report
       app.report()
 
@@ -194,10 +190,7 @@ function selftest ()
       rl:reset(rate_busy_loop, bucket_size)
 
       local snapshot = rl:get_stat_snapshot()
-      for i = 1, 100000 do
-         app.breathe()
-         timer.run()
-      end
+      app.main{duration=0.1}
       local elapsed_time =
          (tonumber(C.get_time_ns()) - snapshot.time) / 1e9
       print("elapsed time ", elapsed_time, "seconds")

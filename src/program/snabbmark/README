@@ -1,6 +1,13 @@
 Usage:
-  snabbmark basic1    <npackets>
+  snabbmark basic1           <npackets>
+  snabbmark basic1_events    <npackets>
+  snabbmark basic1_tick      <npackets>
+  snabbmark basic1_push_link <npackets>
     Benchmark basic app network packet flow.
+
+    The 'events' and 'tick' variants exercise 10 concurrent apps waiting
+    on a lib.throttle(), with the latter variant using the tick() app method.
+    The 'push_link' variant exercises dynamic push methods created on link().
 
   snabbmark nfvconfig  <config-file-x> <config-file-y> <n>
     Benchmark loading <config-file-x> and transitioning from <config-file-x>
