@@ -165,12 +165,14 @@ function Myapp.push_link:foo (input)
 end
 ```
 
-It is valid to create **push_link** methods dynamically during `link()`,
+**Push_link** methods are copied to a fresh table when the app is started,
+and it is valid to create **push_link** methods dynamically during `link()`,
 for example like so:
 
 ```
 Myapp = { push_link={} }
 function Myapp:link (dir, name)
+  -- NB: Myapp.push_link ~= self.push_link
   if dir == 'input' then
     self.push_link[name] = function (self, input)
       while not link.empty(input) do something() end

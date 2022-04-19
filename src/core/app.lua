@@ -377,6 +377,16 @@ function apply_config_actions (actions)
          app.shm.dtime = {counter, C.get_unix_time()}
          app.shm = shm.create_frame("apps/"..name, app.shm)
       end
+      if class.push_link then
+         if type(class.push_link) ~= 'table' then
+            error(("bad push_link value for app '%s' (must be a table)")
+                     :format(name))
+         end
+         app.push_link = {}
+         for name, method in pairs(class.push_link) do
+            app.push_link[name] = method
+         end
+      end
       configuration.apps[name] = { class = class, arg = arg }
    end
    function ops.reconfig_app (name, class, arg)
