@@ -187,9 +187,9 @@ end
 ```
 
 **Push** is not called when an app has **push_link** methods
-for all its input links. If, however, an app at least one input link
+for *all* of its input links. If, however, an app at least one input link
 without an associated **push_link** method then **push** is called
-in addition to the *push_link** methods.
+in addition to the **push_link** methods.
 
 
 — Method **myapp:tick**
