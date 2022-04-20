@@ -118,7 +118,6 @@ function BTLookupQueue:get_lookup(n)
       local streamer = self.streamer
       local pkt, b4_ipv6, br_ipv6
       pkt = self.packet_queue[n]
-      self.packet_queue[n] = nil
       if not streamer:is_empty(n) then
          b4_ipv6 = streamer.entries[n].value.b4_ipv6
          br_ipv6 = streamer.entries[n].value.br_address
@@ -277,14 +276,15 @@ end
 function selftest()
    print('selftest: binding_table')
    local function load_str(str)
+      local mem = require("lib.stream.mem")
       local yang = require('lib.yang.yang')
       local data = require('lib.yang.data')
-      local schema = yang.load_schema_by_name('snabb-softwire-v2')
+      local schema = yang.load_schema_by_name('snabb-softwire-v3')
       local grammar = data.config_grammar_from_schema(schema)
       local subgrammar = assert(grammar.members['softwire-config'])
       local subgrammar = assert(subgrammar.members['binding-table'])
       local parse = data.data_parser_from_grammar(subgrammar)
-      return load(parse(str, '[test suite]'))
+      return load(parse(mem.open_input_string(str)))
    end
    local map = load_str([[
       softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; br-address 8:9:a:b:c:d:e:f; port-set { psid-length 16; }}

@@ -193,6 +193,7 @@ local ioctl = strflag {
   SIOCSIFFLAGS    = 0x8914,
   SIOCGIFMTU      = 0x8921,
   SIOCSIFMTU      = 0x8922,
+  SIOCSIFHWADDR   = 0x8924,
   SIOCGIFHWADDR   = 0x8927,
   SIOCGIFINDEX    = 0x8933,
 
@@ -271,6 +272,16 @@ local ioctl = strflag {
 -- from linux/vfio.h type is ';' base is 100
   VFIO_GET_API_VERSION = vfio('NONE', 0),
   VFIO_CHECK_EXTENSION = vfio('WRITE', 1, "uint32"),
+-- from linux/perf_event.h
+  PERF_EVENT_IOC_ENABLE    = _IO('$', 0),
+  PERF_EVENT_IOC_DISABLE   = _IO('$', 1),
+  PERF_EVENT_IOC_REFRESH   = _IO('$', 2),
+  PERF_EVENT_IOC_RESET     = _IO('$', 3),
+  PERF_EVENT_IOC_PERIOD    = _IOW('$', 4, "uint64"),
+  PERF_EVENT_IOC_SET_OUTPUT= _IO('$', 5),
+  PERF_EVENT_IOC_SET_FILTER= _IOW('$', 6, "uintptr"),
+  PERF_EVENT_IOC_ID        = _IOR('$', 7, "uint64_1"),
+  PERF_EVENT_IOC_SET_BPF   = _IOW('$', 8, "uint32"),
 
 -- allow user defined ioctls
   _IO = _IO,

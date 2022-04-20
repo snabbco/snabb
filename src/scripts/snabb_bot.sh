@@ -26,10 +26,9 @@ function init {
     fi
     export logdir="$SNABBBOTDIR/log"
     export tmpdir="$SNABBBOTDIR/tmp"
+    rm -rf "$tmpdir"
     mkdir -p "$SNABBBOTDIR" "$logdir" "$tmpdir"
 }
-
-function clean { rm -rf "$tmpdir"; }
 
 function fetch_pull_requests {
     local url="https://api.github.com/repos/$REPO/pulls?per_page=100"
@@ -73,15 +72,17 @@ function pull_request_new_p {
 }
 
 function clone_upstream {
+    local url="https://github.com/$REPO.git"
     if [[ -n "$GITHUB_CREDENTIALS" ]]; then
-       git clone "https://$GITHUB_CREDENTIALS@github.com/$REPO.git" $(repo_path)
-    else
-       git clone "https://github.com/$REPO.git" $(repo_path)
+        url="https://$GITHUB_CREDENTIALS@github.com/$REPO.git"
     fi
+    git clone $url $(repo_path) \
+        && (cd $(repo_path)
+               git config user.email "snabb_bot.service@$(hostname)"
+               git config user.name "Snabb Bot")
 }
 
-function dock_build { (cd src && scripts/dock.sh "(cd .. && make)"); }
-function build { git submodule update --init && dock_build; }
+function build { (cd src && scripts/dock.sh "(cd .. && make)"); }
 
 function log_status {
     if grep "ERROR" $(pull_request_log $1) >/dev/null 2>&1; then
@@ -105,6 +106,8 @@ function log_header {
     pci_info SNABB_PCI1 $SNABB_PCI1
     pci_info SNABB_PCI_INTEL0 $SNABB_PCI_INTEL0
     pci_info SNABB_PCI_INTEL1 $SNABB_PCI_INTEL1
+    pci_info SNABB_PCI_INTEL1G0 $SNABB_PCI_INTEL1G0
+    pci_info SNABB_PCI_INTEL1G1 $SNABB_PCI_INTEL1G1
     pci_info SNABB_PCI_SOLARFLARE0 $SNABB_PCI_SOLARFLARE0
     pci_info SNABB_PCI_SOLARFLARE1 $SNABB_PCI_SOLARFLARE1
     echo
@@ -113,14 +116,16 @@ function log_header {
 function benchmark_results { echo $tmpdir/$1_benchmarks; }
 
 function benchmark_target1 {
-    git checkout --force $(target_head $1) \
+    git clean -f -f \
+        && git checkout --force $(target_head $1) \
         && build \
-        && dock_make benchmarks > $(benchmark_results $1)
+        && dock_make benchmarks > $(benchmark_results $(pull_request_target $1))
 }
 function benchmark_target { benchmark_target1 $1 >/dev/null 2>&1; }
 
 function merge_pr_with_target1 {
-    git fetch origin pull/$1/head:pr$1 \
+    git clean -f -f \
+        && git fetch origin pull/$1/head:pr$1 \
         && git checkout --force pr$1 \
         && git merge $(target_head $1) \
         && build
@@ -130,19 +135,22 @@ function merge_pr_with_target {
     if [ "$?" != 0 ]; then
         echo "ERROR: Failed to build $1"
         echo "$out"
+        git status
         echo
         return 1
     fi
 }
 
-function dock_make { (cd src/; scripts/dock.sh make $1); }
+function dock_make {
+    (cd src/; timeout --foreground 1h scripts/dock.sh make $1);
+}
 
 function check_for_performance_regressions {
     echo "Checking for performance regressions:"
     dock_make benchmarks > $(benchmark_results pr)
     for bench in $(cut -d " " -f 1 $(benchmark_results pr)); do
-        if grep $bench $(benchmark_results current) >/dev/null 2>&1; then
-            echo $(grep "$bench " $(benchmark_results current)) \
+        if grep "$bench " $(benchmark_results $1) >/dev/null 2>&1; then
+            echo $(grep "$bench " $(benchmark_results $1)) \
                  $(grep "$bench " $(benchmark_results pr)) \
                 | awk '
 BEGIN {
@@ -164,15 +172,14 @@ BEGIN {
 
 function check_test_suite {
     echo "Checking test suite:"
-    if ! dock_make test_ci; then
+    dock_make test | tee make-test.log
+    echo
+    echo "Errors during tests:"
+    for log in $(grep ERROR make-test.log | awk '{print $2}'); do
+        echo $log:
+        cat src/$log
         echo
-        echo "ERROR during tests:"
-        for log in src/testlog/*; do
-            echo $log:
-            cat $log
-            echo
-        done
-    fi
+    done
     echo
 }
 
@@ -224,10 +231,9 @@ for id in $(pull_request_ids); do
             || benchmark_target $id
         log_header $id
         if merge_pr_with_target $id; then
-            check_for_performance_regressions $id
+            check_for_performance_regressions $(pull_request_target $id)
             check_test_suite
         fi) 2>&1 > $(pull_request_log $id)
     [ ! -z "$GITHUB_CREDENTIALS" ] || continue
     post_status $id $(log_status $id) $(post_gist $(pull_request_log $id))
 done
-clean

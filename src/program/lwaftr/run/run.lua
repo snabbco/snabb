@@ -4,6 +4,7 @@ local S          = require("syscall")
 local config     = require("core.config")
 local cpuset     = require("lib.cpuset")
 local csv_stats  = require("program.lwaftr.csv_stats")
+local ethernet   = require("lib.protocol.ethernet")
 local lib        = require("core.lib")
 local setup      = require("program.lwaftr.setup")
 local cltable    = require("lib.cltable")
@@ -38,9 +39,7 @@ local function migrate_device_on_config(config, v4, v6)
    end
 
    if v6 then
-      for id, queue in cltable.pairs(instance.queue) do
-         queue.external_interface.device = v6
-      end
+      instance.external_device = v6
    end
 end
 
@@ -49,12 +48,16 @@ function parse_args(args)
    local conf_file, v4, v6
    local ring_buffer_size
    local opts = { verbosity = 0 }
-   local scheduling = { ingress_drop_monitor = 'flush' }
+   local scheduling = { ingress_drop_monitor = 'flush', profile = false }
    local handlers = {}
    function handlers.n (arg) opts.name = assert(arg) end
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
    function handlers.t (arg) opts.trace = assert(arg) end
    function handlers.i () opts.virtio_net = true end
+   handlers['xdp'] = function(arg)
+      opts['xdp'] = true
+      scheduling.enable_xdp = {} -- XXX - maybe configure num_chunks here?
+   end
    function handlers.D (arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")
       assert(opts.duration >= 0, "duration can't be negative")
@@ -75,10 +78,11 @@ function parse_args(args)
       ring_buffer_size = tonumber(arg)
    end
    handlers["on-a-stick"] = function(arg)
-      opts["on-a-stick"] = true
-      v4 = arg
-      if not nic_exists(v4) then
-         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4))
+      if lib.is_iface(arg) or nic_exists(arg) then
+         v4 = arg
+         opts['on-a-stick'] = arg
+      else
+         fatal(("Couldn't locate NIC with PCI address '%s'"):format(arg))
       end
    end
    handlers["mirror"] = function (ifname)
@@ -98,18 +102,15 @@ function parse_args(args)
                   .." (valid values: flush, warn, off)")
       end
    end
-   function handlers.reconfigurable()
-      io.stderr:write("Warning: the --reconfigurable flag has been deprecated")
-      io.stderr:write(" as the lwaftr is now always reconfigurable.\n")
-   end
-   function handlers.j(arg) scheduling.j = arg end
+   function handlers.profile() scheduling.profile = true end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:j:t:",
-     { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
-     verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
-     ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
-     ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,
-     hydra = "y", reconfigurable = 0, name = "n", trace = "t" })
+   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:t:",
+     { conf = "c", name = "n", cpu = 1, v4 = 1, v6 = 1,
+       ["on-a-stick"] = 1, virtio = "i", ["ring-buffer-size"] = "r",
+       ["xdp"] = 0,
+       ["real-time"] = 0, mirror = 1, ["ingress-drop-monitor"] = 1,
+       verbose = "v", trace = "t", ["bench-file"] = "b", ["profile"] = 0,
+       duration = "D", hydra = "y", help = "h" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -128,14 +129,12 @@ end
 
 -- Requires a V4V6 splitter if running in on-a-stick mode and VLAN tag values
 -- are the same for the internal and external interfaces.
-local function requires_splitter (opts, conf)
-   local device, id, queue = lwutil.parse_instance(conf)
-   if opts["on-a-stick"] then
-      local internal_interface = queue.internal_interface
-      local external_interface = queue.external_interface
-      return internal_interface.vlan_tag == external_interface.vlan_tag
-   end
-   return false
+local function requires_splitter (conf)
+   local queue = select(3, lwutil.parse_instance(conf))
+   local int = queue.internal_interface
+   local ext = queue.external_interface
+   return ethernet:ntop(int.mac) == ethernet:ntop(ext.mac) and
+          int.vlan_tag == ext.vlan_tag
 end
 
 function run(args)
@@ -144,32 +143,53 @@ function run(args)
 
    -- If the user passed --v4, --v6, or --on-a-stick, migrate the
    -- configuration's device.
+   if opts['on-a-stick'] then assert(v4); v6 = v4 end
    if v4 or v6 then migrate_device_on_config(conf, v4, v6) end
 
    -- If there is a name defined on the command line, it should override
    -- anything defined in the config.
    if opts.name then conf.softwire_config.name = opts.name end
 
+   -- If we’re using XDP, setup interfaces here
+   if opts.xdp then
+      setup.xdp_ifsetup(conf)
+   end
+
    local function setup_fn(graph, lwconfig)
       -- If --virtio has been specified, always use this.
       if opts.virtio_net then
-	 return setup_fn(graph, lwconfig, 'inetNic', 'b4sideNic')
+         return setup_fn(graph, lwconfig, 'inetNic', 'b4sideNic')
       end
 
-      -- If instance has external-interface.device configure as bump-in-the-wire
+      -- If --xdp has been specified, always use this.
+      if opts.xdp then
+         return setup.load_xdp(graph, lwconfig, 'inetNic', 'b4sideNic',
+                               opts.ring_buffer_size)
+      end
+
+      -- If instance has external-device configure as bump-in-the-wire
       -- otherwise configure it in on-a-stick mode.
-      local device, id, queue = lwutil.parse_instance(lwconfig)
-      if queue.external_interface.device then
-	 return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',
-			       opts.ring_buffer_size)
+      local device = lwutil.parse_instance(lwconfig)
+      local instance = lwconfig.softwire_config.instance[device]
+      if not lwutil.is_on_a_stick(lwconfig, device) then
+         if lib.is_iface(instance.external_device) then
+            return setup.load_kernel_iface(graph, lwconfig, 'inetNic', 'b4sideNic')
+         else
+            return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',
+                                  opts.ring_buffer_size)
+         end
       else
-	 local use_splitter = requires_splitter(opts, lwconfig)
-	 local options = {
-	    v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
-	    v4v6 = use_splitter and 'v4v6', mirror = opts.mirror,
-	    ring_buffer_size = opts.ring_buffer_size
-	 }
-	 return setup.load_on_a_stick(graph, lwconfig, options)
+         local use_splitter = requires_splitter(lwconfig)
+         local options = {
+            v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
+            v4v6 = use_splitter and 'v4v6', mirror = opts.mirror,
+            ring_buffer_size = opts.ring_buffer_size
+         }
+         if lib.is_iface(opts['on-a-stick']) then
+            return setup.load_on_a_stick_kernel_iface(graph, lwconfig, options)
+         else
+            return setup.load_on_a_stick(graph, lwconfig, options)
+         end
       end
    end
 
@@ -196,7 +216,7 @@ function run(args)
          local ipv4_rx = opts.hydra and 'ipv4tx' or 'IPv4 TX'
          local ipv6_tx = opts.hydra and 'ipv6rx' or 'IPv6 RX'
          local ipv6_rx = opts.hydra and 'ipv6tx' or 'IPv6 TX'
-         if requires_splitter(opts, conf) then
+         if requires_splitter(conf) then
             csv:add_app('v4v6', { 'v4', 'v4' }, { tx=ipv4_tx, rx=ipv4_rx })
             csv:add_app('v4v6', { 'v6', 'v6' }, { tx=ipv6_tx, rx=ipv6_rx })
          else

@@ -1,0 +1,99 @@
+#!../../snabb snsh
+
+-- Snabb test script for checking that pool selection is working
+-- as expected across app shutdowns
+
+local basic_apps = require("apps.basic.basic_apps")
+local intel      = require("apps.intel_mp.intel_mp")
+local pcap       = require("apps.pcap.pcap")
+local lib        = require("core.lib")
+
+local pciaddr0 = lib.getenv("SNABB_PCI_INTEL1G0")
+local pciaddr1 = lib.getenv("SNABB_PCI_INTEL1G1")
+
+local c = config.new()
+
+-- first add two apps in order & observe poolnums
+config.app(c, "nicp0", intel.Intel,
+           { pciaddr = pciaddr1,
+             vmdq = true,
+             rxq = 0, txq = 0,
+             macaddr = "90:72:82:78:c9:7a" })
+config.app(c, "source", basic_apps.Source)
+
+config.link(c, "source.out0 -> nicp0.input")
+
+engine.configure(c)
+engine.main({ duration = 0.1 })
+
+assert(engine.app_table.nicp0.poolnum == 0, "wrong poolnum for nicp0")
+
+config.app(c, "nicp1", intel.Intel,
+           { pciaddr = pciaddr1,
+             vmdq = true,
+             rxq = 0, txq = 0,
+             macaddr = "90:72:82:78:c9:7b" })
+config.link(c, "source.out1 -> nicp1.input")
+
+engine.configure(c)
+engine.main({ duration = 0.1 })
+
+assert(engine.app_table.nicp1.poolnum == 1, "wrong poolnum for nicp1")
+
+-- now try removing the first app, then add a new one to use pool 0
+local c = config.new()
+
+config.app(c, "nicp1", intel.Intel,
+           { pciaddr = pciaddr1,
+             vmdq = true,
+             rxq = 0, txq = 0,
+             macaddr = "90:72:82:78:c9:7b" })
+config.app(c, "source", basic_apps.Source)
+config.link(c, "source.out1 -> nicp1.input")
+
+engine.configure(c)
+engine.main({ duration = 0.1 })
+
+config.app(c, "nicp2", intel.Intel,
+           { pciaddr = pciaddr1,
+             vmdq = true,
+             rxq = 0, txq = 0,
+             macaddr = "90:72:82:78:c9:7b" })
+config.link(c, "source.out2 -> nicp2.input")
+
+engine.configure(c)
+engine.main({ duration = 0.1 })
+
+assert(engine.app_table.nicp1.poolnum == 1, "wrong poolnum for nicp1")
+-- pool 0 should be freed by nicp0 being stopped
+assert(engine.app_table.nicp2.poolnum == 0, "wrong poolnum for nicp2")
+
+-- next ensure that manually specified poolnums don't conflict with
+-- auto pool selection
+local c = config.new()
+
+config.app(c, "nicp1", intel.Intel,
+           { pciaddr = pciaddr1,
+             vmdq = true,
+             -- this app will take pool 0, so p2 should take 1
+             poolnum = 0,
+             rxq = 0, txq = 0,
+             macaddr = "90:72:82:78:c9:7b" })
+config.app(c, "source", basic_apps.Source)
+config.link(c, "source.out1 -> nicp1.input")
+
+engine.configure(c)
+engine.main({ duration = 0.1 })
+
+config.app(c, "nicp2", intel.Intel,
+           { pciaddr = pciaddr1,
+             vmdq = true,
+             rxq = 0, txq = 0,
+             macaddr = "90:72:82:78:c9:7b" })
+config.link(c, "source.out2 -> nicp2.input")
+
+engine.configure(c)
+engine.main({ duration = 0.1 })
+
+assert(engine.app_table.nicp1.poolnum == 0, "wrong poolnum for nicp1")
+assert(engine.app_table.nicp2.poolnum == 1, "wrong poolnum for nicp2")

@@ -1,0 +1,182 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(..., package.seeall)
+
+local debug = false
+
+local lib = require("core.lib")
+local ffi = require("ffi")
+local dasm = require("dasm")
+
+|.arch x64
+|.actionlist actions
+|.globalnames globalnames
+
+-- Table keeping machine code alive to the GC.
+local anchor = {}
+
+-- leaf_t poptrie_lookup
+-- (leaf_t *leaves, node_t *nodes, uint8_t *key, base_t *directmap)
+-- NB: this type is hardcoded here to avoid filling up the ctype table
+local prototype = ffi.typeof(
+   "uint16_t (*) (void *, void *, uint8_t *, void *)"
+)
+
+-- Assemble a lookup routine
+function generate (Poptrie, keysize)
+   -- Assert assumptions about lib.poptrie
+   assert(Poptrie.k == 6)
+   if Poptrie.direct_pointing then
+      assert(Poptrie.s <= 32)
+      assert(Poptrie.leaf_tag == bit.lshift(1, 31))
+   end
+   assert(ffi.sizeof(Poptrie.leaf_t) == 2)
+   assert(ffi.sizeof(Poptrie.vector_t) == 8)
+   assert(ffi.sizeof(Poptrie.base_t) == 4)
+   assert(ffi.offsetof(Poptrie.node_t, 'leafvec') == 0)
+   assert(ffi.offsetof(Poptrie.node_t, 'vector') == 8)
+   assert(ffi.offsetof(Poptrie.node_t, 'base0') == 16)
+   assert(ffi.offsetof(Poptrie.node_t, 'base1') == 20)
+
+   local name = "poptrie_lookup(k="..Poptrie.k..", keysize="..keysize..")"
+
+   local Dst = dasm.new(actions)
+   lookup(Dst, Poptrie, keysize)
+   local mcode, size = Dst:build()
+   table.insert(anchor, mcode)
+
+   if debug then
+      print("mcode dump: "..name)
+      dasm.dump(mcode, size)
+   end
+
+   return ffi.cast(prototype, mcode)
+end
+
+-- Do we have BMI2?
+local BMI2 = (assert(lib.readfile("/proc/cpuinfo", "*a"),
+                    "failed to read /proc/cpuinfo for hardware check")
+                 :match("bmi2"))
+
+|.define leaves,  rdi -- pointer to leaves array
+|.define nodes,   rsi -- pointer to nodes array
+|.define key,     rdx -- key to look up
+|.define dmap,    rcx -- pointer to directmap
+|.define index,   r8d -- index into node array
+|.define node,    r8  -- pointer into node array 
+|.define offset,  r9d -- offset into key
+|.define offsetx, r9  -- (offset as qword)
+|.define v,       r10 -- k or s bits extracted from key
+|.define v_dw,    r10d -- (v as dword)
+|.define vec,     r11 -- 64-bit vector or leafvec
+
+-- lookup(leaf_t *leaves, node_t *nodes, key) -> leaf_t
+function lookup (Dst, Poptrie, keysize)
+   if Poptrie.direct_pointing then
+      -- v = extract(key, 0, Poptrie.s)
+      local direct_mask = bit.lshift(1ULL, Poptrie.s) - 1
+      -- v = band(key, direct_mask)
+      | mov v_dw, dword [key]
+      | and v, direct_mask
+      -- index = dmap[v]
+      | mov index, dword [dmap+v*4]
+      -- eax = band(index, leaf_tag - 1) (tag inverted)
+      | mov eax, index
+      -- is leaf_tag set? (unsets bit)
+      | btr eax, 31
+      | jnc >1 -- leaf_tag not set, index is a node
+      | ret
+      -- node, offset = nodes[index], s
+      |1:
+      | imul index, 24 -- multiply by node size
+      | lea node, [nodes+index]
+      -- offset = s
+      | mov offset, Poptrie.s
+   else
+      -- index, node, offset = 0, nodes[index], 0
+      | xor index, index
+      | lea node, [nodes+0] -- nodes[0]
+      | xor offset, offset
+   end
+   -- while band(vec, lshift(1ULL, v)) ~= 0
+   |2:
+   -- v = extract(key, offset, k=6)
+   if keysize == 32 then
+      if BMI2 then
+         | shrx v_dw, dword [key], offset
+      else
+         | mov ecx, offset
+         | mov v_dw, dword [key]
+         | shr v, cl
+      end
+   elseif keysize == 64 then
+      if BMI2 then
+         | shrx v, [key], offsetx
+      else
+         | mov ecx, offset
+         | mov v, [key]
+         | shr v, cl
+      end
+   elseif keysize == 128 then
+      | mov ecx, offset
+      | mov v, [key]
+      | mov vec, [key+8]
+      | test cl, 64
+      | cmovnz v, vec
+      | shrd v, vec, cl
+   else error("NYI") end
+   -- v = band(v, lshift(1, k=6) - 1)
+   | and v_dw, 0x3F
+   -- vec = nodes[index].vector
+   | mov vec, qword [node+8]
+   -- is bit v set in vec?
+   | bt vec, v
+   | jnc >4 -- reached leaf, exit loop
+   -- rax = band(vec, lshift(2ULL, v) - 1)
+   if BMI2 then
+      | lea rcx, [v+1]
+      | bzhi rax, vec, rcx
+   else
+      | mov eax, 2
+      | mov ecx, v_dw
+      | shl rax, cl
+      | sub rax, 1
+      | and rax, vec
+   end
+   -- rax = popcnt(rax)
+   | popcnt rax, rax
+   -- index = base + bc - 1
+   | mov index, dword [node+20] -- nodes[index].base1
+   | sub index, 1
+   | add index, eax
+   -- node = nodes[index]
+   | imul index, 24 -- multiply by node size
+   | lea node, [nodes+index]
+   -- offset = offset + k
+   | add offset, 6
+   | jmp <2 -- loop
+   -- end while
+   |4:
+   if Poptrie.leaf_compression then
+      -- vec = nodes[index].leafvec
+      | mov vec, qword [node+0]
+   else error("NYI") end
+   -- rax = band(vec, lshift(2ULL, v) - 1)
+   if BMI2 then
+      | lea rcx, [v+1]
+      | bzhi rax, vec, rcx
+   else
+      | mov eax, 2
+      | mov ecx, v_dw
+      | shl rax, cl
+      | sub rax, 1
+      | and rax, vec
+   end
+   -- rax = popcnt(rax)
+   | popcnt rax, rax
+   -- return leaves[base + bc - 1]
+   | mov index, dword [node+16] -- nodes[index].base0
+   | add index, eax -- index = base + bc
+   | movzx eax, word [leaves+index*2-2] -- leaves[index - 1]
+   | ret
+end

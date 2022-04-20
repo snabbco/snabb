@@ -67,7 +67,7 @@ function selftest ()
       config.link(c, "source.output -> tap.input")
       config.link(c, "tap.output -> sink.input")
       app.configure(c)
-      while not app.app_table.source.done do app.breathe() end
+      app.main{done=function () return app.app_table.source.done end}
 
       local n = 0
       for packet, record in pcap.records(tmp) do n = n + 1 end

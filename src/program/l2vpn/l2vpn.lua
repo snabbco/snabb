@@ -251,7 +251,7 @@ local driver_helpers = {
          return 'input', 'output'
       end,
       stats_path = function (intf)
-         return 'pci/'..intf.pci_address
+         return 'apps/'..intf.app:name()..'/pci/'..intf.pci_address
       end
    },
    ['apps.tap.tap.Tap'] = {
@@ -720,15 +720,12 @@ local long_opts = {
    reconfig = "r",
    logfile = "l",
    debug = "d",
-   jit = "j",
    help = "h",
 }
 
 function run (parameters)
    local duration = 0
    local reconfig = false
-   local jit_conf = {}
-   local jit_opts = {}
    local opt = {}
    function opt.D (arg)
       if arg:match("^[0-9]+$") then
@@ -743,30 +740,10 @@ function run (parameters)
    end
    function opt.h (arg) usage() end
    function opt.d (arg) _G.developer_debug = true end
-   function opt.j (arg)
-      if arg:match("^v") then
-         local file = arg:match("^v=(.*)")
-         if file == '' then file = nil end
-         require("jit.v").start(file)
-      elseif arg:match("^p") then
-         jit_conf.p = {}
-         local p = jit_conf.p
-         p.opts, p.file = arg:match("^p=([^,]*),?(.*)")
-         if p.file == '' then p.file = nil end
-      elseif arg:match("^dump") then
-         jit_conf.dump = {}
-         local dump = jit_conf.dump
-         dump.opts, dump.file = arg:match("^dump=([^,]*),?(.*)")
-         if dump.file == '' then dump.file = nil end
-      elseif arg:match("^opt") then
-         local opt = arg:match("^opt=(.*)")
-         table.insert(jit_opts, opt)
-      end
-   end
    function opt.r (arg) reconfig = true end
 
    -- Parse command line arguments
-   parameters = lib.dogetopt(parameters, opt, "hdj:D:l:r", long_opts)
+   parameters = lib.dogetopt(parameters, opt, "hdD:l:r", long_opts)
    if (reconfig and not (duration > 0)) then
       print("--reconfig requires --duration > 0 to take effect")
       usage()
@@ -774,21 +751,12 @@ function run (parameters)
 
    -- Defaults: sizemcode=32, maxmcode=512
    require("jit.opt").start('sizemcode=256', 'maxmcode=2048')
-   if #jit_opts then
-      require("jit.opt").start(unpack(jit_opts))
-   end
    if #parameters ~= 1 then usage () end
 
    local file = table.remove(parameters, 1)
 
    local engine_opts = { no_report = true }
    if duration ~= 0 then engine_opts.duration = duration end
-   if jit_conf.p then
-      require("jit.p").start(jit_conf.p.opts, jit_conf.p.file)
-   end
-   if jit_conf.dump then
-      require("jit.dump").start(jit_conf.dump.opts, jit_conf.dump.file)
-   end
    local mtime = 0
    local loop = true
    while loop do
@@ -821,8 +789,5 @@ function run (parameters)
       mtime = stat.mtime
       engine.main(engine_opts)
       loop = reconfig
-   end
-   if jit_conf.p then
-      require("jit.p").stop()
    end
 end

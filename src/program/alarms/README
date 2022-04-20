@@ -1,6 +1,7 @@
 Usage:
   snabb alarms compress
   snabb alarms get-state
+  snabb alarms listen
   snabb alarms purge
   snabb alarms set-operator-state
 

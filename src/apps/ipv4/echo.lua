@@ -73,7 +73,14 @@ local function ipv4_header_length(h)
    return bit.band(h.version_and_ihl, ipv4_ihl_mask) * 4
 end
 
-ICMPEcho = {}
+ICMPEcho = {
+   shm = {
+      ['in-icmpv4-echo-bytes'] = {counter},
+      ['in-icmpv4-echo-packets'] = {counter},
+      ['out-icmpv4-echo-bytes'] = {counter},
+      ['out-icmpv4-echo-packets'] = {counter},
+   }
+}
 
 function ICMPEcho:new(conf)
    local addresses = {}
@@ -121,6 +128,9 @@ function ICMPEcho:respond_to_echo_request(pkt)
    out_h.ipv4.flags_and_fragment_offset =
       bit.band(out_h.ipv4.flags_and_fragment_offset, ipv4_fragment_offset_mask)
 
+   -- Set TTL.
+   out_h.ipv4.ttl = 64
+
    -- Recalculate IPv4 checksum.
    out_h.ipv4.checksum = 0
    out_h.ipv4.checksum = htons(
@@ -135,6 +145,12 @@ function ICMPEcho:respond_to_echo_request(pkt)
    icmp.checksum = htons(
       ipsum(out.data + ether_header_len + ipv4_header_len,
             out.length - ether_header_len - ipv4_header_len, 0))
+
+   -- Update counters
+   counter.add(self.shm['in-icmpv4-echo-bytes'], pkt.length)
+   counter.add(self.shm['in-icmpv4-echo-packets'])
+   counter.add(self.shm['out-icmpv4-echo-bytes'], out.length)
+   counter.add(self.shm['out-icmpv4-echo-packets'])
 
    link.transmit(self.output.south, out)
 

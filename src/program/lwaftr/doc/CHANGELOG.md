@@ -1,6 +1,318 @@
 # Change Log
 
-## [2018.04.01] (unreleased)
+## [2022.01.13]
+
+### Notable changes
+
+ * Support for XDP, AVF, and Mellanox drivers
+
+ * Restore support for bump-in-the-wire operation
+
+ * New updated lwAFTR YANG schema: `snabb-softwire-v3.yang`.
+   lwAFTR can now operate on >2 CPU cores
+
+ * Add statistics counters for ICMP, ARP, and NDP
+
+ * Fragmenter/defragmenter can now handle padded packets (bug fix)
+
+ * NDP app now sends correct neighbot advertisements (bug fix)
+
+ * Fix a parsing bug in `lib.yang` where nested default values of leaves where not set
+
+ * Fix a bug in `lib.numa` where it could not gracefully handle the inability to read a CPU performance governor
+
+## [2019.06.02]
+
+### Notable changes
+
+ * Fix `snabb top` to correctly display per-worker statistics for
+   instances of the lwAFTR running with receive-side scaling (RSS).
+   See https://github.com/Igalia/snabb/pull/1237.
+
+ * Fix a problem related to an interaction between late trace
+   compilation and the ingress drop monitor.
+
+   For context, Snabb uses LuaJIT, which is a just-in-time compiler.
+   LuaJIT compiles program segments called traces.  Traces can jump to
+   each other, and thereby form a graph.  The shape of the trace graph
+   can have important performance impacts on a network function, but
+   building the optimal graph shape is fundamentally hard.  Usually
+   LuaJIT does a good job, but if a network function is dropping
+   packets, Snabb's "ingress drop monitor" will ask LuaJIT to re-learn
+   the graph of traces, in the hopes that this self-healing process will
+   fix the packet loss situation.
+
+   Unfortunately, the self-healing process has some poor interactions
+   with so-called "long tail" traces -- traces that aren't taking an
+   important amount of time, but which LuaJIT might decide to compile a
+   few seconds into the running of a network function.  Compiling a
+   trace can cause a latency spike and dropped packets, so the work of
+   compiling these long-tail traces can in fact be interpreted as a
+   packet loss situation, thereby triggering the self-healing process,
+   leading to a pathologically repeating large packet loss situation.
+
+   The right answer is for LuaJIT to avoid the latency cost for
+   long-tail trace compilation.  While this might make long-tail traces
+   run not as fast as they would if they were compiled, these traces
+   take so little time anyway that it doesn't matter enough to pay the
+   cost of trace compilation.
+
+   See https://github.com/Igalia/snabb/pull/1236 and
+   https://github.com/Igalia/snabb/pull/1239 for full details.
+
+ * Disable profiling by default.  The version of LuaJIT that Snabb uses
+   includes a facility for online profiling of network functions.  This
+   facility is low-overhead but not no-overhead.  We have disabled it by
+   default on the lwAFTR; it can be enabled by passing the --profile
+   option.  See https://github.com/Igalia/snabb/pull/1238.
+
+## [2019.06.01]
+
+### Notable changes
+
+ * Improve stability of receive-side scaling (RSS), in which multiple
+   CPU cores can service traffic on the same NIC.  Previously, the
+   lwAFTR had a pathology whereby a transient error condition that could
+   cause one core to drop packets could then cause another core to
+   attempt to perform self-healing by re-optimizing its code, which
+   could then ping-pong back and cause the other core to try to
+   self-heal, and on and on forever.  See
+   https://github.com/Igalia/snabb/pull/1229 and
+   https://github.com/snabbco/snabb/pull/1443 for more details.
+
+ * Fix a problem whereby `snabb config add` would cause the lwAFTR to
+   crash after a few thousand softwire additions.  See
+   https://github.com/Igalia/snabb/pull/1228.
+
+ * Update the `ieee-softwire` compatibility layer for the native
+   `snabb-softwire-v2` Yang module, corresponding the latest changes in
+   the Internet Draft,
+   [`draft-ietf-softwire-yang-16`](https://datatracker.ietf.org/doc/draft-ietf-softwire-yang/16/).
+
+ * Add counters and historical data records for how much memory a lwAFTR
+   process uses over time, for use in on-line and post-mortem system
+   diagnostics.  See https://github.com/Igalia/snabb/pull/1228 for
+   details.
+
+ * Add `snabb rrdcat` tool that can be used to identify when packet
+   drops occured in the past.  See
+   https://github.com/Igalia/snabb/pull/1225 for details.
+
+ * Incorporate changes from the upstream [Snabb 2019.06
+   "Deltadromeus"](https://github.com/snabbco/snabb/releases/tag/v2019.01)
+   release.  This finally includes a switch over to RaptorJIT, which
+   adds a number of on-line diagnostic tools that can be useful for
+   troubleshooting performance problems in production.
+
+## [2018.09.03]
+
+### Features
+
+ * Add new "revision" declaration to snabb-softwire-v2 YANG module,
+   corresponding to addition of flow-label nodes back in version
+   2018.09.01.  No changes to the schema otherwise.
+
+ * Add new performance diagnostics that will print warnings for common
+   system misconfigurations, such as missing `isolcpus` declarations or
+   the use of power-saving CPU frequency scaling strategies.  These
+   warnings detect conditions which are described in the performance
+   tuning document.
+
+     https://github.com/Igalia/snabb/pull/1212
+     https://github.com/snabbco/snabb/blob/master/src/doc/performance-tuning.md
+
+ * Improve `snabb lwaftr run --help` output.  Try it out!
+
+### Bug fixes
+
+ * Ingress drop monitor treats startup as part of grace period (10
+   seconds by default), postponing the start of dropped packet detection
+   until after the system has settled down.
+
+     https://github.com/Igalia/snabb/issues/1216
+     https://github.com/Igalia/snabb/pull/1217
+
+ * Fix PCI/NUMA affinity diagnostics.
+
+     https://github.com/Igalia/snabb/pull/1211
+
+ * New YANG schema revisions cause Snabb to recompile configurations.
+
+     https://github.com/Igalia/snabb/pull/1209
+
+ * Re-enable NUMA binding on newer kernels (including the kernel used by
+   Ubuntu 18.04).
+
+     https://github.com/Igalia/snabb/pull/1207
+
+## [2018.09.02]
+
+### Features
+
+* Add benchmarking test for 2 instances each with 2 queues (total of 4
+  queues).
+
+    https://github.com/Igalia/snabb/pull/1206
+
+### Bug fixes
+
+* Fixes compiling on GCC 8.1 relating to unsafe usage of `strncpy`.
+
+    https://github.com/Igalia/snabb/pull/1193
+
+* Fix bug where the next-hop counter reported an incorrect value. The
+  ARP and NDP apps should now report the next-hop mac address when
+  resolved.
+
+    https://github.com/Igalia/snabb/pull/1204
+
+* Fix bug in with ctables that caused a TABOV (table overflow) error.
+
+    https://github.com/Igalia/snabb/pull/1200
+
+* Fix a bug where the kernel could overwrite some of our memory
+  due to giving an incorrect size being given in `get_mempolicy`. This
+  could have caused a crash in certain situations. We're now
+  allocating a mask of the correct size.
+
+    https://github.com/Igalia/snabb/pull/1198
+
+## [2018.09.01]
+
+### Features
+
+* Allow setting the IPv6 flow-label header field on ingress packets, allowing
+  packets from different lwAFTR instances to be distinguished via the field.
+  This adds a new `flow-label` field that can be used in YANG configurations.
+
+    https://github.com/Igalia/snabb/pull/1183
+
+* Next hop MAC addresses (`next-hop-macaddr-v4` and `next-hop-macaddr-v6`) are now
+  shown in the `snabb top` view and are added to the YANG model so that they
+  can be queried using `snabb config get-state`.
+
+    https://github.com/Igalia/snabb/pull/1182
+
+### Bug fixes
+
+* Fix RRD recording for intel_mp stats counters. This fixes issues discovered
+  with the statistics counter improvements from v2018.06.01 and improves the
+  functionality of `snabb top`.
+
+    https://github.com/Igalia/snabb/pull/1179
+
+* Add a workaround for a bug in Linux kernel version 4.15.0-36 with memory
+  binding to avoid segmentation faults.
+
+    https://github.com/Igalia/snabb/pull/1187
+
+* Improved error messages for invalid config files and for `snabb config`.
+
+    https://github.com/Igalia/snabb/pull/1159
+    https://github.com/Igalia/snabb/pull/1160
+
+* Ensure leader process is bound to the correct NUMA node.
+
+    https://github.com/Igalia/snabb/pull/1133
+
+### Other enhancements from upstream
+
+  * Integrates Snabb 2018.09 "Eggplant".
+
+      https://github.com/snabbco/snabb/releases/tag/v2018.09
+
+  * Includes updates to vhost-user driver, PMU support for some AMD CPUs,
+    hash table improvements, a token bucket implementation, and support for
+    time stamp counters.
+
+Thanks to Alexander Gall, Ben Agricola, Luke Gorrie, Max Rottenkolber, and
+kullanici0606 for their upstream contributions in this release.
+
+## [2018.06.01]
+
+### Features
+
+* Add support for the `snabb lwaftr compile-config` command
+
+* Improve the handling of statistics counters on the intel_mp NIC driver.
+  This change makes queue counters show up for each NIC app in `snabb top`'s
+  tree view.
+
+### Bug fixes
+
+* Fixes the conditions in which the lwAFTR uses a V4V6 splitter app. This
+  fix should allow certain configurations with a different external & internal
+  MAC to work correctly.
+
+### Other enhancements from upstream
+
+  * Adds software-based receive-side scaling (RSS) with an app
+
+      https://github.com/snabbco/snabb/pull/1309
+
+Thanks to Alexander Gall, Luke Gorrie, Max Rottenkolber, R. Matthew Emerson, and
+hepeng for their upstream contributions in this release.
+
+## [2018.04.02]
+
+### Features
+
+* Support influxdb format for `snabb config`.   Pass `--format influxdb` to
+  `snabb config get-state` for output suitable for feeding to influxdb.
+
+* Support larger binding tables.  The lwAFTR has now been tested with binding
+  tables containing 40M entries.
+
+* Support TAP interface for the lwAFTR.  This is useful when testing.
+
+* Completely rewritten `snabb top`.  Notable changes include:
+    * Shows all Snabb instances on the current machine, and worker-manager
+      relationships.
+    * Interactive interface for focussing in on specific Snabb processes.
+    * New `top`-like summary view focussed on NIC throughput.
+    * New tree view that can show all counters.
+    * Support for historical flight-recorder data view.
+
+  The new `snabb top` replaces `snabb snabbvmx top` as well.
+
+  For more information, see `snabb top --help`:
+    https://github.com/Igalia/snabb/tree/lwaftr/src/program/top
+
+* Make the necessary lwAFTR changes to allow it to work with the new raptorJIT
+  engine.  Note that this release does not include RaptorJIT yet; we are waiting
+  on an upstream Snabb release that officially ships it.
+
+* Add RRD support enabling storage of historical counter change rates.  The lwAFTR
+  is configured to record counter change rates over 2-second windows for the last
+  2 hours, 30-second windows for the last 24 hours, and 5-minute intervals over
+  the last 7 days.  This data can be useful in an incident response context to
+  find interesting operational events from the recent past.
+
+* Improved support of several YANG data-types (leafref, ipv4-prefix and ipv6-prefix).
+
+* Added support for YANG notifications.
+
+### Bug fixes
+
+* Fix display of invalid IP address when configured to use ARP to resolve the external
+  interface's next hop.
+
+* Relax NUMA policy to be less strict.  It used to be that if no NUMA-local memory was
+  available for a Snabb worker, the worker would be silently killed.  The new behavior
+  is to continue with some non-local memory.  This is a tradeoff that may result in lower
+  performance when less NUMA-local memory is available, without warnings, but which
+  prevents the operating system from silently killing Snabb workers.
+
+* Fixed the TTL on ICMP ECHO reply packets, which no longer take their initial TTL from
+  the corresponding ECHO request packets.
+
+* Fix timezone offset in YANG alarms.
+
+* Fix `snabb alarms listen` runtime error when running with wrong number of args.
+
+* Fix incorrect argument parsing in `snabb loadtest find-limit` short form.
+
+## [2018.04.01]
 
 ### Features
 

@@ -217,12 +217,12 @@ local function prepend_ethernet_header(pkt, ether_type)
    return pkt
 end
 
-local function write_ipv6_header(ptr, src, dst, tc, next_header, payload_length)
+local function write_ipv6_header(ptr, src, dst, tc, flow_label, next_header, payload_length)
    local h = ffi.cast(ipv6_header_ptr_t, ptr)
    h.v_tc_fl = 0
    lib.bitfield(32, h, 'v_tc_fl', 0, 4, 6)   -- IPv6 Version
    lib.bitfield(32, h, 'v_tc_fl', 4, 8, tc)  -- Traffic class
-   lib.bitfield(32, h, 'v_tc_fl', 12, 20, 0) -- Flow label
+   lib.bitfield(32, h, 'v_tc_fl', 12, 20, flow_label) -- Flow label
    h.payload_length = htons(payload_length)
    h.next_header = next_header
    h.hop_limit = constants.default_ttl
@@ -339,22 +339,7 @@ local function drop(pkt)
    packet.free(pkt)
 end
 
-local function select_instance(conf)
-   local function table_merge(t1, t2)
-      local ret = {}
-      for k,v in pairs(t1) do ret[k] = v end
-      for k,v in pairs(t2) do ret[k] = v end
-      return ret
-   end
-   local device, id, queue = lwutil.parse_instance(conf)
-   conf.softwire_config.external_interface = table_merge(
-      conf.softwire_config.external_interface, queue.external_interface)
-   conf.softwire_config.internal_interface = table_merge(
-      conf.softwire_config.internal_interface, queue.internal_interface)
-   return conf
-end
-
-LwAftr = { yang_schema = 'snabb-softwire-v2' }
+LwAftr = { yang_schema = 'snabb-softwire-v3' }
 -- Fields:
 --   - direction: "in", "out", "hairpin", "drop";
 --   If "direction" is "drop":
@@ -407,22 +392,21 @@ LwAftr.shm = {
    ["in-ipv4-packets"]                                 = {counter},
    ["in-ipv6-bytes"]                                   = {counter},
    ["in-ipv6-packets"]                                 = {counter},
-   ["out-icmpv4-bytes"]                                = {counter},
-   ["out-icmpv4-packets"]                              = {counter},
-   ["out-icmpv6-bytes"]                                = {counter},
-   ["out-icmpv6-packets"]                              = {counter},
+   ["out-icmpv4-error-bytes"]                          = {counter},
+   ["out-icmpv4-error-packets"]                        = {counter},
+   ["out-icmpv6-error-bytes"]                          = {counter},
+   ["out-icmpv6-error-packets"]                        = {counter},
    ["out-ipv4-bytes"]                                  = {counter},
    ["out-ipv4-packets"]                                = {counter},
    ["out-ipv6-bytes"]                                  = {counter},
-   ["out-ipv6-packets"]                                = {counter}
+   ["out-ipv6-packets"]                                = {counter},
 }
 
 function LwAftr:new(conf)
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})
-   conf = select_instance(conf).softwire_config
+   conf = lwutil.merge_instance(conf).softwire_config
    o.conf = conf
-
    o.binding_table = bt.load(conf.binding_table)
    o.inet_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
    o.hairpin_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
@@ -432,38 +416,28 @@ function LwAftr:new(conf)
    o.icmpv6_error_count = 0
    o.icmpv6_error_rate_limit_start = 0
 
-   alarms.add_to_inventory {
-     [{alarm_type_id='bad-ipv4-softwires-matches'}] = {
-       resource=tostring(S.getpid()),
-       has_clear=true,
+   alarms.add_to_inventory(
+      {alarm_type_id='bad-ipv4-softwires-matches'},
+      {resource=tostring(S.getpid()), has_clear=true,
        description="lwAFTR's bad matching softwires due to not found destination "..
-         "address for IPv4 packets",
-     }
-   }
-   alarms.add_to_inventory {
-     [{alarm_type_id='bad-ipv6-softwires-matches'}] = {
-       resource=tostring(S.getpid()),
-       has_clear=true,
+          "address for IPv4 packets"})
+   alarms.add_to_inventory(
+      {alarm_type_id='bad-ipv6-softwires-matches'},
+      {resource=tostring(S.getpid()), has_clear=true,
        description="lwAFTR's bad matching softwires due to not found source"..
-         "address for IPv6 packets",
-     }
-   }
-   local bad_ipv4_softwire_matches = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()), alarm_type_id='bad-ipv4-softwires-matches'}] = {
-         perceived_severity = 'major',
-         alarm_text = "lwAFTR's bad softwires matches due to non matching destination"..
-            "address for incoming packets (IPv4) has reached over 100,000 softwires "..
-            "binding-table.  Please review your lwAFTR's configuration binding-table."
-      },
-   }
-   local bad_ipv6_softwire_matches = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()), alarm_type_id='bad-ipv6-softwires-matches'}] = {
-         perceived_severity = 'major',
-         alarm_text = "lwAFTR's bad softwires matches due to non matching source "..
-            "address for outgoing packets (IPv6) has reached over 100,000 softwires "..
-            "binding-table.  Please review your lwAFTR's configuration binding-table."
-      },
-   }
+          "address for IPv6 packets"})
+   local bad_ipv4_softwire_matches = alarms.declare_alarm(
+      {resource=tostring(S.getpid()), alarm_type_id='bad-ipv4-softwires-matches'},
+      {perceived_severity = 'major',
+       alarm_text = "lwAFTR's bad softwires matches due to non matching destination"..
+         "address for incoming packets (IPv4) has reached over 100,000 softwires "..
+         "binding-table.  Please review your lwAFTR's configuration binding-table."})
+   local bad_ipv6_softwire_matches = alarms.declare_alarm(
+      {resource=tostring(S.getpid()), alarm_type_id='bad-ipv6-softwires-matches'},
+      {perceived_severity = 'major',
+       alarm_text = "lwAFTR's bad softwires matches due to non matching source "..
+         "address for outgoing packets (IPv6) has reached over 100,000 softwires "..
+         "binding-table.  Please review your lwAFTR's configuration binding-table."})
    o.bad_ipv4_softwire_matches_alarm = CounterAlarm.new(bad_ipv4_softwire_matches,
       5, 1e5, o, 'drop-no-dest-softwire-ipv4-packets')
    o.bad_ipv6_softwire_matches_alarm = CounterAlarm.new(bad_ipv6_softwire_matches,
@@ -475,7 +449,7 @@ end
 
 -- The following two methods are called by lib.ptree.worker in reaction
 -- to binding table changes, via
--- lib/ptree/support/snabb-softwire-v2.lua.
+-- lib/ptree/support/snabb-softwire-v3.lua.
 function LwAftr:add_softwire_entry(entry_blob)
    self.binding_table:add_softwire_entry(entry_blob)
 end
@@ -518,8 +492,8 @@ function LwAftr:transmit_icmpv6_reply (pkt)
    -- Send packet if limit not reached.
    if self.icmpv6_error_count < rate_limiting.packets then
       self.icmpv6_error_count = self.icmpv6_error_count + 1
-      counter.add(self.shm["out-icmpv6-bytes"], pkt.length)
-      counter.add(self.shm["out-icmpv6-packets"])
+      counter.add(self.shm["out-icmpv6-error-bytes"], pkt.length)
+      counter.add(self.shm["out-icmpv6-error-packets"])
       counter.add(self.shm["out-ipv6-bytes"], pkt.length)
       counter.add(self.shm["out-ipv6-packets"])
       return transmit(self.o6, pkt)
@@ -562,8 +536,8 @@ function LwAftr:transmit_icmpv4_reply(pkt, orig_pkt, orig_pkt_link)
    -- Send packet if limit not reached.
    if self.icmpv4_error_count < rate_limiting.packets then
       self.icmpv4_error_count = self.icmpv4_error_count + 1
-      counter.add(self.shm["out-icmpv4-bytes"], pkt.length)
-      counter.add(self.shm["out-icmpv4-packets"])
+      counter.add(self.shm["out-icmpv4-error-bytes"], pkt.length)
+      counter.add(self.shm["out-icmpv4-error-packets"])
       -- Only locally generated error packets are handled here.  We transmit
       -- them right away, instead of calling transmit_ipv4, because they are
       -- never hairpinned and should not be counted by the "out-ipv4" counter.
@@ -750,6 +724,7 @@ function LwAftr:encapsulate_and_transmit(pkt, ipv6_dst, ipv6_src, pkt_src_link)
    local payload_length = get_ethernet_payload_length(pkt)
    local l3_header = get_ethernet_payload(pkt)
    local traffic_class = get_ipv4_dscp_and_ecn(l3_header)
+   local flow_label = self.conf.internal_interface.flow_label
    -- Note that this may invalidate any pointer into pkt.data.  Be warned!
    pkt = packet.shiftright(pkt, ipv6_header_size)
    write_ethernet_header(pkt, n_ethertype_ipv6)
@@ -757,7 +732,7 @@ function LwAftr:encapsulate_and_transmit(pkt, ipv6_dst, ipv6_src, pkt_src_link)
    l3_header = get_ethernet_payload(pkt)
 
    write_ipv6_header(l3_header, ipv6_src, ipv6_dst, traffic_class,
-                     proto_ipv4, payload_length)
+                     flow_label, proto_ipv4, payload_length)
 
    if debug then
       print("encapsulated packet:")

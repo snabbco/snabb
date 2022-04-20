@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 # Attempt to migration from legacy to latest
 LEGACY_OUT=`./snabb lwaftr migrate-configuration -f legacy \

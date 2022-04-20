@@ -7,24 +7,13 @@
 
 #define MODRM(mode, r1, r2)	((MCode)((mode)+(((r1)&7)<<3)+((r2)&7)))
 
-#if LJ_64
 #define REXRB(p, rr, rb) \
     { MCode rex = 0x40 + (((rr)>>1)&4) + (((rb)>>3)&1); \
       if (rex != 0x40) *--(p) = rex; }
 #define FORCE_REX		0x200
 #define REX_64			(FORCE_REX|0x080000)
 #define VEX_64			0x800000
-#else
-#define REXRB(p, rr, rb)	((void)0)
-#define FORCE_REX		0
-#define REX_64			0
-#define VEX_64			0
-#endif
-#if LJ_GC64
 #define REX_GC64		REX_64
-#else
-#define REX_GC64		0
-#endif
 
 #define emit_i8(as, i)		(*--as->mcp = (MCode)(i))
 #define emit_i32(as, i)		(*(int32_t *)(as->mcp-4) = (i), as->mcp -= 4)
@@ -39,9 +28,7 @@ static LJ_AINLINE MCode *emit_op(x86Op xo, Reg rr, Reg rb, Reg rx,
 {
   int n = (int8_t)xo;
   if (n == -60) {  /* VEX-encoded instruction */
-#if LJ_64
     xo ^= (((rr>>1)&4)+((rx>>2)&2)+((rb>>3)&1))<<13;
-#endif
     *(uint32_t *)(p+delta-5) = (uint32_t)xo;
     return p+delta-5;
   }
@@ -54,7 +41,6 @@ static LJ_AINLINE MCode *emit_op(x86Op xo, Reg rr, Reg rb, Reg rx,
 #endif
     *(uint32_t *)(p+delta-5) = (uint32_t)xo;
   p += n + delta;
-#if LJ_64
   {
     uint32_t rex = 0x40 + ((rr>>1)&(4+(FORCE_REX>>1)))+((rx>>2)&2)+((rb>>3)&1);
     if (rex != 0x40) {
@@ -64,9 +50,6 @@ static LJ_AINLINE MCode *emit_op(x86Op xo, Reg rr, Reg rb, Reg rx,
       *--p = (MCode)rex;
     }
   }
-#else
-  UNUSED(rr); UNUSED(rb); UNUSED(rx);
-#endif
   return p;
 }
 
@@ -123,14 +106,9 @@ static void emit_rmro(ASMState *as, x86Op xo, Reg rr, Reg rb, int32_t ofs)
       *--p = MODRM(XM_SCALE1, RID_ESP, RID_ESP);
   } else {
     *(int32_t *)(p-4) = ofs;
-#if LJ_64
     p[-5] = MODRM(XM_SCALE1, RID_ESP, RID_EBP);
     p -= 5;
     rb = RID_ESP;
-#else
-    p -= 4;
-    rb = RID_EBP;
-#endif
     mode = XM_OFS0;
   }
   as->mcp = emit_opm(xo, mode, rr, rb, p, 0);
@@ -203,10 +181,8 @@ static void emit_mrm(ASMState *as, x86Op xo, Reg rr, Reg rb)
       *(int32_t *)p = as->mrm.ofs;
       if (as->mrm.idx != RID_NONE)
 	goto mrmidx;
-#if LJ_64
       *--p = MODRM(XM_SCALE1, RID_ESP, RID_EBP);
       rb = RID_ESP;
-#endif
     } else if (LJ_GC64 && rb == RID_RIP) {
       lua_assert(as->mrm.idx == RID_NONE);
       mode = XM_OFS0;
@@ -289,7 +265,6 @@ static void emit_loadi(ASMState *as, Reg r, int32_t i)
   }
 }
 
-#if LJ_GC64
 #define dispofs(as, k) \
   ((intptr_t)((uintptr_t)(k) - (uintptr_t)J2GG(as->J)->dispatch))
 #define mcpofs(as, k) \
@@ -299,13 +274,7 @@ static void emit_loadi(ASMState *as, Reg r, int32_t i)
 /* mov r, addr */
 #define emit_loada(as, r, addr) \
   emit_loadu64(as, (r), (uintptr_t)(addr))
-#else
-/* mov r, addr */
-#define emit_loada(as, r, addr) \
-  emit_loadi(as, (r), ptr2addr((addr)))
-#endif
 
-#if LJ_64
 /* mov r, imm64 or shorter 32 bit extended load. */
 static void emit_loadu64(ASMState *as, Reg r, uint64_t u64)
 {
@@ -315,7 +284,6 @@ static void emit_loadu64(ASMState *as, Reg r, uint64_t u64)
     MCode *p = as->mcp;
     *(int32_t *)(p-4) = (int32_t)u64;
     as->mcp = emit_opm(XO_MOVmi, XM_REG, REX_64, r, p, -4);
-#if LJ_GC64
   } else if (checki32(dispofs(as, u64))) {
     emit_rmro(as, XO_LEA, r|REX_64, RID_DISPATCH, (int32_t)dispofs(as, u64));
   } else if (checki32(mcpofs(as, u64)) && checki32(mctopofs(as, u64))) {
@@ -323,7 +291,6 @@ static void emit_loadu64(ASMState *as, Reg r, uint64_t u64)
     ** RIP-relative addressing reachability for both as->mcp and as->mctop.
     */
     emit_rmro(as, XO_LEA, r|REX_64, RID_RIP, (int32_t)mcpofs(as, u64));
-#endif
   } else {  /* Full-size 64 bit load. */
     MCode *p = as->mcp;
     *(uint64_t *)(p-8) = u64;
@@ -333,30 +300,41 @@ static void emit_loadu64(ASMState *as, Reg r, uint64_t u64)
     as->mcp = p;
   }
 }
-#endif
 
 /* op r, [addr] */
 static void emit_rma(ASMState *as, x86Op xo, Reg rr, const void *addr)
 {
-#if LJ_GC64
   if (checki32(dispofs(as, addr))) {
     emit_rmro(as, xo, rr, RID_DISPATCH, (int32_t)dispofs(as, addr));
   } else if (checki32(mcpofs(as, addr)) && checki32(mctopofs(as, addr))) {
     emit_rmro(as, xo, rr, RID_RIP, (int32_t)mcpofs(as, addr));
-  } else if (!checki32((intptr_t)addr) && (xo == XO_MOV || xo == XO_MOVSD)) {
-    emit_rmro(as, xo, rr, rr, 0);
-    emit_loadu64(as, rr, (uintptr_t)addr);
+  } else if (!checki32((intptr_t)addr)) {
+    Reg ra = (rr & 15);
+    if (xo != XO_MOV) {
+      /* We can't allocate a register here. Use and restore DISPATCH. Ugly. */
+      uint64_t dispaddr = (uintptr_t)J2GG(as->J)->dispatch;
+      uint8_t i8 = xo == XO_GROUP3b ? *as->mcp++ : 0;
+      ra = RID_DISPATCH;
+      if (checku32(dispaddr)) {
+	emit_loadi(as, ra, (int32_t)dispaddr);
+      } else {  /* Full-size 64 bit load. */
+	MCode *p = as->mcp;
+	*(uint64_t *)(p-8) = dispaddr;
+	p[-9] = (MCode)(XI_MOVri+(ra&7));
+	p[-10] = 0x48 + ((ra>>3)&1);
+	p -= 10;
+	as->mcp = p;
+      }
+      if (xo == XO_GROUP3b) emit_i8(as, i8);
+    }
+    emit_rmro(as, xo, rr, ra, 0);
+    emit_loadu64(as, ra, (uintptr_t)addr);
   } else
-#endif
   {
     MCode *p = as->mcp;
     *(int32_t *)(p-4) = ptr2addr(addr);
-#if LJ_64
     p[-5] = MODRM(XM_SCALE1, RID_ESP, RID_EBP);
     as->mcp = emit_opm(xo, XM_OFS0, rr, RID_ESP, p, -5);
-#else
-    as->mcp = emit_opm(xo, XM_OFS0, rr, RID_EBP, p, -4);
-#endif
   }
 }
 
@@ -375,7 +353,6 @@ static void emit_loadk64(ASMState *as, Reg r, IRIns *ir)
   }
   if (*k == 0) {
     emit_rr(as, rset_test(RSET_FPR, r) ? XO_XORPS : XO_ARITH(XOg_XOR), r, r);
-#if LJ_GC64
   } else if (checki32((intptr_t)k) || checki32(dispofs(as, k)) ||
 	     (checki32(mcpofs(as, k)) && checki32(mctopofs(as, k)))) {
     emit_rma(as, xo, r64, k);
@@ -392,12 +369,9 @@ static void emit_loadk64(ASMState *as, Reg r, IRIns *ir)
       ir->i = (int32_t)(as->mctop - as->mcbot);
       as->mcbot += 8;
       as->mclim = as->mcbot + MCLIM_REDZONE;
+      lj_mcode_commitbot(as->J, as->mcbot);
     }
     emit_rmro(as, xo, r64, RID_RIP, (int32_t)mcpofs(as, as->mctop - ir->i));
-#else
-  } else {
-    emit_rma(as, xo, r64, k);
-#endif
   }
 }
 
@@ -406,18 +380,6 @@ static void emit_loadk64(ASMState *as, Reg r, IRIns *ir)
 /* Label for short jumps. */
 typedef MCode *MCLabel;
 
-#if LJ_32 && LJ_HASFFI
-/* jmp short target */
-static void emit_sjmp(ASMState *as, MCLabel target)
-{
-  MCode *p = as->mcp;
-  ptrdiff_t delta = target - p;
-  lua_assert(delta == (int8_t)delta);
-  p[-1] = (MCode)(int8_t)delta;
-  p[-2] = XI_JMPs;
-  as->mcp = p - 2;
-}
-#endif
 
 /* jcc short target */
 static void emit_sjcc(ASMState *as, int cc, MCLabel target)
@@ -480,14 +442,12 @@ static void emit_jmp(ASMState *as, MCode *target)
 static void emit_call_(ASMState *as, MCode *target)
 {
   MCode *p = as->mcp;
-#if LJ_64
   if (target-p != (int32_t)(target-p)) {
     /* Assumes RID_RET is never an argument to calls and always clobbered. */
     emit_rr(as, XO_GROUP5, XOg_CALL, RID_RET);
     emit_loadu64(as, RID_RET, (uint64_t)target);
     return;
   }
-#endif
   *(int32_t *)(p-4) = jmprel(p, target);
   p[-5] = XI_CALL;
   as->mcp = p - 5;
@@ -498,13 +458,8 @@ static void emit_call_(ASMState *as, MCode *target)
 /* -- Emit generic operations --------------------------------------------- */
 
 /* Use 64 bit operations to handle 64 bit IR types. */
-#if LJ_64
 #define REX_64IR(ir, r)		((r) + (irt_is64((ir)->t) ? REX_64 : 0))
 #define VEX_64IR(ir, r)		((r) + (irt_is64((ir)->t) ? VEX_64 : 0))
-#else
-#define REX_64IR(ir, r)		(r)
-#define VEX_64IR(ir, r)		(r)
-#endif
 
 /* Generic move between two regs. */
 static void emit_movrr(ASMState *as, IRIns *ir, Reg dst, Reg src)

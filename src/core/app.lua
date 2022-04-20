@@ -10,7 +10,6 @@ local timer     = require("core.timer")
 local shm       = require("core.shm")
 local histogram = require('core.histogram')
 local counter   = require("core.counter")
-local zone      = require("jit.zone")
 local jit       = require("jit")
 local S         = require("syscall")
 local ffi       = require("ffi")
@@ -22,7 +21,6 @@ pull_npackets = math.floor(link.max / 10)
 
 -- Set to true to enable logging
 log = false
-local use_restart = false
 
 test_skipped_code = 43
 
@@ -31,6 +29,13 @@ local named_program_root = shm.root .. "/" .. "by-name"
 
 -- The currently claimed name (think false = nil but nil makes strict.lua unhappy).
 program_name = false
+
+-- Auditlog state
+auditlog_enabled = false
+function enable_auditlog ()
+   jit.auditlog(shm.path("audit.log"))
+   auditlog_enabled = true
+end
 
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
@@ -68,9 +73,57 @@ maxsleep = 100
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
 busywait = false
 
--- always_push: If true, always call push() methods even if the
--- receiving link is empty
-always_push = false
+-- tick_Hz: Frequency at which to execute tick() methods (<n> per second)
+tick_Hz = 1000
+
+local tick, tick_current_freq
+function enable_tick (freq)
+   freq = freq or tick_Hz
+   if freq == tick_current_freq then
+      return
+   end
+   if freq > 0 then
+      tick = lib.throttle(1/freq)
+   else
+      tick = function () return false end
+   end
+end
+
+-- Profiling with vmprofile --------------------------------
+
+vmprofile_enabled = true
+
+-- Low-level FFI
+ffi.cdef[[
+int vmprofile_get_profile_size();
+void vmprofile_set_profile(void *counters);
+]]
+
+local vmprofile_t = ffi.typeof("uint8_t["..C.vmprofile_get_profile_size().."]")
+
+local vmprofiles = {}
+local function getvmprofile (name)
+   if vmprofiles[name] == nil then
+      vmprofiles[name] = shm.create("vmprofile/"..name..".vmprofile", vmprofile_t)
+   end
+   return vmprofiles[name]
+end
+
+function setvmprofile (name)
+   C.vmprofile_set_profile(getvmprofile(name))
+end
+
+function clearvmprofiles ()
+   jit.vmprofile.stop()
+   for name, profile in pairs(vmprofiles) do
+      shm.unmap(profile)
+      shm.unlink("vmprofile/"..name..".vmprofile")
+      vmprofiles[name] = nil
+   end
+   if vmprofile_enabled then
+      jit.vmprofile.start()
+   end
+end
 
 -- True when the engine is running the breathe loop.
 local running = false
@@ -81,54 +134,6 @@ monotonic_now = false
 function now ()
    -- Return cached time only if it is fresh
    return (running and monotonic_now) or C.get_monotonic_time()
-end
-
--- Run app:methodname() in protected mode (pcall). If it throws an
--- error app will be marked as dead and restarted eventually.
-function with_restart (app, method, link, arg)
-   local status, result
-   if use_restart then
-      -- Run fn in protected mode using pcall.
-      status, result = pcall(method, app, link, arg)
-
-      -- If pcall caught an error mark app as "dead" (record time and cause
-      -- of death).
-      if not status then
-         app.dead = { error = result, time = now() }
-      end
-   else
-      status, result = true, method(app, link, arg)
-   end
-   return status, result
-end
-
--- Restart dead apps.
-function restart_dead_apps ()
-   if not use_restart then return end
-   local restart_delay = 2 -- seconds
-   local actions = {}
-
-   for name, app in pairs(app_table) do
-      if app.dead and (now() - app.dead.time) >= restart_delay then
-         io.stderr:write(("Restarting %s (died at %f: %s)\n")
-                         :format(name, app.dead.time, app.dead.error))
-         local info = configuration.apps[name]
-         table.insert(actions, {'stop_app', {name}})
-         table.insert(actions, {'start_app', {name, info.class, info.arg}})
-         for linkspec in pairs(configuration.links) do
-            local fa, fl, ta, tl = config.parse_link(linkspec)
-            if fa == name then
-               table.insert(actions, {'link_output', {fa, fl, linkspec}})
-            end
-            if ta == name then
-               table.insert(actions, {'link_input', {ta, tl, linkspec}})
-            end
-         end
-      end
-   end
-
-   -- Restart dead apps if necessary.
-   if #actions > 0 then apply_config_actions(actions) end
 end
 
 -- Configure the running app network to match new_configuration.
@@ -309,14 +314,16 @@ function apply_config_actions (actions)
       local link = app.output[linkname]
       app.output[linkname] = nil
       remove_link_from_array(app.output, link)
-      if app.link then app:link('unlink', 'output', linkname) end
+      if app.unlink then app:unlink('output', linkname)
+      elseif app.link then app:link('output', linkname) end
    end
    function ops.unlink_input (appname, linkname)
       local app = app_table[appname]
       local link = app.input[linkname]
       app.input[linkname] = nil
       remove_link_from_array(app.input, link)
-      if app.link then app:link('unlink', 'input', linkname) end
+      if app.unlink then app:unlink('input', linkname)
+      elseif app.link then app:link('input', linkname) end
    end
    function ops.free_link (linkspec)
       link.free(link_table[linkspec], linkspec)
@@ -334,7 +341,7 @@ function apply_config_actions (actions)
              appname..": duplicate output link "..linkname)
       app.output[linkname] = link
       table.insert(app.output, link)
-      if app.link then app:link('link', 'output', linkname, link) end
+      if app.link then app:link('output', linkname) end
    end
    function ops.link_input (appname, linkname, linkspec)
       local app = app_table[appname]
@@ -344,8 +351,7 @@ function apply_config_actions (actions)
       app.input[linkname] = link
       table.insert(app.input, link)
       if app.link then
-         local method, arg = app:link('link', 'input', linkname, link)
-         app.push_link[linkname] = { method = method, arg = arg }
+         app:link('input', linkname)
       end
    end
    function ops.stop_app (name)
@@ -365,12 +371,21 @@ function apply_config_actions (actions)
       app.appname = name
       app.output = {}
       app.input = {}
-      app.push_link = {}
       app_table[name] = app
       app.zone = zone
       if app.shm then
          app.shm.dtime = {counter, C.get_unix_time()}
          app.shm = shm.create_frame("apps/"..name, app.shm)
+      end
+      if class.push_link then
+         if type(class.push_link) ~= 'table' then
+            error(("bad push_link value for app '%s' (must be a table)")
+                     :format(name))
+         end
+         app.push_link = {}
+         for name, method in pairs(class.push_link) do
+            app.push_link[name] = method
+         end
       end
       configuration.apps[name] = { class = class, arg = arg }
    end
@@ -413,13 +428,17 @@ function tsort (nodes, entries, successors)
    return ret
 end
 
-breathe_pull_order = {}
-breathe_push_order = {}
+local breathe_pull_order = {}
+local breathe_push_order = {}
+local breathe_ticks = {}
 
 -- Sort the links in the app graph, and arrange to run push() on the
 -- apps on the receiving ends of those links.  This will run app:push()
 -- once for each link, which for apps with multiple links may cause the
 -- app's push function to run multiple times in a breath.
+--
+-- Also collect tick methods that need to be run on tick breaths in
+-- deterministic order.
 function compute_breathe_order ()
    breathe_pull_order, breathe_push_order = {}, {}
    local pull_links, inputs, successors = {}, {}, {}
@@ -436,14 +455,12 @@ function compute_breathe_order ()
          end
       end
       for linkname,link in pairs(app.input) do
-         if type(linkname) == "string" then
+         -- NB: each link is indexed by number and by name.
+         if type(linkname) == 'string' then
             linknames[link] = appname..'.'..linkname
-            local method, arg = app['push_'..linkname] or app.push, nil
-            if app.push_link[linkname] then
-               method = app.push_link[linkname].method or method
-               arg = app.push_link[linkname].arg
-            end
-            inputs[link] = { app = app, method = method, arg = arg, link = link }
+            local push_link = app.push_link and app.push_link[linkname]
+            local push = push_link or app.push
+            inputs[link] = { app = app, push = push, link = link }
          end
       end
    end
@@ -476,12 +493,22 @@ function compute_breathe_order ()
       table.sort(successors[link], cmp_links)
    end
    local link_order = tsort(nodes, entry_nodes, successors)
-   local i = 1
    for _,link in ipairs(link_order) do
-      if breathe_push_order[#breathe_push_order] ~= inputs[link].app then
-         table.insert(breathe_push_order, inputs[link])
+      local spec = inputs[link]
+      local prev = breathe_push_order[#breathe_push_order]
+      if spec.push then
+         if not prev or prev.app ~= spec.app or prev.push ~= spec.push then
+            table.insert(breathe_push_order, spec)
+         end
       end
    end
+   breathe_ticks = {}
+   for _,app in pairs(app_table) do
+      if app.tick then
+         table.insert(breathe_ticks, app)
+      end
+   end
+   table.sort(breathe_ticks, cmp_apps)
 end
 
 -- Call this to "run snabb switch".
@@ -494,11 +521,22 @@ function main (options)
       done = lib.timeout(options.duration)
    end
 
+   -- Enable auditlog
+   if not auditlog_enabled then
+      enable_auditlog()
+   end
+
+   -- Setup vmprofile
+   setvmprofile("engine")
+
    local breathe = breathe
    if options.measure_latency or options.measure_latency == nil then
       local latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)
       breathe = latency:wrap_thunk(breathe, now)
    end
+
+   -- Enable tick
+   enable_tick()
 
    monotonic_now = C.get_monotonic_time()
    repeat
@@ -508,6 +546,9 @@ function main (options)
    until done and done()
    counter.commit()
    if not options.no_report then report(options.report) end
+
+   -- Switch to catch-all profile
+   setvmprofile("program")
 end
 
 local nextbreath
@@ -537,22 +578,17 @@ function pace_breathing ()
    end
 end
 
-local empty = link.empty
 function breathe ()
    running = true
    monotonic_now = C.get_monotonic_time()
-   -- Restart: restart dead apps
-   restart_dead_apps()
    -- Inhale: pull work into the app network
    local i = 1
    ::PULL_LOOP::
    do
-      if i > #breathe_pull_order then goto PULL_EXIT end
-      local app = breathe_pull_order[i]
-      if app.pull and not app.dead then
-         zone(app.zone)
-         with_restart(app, app.pull)
-         zone()
+      if i > #breathe_pull_order then goto PULL_EXIT else
+         local app = breathe_pull_order[i]
+         setvmprofile(app.zone)
+         app:pull()
       end
       i = i+1
       goto PULL_LOOP
@@ -562,28 +598,27 @@ function breathe ()
    i = 1
    ::PUSH_LOOP::
    do
-      if i > #breathe_push_order then goto PUSH_EXIT end
-      local spec = breathe_push_order[i]
-      local app = spec.app
-      if spec.method and not app.dead then
-         if always_push or not empty(spec.link) then
-            zone(app.zone)
-            with_restart(app, spec.method, spec.link, spec.arg)
-            zone()
-         end
-      end
-      if app.housekeeping then
-         app:housekeeping()
+      if i > #breathe_push_order then goto PUSH_EXIT else
+         local spec = breathe_push_order[i]
+         local app, push, link = spec.app, spec.push, spec.link
+         setvmprofile(app.zone)
+         push(app, link)
       end
       i = i+1
       goto PUSH_LOOP
    end
    ::PUSH_EXIT::
+   -- Tick: call tick() methods at tick_Hz frequency
+   if tick() then
+      for _, app in ipairs(breathe_ticks) do
+         app:tick()
+      end
+   end
+   setvmprofile("engine")
    counter.add(breaths)
-   -- Commit counters and rebalance freelists at a reasonable frequency
+   -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then
       counter.commit()
-      packet.rebalance_freelists()
    end
    running = false
 end
@@ -662,36 +697,28 @@ end
 function report_apps ()
    print ("apps report:")
    for name, app in pairs(app_table) do
-      if app.dead then
-         print(name, ("[dead: %s]"):format(app.dead.error))
-      elseif app.report then
+      if app.report then
+         setvmprofile(app.zone)
          print(name)
-         if use_restart then
-            with_restart(app, app.report)
-         else
-            -- Restarts are disabled, still we want to not die on
-            -- errors during app reports, thus this workaround:
-            local status, err = pcall(app.report, app)
-            if not status then
-               print("Warning: "..name.." threw an error during report: "..err)
-            end
-         end
+         app:report()
       end
    end
+   setvmprofile("engine")
 end
 
 function selftest ()
    print("selftest: app")
-   always_push = true
-   local App = { push = true }
+   local App = {}
    function App:new () return setmetatable({}, {__index = App}) end
+   function App:pull () end
+   function App:push () end
    local c1 = config.new()
    config.app(c1, "app1", App)
    config.app(c1, "app2", App)
    config.link(c1, "app1.x -> app2.x")
    print("empty -> c1")
    configure(c1)
-   assert(#breathe_pull_order == 0)
+   assert(#breathe_pull_order == 2)
    assert(#breathe_push_order == 1)
    assert(app_table.app1 and app_table.app2)
    local orig_app1 = app_table.app1
@@ -709,7 +736,7 @@ function selftest ()
    config.link(c2, "app2.x -> app1.x")
    print("c1 -> c2")
    configure(c2)
-   assert(#breathe_pull_order == 0)
+   assert(#breathe_pull_order == 2)
    assert(#breathe_push_order == 2)
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
@@ -719,7 +746,7 @@ function selftest ()
    configure(c1) -- c2 -> c1
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
-   assert(#breathe_pull_order == 0)
+   assert(#breathe_pull_order == 2)
    assert(#breathe_push_order == 1)
    print("c1 -> empty")
    configure(config.new())
@@ -736,44 +763,105 @@ function selftest ()
    assert(not pcall(config.app, c3, "app_invalid", AppC))
    assert(not pcall(config.app, c3, "app_invalid", AppC, {b="bar"}))
    assert(not pcall(config.app, c3, "app_invalid", AppC, {a="bar", c="foo"}))
--- Test app restarts on failure.
-   use_restart = true
-   print("c_fail")
-   local App1 = {zone="test"}
-   function App1:new () return setmetatable({}, {__index = App1}) end
-   function App1:pull () error("Pull error.") end
-   function App1:push () return true end
-   function App1:report () return true end
-   local App2 = {zone="test"}
-   function App2:new () return setmetatable({}, {__index = App2}) end
-   function App2:pull () return true end
-   function App2:push () error("Push error.") end
-   function App2:report () return true end
-   local App3 = {zone="test"}
-   function App3:new () return setmetatable({}, {__index = App3}) end
-   function App3:pull () return true end
-   function App3:push () return true end
-   function App3:report () error("Report error.") end
-   local c_fail = config.new()
-   config.app(c_fail, "app1", App1)
-   config.app(c_fail, "app2", App2)
-   config.app(c_fail, "app3", App3)
-   config.link(c_fail, "app1.x -> app2.x")
-   configure(c_fail)
-   local orig_app1 = app_table.app1
-   local orig_app2 = app_table.app2
-   local orig_app3 = app_table.app3
-   main({duration = 4, report = {showapps = true}})
-   assert(app_table.app1 ~= orig_app1) -- should be restarted
-   assert(app_table.app2 ~= orig_app2) -- should be restarted
-   assert(app_table.app3 == orig_app3) -- should be the same
-   main({duration = 4, report = {showapps = true}})
-   assert(app_table.app3 ~= orig_app3) -- should be restarted
 
    -- Check engine stop
+   local c4 = config.new()
+   config.app(c4, "app1", App)
+   engine.configure(c4)
    assert(not lib.equal(app_table, {}))
    engine.stop()
    assert(lib.equal(app_table, {}))
+
+   -- Test tick()
+   local TickApp = {}
+   function TickApp:new () return setmetatable({ticks=0}, {__index = TickApp}) end
+   function TickApp:tick () self.ticks = self.ticks + 1 end
+   local c5 = config.new()
+   config.app(c5, "app_tick", TickApp)
+   engine.configure(c5)
+   local t = 0.1
+   engine.main{duration=t}
+   local expected_ticks = t * tick_Hz
+   local ratio = app_table.app_tick.ticks / expected_ticks
+   assert(ratio >= 0.9 and ratio <= 1.1)
+   print("ticks: actual/expected = "..ratio)
+
+   -- Test link() 3.0
+   local LinkApp = {push_link={}}
+   function LinkApp:new ()
+      local self = {linked={input={}, output={}}, called={}, pushed=false}
+      return setmetatable(self, {__index = LinkApp})
+   end
+   function LinkApp:link (dir, name)
+      print('link', dir, name)
+      self.linked[dir][name] = assert(self[dir][name])
+      if dir == 'input' then
+         self.push_link[name] = function (self, input)
+            print('push_link', name, input)
+            self.called[name] = true
+         end
+      end
+   end
+   function LinkApp:unlink (dir, name)
+      print('unlink', dir, name)
+      assert(not self[dir][name])
+      self.linked[dir][name] = nil
+   end
+   function LinkApp:push ()
+      self.pushed = true
+   end
+   local c6 = config.new()
+   config.app(c6, "app_pull", App)
+   config.app(c6, "link_app", LinkApp)
+   config.link(c6, "app_pull.output -> link_app.input")
+   engine.configure(c6)
+   assert(#breathe_pull_order == 1)
+   assert(#breathe_push_order == 1)
+   engine.main{done=function () return true end}
+   assert(app_table.link_app.linked.input.input)
+   assert(app_table.link_app.called.input)
+   assert(not app_table.link_app.pushed)
+   local c7 = config.new()
+   config.app(c7, "app_pull", App)
+   config.app(c7, "link_app", LinkApp)
+   engine.configure(c7)
+   assert(not app_table.link_app.linked.input.input)
+   -- Backwards compatible?
+   local LegacyApp = {push_link={}}
+   function LegacyApp:new ()
+      local self = {linked={input={}, output={}}, called={}, pushed=false}
+      return setmetatable(self, {__index = LegacyApp})
+   end
+   function LegacyApp:link (dir, name)
+      print('link', dir, name)
+      self.linked[dir][name] = self[dir][name]
+   end
+   function LegacyApp.push_link:newstyle (input)
+      print('push_link', 'newstyle', input)
+      self.called.newstyle = true
+   end
+   function LegacyApp:push ()
+      self.pushed = true
+   end
+   local c8 = config.new()
+   config.app(c8, "app_pull", App)
+   config.app(c8, "link_app", LegacyApp)
+   config.link(c8, "app_pull.output -> link_app.input")
+   config.link(c8, "app_pull.output2 -> link_app.newstyle")
+   engine.configure(c8)
+   assert(#breathe_pull_order == 1)
+   assert(#breathe_push_order == 2)
+   engine.main{done=function () return true end}
+   assert(app_table.link_app.linked.input.input)
+   assert(app_table.link_app.linked.input.newstyle)
+   assert(app_table.link_app.called.newstyle)
+   assert(app_table.link_app.pushed)
+   local c9 = config.new()
+   config.app(c9, "app_pull", App)
+   config.app(c9, "link_app", LegacyApp)
+   engine.configure(c9)
+   assert(not app_table.link_app.linked.input.input)
+   assert(not app_table.link_app.linked.input.newstyle)
 
    -- Check one can't unclaim a name if no name is claimed.
    assert(not pcall(unclaim_name))

@@ -9,15 +9,18 @@ local counter      = require("core.counter")
 local histogram    = require('core.histogram')
 local lib          = require('core.lib')
 local timer        = require('core.timer')
+local memory_info  = require("lib.timers.memory_info")
+local alarms       = require("lib.yang.alarms")
 local channel      = require("lib.ptree.channel")
 local action_codec = require("lib.ptree.action_codec")
-local alarm_codec  = require("lib.ptree.alarm_codec")
+local ptree_alarms = require("lib.ptree.alarms")
 
 local Worker = {}
 
 local worker_config_spec = {
    duration = {},
    measure_latency = {default=true},
+   measure_memory = {default=true},
    no_report = {default=false},
    report = {default={showapps=true,showlinks=true}},
    Hz = {default=1000},
@@ -30,13 +33,18 @@ function new_worker (conf)
    ret.duration = conf.duration or 1/0
    ret.no_report = conf.no_report
    ret.channel = channel.create('config-worker-channel', 1e6)
-   ret.alarms_channel = alarm_codec.get_channel()
+   alarms.install_alarm_handler(ptree_alarms:alarm_handler())
    ret.pending_actions = {}
+
+   require("jit.opt").start('sizemcode=256', 'maxmcode=2048')
 
    ret.breathe = engine.breathe
    if conf.measure_latency then
       local latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)
       ret.breathe = latency:wrap_thunk(ret.breathe, engine.now)
+   end
+   if conf.measure_memory then
+      timer.activate(memory_info.HeapSizeMonitor.new():timer())
    end
    return ret
 end
@@ -94,6 +102,12 @@ end
 function Worker:main ()
    local stop = engine.now() + self.duration
    local next_time = engine.now()
+
+   if not engine.auditlog_enabled then engine.enable_auditlog() end
+
+   engine.enable_tick()
+
+   engine.setvmprofile("engine")
    repeat
       self.breathe()
       if next_time < engine.now() then

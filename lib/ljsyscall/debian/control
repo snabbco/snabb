@@ -1,0 +1,25 @@
+Source: lua-ljsyscall
+Section: interpreters
+Priority: optional
+Maintainer: nobody
+Build-Depends: debhelper (>= 9), dh-lua
+Standards-Version: 4.0.0
+Homepage: http://www.myriabit.com/ljsyscall/
+
+Package: lua-ljsyscall
+Architecture: all
+Pre-Depends: ${misc:Pre-Depends}
+Depends: luajit, ${misc:Depends}
+Provides: ${lua:Provides}
+XB-Lua-Versions: ${lua:Versions}
+Description: LuaJIT Linux syscall FFI
+
+Package: lua-ljsyscall-dev
+Section: libdevel
+Architecture: all
+Pre-Depends: ${misc:Pre-Depends}
+Depends: ${misc:Depends}
+Provides: ${lua:Provides}
+XB-Lua-Versions: ${lua:Versions}
+Description: ljsyscall doc
+ This package contains the documentation of the ljsyscall library.

@@ -1,47 +1,70 @@
 Usage: run --help
-       run --conf <conf-file> --v4 <pci-addr> --v4 <pci-addr> [OPTION...]
-       run --conf <conf-file> --on-a-stick <pci-addr> [OPTION...]
+       run --conf CONF [OPTION...]
 
 Required arguments:
-       --conf   <conf-file>     Sets configuration policy table
-       --v4 <pci-addr>          PCI device number for the INET-side NIC
-       --v6 <pci-addr>          PCI device number for the B4-side NIC
-       --on-a-stick <pci-addr>  One single NIC for INET-side and B4-side
+       -c CONF, --conf CONF     Use configuration from the file CONF.
+                                See the snabb-softwire-v3 YANG module
+                                for full documentation.
 
 Optional arguments:
-       --virtio                 Use virtio-net interfaces instead of Intel 82599
-       --ring-buffer-size <size>  Set Intel 82599 receive buffer size
-       --cpu <cpuset>           Run dataplane processes on the given CPUs
-       --real-time              Enable real-time SCHED_FIFO scheduler
-       --mirror <tap>           Copies matching packets to TAP interface. Matching
-                                address set by "lwaftr monitor".
-       -D       <seconds>       Duration in seconds
-       -v                       Verbose (repeat for more verbosity)
-       -y, --hydra
-                                Hydra mode: emit CSV data in the format expected
-                                by the Hydra reports. For instance:
-
-                                  benchmark,id,score,unit
-
-                                rather than the default:
-
-                                  Time (s),Decap. MPPS,Decap. Gbps,Encap. MPPS,Encap. Gbps
-       -b FILENAME, --bench-file FILENAME
-                                The file or path name where benchmark data is to
-                                be written. A simple filename or relative pathname
-                                will be based on the current directory.
-       -n NAME, --name NAME     Sets the name as the identifier of this program.
-                                This must be unique amongst other snab programs.
+       -n NAME, --name NAME     Record NAME as the identifier of this
+                                network function instance.  NAME can
+                                then be passed to "snabb config" to
+                                query or modify the current state or
+                                configuration of the network function at
+                                run-time.  NAME must be unique among
+                                running Snabb programs.
+       --cpu CPUSET             Run data-plane processes on CPUSET, a
+                                list of CPU ranges.  For example
+                                "3-5,7-9", or "3,4,5,7,8,9" both allow
+                                the lwAFTR to run data planes on the
+                                given CPUs.
+       --v4 PCI-ADDR            Use the NIC at PCI-ADDR for IPv4
+                                traffic, instead of the NIC specified in
+                                CONF.
+       --v6 PCI-ADDR            Like --v4, but for IPv6 traffic.
+       --on-a-stick PCI-ADDR    Use the NIC at PCI-ADDR for both IPv4
+                                and IPv6 traffic, instead of the NICs
+                                specified in CONF.
+       -i, --virtio             Interpret PCI addresses as referring to
+                                virtio-net interfaces instead of
+                                auto-detecting the appropriate driver.
+       --xdp                    Use Linux interfaces via XDP.
+                                (Incompatible with --on-a-stick.)
+       -r SIZE, --ring-buffer-size SIZE
+                                Set NIC receive buffer size.  The
+                                default is driver-dependent.  See
+                                performance tuning documentation, for
+                                full details.
+       --real-time              Enable real-time SCHED_FIFO scheduler.
+       --mirror TAP             Copies matching packets to TAP
+                                interface.  Matching address set by
+                                "lwaftr monitor".
+       --ingress-drop-monitor=HANDLER
+                                When excessive packet loss is detected,
+                                respond according to HANDLER.  HANDLER
+                                can be one of "off" (to do nothing),
+                                "warn" (to print a warning), or "flush"
+                                (to warn and also cause Snabb to
+                                re-optimize itself).  The default is
+                                "flush".
 
 Optional arguments for debugging and profiling:
-       -jv, -jv=FILE            Print out when traces are recorded
-       -jp, -jp=MODE,FILE       Profile the system by method
-       -jtprof                  Profile the system by trace
+       -v                       Verbose (repeat for more verbosity).
+       --profile                Enable the low-overhead sampling
+                                profiler.
+       -t FILE, --trace FILE    Record a trace of any run-time "snabb
+                                config" commands to FILE.
+       -b FILENAME, --bench-file FILENAME
+                                Write any benchmarking data to FILENAME.
+       -D SECONDS               Stop after SECONDS, for debugging
+                                purposes.
+       -y, --hydra              Emit CSV data in the format expected
+                                by the automated Hydra benchmarks.
+       -h, --help               Show this help message.
 
-When the -v option is used at least once, packets on the network interfaces are
-counted and recorded, and the corresponding incoming and outgoing packet rates
-are written to stdout in CSV format, suitable for passing to a graphing program.
-If bench-file is set, output is written to a file instead of stdout.
-
-CPUSET is a list of CPU ranges.  For example "3-5,7-9", or "3,4,5,7,8,9"
-both allow the lwAFTR to run data planes on the given CPUs.
+When the -v option is used at least once, packets on the network
+interfaces are counted and recorded, and the corresponding incoming and
+outgoing packet rates are written to stdout in CSV format, suitable for
+passing to a graphing program.  If a --bench-file is set, output is
+written to a file instead of stdout.

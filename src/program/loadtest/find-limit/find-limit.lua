@@ -85,9 +85,9 @@ local function parse_args(args)
 
    if #args == 2 then
       args = {
-         args[1],
+         args[2],
          'NIC', 'NIC',
-         args[2]
+         args[1]
       }
    end
    if #args == 0 or #args % 4 ~= 0 then show_usage(1) end
@@ -152,6 +152,7 @@ function run(args)
          counters[stream.nic_tx_id] = {
             txpackets = counter.read(tx.stats.txpackets),
             txbytes = counter.read(tx.stats.txbytes),
+            txdrop = counter.read(tx.stats.txdrop) + tx_app:txdrop(),
             rxpackets = counter.read(rx.stats.txpackets),
             rxbytes = counter.read(rx.stats.txbytes),
             rxdrop = rx_app:rxdrop()
@@ -171,7 +172,9 @@ function run(args)
       local success = true
       for _, stream in ipairs(streams) do
          local diff = stats[stream.nic_tx_id]
-         success = (diff.rxpackets == diff.txpackets and diff.rxdrop == 0) and success
+         success = (diff.rxpackets >= diff.txpackets)
+            and diff.rxdrop == 0 and diff.txdrop == 0
+            and success
       end
       return success
    end
@@ -226,8 +229,8 @@ function run(args)
             s.tx_gbps = compute_bitrate(s.txpackets, s.txbytes, duration) / 1e9
             s.rx_mpps = s.rxpackets / duration / 1e6
             s.rx_gbps = compute_bitrate(s.rxpackets, s.rxbytes, duration) / 1e9
-            s.lost_packets = s.txpackets - s.rxpackets - s.rxdrop
-            s.lost_percent = s.lost_packets / s.txpackets * 100
+            s.lost_packets = (s.txpackets - s.rxpackets) - s.rxdrop
+            s.lost_percent = (s.txpackets - s.rxpackets) / s.txpackets * 100
             print(string.format('  %s:', stream.tx_name))
             print(string.format('    TX %d packets (%f MPPS), %d bytes (%f Gbps)',
                        s.txpackets, s.tx_mpps, s.txbytes, s.tx_gbps))

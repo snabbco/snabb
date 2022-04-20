@@ -28,7 +28,8 @@ Untagger = {
 VlanMux = {
    config = {
       encapsulation = default_encap,
-   }
+   },
+   push_link = {}
 }
 
 local tpids = { dot1q = 0x8100, dot1ad = 0x88A8 }
@@ -131,48 +132,57 @@ function VlanMux:new (conf)
    return new_aux(o, conf)
 end
 
-function VlanMux:link (mode, dir, name, l)
-   local vid
-   if string.match(name, "vlan%d+") then
-      vid = check_tag(tonumber(string.sub(name, 5)))
+function VlanMux:link (dir, name)
+   local vid = self:link_vid(dir, name)
+   if dir == 'output' and vid then
+      self.vlan_links[vid] = self[dir][name]
+   elseif dir == 'input' and vid then
+      local tag = build_tag(vid, self.tpid)
+      self.push_link[name] = self:make_push_from_vlan(tag)
    end
-   if dir == 'output' then
-      if name == 'native' then vid = 0 end
-      if vid then
-         if mode == 'unlink' then
-            self.vlan_links[vid] = nil
-         else
-            self.vlan_links[vid] = l
-         end
-         return
-      end
+end
+
+function VlanMux:unlink (dir, name)
+   local vid = self:link_vid(dir, name)
+   if dir == 'output' and vid then
+      self.vlan_links[vid] = nil
+   end
+end
+
+function VlanMux:link_vid (dir, name)
+   local vid = name:match("vlan(%d+)")
+   if vid then
+      return check_tag(tonumber(vid))
+   elseif name == 'native' then
+      return ({output=0, input=nil})[dir]
+   elseif name == 'trunk' then
+      return nil
    else
-      if mode == 'unlink' then return end
-      if vid then
-         return self.push_from_vlans, build_tag(vid, self.tpid)
-      end
-   end
-   if name ~= "trunk" and name ~= "native" then
       error("invalid link name "..name)
    end
 end
 
-function VlanMux:push_from_vlans (lin, tag)
+function VlanMux:make_push_from_vlan (tag)
+   return function (self, lin)
+      self:push_from_vlan(lin, tag)
+   end
+end
+
+function VlanMux:push_from_vlan (lin, tag)
    local otrunk = assert(self.output.trunk)
    for _ = 1, link.nreadable(lin) do
       self:transmit(otrunk, push_tag(receive(lin), tag))
    end
 end
 
-function VlanMux:push_native (lin)
+function VlanMux.push_link:native (lin)
    local otrunk = assert(self.output.trunk)
    for _ = 1, link.nreadable(lin) do
       self:transmit(otrunk, receive(lin))
    end
 end
 
--- Only called for input from "trunk"
-function VlanMux:push (itrunk)
+function VlanMux.push_link:trunk (itrunk)
    local links = self.vlan_links
    local tpid = self.tpid
    for _ = 1, link.nreadable(itrunk) do

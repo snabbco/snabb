@@ -378,7 +378,7 @@ function nd_light:push ()
    end
 end
 
-function nd_light:housekeeping ()
+function nd_light:tick ()
    if self._next_hop.nsent == 0 and self._eth_header == nil then
       -- Kick off address resolution
       self._next_hop.timer_cb()

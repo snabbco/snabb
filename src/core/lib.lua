@@ -71,8 +71,7 @@ function writefile (filename, value)
    local f = io.open(filename, "w")
    if f == nil then error("Unable to open file: " .. filename) end
    local result = f:write(value)
-   f:close()
-   return result
+   return f:close() and result
 end
 
 function readlink (path)
@@ -200,20 +199,23 @@ function hexdump(s)
    return string.format(frm, s:byte(1, #s))
 end
 
-function hexundump(h, n)
+function hexundump(h, n, error)
    local buf = ffi.new('char[?]', n)
    local i = 0
-   for b in h:gmatch('%x%x') do
+   for b in h:gmatch('%s*(%x%x)') do
       buf[i] = tonumber(b, 16)
       i = i+1
       if i >= n then break end
+   end
+   if error ~= false then
+      assert(i == n, error or "Wanted "..n.." bytes, but only got "..i)
    end
    return ffi.string(buf, n)
 end
 
 function comma_value(n) -- credit http://richard.warburton.it
    if type(n) == 'cdata' then
-      n = tonumber(n)
+      n = string.match(tostring(n), '^-?([0-9]+)U?LL$') or tonumber(n)
    end
    if n ~= n then return "NaN" end
    local left,num,right = string.match(n,'^([^%d]*%d)(%d*)(.-)$')
@@ -561,6 +563,17 @@ function set(...)
    local ret = {}
    for k, v in pairs({...}) do ret[v] = true end
    return ret
+end
+
+-- Check if 'name' is a kernel network interface.
+function is_iface (name)
+   local f = io.open('/proc/net/dev')
+   for line in f:lines() do
+      local iface = line:match("^%s*(%w+):")
+      if iface and iface == name then f:close() return true end
+   end
+   f:close()
+   return false
 end
 
 function selftest ()

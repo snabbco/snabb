@@ -2,7 +2,7 @@
 
 The lwAFTR's configuration is modelled by a
 [YANG](https://tools.ietf.org/html/rfc6020) schema,
-[snabb-softwire-v2](../../../lib/yang/snabb-softwire-v2.yang).
+[snabb-softwire-v3](../../../lib/yang/snabb-softwire-v3.yang).
 
 The lwAFTR takes its configuration from the user in the form of a text
 file.  That file's grammar is derived from the YANG schema; see the
@@ -11,7 +11,7 @@ Here's an example:
 
 ```
 softwire-config {
-  instances {
+  instance {
     device "00:05.0"
     queue {
       id 0;
@@ -120,11 +120,10 @@ softwire-config {
 The lwaftr will spawn a number of worker processes that perform packet
 forwarding.  Each `queue` statement in the configuration corresponds to
 one process servicing one RSS queue on one or two network devices.  For
-on-a-stick operation, only the `device` leaf that is part of the
-`instance` leaf will be specified.  For bump-in-the-wire operation, the
-`instance` device will handle IPv6 traffic, and the `device` specified
-in the `external-interface` that's part of the `queue` will handle IPv4
-traffic.
+on-a-stick operation, only the `device` leaf will be specified.
+For bump-in-the-wire operation, `device` will handle IPv6 traffic, and
+IPv4 traffic will be handled on the device specified in the
+`external-device` leaf.
 
 The `external-interface` define parameters around the IPv4 interface
 that communicates with the internet and the `internal-interface` section
@@ -151,7 +150,7 @@ the given *PID* to reload its configuration from the given file.
 ## In-depth configuration explanation
 
 See the embedded descriptions in the
-[snabb-softwire-v2](../../../lib/yang/snabb-softwire-v2.yang) schema
+[snabb-softwire-v3](../../../lib/yang/snabb-softwire-v3.yang) schema
 file.
 
 ## Binding tables
@@ -309,10 +308,10 @@ example, here's a bump-in-the-wire configuration with two RSS workers:
 ```
   instance {
     device 83:00.0;
+    external-device 83:00.1;
     queue {
       id 0;
       external-interface {
-        device 83:00.1;
         ip 10.10.10.10;
         mac 56:56:56:56:56:56;
         next-hop { mac 02:68:68:68:68:68; }
@@ -326,7 +325,6 @@ example, here's a bump-in-the-wire configuration with two RSS workers:
     queue {
       id 1;
       external-interface {
-        device 83:00.1;
         ip 10.10.10.10;
         mac 56:56:56:56:56:56;
         next-hop { mac 02:68:68:68:68:68; }
@@ -341,8 +339,7 @@ example, here's a bump-in-the-wire configuration with two RSS workers:
 ```
 
 These queues are configured on the `83:00.0` instance, and because the
-queues have a different device configured on the `external-interface`
-containers, that makes this configuration a bump-in-the-wire
+instance specifies an `external-device` this is a bump-in-the-wire
 configuration.  The two queues are identical with the exception of their
 `id` fields.  Incoming IPv6 traffic on `83:00.0` and IPv4 traffic on
 `83:00.1` will be evenly split between these two worker processes using
@@ -384,7 +381,7 @@ lwAFTR is addressable using the
 [`ietf-softwire-br`](../../../lib/yang/ietf-softwire-br.yang) YANG
 schema.  The lwAFTR also has a "native" schema that exposes more
 configuration information,
-[`snabb-softwire-v2`](../../../lib/yang/snabb-softwire-v2.yang).  Pass
+[`snabb-softwire-v3`](../../../lib/yang/snabb-softwire-v3.yang).  Pass
 the `-s` argument to the `snabb config` tools to specify a non-default
 YANG schema.
 
@@ -393,7 +390,7 @@ next-hop address of the external interface on lwaftr instance `lwaftr`'s
 queue `0` on device `83:00.0`:
 
 ```
-$ snabb config set -s snabb-softwire-v2 lwaftr \
+$ snabb config set -s snabb-softwire-v3 lwaftr \
     /softwire-config/instance[device=83:00.0]/queue[id=0]/external-interface/next-hop/mac \
     02:02:02:02:02:02
 ```
@@ -402,7 +399,7 @@ $ snabb config set -s snabb-softwire-v2 lwaftr \
 
 Firstly, we suggest getting a lwAFTR configuration working that runs on
 only one interface and one queue.  Once you have that working, do a
-`snabb config get -s snabb-softwire-v2 lwaftr /softwire-config/instance`
+`snabb config get -s snabb-softwire-v3 lwaftr /softwire-config/instance`
 to get the `instance` configuration for the `lwaftr` instance.  You'll
 get something like this:
 
@@ -421,7 +418,7 @@ So to add another device, you can just paste that into a file, change the
 devices, and then do:
 
 ```
-$ snabb config add -s snabb-softwire-v2 lwaftr \
+$ snabb config add -s snabb-softwire-v3 lwaftr \
     /softwire-config/instance < my-instance.file.conf
 ```
 
@@ -442,14 +439,14 @@ like you think they should be.
 To remove a queue, use `snabb config remove`:
 
 ```
-$ snabb config remove -s snabb-softwire-v2 lwaftr \
+$ snabb config remove -s snabb-softwire-v3 lwaftr \
     /softwire-config/instance[device=XX:XX.X]/queue[id=ID]
 ```
 
 Likewise you can remove instances this way:
 
 ```
-$ snabb config remove -s snabb-softwire-v2 lwaftr \
+$ snabb config remove -s snabb-softwire-v3 lwaftr \
     /softwire-config/instance[device=XX:XX.X]
 ```
 

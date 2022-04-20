@@ -3,6 +3,7 @@
 module(...,package.seeall)
 
 local numa = require('lib.numa')
+local S = require('syscall')
 
 local CPUSet = {}
 
@@ -18,6 +19,19 @@ do
    end
 end
 
+local function available_cpus (node)
+   local function subtract (s, t)
+      local ret = {}
+      for k,_ in pairs(s) do
+         if not t[k] then table.insert(ret, k) end
+      end
+      table.sort(ret)
+      return ret
+   end
+   -- XXX: Add sched_getaffinity cpus.
+   return subtract(numa.node_cpus(node), numa.isolated_cpus())
+end
+
 function CPUSet:bind_to_numa_node()
    local nodes = {}
    for node, _ in pairs(self.by_node) do table.insert(nodes, node) end
@@ -25,7 +39,10 @@ function CPUSet:bind_to_numa_node()
       print("No CPUs available; not binding to any NUMA node.")
    elseif #nodes == 1 then
       numa.bind_to_numa_node(nodes[1])
-      print("Bound main process to NUMA node: ", nodes[1])
+      local cpus = available_cpus(nodes[1])
+      assert(#cpus > 0, 'Not available CPUs')
+      numa.bind_to_cpu(cpus, 'skip-perf-checks')
+      print(("Bound main process to NUMA node: %s (CPU %s)"):format(nodes[1], cpus[1]))
    else
       print("CPUs available from multiple NUMA nodes: "..table.concat(nodes, ","))
       print("Not binding to any NUMA node.")
@@ -33,20 +50,8 @@ function CPUSet:bind_to_numa_node()
 end
 
 function CPUSet:add_from_string(cpus)
-   for range in cpus:split(',') do
-      local lo, hi = range:match("^%s*([^%-]*)%s*-%s*([^%-%s]*)%s*$")
-      if lo == nil then lo = range:match("^%s*([^%-]*)%s*$") end
-      assert(lo ~= nil, 'invalid range: '..range)
-      lo = assert(tonumber(lo), 'invalid range begin: '..lo)
-      assert(lo == math.floor(lo), 'invalid range begin: '..lo)
-      if hi ~= nil then
-         hi = assert(tonumber(hi), 'invalid range end: '..hi)
-         assert(hi == math.floor(hi), 'invalid range end: '..hi)
-         assert(lo < hi, 'invalid range: '..range)
-      else
-         hi = lo
-      end
-      for cpu=lo,hi do self:add(cpu) end
+   for cpu,_ in pairs(numa.parse_cpuset(cpus)) do
+      self:add(cpu)
    end
 end
 
@@ -86,12 +91,12 @@ function CPUSet:acquire(on_node)
       end
    end
    for node, cpus in pairs(self.by_node) do
-      print("Warning: All assignable CPUs in use; "
-               .."leaving data-plane process without assigned CPU.")
+      print(("Warning: All assignable CPUs in use; "..
+             "leaving data-plane PID %d without assigned CPU."):format(S.getpid()))
       return
    end
-   print("Warning: No assignable CPUs declared; "
-            .."leaving data-plane process without assigned CPU.")
+   print(("Warning: No assignable CPUs declared; "..
+         "leaving data-plane PID %d without assigned CPU."):format(S.getpid()))
 end
 
 function CPUSet:release(cpu)

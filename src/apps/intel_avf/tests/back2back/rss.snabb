@@ -1,0 +1,125 @@
+#!../../../../snabb snsh
+local vf0 = os.getenv("SNABB_AVF_PF0_VF0")
+local vf1 = os.getenv("SNABB_AVF_PF1_VF0") or os.getenv("SNABB_AVF_PF0_VF1")
+
+assert(vf0 ~= nil, "SNABB_AVF_PF0_VF0 is nil")
+assert(vf1 ~= nil, "SNABB_AVF_PF1_VF0 is nil")
+
+local src = os.getenv("SNABB_AVF_PF0_SRC0")
+local dst = os.getenv("SNABB_AVF_PF1_DST0") or os.getenv("SNABB_AVF_PF0_DST1")
+
+assert(src ~= nil, "SNABB_AVF_SRC0 is nil")
+assert(dst ~= nil, "SNABB_AVF_DST1 is nil")
+
+local basic = require("apps.basic.basic_apps")
+local intel_avf = require("apps.intel_avf.intel_avf")
+local synth = require("apps.test.synth")
+local counter = require("core.counter")
+
+-- Test RSS queues
+local nqueues = 4
+local c = config.new()
+local sizes = {64,128,192,256,384,512,1024,1500}
+local function random_v4_packets (conf)
+   local lib = require("core.lib")
+   local ethernet = require("lib.protocol.ethernet")
+   local ipv4 = require("lib.protocol.ipv4")
+   local eth = ethernet:new{src = ethernet:pton(conf.src),
+                            dst = ethernet:pton(conf.dst),
+                            type = 0x0800}
+   local packets = {}
+   for _, size in ipairs(conf.sizes) do
+      for _=1,10 do
+         local ip = ipv4:new{src=lib.random_bytes(4),
+                             dst=lib.random_bytes(4)}
+         ip:total_length(size - eth:sizeof())
+         local payload_length = ip:total_length() - ip:sizeof()
+         local p = packet.allocate()
+         packet.append(p, eth:header(), eth:sizeof())
+         packet.append(p, ip:header(), ip:sizeof())
+         packet.append(p, lib.random_bytes(payload_length), payload_length)
+         table.insert(packets, p)
+      end
+   end
+   return packets
+end
+
+config.app(c, "synth0", synth.Synth, {
+       packets = random_v4_packets{
+       	       sizes=sizes,
+       	       src=src,
+       	       dst=dst
+       }
+})
+config.app(c, "synth1", synth.Synth, {
+       packets = random_v4_packets{
+       	       sizes=sizes,
+       	       src=dst,
+       	       dst=src
+       }
+})
+config.app(c, "nic0", intel_avf.Intel_avf, { pciaddr = vf0, nqueues = nqueues })
+config.app(c, "nic1", intel_avf.Intel_avf, { pciaddr = vf1, nqueues = nqueues })
+config.app(c, "sink", basic.Sink)
+for qno=0, nqueues-1 do
+       config.app(c, "nic0_io"..qno, intel_avf.IO, {pciaddr = vf0, queue = qno})
+       config.link(c, "synth0.output"..qno.. " -> nic0_io"..qno..".input")
+       config.link(c, "nic0_io"..qno..".output -> sink.input_nic0_io"..qno)
+       config.app(c, "nic1_io"..qno, intel_avf.IO, {pciaddr = vf1, queue = qno})
+       config.link(c, "synth1.output"..qno.. " -> nic1_io"..qno..".input")
+       config.link(c, "nic1_io"..qno..".output -> sink.input_nic1_io"..qno)
+end
+engine.configure(c)
+engine.main({ duration = 1, no_report = true })
+engine.report_links()
+engine.report_apps()
+
+local received = {}
+for nic=0,1 do
+   for qno=0, nqueues-1 do
+     local output = engine.app_table["nic"..nic.."_io"..qno].output.output
+     received[#received+1] = tonumber(counter.read(output.stats.txpackets))
+   end
+end
+
+local function mean (values)
+   local sum = 0
+   for _, value in ipairs(values) do
+      sum = sum + value
+   end
+   return sum / #values
+end
+
+local function stdev (values)
+   local avg = mean(values)
+   local var = {}
+   for _, value in ipairs(values) do
+      var[#var+1] = (value-avg)^2
+   end
+   return math.sqrt(mean(var))
+end
+
+local rx_mean, rx_sd = mean(received), stdev(received)
+print("RX AVG", rx_mean, "SD", rx_sd)
+assert(rx_sd/rx_mean <= 0.1, "SD exceeds 10% of mean (queues should receive roughly equal numbers of packets)")
+
+-- Exercise VLANs
+
+config.app(c, "nic0", intel_avf.Intel_avf, { pciaddr = vf0, nqueues = nqueues, vlan = 42 })
+config.app(c, "nic1", intel_avf.Intel_avf, { pciaddr = vf1, nqueues = nqueues, vlan = 42 })
+engine.configure(c)
+engine.main({ duration = 1, no_report = true })
+engine.report_links()
+engine.report_apps()
+
+local received = {}
+for nic=0,1 do
+   for qno=0, nqueues-1 do
+     local output = engine.app_table["nic"..nic.."_io"..qno].output.output
+     received[#received+1] = tonumber(counter.read(output.stats.txpackets))
+   end
+end
+
+local rx_mean, rx_sd = mean(received), stdev(received)
+print("RX AVG", rx_mean, "SD", rx_sd)
+assert(rx_sd/rx_mean <= 0.1, "SD exceeds 10% of mean (queues should receive roughly equal numbers of packets)")

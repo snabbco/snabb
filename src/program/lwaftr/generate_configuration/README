@@ -1,0 +1,47 @@
+Usage:
+
+snabb lwaftr generate-configuration <ipv4> <num_ipv4s> <br_address> <b4> <psid_len> <shift>
+    --output <filename>: Write down binding table to file.
+
+Arguments:
+
+   --output <filename>     Output filename (snabb-softwire-v3 configuration file).
+
+Examples:
+
+- 10 public IPv4 address starting from 193.5.1.00.
+  Total subscribers: 630 (10 * (2^6 - 1)):
+
+  snabb lwaftr generate-configuration --output lwaftr.conf \
+     193.5.1.100 10 fc00::100 fc00:1:2:3:4:5:0:7e 6
+
+- 1 million subscribers:
+
+  snabb lwaftr generate-configuration --output lwaftr.conf \
+    193.5.1.100 15874 fc00::100 fc00:1:2:3:4:5:0:7e 6
+
+
+When the output file is a configuration file, it contains predefined values
+for "external-interface", "internal-interface" and "instance" containers which
+will be needed to change:
+
+   instance {
+       device test;
+       queue {
+           id 1;
+           external-interface {
+               ip 10.0.1.1;
+               mac 02:aa:aa:aa:aa:aa;
+               next-hop {
+                   mac 02:99:99:99:99:99;
+               }
+           }
+           internal-interface {
+               ip fc00::100;
+               mac 02:aa:aa:aa:aa:aa;
+               next-hop {
+                   mac 02:99:99:99:99:99;
+               }
+           }
+       }
+   }

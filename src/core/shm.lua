@@ -63,8 +63,7 @@ end
 
 function alias (name, target)
    mkdir(lib.dirname(resolve(name)))
-   assert(S.symlink(root.."/"..resolve(target), root.."/"..resolve(name)),
-          "shm alias failed")
+   assert(S.symlink(root.."/"..resolve(target), root.."/"..resolve(name)))
 end
 
 function resolve (name)
@@ -72,6 +71,10 @@ function resolve (name)
    local result = p
    if q ~= '/' then result = tostring(S.getpid()).."/"..result end
    return result
+end
+
+function path (name)
+   return root..'/'..resolve(name)
 end
 
 -- Make the named subdirectory in the shm folder.

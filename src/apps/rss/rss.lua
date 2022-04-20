@@ -36,7 +36,8 @@ rss = {
    shm = {
       rxpackets = { counter, 0},
       rxdrops_filter = { counter, 0}
-   }
+   },
+   push_link = {}
 }
 local class_config = {
    name = { required = true },
@@ -240,16 +241,16 @@ local function insert_unique(t, new_elt)
    table.insert(t, new_elt)
 end
 
-function rss:link (mode, direction, name, link)
-   if mode == 'unlink' then return end
-
+function rss:link (direction, name)
    if direction == 'input' then
       local vlan = name:match("^vlan(%d+)$")
       if vlan then
          vlan = tonumber(vlan)
          assert(vlan > 0 and vlan < 4095, "Illegal VLAN id: "..vlan)
       end
-      return self.push_with_vlan, vlan
+      self.push_link[name] = function (self, input)
+         self:push_with_vlan(input, vlan)
+      end
    else
       local match = false
       for _, class in ipairs(self.classes) do
@@ -258,7 +259,7 @@ function rss:link (mode, direction, name, link)
             match = true
             local weight = instance:match("^%w+_(%d+)$") or 1
             for _ = 1, weight do
-               table.insert(class.output, link)
+               table.insert(class.output, self.output[name])
             end
             -- Avoid calls to lj_tab_len() in distribute()
             class.output.n = #class.output
@@ -272,6 +273,14 @@ function rss:link (mode, direction, name, link)
       if not match then
          print("Ignoring link (does not match any filters): "..name)
       end
+   end
+end
+
+function rss:unlink (direction, name)
+   if direction == 'input' then
+      self.push_link[name] = nil
+   else
+      -- XXX - undo 'output' case in link()?
    end
 end
 
@@ -419,7 +428,7 @@ function rss:push_with_vlan(link, vlan)
    end
 end
 
-function rss:housekeeping()
+function rss:tick()
    if self.sync_timer() then
       counter.set(self.shm.rxpackets, self.rxpackets)
       counter.set(self.shm.rxdrops_filter, self.rxdrops_filter)

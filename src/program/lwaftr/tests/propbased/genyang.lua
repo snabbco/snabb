@@ -12,7 +12,7 @@ local util      = require("lib.yang.util")
 local capabilities = {['ietf-softwire-br']={feature={'binding'}},}
 require('lib.yang.schema').set_default_capabilities(capabilities)
 
-local schemas = { "ietf-softwire-br", "snabb-softwire-v2" }
+local schemas = { "ietf-softwire-br", "snabb-softwire-v3" }
 
 -- choose an element of an array randomly
 local function choose(choices)
@@ -385,7 +385,7 @@ local function path_generator_from_grammar(production, generate_invalid)
       table.sort(members)
       return function ()
          local head = keyword or ''
-         if math.random() < 0.1 then return head end
+         if #members == 0 or math.random() < 0.1 then return head end
          if head ~= '' then head = head..'/' end
          local k = choose(members)
          return head..gen_tail[k]()
@@ -501,7 +501,7 @@ end
 
 function selftest()
    print('selftest: program.lwaftr.tests.propbased.genyang')
-   local schema = schema.load_schema_by_name("snabb-softwire-v2")
+   local schema = schema.load_schema_by_name("snabb-softwire-v3")
    local grammar = data.config_grammar_from_schema(schema)
 
    for i=1,1000 do generate_xpath_and_val(schema, true) end

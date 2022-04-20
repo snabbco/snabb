@@ -766,7 +766,13 @@ function IPFIX:add_transport_headers (pkt)
    return packet.prepend(pkt, headers.pkt.data, headers.pkt.length)
 end
 
-function IPFIX:push(input)
+function IPFIX:push ()
+   for _, input in ipairs(self.input) do
+      self:push1(input)
+   end
+end
+
+function IPFIX:push1(input)
    -- FIXME: Use engine.now() for monotonic time.  Have to check that
    -- engine.now() gives values relative to the UNIX epoch though.
    local timestamp = ffi.C.get_unix_time()
@@ -805,7 +811,7 @@ function IPFIX:push(input)
 
 end
 
-function IPFIX:housekeeping()
+function IPFIX:tick()
    local timestamp = ffi.C.get_unix_time()
    assert(self.output.output, "missing output link")
    local output = self.output.output

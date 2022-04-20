@@ -2,6 +2,7 @@
 -- COPYING.
 module(..., package.seeall)
 
+local mem = require("lib.stream.mem")
 local parser_mod = require("lib.yang.parser")
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
@@ -9,10 +10,12 @@ local value = require("lib.yang.value")
 local ffi = require("ffi")
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
+local lib = require('core.lib')
 local regexp = require("lib.xsd_regexp")
+local lib = require("core.lib")
 
 function normalize_id(id)
-   return id:gsub('[^%w_]', '_')
+   return (id:gsub('[^%w_]', '_'))
 end
 
 -- Helper for parsing C type declarations.
@@ -109,18 +112,30 @@ function typeof(name)
    return type_cache[name]
 end
 
--- If a "list" node has one key that is string-valued, we will represent
--- instances of that node as normal Lua tables where the key is the
--- table key and the value does not contain the key.
-local function table_string_key(keys)
-   local string_key = nil
-   for k,v in pairs(keys) do
-      if v.type ~= 'scalar' then return nil end
-      if v.argument_type.primitive_type ~= 'string' then return nil end
-      if string_key ~= nil then return nil end
-      string_key = k
+-- If a "list" node has a single key that is string-valued or representable as
+-- a Lua number, we will represent instances of that node as normal Lua tables
+-- where the key is the table key and the value does not contain the key.
+local function table_native_key(keys)
+   local native_number_types =
+      lib.set('int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32')
+   local function representable_as_native(v)
+      return v.type == 'scalar' and
+             (v.argument_type.primitive_type == 'string' or
+              native_number_types[v.argument_type.primitive_type])
    end
-   return string_key
+   local native_key = nil
+   for k,v in pairs(keys) do
+      if native_key ~= nil then
+         -- Bail out if the list has multiple keys, native or otherwise.
+         return nil
+      elseif representable_as_native(v) then
+         -- Select the first native key, if any.
+         native_key = k
+      else
+         return nil
+      end
+   end
+   return native_key
 end
 
 -- We need to properly support unions.  It's a big FIXME!  As an
@@ -182,8 +197,12 @@ function data_grammar_from_schema(schema, is_config)
    function handlers.choice(node)
       local choices = {}
       for choice, n in pairs(node.body) do
-         local members = visit_body(n)
-         if not is_empty(members) then choices[choice] = members end
+         if n.kind == 'case' then
+            local members = visit_body(n)
+            if not is_empty(members) then choices[choice] = members end
+         else
+            choices[choice] = { [choice] = visit(n) }
+         end
       end
       if is_empty(choices) then return end
       return {type="choice", default=node.default, mandatory=node.mandatory,
@@ -192,7 +211,8 @@ function data_grammar_from_schema(schema, is_config)
    handlers['leaf-list'] = function(node)
       if node.config ~= is_config then return end
       local t = elide_unions(node.type)
-      return {type='array', element_type=t, ctype=value_ctype(t)}
+      return {type='array', element_type=t, ctype=value_ctype(t),
+              min_elements=node.min_elements, max_elements=node.max_elements}
    end
    function handlers.list(node)
       local norm = {}
@@ -219,9 +239,11 @@ function data_grammar_from_schema(schema, is_config)
       end
       if is_empty(values) and node.config ~= is_config then return end
       return {type='table', keys=keys, values=values,
-              string_key=table_string_key(keys),
+              native_key=table_native_key(keys),
               key_ctype=struct_ctype(keys),
-              value_ctype=struct_ctype(values)}
+              value_ctype=struct_ctype(values),
+              unique = node.unique,
+              min_elements=node.min_elements, max_elements=node.max_elements}
    end
    function handlers.leaf(node, for_key)
       if node.config ~= is_config and not for_key then return end
@@ -230,7 +252,7 @@ function data_grammar_from_schema(schema, is_config)
       if node.default or node.mandatory then ctype=value_ctype(t) end
       return {type='scalar', argument_type=t,
               default=node.default, mandatory=node.mandatory,
-              ctype=ctype}
+              is_unique = node.is_unique, ctype=ctype}
    end
    local members = visit_body(schema)
    return {type="struct", members=members, ctype=struct_ctype(members)}
@@ -270,12 +292,6 @@ end
 
 function rpc_output_grammar_from_schema(schema)
    return rpc_grammar_from_schema(schema).output
-end
-
-local function integer_type(min, max)
-   return function(str, k)
-      return util.tointeger(str, k, min, max)
-   end
 end
 
 local function range_predicate(range, val)
@@ -372,10 +388,9 @@ end
 local function struct_parser(keyword, members, ctype)
    local keys = {}
    for k,v in pairs(members) do table.insert(keys, k) end
-   local function init() return nil end
-   local function parse1(P)
-      local ret = {}
-      local expanded_members = {}
+   local ret, expanded_members
+   local function init()
+      ret, expanded_members = {}, {}
       for _,k in ipairs(keys) do
          if members[k].represents then
             -- Choice fields don't include the name of the choice block in the data. They
@@ -391,6 +406,8 @@ local function struct_parser(keyword, members, ctype)
             expanded_members[k] = members[k]
          end
       end
+   end
+   local function parse1(P)
       P:skip_whitespace()
       P:consume("{")
       P:skip_whitespace()
@@ -400,14 +417,11 @@ local function struct_parser(keyword, members, ctype)
          -- Scalar/array parser responsible for requiring whitespace
          -- after keyword.  Struct/table don't need it as they have
          -- braces.
-         local sub = assert(expanded_members[k], 'unrecognized parameter: '..k)
+         local sub = expanded_members[k]
+         if not sub then P:error('unrecognized parameter: '..k) end
          local id = normalize_id(k)
          ret[id] = sub.parse(P, ret[id], k)
          P:skip_whitespace()
-      end
-      for k,_ in pairs(expanded_members) do
-         local id = normalize_id(k)
-         ret[id] = expanded_members[k].finish(ret[id], k)
       end
       return ret
    end
@@ -417,12 +431,14 @@ local function struct_parser(keyword, members, ctype)
    end
    local struct_t = ctype and typeof(ctype)
    local function finish(out, leaf)
+      for k,_ in pairs(expanded_members) do
+         out = out or {}
+         local id = normalize_id(k)
+         out[id] = expanded_members[k].finish(out[id], k)
+      end
      -- FIXME check mandatory values.
       if struct_t then
-        local ret
-        if out == nil then ret = struct_t()
-        else ret = struct_t(out) end
-        return ret
+        return struct_t(out)
       else
         return out
       end
@@ -498,6 +514,9 @@ function choice_parser(keyword, choices, members, default, mandatory)
       -- using different leaves from different case statements.
       local chosen
 
+      -- keep track of initialzed members
+      local inits = {}
+
       local function init() return {} end
       local function parse(P, out, k)
          if chosen and choice_map[k] ~= chosen then
@@ -505,12 +524,13 @@ function choice_parser(keyword, choices, members, default, mandatory)
          else
             chosen = choice_map[k]
          end
-         return members[chosen][k].parse(P, members[chosen][k].init(), k)
+         inits[k] = inits[k] or members[chosen][k].init()
+         return members[chosen][k].parse(P, inits[k], k)
       end
 
       -- This holds a copy of all the nodes so we know when we've hit the last one.
       local function finish(out, k)
-         if out ~= nil then return out end
+         if out ~= nil then return members[chosen][k].finish(out) end
          if mandatory and chosen == nil then error("missing choice value: "..keyword) end
          if default and default == choice_map[k] then
             return members[default][k].finish()
@@ -541,13 +561,13 @@ local function ctable_builder(key_t, value_t)
    return builder
 end
 
-local function string_keyed_table_builder(string_key)
+local function native_keyed_table_builder(native_key)
    local res = {}
    local builder = {}
    function builder:add(key, value)
-      local str = assert(key[string_key])
-      assert(res[str] == nil, 'duplicate key: '..str)
-      res[str] = value
+      local k = assert(key[native_key])
+      assert(res[k] == nil, 'duplicate key: '..k)
+      res[k] = value
    end
    function builder:finish() return res end
    return builder
@@ -572,7 +592,7 @@ local function ltable_builder()
    return builder
 end
 
-local function table_parser(keyword, keys, values, string_key, key_ctype,
+local function table_parser(keyword, keys, values, native_key, key_ctype,
                             value_ctype)
    local members = {}
    for k,v in pairs(keys) do members[k] = v end
@@ -583,8 +603,8 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
    local init
    if key_t and value_t then
       function init() return ctable_builder(key_t, value_t) end
-   elseif string_key then
-      function init() return string_keyed_table_builder(string_key) end
+   elseif native_key then
+      function init() return native_keyed_table_builder(native_key) end
    elseif key_t then
       function init() return cltable_builder(key_t) end
    else
@@ -612,7 +632,9 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
       return assoc
    end
    local function finish(assoc)
-      return assoc:finish()
+      if assoc then
+         return assoc:finish()
+      end
    end
    return {init=init, parse=parse, finish=finish}
 end
@@ -638,7 +660,7 @@ function data_parser_from_grammar(production)
    end
    function handlers.table(keyword, production)
       local keys, values = visitn(production.keys), visitn(production.values)
-      return table_parser(keyword, keys, values, production.string_key,
+      return table_parser(keyword, keys, values, production.native_key,
                           production.key_ctype, production.value_ctype)
    end
    function handlers.scalar(keyword, production)
@@ -656,37 +678,56 @@ function data_parser_from_grammar(production)
    function top_parsers.struct(production)
       local struct_t = production.ctype and typeof(production.ctype)
       local members = visitn(production.members)
-      return function(str, filename)
-         local P = parser_mod.Parser.new(str, filename)
+      local keys = {}
+      for k,v in pairs(members) do table.insert(keys, k) end
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
          local ret = {}
-         for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
+         local expanded_members = {}
+         for _,k in ipairs(keys) do
+            if members[k].represents then
+               -- Choice fields don't include the name of the choice block in the data. They
+               -- need to be able to provide the parser for the leaves it represents.
+               local member_parser = members[k].stateful_parser()
+               for _, node in pairs(members[k].represents()) do
+                  -- Choice fields need to keep state around as they're called multiple times
+                  -- and need to do some validation to comply with spec.
+                  expanded_members[node] = member_parser
+               end
+            else
+               ret[normalize_id(k)] = members[k].init()
+               expanded_members[k] = members[k]
+            end
+         end
          while true do
             P:skip_whitespace()
             if P:is_eof() then break end
             local k = P:parse_identifier()
             if k == '' then P:error("Expected a keyword") end
-            local sub = assert(members[k], 'unrecognized parameter: '..k)
+            local sub = expanded_members[k]
+            if not sub then P:error('unrecognized parameter: '..k) end
             local id = normalize_id(k)
             ret[id] = sub.parse(P, ret[id], k)
          end
-         for k,sub in pairs(members) do
+         for k,sub in pairs(expanded_members) do
             local id = normalize_id(k)
-            ret[id] = sub.finish(ret[id])
+            ret[id] = sub.finish(ret[id], k)
          end
          if struct_t then return struct_t(ret) else return ret end
       end
    end
    function top_parsers.sequence(production)
       local members = visitn(production.members)
-      return function(str, filename)
-         local P = parser_mod.Parser.new(str, filename)
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
          local ret = {}
          while true do
             P:skip_whitespace()
             if P:is_eof() then break end
             local k = P:parse_identifier()
             P:consume_whitespace()
-            local sub = assert(members[k], 'unrecognized rpc: '..k)
+            local sub = assert(members[k])
+            if not sub then P:error('unrecognized rpc: '..k) end
             local data = sub.finish(sub.parse(P, sub.init(), k))
             table.insert(ret, {id=k, data=data})
          end
@@ -695,8 +736,8 @@ function data_parser_from_grammar(production)
    end
    function top_parsers.array(production)
       local parser = visit1('[bare array]', production)
-      return function(str, filename)
-         local P = parser_mod.Parser.new(str, filename)
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
          local out = parser.init()
          while true do
             P:skip_whitespace()
@@ -708,8 +749,8 @@ function data_parser_from_grammar(production)
    end
    function top_parsers.table(production)
       local parser = visit1('[bare table]', production)
-      return function(str, filename)
-         local P = parser_mod.Parser.new(str, filename)
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
          local out = parser.init()
          while true do
             P:skip_whitespace()
@@ -721,10 +762,14 @@ function data_parser_from_grammar(production)
    end
    function top_parsers.scalar(production)
       local parse = value_parser(production.argument_type)
-      return function(str, filename)
-         return parse(parser_mod.parse_string(str, filename),
-                      '[bare scalar]',
-                      default_parser)
+
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
+         P:skip_whitespace()
+         local str = P:parse_string()
+         P:skip_whitespace()
+         if not P:is_eof() then P:error("Not end of file") end
+         return parse(str, '[bare scalar]', default_parser)
       end
    end
    return assert(top_parsers[production.type])(production)
@@ -744,29 +789,29 @@ function state_parser_from_schema(schema)
    return data_parser_from_schema(schema, false)
 end
 
-function load_data_for_schema(schema, str, filename, is_config)
-   return data_parser_from_schema(schema, is_config)(str, filename)
+function load_data_for_schema(schema, stream, is_config)
+   return data_parser_from_schema(schema, is_config)(stream)
 end
 
-function load_config_for_schema(schema, str, filename)
-   return load_data_for_schema(schema, str, filename, true)
+function load_config_for_schema(schema, stream)
+   return load_data_for_schema(schema, stream, true)
 end
 
-function load_state_for_schema(schema, str, filename)
-   return load_data_for_schema(schema, str, filename, false)
+function load_state_for_schema(schema, stream)
+   return load_data_for_schema(schema, stream, false)
 end
 
-function load_data_for_schema_by_name(schema_name, str, filename, is_config)
+function load_data_for_schema_by_name(schema_name, stream, is_config)
    local schema = schema.load_schema_by_name(schema_name)
-   return load_data_for_schema(schema, str, filename, is_config)
+   return load_data_for_schema(schema, stream, is_config)
 end
 
-function load_config_for_schema_by_name(schema_name, str, filename)
-   return load_data_for_schema_by_name(schema_name, str, filename, true)
+function load_config_for_schema_by_name(schema_name, stream)
+   return load_data_for_schema_by_name(schema_name, stream, true)
 end
 
-function load_state_for_schema_by_name(schema_name, str, filename)
-   return load_data_for_schema_by_name(schema_name, str, filename, false)
+function load_state_for_schema_by_name(schema_name, stream)
+   return load_data_for_schema_by_name(schema_name, stream, false)
 end
 
 function rpc_input_parser_from_schema(schema)
@@ -811,6 +856,7 @@ local function print_yang_string(str, file)
 end
 
 function xpath_printer_from_grammar(production, print_default, root)
+   if not root then root = '' end
    if #root == 1 and root:sub(1, 1) == '/' then
       root = ''
    end
@@ -825,7 +871,7 @@ function xpath_printer_from_grammar(production, print_default, root)
       print_yang_string(k, file)
       file:write(' ')
    end
-   local function body_printer(productions, order)
+   local function body_printer(productions)
       -- Iterate over productions trying to translate to other statements. This
       -- is used for example in choice statements raising the lower statements
       -- in case blocks up to the level of the choice, in place of the choice.
@@ -840,11 +886,9 @@ function xpath_printer_from_grammar(production, print_default, root)
          end
       end
       productions = translated
-      if not order then
-         order = {}
-         for k,_ in pairs(productions) do table.insert(order, k) end
-         table.sort(order)
-      end
+      local order = {}
+      for k,_ in pairs(productions) do table.insert(order, k) end
+      table.sort(order)
       local printers = {}
       for keyword,production in pairs(productions) do
          local printer = printer(keyword, production, printers)
@@ -859,8 +903,8 @@ function xpath_printer_from_grammar(production, print_default, root)
          end
       end
    end
-   local function key_composer (productions, order)
-      local printer = body_printer(productions, order)
+   local function key_composer (productions)
+      local printer = body_printer(productions)
       local file = {t={}}
       function file:write (str)
          str = str:match("([^%s]+)")
@@ -913,13 +957,8 @@ function xpath_printer_from_grammar(production, print_default, root)
    -- As a special case, the table handler allows the keyword to be nil,
    -- for printing tables at the top level without keywords.
    function handlers.table(keyword, production)
-      local key_order, value_order = {}, {}
-      for k,_ in pairs(production.keys) do table.insert(key_order, k) end
-      for k,_ in pairs(production.values) do table.insert(value_order, k) end
-      table.sort(key_order)
-      table.sort(value_order)
-      local compose_key = key_composer(production.keys, key_order)
-      local print_value = body_printer(production.values, value_order)
+      local compose_key = key_composer(production.keys)
+      local print_value = body_printer(production.values)
       if production.key_ctype and production.value_ctype then
          return function(data, file, path)
             path = path or ''
@@ -929,8 +968,8 @@ function xpath_printer_from_grammar(production, print_default, root)
                print_value(entry.value, file, path)
             end
          end
-      elseif production.string_key then
-         local id = normalize_id(production.string_key)
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
          return function(data, file, path)
             path = path or ''
             for key, value in pairs(data) do
@@ -1031,18 +1070,51 @@ function xpath_printer_from_grammar(production, print_default, root)
 end
 xpath_printer_from_grammar = util.memoize(xpath_printer_from_grammar)
 
-function data_printer_from_grammar(production, print_default)
+function influxdb_printer_from_grammar(production, print_default, root)
+   if not root then root = '' end
+   if root and #root == 1 and root:sub(1, 1) == '/' then
+      root = ''
+   end
    local handlers = {}
    local translators = {}
    local function printer(keyword, production, printers)
       return assert(handlers[production.type])(keyword, production, printers)
    end
-   local function print_keyword(k, file, indent)
-      file:write(indent)
-      print_yang_string(k, file)
-      file:write(' ')
+   local function escape_double_quotes (value)
+      assert(type(value) == 'string')
+      return value:gsub('"', '\\"')
    end
-   local function body_printer(productions, order)
+   local integers = lib.set('int8','int16','int32','int64',
+                            'uint8','uint16','uint32','uint64')
+   local function escape_value (primitive_type, val)
+      if integers[primitive_type] then
+         return tostring(val).."i"
+      elseif primitive_type == 'decimal64' then
+         return tostring(val)
+      elseif primitive_type == 'string' then
+         return '"'..escape_double_quotes(val)..'"'
+      elseif primitive_type == 'boolean' then
+         return val and 'true' or 'false'
+      else
+         return val
+      end
+   end
+   local function print_entry (file, entry)
+      local path, keyword = entry.path, entry.keyword
+      local value = entry.value
+      if not file.is_tag then value = escape_value(entry.primitive_type, value) end
+      if entry.is_unique then
+         file:write(keyword)
+      else
+         path = path..keyword
+         if not file.is_tag then path = '/'..path end
+         file:write(path)
+      end
+      if entry.tags then file:write(','..entry.tags) end
+      file:write(file.is_tag and value or ' value='..value)
+      file:write('\n')
+   end
+   local function body_printer(productions)
       -- Iterate over productions trying to translate to other statements. This
       -- is used for example in choice statements raising the lower statements
       -- in case blocks up to the level of the choice, in place of the choice.
@@ -1057,11 +1129,243 @@ function data_printer_from_grammar(production, print_default)
          end
       end
       productions = translated
-      if not order then
-         order = {}
-         for k,_ in pairs(productions) do table.insert(order, k) end
-         table.sort(order)
+      local order = {}
+      for k,_ in pairs(productions) do table.insert(order, k) end
+      table.sort(order)
+      local printers = {}
+      for keyword,production in pairs(productions) do
+         local printer = printer(keyword, production, printers)
+         if printer ~= nil then
+            printers[keyword] = printer
+         end
       end
+      return function(data, file, path, tags)
+         for _,k in ipairs(order) do
+            local v = data[normalize_id(k)]
+            if v ~= nil then printers[k](v, file, path, tags) end
+         end
+      end
+   end
+   local function escape_tag (tag)
+      return tag:gsub('=', '\\=')
+                :gsub(',', '\\,')
+                :gsub(' ', '\\ ')
+   end
+   local function key_composer (productions)
+      local printer = body_printer(productions)
+      local file = {t={}, is_tag=true}
+      function file:write (str)
+         str = str:match("([^%s]+)")
+         if str and #str > 0 and str ~= ";" and str ~= root..'/' then
+            table.insert(self.t, str)
+         end
+      end
+      function file:flush ()
+         local ret = {}
+         for i=1,#self.t,2 do
+            local key, value = self.t[i], self.t[i+1]
+            if key and value then
+               table.insert(ret, escape_tag(key).."="..escape_tag(value))
+            end
+         end
+         self.t = {}
+         return #ret > 0 and table.concat(ret, ',')
+      end
+      return function (data, path, tags)
+         path = path or ''
+         printer(data, file, path, tags)
+         return file:flush()
+      end
+   end
+   function translators.choice(keyword, production)
+      local rtn = {}
+      for case, body in pairs(production.choices) do
+         for name, statement in pairs(body) do
+            rtn[name] = statement
+         end
+      end
+      return rtn
+   end
+   function handlers.struct(keyword, production)
+      local print_body = body_printer(production.members)
+      return function(data, file, path, tags)
+         print_body(data, file, path..keyword..'/', tags)
+      end
+   end
+   function handlers.array(keyword, production)
+      local serialize = value_serializer(production.element_type)
+      return function(data, file, path, tags)
+         local count = 1
+         for _,v in ipairs(data) do
+            local tag, value = '%position='..count, serialize(v)
+            local tags = tags and tags..','..tag or tag
+            print_entry(file, {keyword=keyword, tags=tags, value=value,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=production.primitive_type})
+            count = count + 1
+         end
+      end
+   end
+   local function is_key_unique (node)
+      if not node.keys then return true end
+      for k,v in pairs(node.keys) do
+         if not v.is_unique then return false end
+      end
+      return true
+   end
+   -- As a special case, the table handler allows the keyword to be nil,
+   -- for printing tables at the top level without keywords.
+   function handlers.table(keyword, production)
+      local is_key_unique = is_key_unique(production)
+      local compose_key = key_composer(production.keys)
+      local print_value = body_printer(production.values)
+      if production.key_ctype and production.value_ctype then
+         return function(data, file, path)
+            path = path or ''
+            for entry in data:iterate() do
+               local key = compose_key(entry.key)
+               local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
+               print_value(entry.value, file, path, key)
+            end
+         end
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
+         return function(data, file, path)
+            path = path or ''
+            for key, value in pairs(data) do
+               local key = compose_key({[id]=key})
+               local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
+               print_value(value, file, path, key)
+            end
+         end
+      elseif production.key_ctype then
+         return function(data, file, path)
+            path = path or ''
+            for key, value in cltable.pairs(data) do
+               local key = compose_key(key)
+               local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
+               print_value(value, file, path, key)
+            end
+         end
+      else
+         return function(data, file, path)
+            path = path or ''
+            for key, value in pairs(data) do
+               local key = compose_key(key)
+               local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
+               print_value(value, file, path, key)
+            end
+         end
+      end
+   end
+   function handlers.scalar(keyword, production)
+      local primitive_type = production.argument_type.primitive_type
+      local serialize = value_serializer(production.argument_type)
+      return function(data, file, path, tags)
+         local str = serialize(data)
+         if print_default or str ~= production.default then
+            print_entry(file, {keyword=keyword, tags=tags, value=str,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=primitive_type})
+         end
+      end
+   end
+
+   local top_printers = {}
+   function top_printers.struct(production)
+      local printer = body_printer(production.members)
+      return function(data, file)
+         printer(data, file, '')
+         return file:flush()
+      end
+   end
+   function top_printers.sequence(production)
+      local printers = {}
+      for k,v in pairs(production.members) do
+         printers[k] = printer(k, v)
+      end
+      return function(data, file)
+         for _,elt in ipairs(data) do
+            local id = assert(elt.id)
+            assert(printers[id])(elt.data, file, '')
+         end
+         return file:flush()
+      end
+   end
+   function top_printers.table(production)
+      local printer = handlers.table(nil, production)
+      return function(data, file)
+         printer(data, file, '')
+         return file:flush()
+      end
+   end
+   function top_printers.array(production)
+      local primitive_type = production.argument_type.primitive_type
+      local serialize = value_serializer(production.element_type)
+      return function(data, file, path, tags)
+         local count = 1
+         for _,v in ipairs(data) do
+            local tag, value = '%position='..count, serialize(v)
+            local tags = tags and tags..','..tag or tag
+            print_entry(file, {keyword=keyword, tags=tags, value=value,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=production.primitive_type})
+            count = count + 1
+         end
+         return file:flush()
+      end
+   end
+   function top_printers.scalar(production)
+      local primitive_type = production.argument_type.primitive_type
+      local serialize = value_serializer(production.argument_type)
+      return function(data, file, path, tags)
+         local str = serialize(data)
+         if print_default or str ~= production.default then
+            print_entry(file, {keyword=root, tags=tags, value=str,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=primitive_type})
+            return file:flush()
+         end
+      end
+   end
+
+   return assert(top_printers[production.type])(production)
+end
+influxdb_printer_from_grammar = util.memoize(influxdb_printer_from_grammar)
+
+function data_printer_from_grammar(production, print_default)
+   local handlers = {}
+   local translators = {}
+   local function printer(keyword, production, printers)
+      return assert(handlers[production.type])(keyword, production, printers)
+   end
+   local function print_keyword(k, file, indent)
+      file:write(indent)
+      print_yang_string(k, file)
+      file:write(' ')
+   end
+   local function body_printer(productions)
+      -- Iterate over productions trying to translate to other statements. This
+      -- is used for example in choice statements raising the lower statements
+      -- in case blocks up to the level of the choice, in place of the choice.
+      local translated = {}
+      for keyword,production in pairs(productions) do
+         local translator = translators[production.type]
+         if translator ~= nil then
+            local statements = translator(keyword, production)
+            for k,v in pairs(statements) do translated[k] = v end
+         else
+            translated[keyword] = production
+         end
+      end
+      productions = translated
+      local order = {}
+      for k,_ in pairs(productions) do table.insert(order, k) end
+      table.sort(order)
       local printers = {}
       for keyword,production in pairs(productions) do
          local printer = printer(keyword, production, printers)
@@ -1107,13 +1411,8 @@ function data_printer_from_grammar(production, print_default)
    -- As a special case, the table handler allows the keyword to be nil,
    -- for printing tables at the top level without keywords.
    function handlers.table(keyword, production)
-      local key_order, value_order = {}, {}
-      for k,_ in pairs(production.keys) do table.insert(key_order, k) end
-      for k,_ in pairs(production.values) do table.insert(value_order, k) end
-      table.sort(key_order)
-      table.sort(value_order)
-      local print_key = body_printer(production.keys, key_order)
-      local print_value = body_printer(production.values, value_order)
+      local print_key = body_printer(production.keys)
+      local print_value = body_printer(production.values)
       if production.key_ctype and production.value_ctype then
          return function(data, file, indent)
             for entry in data:iterate() do
@@ -1124,8 +1423,8 @@ function data_printer_from_grammar(production, print_default)
                file:write(indent..'}\n')
             end
          end
-      elseif production.string_key then
-         local id = normalize_id(production.string_key)
+      elseif production.native_key then
+         local id = normalize_id(production.native_key)
          return function(data, file, indent)
             for key, value in pairs(data) do
                if keyword then print_keyword(keyword, file, indent) end
@@ -1264,6 +1563,145 @@ function rpc_output_printer_from_schema(schema)
    return data_printer_from_grammar(rpc_output_grammar_from_schema(schema))
 end
 
+local function influxdb_printer_tests ()
+   local function lint (text)
+      local ret = {}
+      for line in text:gmatch("[^\n]+") do
+         table.insert(ret, (line:gsub("^%s+", "")))
+      end
+      return table.concat(ret, "\n")
+   end
+   local function influxdb_printer_test (test)
+      local schema_str, data_str, expected = unpack(test)
+      local format = 'influxdb'
+      local is_config, print_default = true, true
+      local schema = schema.load_schema(schema_str)
+      local data = load_config_for_schema(schema, mem.open_input_string(data_str))
+      local grammar = data_grammar_from_schema(schema, is_config, format)
+      local printer = influxdb_printer_from_grammar(grammar, print_default)
+      local actual = mem.call_with_output_string(printer, data)
+      assert(actual == lint(expected))
+   end
+   local test_schema = [[
+      module test {
+         namespace test;
+         prefix test;
+
+         container foo {
+            leaf x { type string; }
+            leaf y { type string; }
+            list bar {
+               key baz;
+               leaf baz { type string; }
+               leaf y { type string; }
+               leaf z { type string; }
+            }
+         }
+         container continents {
+            grouping country {
+               list country {
+                  key name;
+                  leaf name { type string; mandatory true; }
+                  leaf capital { type string; }
+                  leaf gdp { type decimal64; }
+                  leaf eu-member { type boolean; }
+                  leaf main-cities { type string; }
+                  leaf population { type uint32; }
+               }
+            }
+            container europe {
+               uses country;
+            }
+            container asia {
+               uses country;
+            }
+         }
+         container users {
+            leaf-list allow-user {
+               type string;
+            }
+         }
+         container nested-list {
+            leaf-list foo {
+               type string;
+            }
+            list bar {
+               leaf-list foo {
+                  type string;
+               }
+            }
+         }
+      }
+   ]]
+
+   local tests = {
+      {test_schema,
+      [[
+         foo {
+            x "x";
+            y "y";
+            bar {baz "baz"; y "y"; z "z";}
+         }
+      ]], [[
+         /foo/bar/y,baz=baz value="y"
+         z,baz=baz value="z"
+         x value="x"
+         y value="y"
+      ]]},
+      {test_schema,
+      [[
+         continents {
+            europe {
+               country {
+                  name "uk";
+                  capital "london";
+                  eu-member true;
+                  main-cities "\"Manchester\", \"Bristol\", \"Liverpool\"";
+                  gdp 2.914e9;
+                  population 65000000;
+               }
+            }
+            asia {
+               country {
+                  name "japan";
+                  capital "tokyo";
+               }
+            }
+         }
+      ]], [[
+         capital,name=japan value="tokyo"
+         /continents/europe/country/capital,continents/europe/country/name=uk value="london"
+         /continents/europe/country/eu-member,continents/europe/country/name=uk value=true
+         /continents/europe/country/gdp,continents/europe/country/name=uk value=2914000000
+         /continents/europe/country/main-cities,continents/europe/country/name=uk value="\"Manchester\", \"Bristol\", \"Liverpool\""
+         /continents/europe/country/population,continents/europe/country/name=uk value=65000000i
+      ]]},
+      {test_schema,
+      [[
+         users {
+            allow-user "jane";
+         }
+      ]], [[
+         /users/allow-user,%position=1 value=jane
+      ]]},
+      {test_schema,
+      [[
+         nested-list {
+            foo "jane";
+            bar {
+               foo "john";
+            }
+         }
+      ]], [[
+         /nested-list/bar/foo,%position=1 value=john
+         /nested-list/foo,%position=1 value=jane
+      ]]},
+   }
+   for _, each in ipairs(tests) do
+      influxdb_printer_test(each)
+   end
+end
+
 function selftest()
    print('selfcheck: lib.yang.data')
    local test_schema = schema.load_schema([[module fruit {
@@ -1284,25 +1722,54 @@ function selftest()
 
       container fruit-bowl {
          leaf description { type string; }
+         leaf material {
+            type enumeration {
+               enum wood;
+               enum glass;
+               enum plastic;
+            }
+         }
          list contents { uses fruit; key name; }
       }
       leaf addr {
          description "internet of fruit";
          type inet:ipv4-address;
       }
+
+      leaf-list address {
+         type inet:ip-prefix;
+         description
+         "Address prefixes bound to this interface.";
+      }
+
+      list choices {
+         key id;
+         leaf id { type string; }
+         choice choice {
+            leaf red { type string; }
+            leaf blue { type string; }
+         }
+      }
    }]])
 
-   local data = load_config_for_schema(test_schema, [[
+   local data = load_config_for_schema(test_schema,
+                                       mem.open_input_string [[
      fruit-bowl {
        description 'ohai';
+       material glass;
        contents { name foo; score 7; }
        contents { name bar; score 8; }
        contents { name baz; score 9; tree-grown true; }
      }
      addr 1.2.3.4;
+     address 1.2.3.4/24;
+     choices { id "one"; blue "hey"; }
+     choices { id "two"; red "bye"; }
+
    ]])
    for i =1,2 do
       assert(data.fruit_bowl.description == 'ohai')
+      assert(data.fruit_bowl.material == 'glass', data.material)
       local contents = data.fruit_bowl.contents
       assert(contents.foo.score == 7)
       assert(contents.foo.tree_grown == nil)
@@ -1311,24 +1778,22 @@ function selftest()
       assert(contents.baz.score == 9)
       assert(contents.baz.tree_grown == true)
       assert(data.addr == util.ipv4_pton('1.2.3.4'))
+      assert(data.choices.one.blue == "hey")
+      assert(data.choices.two.red == "bye")
 
-      local tmp = os.tmpname()
-      local file = io.open(tmp, 'w')
-      print_config_for_schema(test_schema, data, file)
-      file:close()
-      local file = io.open(tmp, 'r')
-      data = load_config_for_schema(test_schema, file:read('*a'), tmp)
-      file:close()
-      os.remove(tmp)
+      local stream = mem.tmpfile()
+      print_config_for_schema(test_schema, data, stream)
+      stream:seek('set', 0)
+      data = load_config_for_schema(test_schema, stream)
    end
    local scalar_uint32 =
       { type='scalar', argument_type={primitive_type='uint32'} }
    local parse_uint32 = data_parser_from_grammar(scalar_uint32)
    local print_uint32 = data_printer_from_grammar(scalar_uint32)
-   assert(parse_uint32('1') == 1)
-   assert(parse_uint32('"1"') == 1)
-   assert(parse_uint32('    "1"   \n  ') == 1)
-   assert(print_uint32(1, util.string_io_file()) == '1')
+   assert(parse_uint32(mem.open_input_string('1')) == 1)
+   assert(parse_uint32(mem.open_input_string('"1"')) == 1)
+   assert(parse_uint32(mem.open_input_string('    "1"   \n  ')) == 1)
+   assert(mem.call_with_output_string(print_uint32, 1) == '1')
 
    -- Verify that lists can lack keys when "config false;" is set.
    local list_wo_key_config_false = [[module config-false-schema {
@@ -1345,7 +1810,8 @@ function selftest()
       }
    }]]
    local keyless_schema = schema.load_schema(list_wo_key_config_false)
-   local keyless_list_data = load_state_for_schema(keyless_schema, [[
+   local keyless_list_data = load_state_for_schema(keyless_schema,
+                                                   mem.open_input_string [[
    test {
       node {
          name "hello";
@@ -1363,12 +1829,51 @@ function selftest()
       }
    }]]
    local loaded_schema = schema.load_schema(test_schema)
-   local object = load_config_for_schema(loaded_schema, [[
+   local object = load_config_for_schema(loaded_schema,
+                                         mem.open_input_string [[
       summary {
          shelves-active;
       }
    ]])
    assert(object.summary.shelves_active)
+
+   -- Test nested defaults
+   local default_schema = [[module default-schema {
+      namespace "urn:ietf:params:xml:ns:yang:default-schema";
+      prefix "default";
+
+      container optional {
+         leaf default {
+             type string;
+             default "foo";
+         }
+      }
+   }]]
+   local loaded_schema = schema.load_schema(default_schema)
+   local object = load_config_for_schema(loaded_schema,
+                                         mem.open_input_string "")
+   assert(object.optional)
+   assert(object.optional.default == "foo")
+
+   local default2_schema = [[module default2-schema {
+      namespace "urn:ietf:params:xml:ns:yang:default2-schema";
+      prefix "default";
+
+      container optional1 {
+         container optional2 {
+            leaf default {
+               type string;
+               default "foo";
+            }
+         }
+      }
+   }]]
+   local loaded_schema = schema.load_schema(default2_schema)
+   local object = load_config_for_schema(loaded_schema,
+                                         mem.open_input_string "")
+   assert(object.optional1)
+   assert(object.optional1.optional2)
+   assert(object.optional1.optional2.default == "foo")
 
    -- Test choice field.
    local choice_schema = schema.load_schema([[module choice-schema {
@@ -1389,7 +1894,8 @@ function selftest()
          }
       }
    }]])
-   local choice_data = load_config_for_schema(choice_schema, [[
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
       boat {
          name "Boaty McBoatFace";
          country-name "United Kingdom";
@@ -1403,7 +1909,8 @@ function selftest()
    assert(choice_data.boat["Vasa"].country_code == "SE")
 
    -- Test mandatory true on choice statement. (should fail)
-   local success, err = pcall(load_config_for_schema, choice_schema, [[
+   local success, err = pcall(load_config_for_schema, choice_schema,
+                              mem.open_input_string [[
       boat {
          name "Boaty McBoatFace";
       }
@@ -1430,7 +1937,8 @@ function selftest()
       }
    }]])
 
-   local choice_data_with_default = load_config_for_schema(choice_default_schema, [[
+   local choice_data_with_default = load_config_for_schema(choice_default_schema,
+                                                           mem.open_input_string [[
       boat {
          name "Kronan";
       }
@@ -1438,7 +1946,8 @@ function selftest()
    assert(choice_data_with_default.boat["Kronan"].country_code == "SE")
 
    -- Check that we can't specify both of the choice fields. (should fail)
-   local success, err = pcall(load_config_for_schema, choice_schema, [[
+   local success, err = pcall(load_config_for_schema, choice_schema,
+                              mem.open_input_string [[
       boat {
          name "Boaty McBoatFace";
          country-name "United Kingdom";
@@ -1446,6 +1955,76 @@ function selftest()
       }
    ]])
    assert(success == false)
+
+   -- Check native number key.
+   local native_number_key_schema = schema.load_schema([[module native-number-key {
+      namespace "urn:ietf:params:xml:ns:yang:native-number-key";
+      prefix "test";
+
+      list number {
+         key "number";
+         leaf number { type uint32; }
+         leaf name { type string; }
+      }
+   }]])
+
+   local native_number_key_data = load_config_for_schema(
+      native_number_key_schema,
+      mem.open_input_string [[
+         number {
+            number 1;
+            name "Number one!";
+         }
+   ]])
+   assert(native_number_key_data.number[1].name == "Number one!")
+
+   -- Test top-level choice with list member.
+   local choice_schema = schema.load_schema([[module toplevel-choice-schema {
+      namespace "urn:ietf:params:xml:ns:yang:toplevel-choice-schema";
+      prefix "test";
+
+      choice test {
+        case this {
+          leaf foo { type string; }
+          leaf bar { type string; }
+        }
+        case that {
+          leaf baz { type uint32; }
+          list qu-x { key id; leaf id { type string; } leaf v { type string; } }
+        }
+      }
+   }]])
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
+      foo "hello";
+      bar "world";
+   ]])
+   assert(choice_data.foo == "hello")
+   assert(choice_data.bar == "world")
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
+      baz 1;
+      qu-x { id "me"; v "hey"; }
+      qu-x { id "you"; v "hi"; }
+   ]])
+   assert(choice_data.baz == 1)
+   assert(choice_data.qu_x.me.v == "hey")
+   assert(choice_data.qu_x.you.v == "hi")
+
+   -- Test choice with case short form.
+   local choice_schema = schema.load_schema([[module shortform-choice-schema {
+      namespace "urn:ietf:params:xml:ns:yang:shortform-choice-schema";
+      prefix "test";
+
+      choice test {
+        default foo;
+        leaf foo { type string; default "something"; }
+        leaf bar { type string; }
+      }
+   }]])
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string "")
+   assert(choice_data.foo == "something")
 
    -- Test range / length restrictions.
    local range_length_schema = schema.load_schema([[module range-length-schema {
@@ -1461,32 +2040,38 @@ function selftest()
    }]])
 
    -- Test range validation. (should fail)
-   local success, err = pcall(load_config_for_schema, range_length_schema, [[
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
       range_test 9;
       range_test 35;
    ]])
    assert(success == false)
 
    -- Test length validation. (should fail)
-   local success, err = pcall(load_config_for_schema, range_length_schema, [[
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
       length_test "+++++++++++++++++++++++++++++++++++";
       length_test "...............";
    ]])
    assert(success == false)
 
    -- Test range validation. (should succeed)
-   local success, err = pcall(load_config_for_schema, range_length_schema, [[
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
       range_test 9;
       range_test 22;
    ]])
    assert(success)
 
    -- Test length validation. (should succeed)
-   local success, err = pcall(load_config_for_schema, range_length_schema, [[
+   local success, err = pcall(load_config_for_schema, range_length_schema,
+                              mem.open_input_string [[
       length_test ".........";
       length_test "++++++++++++++++++++++";
    ]])
    assert(success)
+
+   influxdb_printer_tests()
 
    print('selfcheck: ok')
 end

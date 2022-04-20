@@ -1,0 +1,172 @@
+#!snabb snsh
+
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+io.stdout:setvbuf('no')
+io.stderr:setvbuf('no')
+
+local lib = require("core.lib")
+local udp = require("lib.protocol.udp")
+local ipv6 = require("lib.protocol.ipv6")
+local eth = require("lib.protocol.ethernet")
+local dg = require("lib.protocol.datagram")
+local vhost = require("apps.vhost.vhost_user")
+local esp = require("apps.ipsec.esp")
+local nd_light = require("apps.ipv6.nd_light").nd_light
+local ffi = require("ffi")
+
+-- this is supposed to be run from a selftest shell script
+-- which hopefully can figure out most arguments on its own.
+if not (#main.parameters == 13 ) then
+   print("need 13 arguments: mode srcmac srcip dstip srcport dstport spi txkey txsalt rxkey rxsalt payload") -- XXX usage
+   main.exit(1)
+end
+
+local args = {
+   mode = main.parameters[1],
+   aead = main.parameters[2],
+   srcmac = main.parameters[3],
+   srcip = main.parameters[4],
+   dstip = main.parameters[5],
+   srcport = main.parameters[6],
+   dstport = main.parameters[7],
+   spi = main.parameters[8],
+   txkey = main.parameters[9],
+   txsalt = main.parameters[10],
+   rxkey = main.parameters[11],
+   rxsalt = main.parameters[12],
+   payload = main.parameters[13],
+}
+
+local UDPing = {
+   zone = "UDPing",
+   config = {
+      srcport = {default=args.srcport},
+      dstport = {default=args.dstport},
+      srcaddr = {default=args.srcip},
+      dstaddr = {default=args.dstip},
+      payload = {default=args.payload},
+      throttle = {default=1},
+      timeout = {default=60}
+   }
+}
+
+function UDPing:new (conf)
+   local o = {
+      conf = conf,
+      ping = lib.throttle(conf.throttle),
+      timeout = lib.timeout(conf.timeout)
+   }
+   return setmetatable(o, {__index = UDPing})
+end
+
+function UDPing:deudpify (p)
+   local dgram = dg:new(p, eth)
+   dgram:parse_n(3)
+   return dgram
+end
+
+function UDPing:udpify (p)
+   local dgram = dg:new(p)
+
+   local udpcfg = {
+      src_port = self.conf.srcport,
+      dst_port = self.conf.dstport
+   }
+   local udpish = udp:new(udpcfg)
+
+   local ipcfg = {
+      src = ipv6:pton(self.conf.srcaddr),
+      dst = ipv6:pton(self.conf.dstaddr),
+      next_header = 17, -- UDP
+      hop_limit = 64,
+   }
+   local ipish = ipv6:new(ipcfg)
+
+   local ethcfg = { type = 0x86dd } -- IPv6
+   local ethish = eth:new(ethcfg)
+
+   local payload, length = dgram:payload()
+   udpish:length(udpish:length() + length)
+   udpish:checksum(payload, length, ipish)
+   ipish:payload_length(udpish:length())
+
+   dgram:push(udpish)
+   dgram:push(ipish)
+   dgram:push(ethish)
+
+   return dgram:packet()
+end
+
+function UDPing:pull ()
+   if self.ping() then
+      link.transmit(self.output.output,
+                    self:udpify(packet.from_string(self.conf.payload)))
+   end
+end
+
+function UDPing:push ()
+   if self.timeout() then
+      error("No reply.")
+   end
+
+   while not link.empty(self.input.input) do
+      local dgram = self:deudpify(link.receive(self.input.input))
+      local recvstr = ffi.string(dgram:payload())
+      print("< '" .. recvstr .. "'")
+      assert(args.payload == recvstr,
+             "wanted '"..(args.payload).."' got '"..recvstr.."'")
+      packet.free(dgram:packet())
+   end
+end
+
+
+local c = config.new()
+
+config.app(c, "udping", UDPing)
+
+local espconf = {
+   aead = args.aead,
+   self_ip = (args.mode == "tunnel" and args.srcip) or nil,
+   nexthop_ip = (args.mode == "tunnel" and args.dstip) or nil,
+   spi = args.spi,
+   transmit_key = args.txkey,
+   transmit_salt =  args.txsalt,
+   receive_key = args.rxkey,
+   receive_salt =  args.rxsalt,
+   receive_window = 32,
+   resync_threshold = 8192,
+   resync_attempts = 8,
+   auditing = true
+}
+config.app(c, "esp",
+           assert(({transport=esp.Transport6, tunnel=esp.Tunnel6})[args.mode]),
+           espconf)
+
+local vhostconf = {
+   socket_path = 'esp.sock',
+   is_server = false
+}
+config.app(c, "vhost", vhost.VhostUser, vhostconf)
+
+local ndconf = {
+   local_mac = args.srcmac,
+   local_ip = args.srcip,
+   next_hop = args.dstip
+}
+config.app(c, "nd", nd_light, ndconf)
+
+config.link(c, "udping.output -> esp.decapsulated")
+config.link(c, "esp.encapsulated -> nd.north")
+config.link(c, "nd.south -> vhost.rx")
+
+config.link(c, "vhost.tx -> nd.south")
+config.link(c, "nd.north -> esp.encapsulated")
+config.link(c, "esp.decapsulated -> udping.input")
+
+engine.configure(c)
+
+local function received_pong ()
+   return link.stats(engine.app_table.udping.input.input).rxpackets > 0
+end
+engine.main({done=received_pong})

@@ -85,11 +85,11 @@ local lib_version = (function ()
 end)()
 
 -- Only nDPI 1.x versions above 1.7 are supported.
-if lib_version.major ~= 1 or lib_version.minor < 7 then
+if lib_version.major == 1 and lib_version.minor < 7 then
    error("Unsupported nDPI version: " .. tostring(lib_version))
 end
 
-if lib_version.minor == 7 then
+if lib_version.major == 1 and lib_version.minor == 7 then
    -- nDPI 1.7
    ffi.cdef [[
    ndpi_detection_module_t* ndpi_init_detection_module (uint32_t ticks_per_second,
@@ -105,8 +105,8 @@ if lib_version.minor == 7 then
                                                   uint32_t src_host, uint16_t src_port,
                                                   uint32_t dst_host, uint32_t dst_port);
    ]]
-elseif lib_version.minor == 8 then
-   -- nDPI 1.8
+else
+   -- nDPI 1.8 and later
    ffi.cdef [[
    ndpi_detection_module_t* ndpi_init_detection_module (void);
 

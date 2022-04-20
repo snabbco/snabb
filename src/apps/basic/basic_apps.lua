@@ -39,9 +39,11 @@ function Join:new()
    return setmetatable({}, {__index=Join})
 end
 
-function Join:push (i)
-   while not link.empty(i) do
-      transmit(self.output.output, receive(i))
+function Join:push ()
+   for _, inport in ipairs(self.input) do
+      while not link.empty(inport) do
+         transmit(self.output.output, receive(inport))
+      end
    end
 end
 
@@ -55,10 +57,12 @@ function Split:new ()
    return setmetatable({}, {__index=Split})
 end
 
-function Split:push (i)
-   for _, o in ipairs(self.output) do
-      for _ = 1, link.nreadable(i) do
-         transmit(o, receive(i))
+function Split:push ()
+   for _, i in ipairs(self.input) do
+      for _, o in ipairs(self.output) do
+         for _ = 1, link.nreadable(i) do
+            transmit(o, receive(i))
+         end
       end
    end
 end
@@ -71,10 +75,12 @@ function Sink:new ()
    return setmetatable({}, {__index=Sink})
 end
 
-function Sink:push (i)
-   for _ = 1, link.nreadable(i) do
-      local p = receive(i)
-      packet.free(p)
+function Sink:push ()
+   for _, i in ipairs(self.input) do
+      for _ = 1, link.nreadable(i) do
+        local p = receive(i)
+        packet.free(p)
+      end
    end
 end
 
@@ -86,14 +92,16 @@ function Tee:new ()
    return setmetatable({}, {__index=Tee})
 end
 
-function Tee:push (i)
+function Tee:push ()
    local noutputs = #self.output
    if noutputs > 0 then
-      for _ = 1, link.nreadable(i) do
-         local p = receive(i)
-         do local output = self.output
-            for k = 1, #output do
-               transmit(output[k], k == #output and p or packet.clone(p))
+      for _, i in ipairs(self.input) do
+         for _ = 1, link.nreadable(i) do
+            local p = receive(i)
+            do local output = self.output
+               for k = 1, #output do
+                  transmit(output[k], k == #output and p or packet.clone(p))
+               end
             end
          end
       end
@@ -109,8 +117,8 @@ function Repeater:new ()
                        {__index=Repeater})
 end
 
-function Repeater:push (i)
-   local o = self.output.output
+function Repeater:push ()
+   local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
       local p = receive(i)
       table.insert(self.packets, p)
@@ -139,9 +147,9 @@ function Truncate:new (n)
    return setmetatable({n = n}, {__index=Truncate})
 end
 
-function Truncate:push (i)
-   for _ = 1, link.nreadable(i) do
-      local p = receive(i)
+function Truncate:push ()
+   for _ = 1, link.nreadable(self.input.input) do
+      local p = receive(self.input.input)
       ffi.fill(p.data, math.min(0, self.n - p.length))
       p.length = self.n
       transmit(self.output.output,p)
@@ -156,9 +164,9 @@ function Sample:new (n)
    return setmetatable({n = n, seen = 1}, {__index=Sample})
 end
 
-function Sample:push (i)
-   for _ = 1, link.nreadable(i) do
-      local p = receive(i)
+function Sample:push ()
+   for _ = 1, link.nreadable(self.input.input) do
+      local p = receive(self.input.input)
       if self.n == self.seen then
          transmit(self.output.output, p)
          self.seen = 1

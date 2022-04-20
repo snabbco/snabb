@@ -84,7 +84,7 @@ function selftest()
    engine.main({duration=0.0001})
    assert(#engine.app_table.sink:errors() > 0)
 
-   c = config.new()
+   local c = config.new()
    config.app(c, "sink", Match, {fuzzy=true})
    config.app(c, "src", basic_apps.Source, 8)
    config.app(c, "comparator", basic_apps.Source, 8)

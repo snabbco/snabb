@@ -14,12 +14,18 @@ Usage: packetblaster lwaftr [OPTIONS]
 
   --sock <SOCKET>       Socket name for virtio interface
 
-  --vlan VLANID         VLAN tag traffic with VLANID if set
+  --vlan4 VLANID        Encapsulate IPv4 traffic with IEEE 802.1Q with the given VLANID
+  --vlan6 VLANID        Encapsulate IPv6 traffic with IEEE 802.1Q with the given VLANID
+  --vlan VLANID         Same as --vlan4 VLANID --vlan6 VLANID
 
-  --src_mac SOURCE      Source MAC-Address
+  --src_mac4 SOURCE     Local MAC Address for IPv4 traffic
+  --src_mac6 SOURCE     Local MAC Address for IPv6 traffic
+  --src_mac SOURCE      Same as --src_mac4 SOURCE --src_mac6 SOURCE
                         Default: 00:00:00:00:00:00
 
-  --dst_mac DESTINATION Destination MAC-Address
+  --dst_mac4 DEST       Remote MAC Address for IPv4 traffic
+  --dst_mac6 DEST       Remote MAC Address for IPv6 traffic
+  --dst_mac DESTINATION Same as --dst_mac4 DEST --dst_mac6 DEST
                         Default: 00:00:00:00:00:00
 
   --size SIZES          A comma separated list of numbers. Send packets whose
@@ -28,21 +34,22 @@ Usage: packetblaster lwaftr [OPTIONS]
                         headers, and additionally a 4-byte CRC that is written
                         and read by the NIC.
 
-                        Note that the minimum ethernet frame size is 64 bytes.
-                        While it's technically possible to make smaller frames
-                        and we do allow it, the NIC will pad it up to the
+                        Note that the minimum ethernet frame size is 64
+                        bytes.  While it's technically possible to make
+                        smaller frames, the NIC will pad it up to the
                         minimum before sending, so it's a bit pointless.
-                        Since Snabb does not see the CRC in the packet, that
-                        means that from Snabb's perspective the minimum useful
-                        packet size is 60 bytes.
+                        We signal an error if the user requests a packet
+                        size that's smaller than 64 bytes, to avoid
+                        misinterpreted benchmarks.
 
-                        The smallest allowed frame size is 46 bytes,
-                        comprising 14 bytes for the ethernet header, 20 for
-                        the IPv4 header, 8 for the UDP header, and 4
-                        additional bytes for the ethernet checksum.  If the
-                        packet has at least 8 bytes of payload, the generated
-                        packets will include a unique identifier in the
-                        payload as well.
+                        Packets will consist of 14 bytes for the
+                        ethernet header, 4 additional bytes for the
+                        ethernet checksum, a possible 4 bytes for a VLAN
+                        tag, 20 for the IPv4 header, 8 for the UDP
+                        header, and then a payload.  The payload
+                        includes a unique identifier in the first 8
+                        bytes.  IPv6 packets include an additional 40
+                        bytes for the IPv6 header.
 
                         Default: 64,64,64,64,64,64,64,594,594,594,1500
 

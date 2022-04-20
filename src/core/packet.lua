@@ -12,9 +12,10 @@ local lib      = require("core.lib")
 local memory   = require("core.memory")
 local shm      = require("core.shm")
 local counter  = require("core.counter")
-local sync     = require("core.sync")
 
 require("core.packet_h")
+
+local group_freelist = require("core.group_freelist")
 
 local packet_t = ffi.typeof("struct packet")
 local packet_ptr_t = ffi.typeof("struct packet *")
@@ -24,11 +25,15 @@ max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 -- For operations that add or remove headers from the beginning of a
 -- packet, instead of copying around the payload we just move the
 -- packet structure as a whole around.
-local packet_alignment = 512
-local default_headroom = 256
+packet_alignment = 512
+default_headroom = 256
 -- The Intel82599 driver requires even-byte alignment, so let's keep
 -- things aligned at least this much.
-local minimum_alignment = 2
+minimum_alignment = 2
+
+-- Copy read-only constants to locals
+local max_payload, packet_alignment, default_headroom, minimum_alignment =
+   max_payload, packet_alignment, default_headroom, minimum_alignment
 
 local function get_alignment (addr, alignment)
    -- Precondition: alignment is a power of 2.
@@ -51,12 +56,21 @@ local max_packets = 1e7
 
 ffi.cdef([[
 struct freelist {
-    int32_t lock[1];
-    uint64_t nfree;
-    uint64_t max;
+    int nfree;
+    int max;
     struct packet *list[]]..max_packets..[[];
 };
 ]])
+
+local function freelist_create(name)
+   local fl = shm.create(name, "struct freelist")
+   fl.max = max_packets
+   return fl
+end
+
+local function freelist_open(name, readonly)
+   return shm.open(name, "struct freelist", readonly)
+end
 
 local function freelist_full(freelist)
    return freelist.nfree == freelist.max
@@ -84,55 +98,98 @@ local function freelist_nfree(freelist)
    return freelist.nfree
 end
 
-local function freelist_lock(freelist)
-   sync.lock(freelist.lock)
-end
-
-local function freelist_unlock(freelist)
-   sync.unlock(freelist.lock)
-end
-
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = ffi.new("struct freelist", {max=max_packets})
-local group_fl -- Initialized on demand.
+ -- Initialized on demand.
+local packets_fl, group_fl
+
+-- Call to ensure packet freelist is enabled.
+function initialize ()
+   packets_fl = freelist_create("engine/packets.freelist")
+end
 
 -- Call to ensure group freelist is enabled.
 function enable_group_freelist ()
    if not group_fl then
-      group_fl = shm.create("group/packets.freelist", "struct freelist")
-      group_fl.max = max_packets
+      group_fl = group_freelist.freelist_create("group/packets.freelist")
    end
 end
 
+-- Cache group_freelist.chunksize
+local group_fl_chunksize = group_freelist.chunksize
+
 -- Return borrowed packets to group freelist.
-function rebalance_freelists ()
-   if group_fl and freelist_nfree(packets_fl) > packets_allocated then
-      freelist_lock(group_fl)
-      while freelist_nfree(packets_fl) > packets_allocated
-      and not freelist_full(group_fl) do
-         freelist_add(group_fl, freelist_remove(packets_fl))
+function rebalance_step ()
+   local chunk, seq = group_freelist.start_add(group_fl)
+   if chunk then
+      chunk.nfree = group_fl_chunksize
+      for i=0, chunk.nfree-1 do
+         chunk.list[i] = freelist_remove(packets_fl)
       end
-      freelist_unlock(group_fl)
+      group_freelist.finish(chunk, seq)
+   else
+      error("group freelist overflow")
    end
 end
+
+function need_rebalance ()
+   return freelist_nfree(packets_fl) >= (packets_allocated + group_fl_chunksize)
+end
+
+-- Reclaim packets from group freelist.
+function reclaim_step ()
+   local chunk, seq = group_freelist.start_remove(group_fl)
+   if chunk then
+      for i=0, chunk.nfree-1 do
+         freelist_add(packets_fl, chunk.list[i])
+      end
+      group_freelist.finish(chunk, seq)
+   end
+end
+
+-- Register struct freelist as an abstract SHM object type so that the group
+-- freelist can be recognized by shm.open_frame and described with tostring().
+shm.register(
+   'freelist',
+   {open = function (name) return shm.open(name, "struct freelist") end}
+)
+ffi.metatype("struct freelist", {__tostring = function (freelist)
+   return ("%d/%d"):format(freelist.nfree, freelist.max)
+end})
 
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
       if group_fl then
-         freelist_lock(group_fl)
-         while freelist_nfree(group_fl) > 0
-         and freelist_nfree(packets_fl) < packets_allocated do
-            freelist_add(packets_fl, freelist_remove(group_fl))
-         end
-         freelist_unlock(group_fl)
+         reclaim_step()
       end
       if freelist_nfree(packets_fl) == 0 then
          preallocate_step()
       end
    end
    return freelist_remove(packets_fl)
+end
+
+-- Release all packets allocated by pid to its group freelist (if one exists.)
+--
+-- This is an internal API function provided for cleanup during
+-- process termination.
+function shutdown (pid)
+   local in_group, group_fl = pcall(
+      group_freelist.freelist_open, "/"..pid.."/group/packets.freelist"
+   )
+   if in_group then
+      local packets_fl = freelist_open("/"..pid.."/engine/packets.freelist")
+      while freelist_nfree(packets_fl) > 0 do
+         local chunk, seq = group_freelist.start_add(group_fl)
+         assert(chunk, "group freelist overflow")
+         chunk.nfree = math.min(group_fl_chunksize, freelist_nfree(packets_fl))
+         for i=0, chunk.nfree-1 do
+            chunk.list[i] = freelist_remove(packets_fl)
+         end
+         group_freelist.finish(chunk, seq)
+      end
+   end
 end
 
 -- Create a new empty packet.
@@ -209,11 +266,13 @@ function shiftright (p, bytes)
 end
 
 -- Conveniently create a packet by copying some existing data.
-function from_pointer (ptr, len) return append(allocate(), ptr, len) end
+function from_pointer (ptr, len)
+   return append(allocate(), ffi.cast("uint8_t *", ptr), len)
+end
 function from_string (d)         return from_pointer(d, #d) end
 
 -- Free a packet that is no longer in use.
-local function free_internal (p)
+function free_internal (p)
    local ptr = ffi.cast("char*", p)
    p = ffi.cast(packet_ptr_t, ptr - get_headroom(ptr) + default_headroom)
    p.length = 0
@@ -225,12 +284,18 @@ function account_free (p)
    counter.add(engine.freebytes, p.length)
    -- Calculate bits of physical capacity required for packet on 10GbE
    -- Account for minimum data size and overhead of CRC and inter-packet gap
-   counter.add(engine.freebits, (math.max(p.length, 46) + 4 + 5) * 8)
+   -- https://en.wikipedia.org/wiki/Ethernet_frame
+   counter.add(engine.freebits, (12 + 8 + math.max(p.length, 60) + 4) * 8)
 end
 
+local free_internal, account_free =
+   free_internal, account_free
 function free (p)
    account_free(p)
    free_internal(p)
+   if group_fl and need_rebalance() then
+      rebalance_step()
+   end
 end
 
 -- Set packet data length.
@@ -242,7 +307,8 @@ function resize (p, len)
 end
 
 function preallocate_step()
-   assert(packets_allocated + packet_allocation_step <= max_packets,
+   assert(packets_allocated + packet_allocation_step
+            <= max_packets - group_fl_chunksize,
           "packet allocation overflow")
 
    for i=1, packet_allocation_step do
