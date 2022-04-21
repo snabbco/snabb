@@ -847,7 +847,7 @@ function selftest()
    -- Mock input and output.
    local input_name, input = new_internal_link('ipfix selftest input')
    local output_name, output = new_internal_link('ipfix selftest output')
-   ipfix.input, ipfix.output = { input = input }, { output = output }
+   ipfix.input, ipfix.output = { [1] = input, input = input }, { [1] = output, output = output }
    local ipv4_flows, ipv6_flows = unpack(ipfix.flow_sets)
 
    -- Test helper that supplies a packet with some given fields.
@@ -883,6 +883,7 @@ function selftest()
    test("192.168.1.25", "8.8.8.8", 58342, 53)
    test("8.8.8.8", "192.168.1.25", 53, 58342)
    test("2001:4860:4860::8888", "2001:db8::ff00:42:8329", 53, 57777)
+   ipfix:tick()
    assert(ipv4_flows.table.occupancy == 4,
           string.format("wrong number of v4 flows: %d", ipv4_flows.table.occupancy))
    assert(ipv6_flows.table.occupancy == 1,
@@ -950,7 +951,7 @@ function selftest()
    -- "scan_time")
    local now = engine.now()
    while engine.now() - now < 1 do
-      ipfix:push()
+      ipfix:tick()
    end
    assert(link.nreadable(output) == 2)
 
