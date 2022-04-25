@@ -478,6 +478,11 @@ function NDP:push()
    local isouth, osouth = self.input.south, self.output.south
    local inorth, onorth = self.input.north, self.output.north
 
+   -- TODO: do unsolicited neighbor advertisement on start and on
+   -- configuration reloads?
+   -- This would be an optimization, not a correctness issue
+   self:maybe_send_ns_request(osouth)
+
    for _ = 1, link.nreadable(isouth) do
       local p = receive(isouth)
       if is_ndp(p) then
@@ -504,13 +509,6 @@ function NDP:push()
       -- updated, we will get its new value.
       if ok then self:ndp_resolved(self.next_ip, mac, 'peer') end
    end
-end
-
-function NDP:tick()
-   -- TODO: do unsolicited neighbor advertisement on start and on
-   -- configuration reloads?
-   -- This would be an optimization, not a correctness issue
-   self:maybe_send_ns_request(self.output.south)
 end
 
 function selftest()
