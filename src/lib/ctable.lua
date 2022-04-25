@@ -14,7 +14,6 @@ CTable = {}
 LookupStreamer = {}
 
 local HASH_MAX = 0xFFFFFFFF
-local MAX_MAX_DISPLACEMENT = 30
 local uint8_ptr_t = ffi.typeof('uint8_t*')
 local uint16_ptr_t = ffi.typeof('uint16_t*')
 local uint32_ptr_t = ffi.typeof('uint32_t*')
@@ -129,7 +128,13 @@ local optional_params = {
    initial_size = 8,
    max_occupancy_rate = 0.9,
    min_occupancy_rate = 0.0,
-   resize_callback = false
+   resize_callback = false,
+   -- The default value for max_displacement_limit is infinity.
+   -- This is safe but uses lots of memory. An alternative
+   -- known-to-be-reasonable, virtually-infinite-in-practice value is: 30.
+   -- In practice, users of lib.ctable can use a lower max_displacement
+   -- to limit memory usage. See CTable:resize().
+   max_displacement_limit = 1/0
 }
 
 function new(params)
@@ -152,6 +157,7 @@ function new(params)
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
    ctab.resize_callback = params.resize_callback
+   ctab.max_displacement_limit = params.max_displacement_limit
    ctab = setmetatable(ctab, { __index = CTable })
    ctab:reseed_hash_function(params.hash_seed)
    ctab:resize(params.initial_size)
@@ -226,12 +232,12 @@ function CTable:resize(size)
    -- max_displacement could become as large as the table size. To be
    -- safe, we should allocate twice as many entries as the size of
    -- the table.  In practice, max_displacement is expected to always
-   -- be a small number.  We use a static cap for this value that
-   -- "should be enough for everyone".  This is not entirely safe,
-   -- since an overrung can occur before the check for the cap in
-   -- maybe_increase_max_displacement(). The factor 2 here reduces
-   -- that risk but does not eliminate it.
-   local alloc_size = math.min(size*2, size + 2 * MAX_MAX_DISPLACEMENT)
+   -- be a small number.  We use max_displacement_limit as a cap for 
+   -- this value that "should be enough for everyone".  This is not
+   -- entirely safe, since an overrun can occur before the check for
+   -- the cap in maybe_increase_max_displacement(). The factor 2 here
+   -- reduces that risk but does not eliminate it.
+   local alloc_size = math.min(size*2, size + 2 * self.max_displacement_limit)
    self.entries, self.byte_size = calloc(self.entry_type, alloc_size)
    self.size = size
    self.scale = self.size / HASH_MAX
@@ -312,7 +318,7 @@ end
 
 function CTable:maybe_increase_max_displacement(displacement)
    if displacement <= self.max_displacement then return end
-   assert(displacement <= MAX_MAX_DISPLACEMENT)
+   assert(displacement <= self.max_displacement_limit)
    self.max_displacement = displacement
    self.lookup_helper = self:make_lookup_helper()
 end

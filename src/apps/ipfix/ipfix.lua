@@ -198,7 +198,8 @@ function FlowSet:new (spec, args)
          end
          require('jit').flush()
          o.table_tb:set(math.ceil(table.size / o.scan_time))
-      end
+      end,
+      max_displacement_limit = 30
    }
    if args.cache_size then
       params.initial_size = math.ceil(args.cache_size / args.max_load_factor)
@@ -247,7 +248,8 @@ function FlowSet:new (spec, args)
                sp.table_tb:set(
                   math.ceil(table.size / args.scan_protection.interval)
                )
-            end
+            end,
+            max_displacement_limit = 30
       })
       sp.expiry_cursor = 0
       sp.scratch_entry = sp.table.entry_type()

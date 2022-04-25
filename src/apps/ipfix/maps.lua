@@ -18,7 +18,8 @@ local mac_to_as_value_t = ffi.typeof("uint32_t")
 local function make_mac_to_as_map(name)
    local table = ctable.new({ key_type = mac_to_as_key_t,
                               value_type = mac_to_as_value_t,
-                              initial_size = 15000 })
+                              initial_size = 15000,
+                              max_displacement_limit = 30 })
    local key = mac_to_as_key_t()
    local value = mac_to_as_value_t()
    for line in assert(io.lines(name)) do
