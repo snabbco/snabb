@@ -4,7 +4,8 @@ local ffi      = require("ffi")
 local lib      = require("core.lib")
 local ctable   = require("lib.ctable")
 local ethernet = require("lib.protocol.ethernet")
-local lpm      = require("lib.lpm.lpm4_248").LPM4_248
+local ipv4     = require("lib.protocol.ipv4")
+local poptrie  = require("lib.poptrie")
 local logger   = require("lib.logger")
 
 -- Map MAC addresses to peer AS number
@@ -73,14 +74,15 @@ end
 -- used by the Geo2Lite database provided by MaxMind:
 -- http://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN-CSV.zip
 local function make_pfx_to_as_map(name)
-   local table = lpm:new({ keybits = 31 })
-   -- Assign AS 0 to addresses not covered by the map
-   table:add_string("0.0.0.0/0", 0)
+   local table = poptrie.new{direct_pointing=true}
    for line in assert(io.lines(name)) do
       if not line:match("^network") then
-         local pfx, asn = line:match("([^,]*),(%d+),")
-         assert(pfx and asn, "Prefix-to-AS map: invalid line: "..line)
-         table:add_string(pfx, tonumber(asn))
+         local cidr, asn = line:match("([^,]*),(%d+),")
+         asn = tonumber(asn)
+         assert(cidr and asn and asn == bit.band(asn, 0xffff),
+                "Prefix-to-AS map: invalid line: "..line)
+         local pfx, len = ipv4:pton_cidr(cidr)
+         table:add(pfx, len, asn)
       end
    end
    table:build()
