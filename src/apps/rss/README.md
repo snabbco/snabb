@@ -51,12 +51,27 @@ the following set of extensions.
 
 The output links can be grouped into equivalence classes with respect
 to matching conditions in terms of arbitrary pflang expressions as
-provided by the `pf` module.  Matching packets are only distributed to
-the output links that belong to the equivalence class.  By default, a
-single equivalence class exists which matches all packets.  It is
-special in the sense that the matching condition cannot be expressed
-in pflang.  This default class is the only one that can receive non-IP
-packets.
+provided by the `pf` module. Because the current implementation of the
+`pf` module does not implement the `vlan` primitive, an auxiliary
+construct is needed to match on the VLAN tag if required. Apart from a
+regular BPF expression, the `rss` module also accepts a string of the
+form
+
+```
+VLAN <vid1> <vid2> ... [ BPF <string> ]
+```
+
+where `<vidn>` are numbers representig VLAN IDs. This expression
+matches a packet that carries any of the given VLAN tags. If the
+expression also contains the keyword `BPF` followed by a regular BPF
+expression, the packet must also match that expression to be mapped to
+this equivalence class.
+
+Matching packets are only distributed to the output links that belong
+to the equivalence class.  By default, a single equivalence class
+exists which matches all packets.  It is special in the sense that the
+matching condition cannot be expressed in pflang.  This default class
+is the only one that can receive non-IP packets.
 
 Classes are specified in an explicit order when an instance of the
 `rss` app is created.  The default class is created implicitly as the

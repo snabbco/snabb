@@ -343,15 +343,6 @@ end
 function Reassembler:push ()
    local input, output = self.input.input, self.output.output
 
-   self.incoming_ipv6_fragments_alarm:check()
-
-   do
-      local now = self.tsc:stamp()
-      if now - self.scan_tstamp > self.scan_interval then
-         self:expire(now)
-      end
-   end
-
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
@@ -379,6 +370,17 @@ function Reassembler:push ()
       local pkt = link.receive(input)
       self:handle_fragment(pkt)
       packet.free(pkt)
+   end
+end
+
+function Reassembler:tick ()
+   self.incoming_ipv6_fragments_alarm:check()
+
+   do
+      local now = self.tsc:stamp()
+      if now - self.scan_tstamp > self.scan_interval then
+         self:expire(now)
+      end
    end
 
    if self.next_counter_update < engine.now() then

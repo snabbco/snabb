@@ -7,20 +7,27 @@ module(..., package.seeall)
 
 local bit      = require("bit")
 local ffi      = require("ffi")
-local pf       = require("pf")
 local template = require("apps.ipfix.template")
+local maps     = require("apps.ipfix.maps")
+local metadata = require("apps.rss.metadata")
 local lib      = require("core.lib")
 local link     = require("core.link")
 local packet   = require("core.packet")
+local shm      = require("core.shm")
+local counter  = require("core.counter")
 local datagram = require("lib.protocol.datagram")
 local ether    = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
 local ipv6     = require("lib.protocol.ipv6")
 local udp      = require("lib.protocol.udp")
 local ctable   = require("lib.ctable")
+local logger   = require("lib.logger")
+local token_bucket = require("lib.token_bucket")
 local C        = ffi.C
+local S        = require("syscall")
 
 local htonl, htons = lib.htonl, lib.htons
+local metadata_add, metadata_get = metadata.add, metadata.get
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
@@ -89,21 +96,6 @@ local function padded_length(len)
    return bit.band(len + max_padding, bit.bnot(max_padding))
 end
 
--- Sadly, for NetFlow v9, the header needs to know the number of
--- records in a message.  So before flushing out a message, a FlowSet
--- will append the record count, and then the exporter needs to slurp
--- this data off before adding the NetFlow/IPFIX header.
-local uint16_ptr_t = ffi.typeof('uint16_t*')
-local function add_record_count(pkt, count)
-   pkt.length = pkt.length + 2
-   ffi.cast(uint16_ptr_t, pkt.data + pkt.length)[-1] = count
-end
-local function remove_record_count(pkt, count)
-   local count = ffi.cast(uint16_ptr_t, pkt.data + pkt.length)[-1]
-   pkt.length = pkt.length - 2
-   return count
-end
-
 -- The real work in the IPFIX app is performed by FlowSet objects,
 -- which record and export flows.  However an IPv4 FlowSet won't know
 -- what to do with IPv6 packets, so the IPFIX app can have multiple
@@ -127,10 +119,55 @@ end
 
 FlowSet = {}
 
-function FlowSet:new (template, args)
+function FlowSet:new (spec, args)
+   local t = {}
+   for s in spec:split(':') do
+      table.insert(t, s)
+   end
+   assert(#t == 1 or #t == 2, "Invalid template specifier: "..spec)
+   local template_name, cache_size = unpack(t)
+   assert(template.templates[template_name],
+          "Undefined template : "..template_name)
+   if cache_size then
+      assert(cache_size:match("^%d+$"),
+             string.format("Invalid cache size for template %s: %s",
+                           template_name, cache_size))
+      args.cache_size = tonumber(cache_size)
+   end
+
+   local template =
+      template.make_template_info(template.templates[template_name])
+   template.logger = logger.new({ date = args.log_date,
+                                  module = ("[%5d]"):format(S.getpid())
+                                     .." IPFIX template #"..template.id })
+   template.name = template_name
+   template.maps = {}
+   for _, name in ipairs(template.require_maps) do
+      assert(args.maps[name],
+             string.format("Template #%d: required map %s "
+                              .."not configured", template.id, name))
+      template.maps[name] = maps.mk_map(name, args.maps[name],
+                                        nil, args.maps_log_fh)
+   end
+
+   assert(args.active_timeout > args.scan_time,
+          string.format("Template #%d: active timeout (%d) "
+                           .."must be larger than scan time (%d)",
+                        template.id, args.active_timeout,
+                        args.scan_time))
+   assert(args.idle_timeout > args.scan_time,
+          string.format("Template #%d: idle timeout (%d) "
+                           .."must be larger than scan time (%d)",
+                        template.id, args.idle_timeout,
+                        args.scan_time))
    local o = { template = template,
+               flush_timer = (args.flush_timeout > 0 and
+                                 lib.throttle(args.flush_timeout))
+                  or function () return true end,
                idle_timeout = assert(args.idle_timeout),
-               active_timeout = assert(args.active_timeout) }
+               active_timeout = assert(args.active_timeout),
+               scan_time = args.scan_time,
+               parent = assert(args.parent) }
 
    if     args.version == 9  then o.template_id = V9_TEMPLATE_ID
    elseif args.version == 10 then o.template_id = V10_TEMPLATE_ID
@@ -153,19 +190,105 @@ function FlowSet:new (template, args)
    local params = {
       key_type = template.key_t,
       value_type = template.value_t,
-      max_occupancy_rate = 0.4,
+      max_occupancy_rate = args.max_load_factor,
+      resize_callback = function(table, old_size)
+         if old_size > 0 then
+            template.logger:log("resize flow cache "..old_size..
+                                   " -> "..table.size)
+         end
+         require('jit').flush()
+         o.table_tb:set(math.ceil(table.size / o.scan_time))
+      end
    }
    if args.cache_size then
-      params.initial_size = math.ceil(args.cache_size / 0.4)
+      params.initial_size = math.ceil(args.cache_size / args.max_load_factor)
    end
+   o.table_tb = token_bucket.new({ rate = 1 }) -- Will be set by resize_callback
    o.table = ctable.new(params)
+   o.table_tstamp = C.get_unix_time()
+   o.table_scan_time = 0
    o.scratch_entry = o.table.entry_type()
    o.expiry_cursor = 0
+
+   o.scan_protection = args.scan_protection
+   local sp = { table = {} }
+   if args.scan_protection.enable then
+      aggr_info = template.aggregate_info
+      sp.aggr_key_fn, sp.ntop_fn = aggr_info.mk_fns(
+         args.scan_protection.aggregate_v4,
+         args.scan_protection.aggregate_v6
+      )
+      -- Will be set by resize_callback
+      sp.table_tb = token_bucket.new({ rate = 1 })
+      sp.export_rate_tb = token_bucket.new(
+         { rate = args.scan_protection.export_rate })
+      sp.table = ctable.new({
+            key_type = aggr_info.key_type,
+            value_type = ffi.typeof([[
+               struct {
+                  uint8_t  suppress;
+                  uint64_t tstamp;
+                  uint64_t flow_count;
+                  uint64_t packets;
+                  uint64_t octets;
+                  uint64_t tstamp_drop_start;
+                  uint64_t drops;
+                  uint64_t exports;
+               } __attribute__((packed))
+            ]]),
+            initial_size = args.scan_protection.cache_size,
+            max_occupancy_rate = args.scan_protection.max_load_factor,
+            resize_callback = function(table, old_size)
+               if old_size > 0 then
+                  template.logger:log("resize flow rate tracking cache "
+                                         ..old_size.." -> "..table.size)
+               end
+               require('jit').flush()
+               sp.table_tb:set(
+                  math.ceil(table.size / args.scan_protection.interval)
+               )
+            end
+      })
+      sp.expiry_cursor = 0
+      sp.scratch_entry = sp.table.entry_type()
+   end
+   o.sp = sp
 
    o.match = template.match
    o.incoming_link_name, o.incoming = new_internal_link('IPFIX incoming')
 
+   -- Generic per-template counters
+   local shm_name = "ipfix_templates/"..args.instance.."/"..template.id
+   local frame_init = {
+      packets_in = { counter, 0 },
+      flow_export_packets = { counter, 0 },
+      exported_flows = { counter, 0 },
+      table_scan_time = { counter, 0 },
+   }
+   local function add_table_counters(prefix, table)
+      for _, item in ipairs({ 'size', 'byte_size',
+                              'occupancy', 'max_displacement' }) do
+         frame_init[prefix..'_'..item] = { counter, table[item] }
+      end
+   end
+   add_table_counters('table', o.table)
+   add_table_counters('rate_table', o.sp.table)
+   o.shm = shm.create_frame(shm_name, frame_init)
+
+   -- Template-specific counters
+   if template.counters then
+      local conf = {}
+      for name, _ in pairs(template.counters) do
+         conf[name] = { counter, 0 }
+      end
+      o.shm_template =
+         shm.create_frame(shm_name.."/stats", conf)
+   end
    return setmetatable(o, { __index = self })
+end
+
+function FlowSet:id()
+   return string.format("%s(#%d)", self.template.name, self.template.id)
 end
 
 function FlowSet:record_flows(timestamp)
@@ -173,14 +296,15 @@ function FlowSet:record_flows(timestamp)
    timestamp = to_milliseconds(timestamp)
    for i=1,link.nreadable(self.incoming) do
       local pkt = link.receive(self.incoming)
-      self.template.extract(pkt, timestamp, entry)
-      packet.free(pkt)
+      counter.add(self.shm.packets_in)
+      self.template:extract(pkt, timestamp, entry)
       local lookup_result = self.table:lookup_ptr(entry.key)
       if lookup_result == nil then
          self.table:add(entry.key, entry.value)
       else
-         self.template.accumulate(lookup_result, entry)
+         self.template:accumulate(lookup_result, entry, pkt)
       end
+      packet.free(pkt)
    end
 end
 
@@ -206,6 +330,7 @@ function FlowSet:add_data_record(record, out)
    ffi.copy(ptr, record, record_len)
    self.template.swap_fn(ffi.cast(self.template.record_ptr_t, ptr))
    pkt.length = pkt.length + record_len
+   counter.add(self.shm.exported_flows)
 
    self.record_count = self.record_count + 1
    if self.record_count == self.max_record_count then
@@ -230,9 +355,11 @@ function FlowSet:flush_data_records(out)
    set_header.id = htons(self.template.id)
    set_header.length = htons(pkt.length)
 
-   -- Add record count and push.
-   add_record_count(pkt, record_count)
+   -- Add headers provided by the IPFIX object that created us
+   pkt = self.parent:add_ipfix_header(pkt, record_count)
+   pkt = self.parent:add_transport_headers(pkt)
    link.transmit(out, pkt)
+   counter.add(self.shm.flow_export_packets)
 end
 
 -- Print debugging messages for a flow.
@@ -245,50 +372,203 @@ function FlowSet:debug_flow(entry, msg)
    end
 end
 
+function FlowSet:expire_flow_rate_records(now)
+   if not self.scan_protection.enable then
+      return
+   end
+   local cursor = self.sp.expiry_cursor
+   local now_ms = to_milliseconds(now)
+   local interval = to_milliseconds(self.scan_protection.interval)
+   for i = 1, self.sp.table_tb:take_burst() do
+      local entry
+      cursor, entry = self.sp.table:next_entry(cursor, cursor + 1)
+      if entry then
+         if now_ms - tonumber(entry.value.tstamp) > 2*interval then
+            self.sp.table:remove_ptr(entry)
+         else
+            cursor = cursor + 1
+         end
+      end
+   end
+   self.sp.expiry_cursor = cursor
+end
+
+local function reset_rate_entry(entry, flow_entry, timestamp)
+      entry.value.tstamp = timestamp
+      entry.value.flow_count = 1
+      entry.value.packets = flow_entry.value.packetDeltaCount
+      entry.value.octets = flow_entry.value.octetDeltaCount
+end
+
+local function reset_drop_stats(entry, timestamp)
+   entry.value.drops = 0
+   entry.value.exports = 0
+   entry.value.tstamp_drop_start = timestamp
+end
+
+-- To implement the scan-protection feature, we keep track of flows
+-- that satisfy the configured criteria for packets-per-flow (ppf) and
+-- bytes-per-packet (bpp) per prefix aggregate (defaulting to /24 and
+-- /64 for IPv4 and IPv6, respectively).
+function FlowSet:suppress_flow(flow_entry, timestamp)
+   local config = self.scan_protection
+   if not config.enable then
+      return false
+   end
+
+   -- Only consider flows that satisfy the ppf and bpp criteria
+   local ppf = flow_entry.value.packetDeltaCount
+   local bpp = flow_entry.value.octetDeltaCount/ppf
+   if (ppf > config.max_packets_per_flow or bpp > config.max_bytes_per_packet) then
+      return false
+   end
+
+   local entry = self.sp.scratch_entry
+   self.sp.aggr_key_fn(flow_entry.key, entry.key)
+   local result = self.sp.table:lookup_ptr(entry.key)
+   if result then
+      local aggr = result.value
+      local interval = tonumber(timestamp - aggr.tstamp)/1000
+      if interval >= config.interval then
+         local fps = aggr.flow_count/interval
+         local drop_interval = (timestamp - aggr.tstamp_drop_start)/1000
+         if (fps >= config.threshold_rate) then
+	    local aggr_ppf = aggr.packets/aggr.flow_count
+	    local aggr_bpp = aggr.octets/aggr.packets
+            if aggr.suppress == 0 then
+               self.template.logger:log(
+                  string.format("Flow rate threshold exceeded from %s: "..
+                                   "%d fps, %d bpp, %d ppf",
+                                self.sp.ntop_fn(entry.key),
+                                tonumber(fps), tonumber(aggr_bpp), tonumber(aggr_ppf)))
+               reset_drop_stats(result, timestamp)
+               aggr.suppress = 1
+            elseif drop_interval > config.report_interval then
+               self.template.logger:log(
+                  string.format("Flow rate report for %s: "..
+                                   "%d fps, %d bpp, %d ppf, %d flows dropped, "..
+                                   "%d exported in past %d seconds",
+                                self.sp.ntop_fn(entry.key),
+                                tonumber(fps), tonumber(aggr_bpp), tonumber(aggr_ppf),
+                                tonumber(aggr.drops),
+                                tonumber(aggr.exports),
+                                tonumber(drop_interval)))
+               reset_drop_stats(result, timestamp)
+            end
+         else
+            if aggr.suppress == 1 then
+               self.template.logger:log(
+                  string.format("Flow rate below threshold from %s: "..
+                                   "%d flows dropped, %d exported in past "..
+                                   "%d seconds ",
+                                self.sp.ntop_fn(entry.key),
+                                tonumber(aggr.drops),
+                                tonumber(aggr.exports),
+                                tonumber(drop_interval)))
+               aggr.suppress = 0
+            end
+         end
+         reset_rate_entry(result, flow_entry, timestamp)
+      else
+         aggr.flow_count = aggr.flow_count + 1
+         aggr.packets = aggr.packets +
+            flow_entry.value.packetDeltaCount
+         aggr.octets = aggr.octets +
+            flow_entry.value.octetDeltaCount
+      end
+      if config.drop and aggr.suppress == 1 then
+	 -- NB: this rate-limiter applies to flows from *all*
+	 -- aggregates, while the threshold rate applies to each
+	 -- aggregate individually.
+         if self.sp.export_rate_tb:take(1) then
+            aggr.exports = aggr.exports + 1
+            return false
+         else
+            aggr.drops = aggr.drops + 1
+            return true
+         end
+      end
+   else
+      ffi.fill(entry.value, ffi.sizeof(entry.value))
+      reset_rate_entry(entry, flow_entry, timestamp)
+      self.sp.table:add(entry.key, entry.value)
+   end
+   return false
+end
+
 -- Walk through flow set to see if flow records need to be expired.
 -- Collect expired records and export them to the collector.
 function FlowSet:expire_records(out, now)
-   -- For a breath time of 100us, we will get 1e4 calls to push() every
-   -- second.  We'd like to sweep through the flow table once every 10
-   -- seconds, so on each breath we process 1e-5th of the table.
    local cursor = self.expiry_cursor
-   local limit = cursor + math.ceil(self.table.size * 1e-5)
-   now = to_milliseconds(now)
+   now_ms = to_milliseconds(now)
    local active = to_milliseconds(self.active_timeout)
    local idle = to_milliseconds(self.idle_timeout)
-   while true do
+   for i = 1, self.table_tb:take_burst() do
       local entry
-      cursor, entry = self.table:next_entry(cursor, limit)
-      if not entry then break end
-      if now - tonumber(entry.value.flowEndMilliseconds) > idle then
-         self:debug_flow(entry, "expire idle")
-         -- Relying on key and value being contiguous.
-         self:add_data_record(entry.key, out)
-         self.table:remove(entry.key)
-      elseif now - tonumber(entry.value.flowStartMilliseconds) > active then
-         self:debug_flow(entry, "expire active")
-         -- TODO: what should timers reset to?
-         entry.value.flowStartMilliseconds = now
-         entry.value.flowEndMilliseconds = now
-         entry.value.packetDeltaCount = 0
-         entry.value.octetDeltaCount = 0
-         self:add_data_record(entry.key, out)
-         cursor = cursor + 1
+      cursor, entry = self.table:next_entry(cursor, cursor + 1)
+      if entry then
+         if now_ms - tonumber(entry.value.flowEndMilliseconds) > idle then
+            self:debug_flow(entry, "expire idle")
+            if (not self:suppress_flow(entry, now_ms) and
+                entry.value.packetDeltaCount > 0) then
+               -- Relying on key and value being contiguous.
+               self:add_data_record(entry.key, out)
+            end
+            self.table:remove_ptr(entry)
+         elseif now_ms - tonumber(entry.value.flowStartMilliseconds) > active then
+            self:debug_flow(entry, "expire active")
+            if (not self:suppress_flow(entry, now_ms) and
+                entry.value.packetDeltaCount > 0) then
+               self:add_data_record(entry.key, out)
+            end
+            entry.value.flowStartMilliseconds = now_ms
+            entry.value.flowEndMilliseconds = now_ms
+            entry.value.packetDeltaCount = 0
+            entry.value.octetDeltaCount = 0
+            cursor = cursor + 1
+         else
+            -- Flow still live.
+            cursor = cursor + 1
+         end
       else
-         -- Flow still live.
-         cursor = cursor + 1
+         -- Empty slot or end of table
+         if cursor == 0 then
+            self.table_scan_time = now - self.table_tstamp
+            self.table_tstamp = now
+         end
       end
    end
    self.expiry_cursor = cursor
 
-   self:flush_data_records(out)
+   if self.flush_timer() then self:flush_data_records(out) end
+end
+
+function FlowSet:sync_stats()
+   counter.set(self.shm.table_size, self.table.size)
+   counter.set(self.shm.table_byte_size, self.table.byte_size)
+   counter.set(self.shm.table_occupancy, self.table.occupancy)
+   counter.set(self.shm.table_max_displacement, self.table.max_displacement)
+   counter.set(self.shm.table_scan_time, self.table_scan_time)
+   counter.set(self.shm.rate_table_size, self.sp.table.size or 0)
+   counter.set(self.shm.rate_table_byte_size, self.sp.table.byte_size or 0)
+   counter.set(self.shm.rate_table_occupancy, self.sp.table.occupancy or 0)
+   counter.set(self.shm.rate_table_max_displacement, self.sp.table.max_displacement or 0)
+   if self.shm_template then
+      for _, name in ipairs(self.template.counters_names) do
+         counter.set(self.shm_template[name], self.template.counters[name])
+      end
+   end
 end
 
 IPFIX = {}
 local ipfix_config_params = {
    idle_timeout = { default = 300 },
    active_timeout = { default = 120 },
+   flush_timeout = { default = 10 },
    cache_size = { default = 20000 },
+   max_load_factor = { default = 0.4 },
+   scan_protection = { default = {} },
+   scan_time = { default = 10 },
    -- RFC 5153 §6.2 recommends a 10-minute template refresh
    -- configurable from 1 minute to 1 day.
    template_refresh_interval = { default = 600 },
@@ -299,23 +579,89 @@ local ipfix_config_params = {
    mtu = { default = 512 },
    observation_domain = { default = 256 },
    exporter_ip = { required = true },
+   exporter_eth_src = { default = '00:00:00:00:00:00' },
+   exporter_eth_dst = { default = '00:00:00:00:00:00' },
    collector_ip = { required = true },
    collector_port = { required = true },
-   templates = { default = { template.v4, template.v6 } }
+   templates = { default = { "v4", "v6" } },
+   maps = { default = {} },
+   maps_log_fh = { default = nil },
+   -- Used to distinguish instances of the app running in the same
+   -- process
+   instance = { default = 1 },
+   add_packet_metadata = { default = true },
+   log_date = { default = true }
 }
+
+local scan_protection_params = {
+   enable = { default = false },
+   drop = { default = true },
+   aggregate_v4 = { default = 24 },
+   aggregate_v6 = { default = 64 },
+   cache_size = { default = 20000 },
+   max_load_factor = { default = 0.6 },
+   interval = { default = 300 },
+   report_interval = { default = 43200 },
+   threshold_rate = { default = 10000 },
+   export_rate = { default = 500 },
+   max_bytes_per_packet = { default = 90 },
+   max_packets_per_flow = { default = 2 }
+}
+
+local function setup_transport_header(self, config)
+   -- Prepare transport headers to prepend to each export packet
+   -- TODO: Support IPv6.
+   local eth_h = ether:new({ src = ether:pton(config.exporter_eth_src),
+                             dst = ether:pton(config.exporter_eth_dst),
+                             type = 0x0800 })
+   local ip_h  = ipv4:new({ src = ipv4:pton(config.exporter_ip),
+                            dst = ipv4:pton(config.collector_ip),
+                            protocol = 17,
+                            ttl = 64 })
+   local udp_h = udp:new({ src_port = math.random(49152, 65535),
+                           dst_port = config.collector_port })
+   local transport_headers = datagram:new(packet.allocate())
+   transport_headers:push(udp_h)
+   transport_headers:push(ip_h)
+   transport_headers:push(eth_h)
+   -- We need to update the IP and UDP headers after adding a payload.
+   -- The following re-locates ip_h and udp_h to point to the headers
+   -- in the template packet.
+   transport_headers:new(transport_headers:packet(), ether) -- Reset the parse stack
+   transport_headers:parse_n(3)
+   _, ip_h, udp_h = unpack(transport_headers:stack())
+   self.transport_headers = {
+      ip_h = ip_h,
+      udp_h = udp_h,
+      pkt = transport_headers:packet()
+   }
+end
 
 function IPFIX:new(config)
    config = lib.parse(config, ipfix_config_params)
-   local o = { sequence_number = 1,
-               boot_time = engine.now(),
+   local o = { boot_time = engine.now(),
                template_refresh_interval = config.template_refresh_interval,
                next_template_refresh = -1,
                version = config.ipfix_version,
                observation_domain = config.observation_domain,
-               exporter_ip = config.exporter_ip,
-               exporter_port = math.random(49152, 65535),
-               collector_ip = config.collector_ip,
-               collector_port = config.collector_port }
+               instance = config.instance,
+               add_packet_metadata = config.add_packet_metadata,
+               logger = logger.new({ date = config.log_date,
+                                     module = ("[%5d]"):format(S.getpid())
+                                        .." IPFIX exporter"} ) }
+   o.shm = {
+      -- Total number of packets received
+      received_packets = { counter },
+      -- Packets not matched by any flow set
+      ignored_packets = { counter },
+      -- Number of template packets sent
+      template_packets = { counter },
+      -- Non-wrapping sequence number (see add_ipfix_header() for a
+      -- brief description of the semantics for IPFIX and Netflowv9)
+      sequence_number = { counter, 1 },
+      version = { counter, o.version },
+      observation_domain = { counter, o.observation_domain },
+   }
 
    if o.version == 9 then
       o.header_t = netflow_v9_packet_header_t
@@ -327,6 +673,8 @@ function IPFIX:new(config)
    o.header_ptr_t = ptr_to(o.header_t)
    o.header_size = ffi.sizeof(o.header_t)
 
+   setup_transport_header(o, config)
+
    -- FIXME: Assuming we export to IPv4 address.
    local l3_header_len = 20
    local l4_header_len = 8
@@ -335,17 +683,33 @@ function IPFIX:new(config)
    local flow_set_args = { mtu = config.mtu - total_header_len,
                            version = config.ipfix_version,
                            cache_size = config.cache_size,
+			   max_load_factor = config.max_load_factor,
+                           scan_protection = lib.parse(config.scan_protection,
+                                                       scan_protection_params),
                            idle_timeout = config.idle_timeout,
-                           active_timeout = config.active_timeout }
+                           active_timeout = config.active_timeout,
+                           scan_time = config.scan_time,
+                           flush_timeout = config.flush_timeout,
+                           parent = o,
+                           maps = config.maps,
+                           maps_log_fh = config.maps_log_fh,
+                           instance = config.instance,
+                           log_date = config.log_date }
 
    o.flow_sets = {}
    for _, template in ipairs(config.templates) do
       table.insert(o.flow_sets, FlowSet:new(template, flow_set_args))
+      o.logger:log("Added template "..o.flow_sets[#o.flow_sets]:id())
    end
 
-   self.outgoing_link_name, self.outgoing = new_internal_link('IPFIX outgoing')
-
+   o.stats_timer = lib.throttle(5)
    return setmetatable(o, { __index = self })
+end
+
+function IPFIX:reconfig(config)
+   -- Only support reconfiguration of the transport header for now
+   config = lib.parse(config, ipfix_config_params)
+   setup_transport_header(self, config)
 end
 
 function IPFIX:send_template_records(out)
@@ -353,7 +717,17 @@ function IPFIX:send_template_records(out)
    for _, flow_set in ipairs(self.flow_sets) do
       pkt = flow_set:append_template_record(pkt)
    end
-   add_record_count(pkt, #self.flow_sets)
+   local record_count
+   if self.version == 9 then
+      record_count = #self.flow_sets
+   else
+      -- For IPFIX, template records are not accounted for in the
+      -- sequence number of the header
+      record_count = 0
+   end
+   pkt = self:add_ipfix_header(pkt, record_count)
+   pkt = self:add_transport_headers(pkt)
+   counter.add(self.shm.template_packets)
    link.transmit(out, pkt)
 end
 
@@ -362,82 +736,99 @@ function IPFIX:add_ipfix_header(pkt, count)
    local header = ffi.cast(self.header_ptr_t, pkt.data)
 
    header.version = htons(self.version)
+   header.sequence_number = htonl(tonumber(counter.read(self.shm.sequence_number)))
    if self.version == 9 then
+      -- record_count counts the number of all records in this packet
+      -- (template and data)
       header.record_count = htons(count)
+      -- sequence_number counts the number of exported packets
+      conter.add(self.shm.sequence_number)
       header.uptime = htonl(to_milliseconds(engine.now() - self.boot_time))
    elseif self.version == 10 then
+      -- sequence_number counts the cumulative number of data records
+      -- (i.e. excluding template and option records)
+      counter.add(self.shm.sequence_number, count)
       header.byte_length = htons(pkt.length)
    end
    header.timestamp = htonl(math.floor(C.get_unix_time()))
-   header.sequence_number = htonl(self.sequence_number)
    header.observation_domain = htonl(self.observation_domain)
-
-   self.sequence_number = self.sequence_number + 1
 
    return pkt
 end
 
 function IPFIX:add_transport_headers (pkt)
-   -- TODO: Support IPv6.
-   local eth_h = ether:new({ src = ether:pton('00:00:00:00:00:00'),
-                             dst = ether:pton('00:00:00:00:00:00'),
-                             type = 0x0800 })
-   local ip_h  = ipv4:new({ src = ipv4:pton(self.exporter_ip),
-                            dst = ipv4:pton(self.collector_ip),
-                            protocol = 17,
-                            ttl = 64,
-                            flags = 0x02 })
-   local udp_h = udp:new({ src_port = self.exporter_port,
-                           dst_port = self.collector_port })
-
+   local headers = self.transport_headers
+   local ip_h, udp_h = headers.ip_h, headers.udp_h
    udp_h:length(udp_h:sizeof() + pkt.length)
    udp_h:checksum(pkt.data, pkt.length, ip_h)
    ip_h:total_length(ip_h:sizeof() + udp_h:sizeof() + pkt.length)
    ip_h:checksum()
-
-   local dgram = datagram:new(pkt)
-   dgram:push(udp_h)
-   dgram:push(ip_h)
-   dgram:push(eth_h)
-   return dgram:packet()
+   return packet.prepend(pkt, headers.pkt.data, headers.pkt.length)
 end
 
-function IPFIX:push()
-   local input = self.input.input
+function IPFIX:push ()
+   for _, input in ipairs(self.input) do
+      self:push1(input)
+   end
+end
+
+function IPFIX:push1(input)
    -- FIXME: Use engine.now() for monotonic time.  Have to check that
    -- engine.now() gives values relative to the UNIX epoch though.
    local timestamp = ffi.C.get_unix_time()
-   assert(self.output.output, "missing output link")
-   local outgoing = self.outgoing
-
-   if self.next_template_refresh < engine.now() then
-      self.next_template_refresh = engine.now() + self.template_refresh_interval
-      self:send_template_records(outgoing)
-   end
 
    local flow_sets = self.flow_sets
-   for i=1,link.nreadable(input) do
-      local pkt = link.receive(input)
-      local handled = false
-      for _,set in ipairs(flow_sets) do
-         if set.match(pkt.data, pkt.length) then
-            link.transmit(set.incoming, pkt)
-            handled = true
-            break
+   local nreadable = link.nreadable(input)
+   counter.add(self.shm.received_packets, nreadable)
+
+   if self.add_packet_metadata then
+      for _ = 1, nreadable do
+         local p = link.receive(input)
+         metadata_add(p)
+         link.transmit(input, p)
+      end
+   end
+
+   for _,set in ipairs(flow_sets) do
+      for _ = 1, nreadable do
+         local p = link.receive(input)
+         local md = metadata_get(p)
+         if set.match(md.filter_start, md.filter_length) then
+            link.transmit(set.incoming, p)
+         else
+            link.transmit(input, p)
          end
       end
-      -- Drop packet if it didn't match any flow set.
-      if not handled then packet.free(pkt) end
+      nreadable = link.nreadable(input)
+   end
+
+   counter.add(self.shm.ignored_packets, nreadable)
+   for _ = 1, nreadable do
+      packet.free(link.receive(input))
    end
 
    for _,set in ipairs(flow_sets) do set:record_flows(timestamp) end
-   for _,set in ipairs(flow_sets) do set:expire_records(outgoing, timestamp) end
 
-   for i=1,link.nreadable(outgoing) do
-      local pkt = link.receive(outgoing)
-      pkt = self:add_ipfix_header(pkt, remove_record_count(pkt))
-      pkt = self:add_transport_headers(pkt)
-      link.transmit(self.output.output, pkt)
+end
+
+function IPFIX:tick()
+   local timestamp = ffi.C.get_unix_time()
+   assert(self.output.output, "missing output link")
+   local output = self.output.output
+   for _,set in ipairs(self.flow_sets) do
+      set:expire_records(output, timestamp)
+      set:expire_flow_rate_records(timestamp)
+   end
+
+   if self.next_template_refresh < engine.now() then
+      self.next_template_refresh = engine.now() + self.template_refresh_interval
+      self:send_template_records(self.output.output)
+   end
+
+   if self.stats_timer() then
+      for _,set in ipairs(self.flow_sets) do
+         set:sync_stats()
+      end
    end
 end
 
@@ -448,12 +839,15 @@ function selftest()
    local ethertype_ipv6 = consts.ethertype_ipv6
    local ipfix = IPFIX:new({ exporter_ip = "192.168.1.2",
                              collector_ip = "192.168.1.1",
-                             collector_port = 4739 })
+                             collector_port = 4739,
+                             flush_timeout = 0,
+                             scan_time = 1})
+   ipfix.shm = shm.create_frame("apps/ipfix", ipfix.shm)
 
    -- Mock input and output.
    local input_name, input = new_internal_link('ipfix selftest input')
    local output_name, output = new_internal_link('ipfix selftest output')
-   ipfix.input, ipfix.output = { input = input }, { output = output }
+   ipfix.input, ipfix.output = { [1] = input, input = input }, { [1] = output, output = output }
    local ipv4_flows, ipv6_flows = unpack(ipfix.flow_sets)
 
    -- Test helper that supplies a packet with some given fields.
@@ -489,6 +883,7 @@ function selftest()
    test("192.168.1.25", "8.8.8.8", 58342, 53)
    test("8.8.8.8", "192.168.1.25", 53, 58342)
    test("2001:4860:4860::8888", "2001:db8::ff00:42:8329", 53, 57777)
+   ipfix:tick()
    assert(ipv4_flows.table.occupancy == 4,
           string.format("wrong number of v4 flows: %d", ipv4_flows.table.occupancy))
    assert(ipv6_flows.table.occupancy == 1,
@@ -552,10 +947,12 @@ function selftest()
 
    -- Template message; no data yet.
    assert(link.nreadable(output) == 1)
-   -- Cause expiry.  By default we do 1e-5th of the table per push,
-   -- so this should be good.
-   for i=1,2e5 do ipfix:push() end
-   -- Template message and data message.
+   -- Wait for a full scan of the table to complete (1 second,
+   -- "scan_time")
+   local now = engine.now()
+   while engine.now() - now < 1 do
+      ipfix:tick()
+   end
    assert(link.nreadable(output) == 2)
 
    local filter = require("pf").compile_filter([[

@@ -235,8 +235,6 @@ function ARP:push()
    local isouth, osouth = self.input.south, self.output.south
    local inorth, onorth = self.input.north, self.output.north
 
-   self:maybe_send_arp_request(osouth)
-
    for _ = 1, link.nreadable(isouth) do
       local p = receive(isouth)
       if p.length < ether_header_len then
@@ -290,6 +288,10 @@ function ARP:push()
    end
 end
 
+function ARP:tick ()
+   self:maybe_send_arp_request(self.output.south)
+end
+
 function selftest()
    print('selftest: arp')
 
@@ -304,8 +306,8 @@ function selftest()
    arp.input  = { south=link.new('south in'),  north=link.new('north in') }
    arp.output = { south=link.new('south out'), north=link.new('north out') }
 
-   -- After first push, ARP should have sent out request.
-   arp:push()
+   -- After first tick, ARP should have sent out request.
+   arp:tick()
    assert(link.nreadable(arp.output.south) == 1)
    assert(link.nreadable(arp.output.north) == 0)
    local req = link.receive(arp.output.south)
