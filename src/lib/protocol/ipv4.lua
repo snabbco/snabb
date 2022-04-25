@@ -108,15 +108,7 @@ function ipv4:pton_cidr (p)
       assert(tonumber(length), "Invalid length "..length)
 end
 
-function ipv4:set(addr)
-   return ipv4:pton(addr)
-end
-
 -- Instance methods
-
-function ipv4:get()
-   return ipv4:ntop(self)
-end
 
 function ipv4:version (v)
    return lib.bitfield(16, self:header(), 'ihl_v_tos', 0, 4, v)
