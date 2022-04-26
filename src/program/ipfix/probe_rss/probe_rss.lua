@@ -39,7 +39,8 @@ local collector_pool_config = {
    port = { required = true }
 }
 local maps_config = {
-   pfx_to_as = { default = nil },
+   pfx4_to_as = { default = nil },
+   pfx6_to_as = { default = nil },
    vlan_to_ifindex = { default = nil },
    mac_to_as = { default = nil }
 }

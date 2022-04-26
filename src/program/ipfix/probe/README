@@ -50,7 +50,9 @@ Available options:
        --template-refresh <seconds>
                                 The interval at which template records are sent in
                                 seconds. Defaults to 600.
-       --pfx-to-as <file>       Name of the file that contains mappings from prefixes
+       --pfx4-to-as <file>      Name of the file that contains mappings from IPv4 prefixes
+                                to AS numbers from RIR data (used by extended templates)
+       --pfx6-to-as <file>      Name of the file that contains mappings from IPv6 prefixes
                                 to AS numbers from RIR data (used by extended templates)
        --vlan-to-ifindex <file> Name of the file that contains mappings from VLAN
                                 tags to interface indices (used by extended templates)

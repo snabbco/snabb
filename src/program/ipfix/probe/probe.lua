@@ -29,7 +29,8 @@ local long_opts = {
    ["flush-timeout"] = 1,
    ["cache-size"] = 1,
    ["scan-time"] = 1,
-   ["pfx-to-as"] = 1,
+   ["pfx4-to-as"] = 1,
+   ["pfx6-to-as"] = 1,
    ["maps-log"] = 1,
    ["vlan-to-ifindex"] = 1,
    ["mac-to-as"] = 1,
@@ -58,8 +59,6 @@ function run (args)
    local templates = {}
    local maps = {}
    local maps_logfile
-
-   local pfx_to_as, vlan_to_ifindex, mac_to_as
 
    local cpu
 
@@ -121,9 +120,14 @@ function run (args)
          cache_size =
             assert(tonumber(arg), "expected number for cache size")
       end,
-      ["pfx-to-as"] = function (arg)
+      ["pfx4-to-as"] = function (arg)
          if arg then
-            maps.pfx_to_as = arg
+            maps.pfx4_to_as = arg
+         end
+      end,
+      ["pfx6-to-as"] = function (arg)
+         if arg then
+            maps.pfx6_to_as = arg
          end
       end,
       ["vlan-to-ifindex"] = function (arg)
