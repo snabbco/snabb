@@ -5,6 +5,7 @@ local lib      = require("core.lib")
 local ctable   = require("lib.ctable")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
+local ipv6     = require("lib.protocol.ipv6")
 local poptrie  = require("lib.poptrie")
 local logger   = require("lib.logger")
 
@@ -74,14 +75,15 @@ end
 -- used by the Geo2Lite database provided by MaxMind:
 -- http://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN-CSV.zip
 local function make_pfx_to_as_map(name, proto)
-   local table = { pt = poptrie.new{direct_pointing=true}, asn = {} }
+   local table = { pt = poptrie.new{direct_pointing=true,
+                                    leaf_t=ffi.typeof("uint32_t")} }
    if proto == ipv4 then
       function table:search_bytes (a)
-         return self.asn[self.pt:lookup32(a)]
+         return self.pt:lookup32(a)
       end
    elseif proto == ipv6 then
       function table:search_bytes (a)
-         return self.asn[self.pt:lookup128(a)]
+         return self.pt:lookup128(a)
       end
    else
       error("Proto must be ipv4 or ipv6")
@@ -91,14 +93,12 @@ local function make_pfx_to_as_map(name, proto)
          local cidr, asn = line:match("([^,]*),(%d+),")
          asn = tonumber(asn)
          assert(cidr and asn, "Prefix-to-AS map: invalid line: "..line)
-         local id = #asn+1
-         assert(id < 2^16, "Prefix-to-AS map: poptrie overflow")
-         table.asn[id] = asn
+         assert(asn > 0 and asn < 2^32, "Prefix-to-AS map: asn out of range: "..asn)
          local pfx, len = proto:pton_cidr(cidr)
-         table:add(pfx, len, id)
+         table.pt:add(pfx, len, asn)
       end
    end
-   table:build()
+   table.pt:build()
    return table
 end
 
