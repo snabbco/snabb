@@ -568,7 +568,7 @@ local function v4_extended_extract (self, pkt, timestamp, entry)
    local md = metadata_get(pkt)
    extended_extract(self, pkt, md, timestamp, entry, extract_v4_addr)
 
-   local pfx_to_as = self.maps.pfx_to_as
+   local pfx_to_as = self.maps.pfx4_to_as
    local asn = pfx_to_as.map:search_bytes(entry.key.sourceIPv4Address)
    if asn then
       entry.value.bgpSourceAsNumber = asn
@@ -600,6 +600,23 @@ end
 local function v6_extended_extract (self, pkt, timestamp, entry)
    local md = metadata_get(pkt)
    extended_extract(self, pkt, md, timestamp, entry, extract_v6_addr)
+
+   local pfx_to_as = self.maps.pfx6_to_as
+   local asn = pfx_to_as.map:search_bytes(entry.key.sourceIPv6Address)
+   if asn then
+      entry.value.bgpSourceAsNumber = asn
+   elseif can_log(pfx_to_as.logger) then
+      pfx_to_as.logger:log("missing AS for source "
+                              ..ipv6:ntop(entry.key.sourceIPv6Address))
+   end
+   local asn = pfx_to_as.map:search_bytes(entry.key.destinationIPv6Address)
+   if asn then
+      entry.value.bgpDestinationAsNumber = asn
+   elseif can_log(pfx_to_as.logger) then
+      pfx_to_as.logger:log("missing AS for destination "
+                              ..ipv6:ntop(entry.key.destinationIPv6Address))
+   end
+
    entry.value.ipClassOfService = get_ipv6_tc(md.l3)
    if md.proto == IP_PROTO_ICMP6 and md.frag_offset == 0 then
       entry.value.icmpTypeCodeIPv6 = get_icmp_typecode(md.l4)
@@ -729,7 +746,7 @@ templates = {
                  "icmpTypeCodeIPv4",
                  "ingressInterface",
                  "egressInterface" },
-      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx_to_as' },
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx4_to_as' },
       extract = v4_extended_extract,
       accumulate = v4_extended_accumulate
    },
@@ -848,7 +865,7 @@ templates = {
                  "icmpTypeCodeIPv6",
                  "ingressInterface",
                  "egressInterface" },
-      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx_to_as' },
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx6_to_as' },
       extract = v6_extended_extract,
       accumulate = v6_extended_accumulate,
    },

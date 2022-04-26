@@ -65,20 +65,27 @@ local function make_vlan_to_ifindex_map(name)
    return table
 end
 
--- Map IPv4 address to AS number
+-- Map IP address to AS number
 --
--- Used to set bgpSourceAsNumber, bgpDestinationAsNumber from the IPv4
+-- Used to set bgpSourceAsNumber, bgpDestinationAsNumber from the IP
 -- source and destination address, respectively.  The file contains a
 -- list of prefixes and their proper source AS number based on
 -- authoritative data from the RIRs. This parser supports the format
 -- used by the Geo2Lite database provided by MaxMind:
 -- http://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN-CSV.zip
-local function make_pfx_to_as_map(name)
-   local table = { pt = poptrie.new{direct_pointing=true},
-                   asn = {},
-                   search_bytes = function (self, a)
-                     return self.asn[self.pt:lookup32(a)]
-                   end }
+local function make_pfx_to_as_map(name, proto)
+   local table = { pt = poptrie.new{direct_pointing=true}, asn = {} }
+   if proto == ipv4 then
+      function table:search_bytes (a)
+         return self.asn[self.pt:lookup32(a)]
+      end
+   elseif proto == ipv6 then
+      function table:search_bytes (a)
+         return self.asn[self.pt:lookup128(a)]
+      end
+   else
+      error("Proto must be ipv4 or ipv6")
+   end
    for line in assert(io.lines(name)) do
       if not line:match("^network") then
          local cidr, asn = line:match("([^,]*),(%d+),")
@@ -87,7 +94,7 @@ local function make_pfx_to_as_map(name)
          local id = #asn+1
          assert(id < 2^16, "Prefix-to-AS map: poptrie overflow")
          table.asn[id] = asn
-         local pfx, len = ipv4:pton_cidr(cidr)
+         local pfx, len = proto:pton_cidr(cidr)
          table:add(pfx, len, id)
       end
    end
@@ -104,9 +111,13 @@ local map_info = {
       create_fn = make_vlan_to_ifindex_map,
       logger_module = 'VLAN to ifIndex mapper'
    },
-   pfx_to_as = {
-      create_fn = make_pfx_to_as_map,
-      logger_module = 'Prefix to AS mapper'
+   pfx4_to_as = {
+      create_fn = function (name) return make_pfx_to_as_map(name, ipv4) end,
+      logger_module = 'IPv4 prefix to AS mapper'
+   },
+   pfx6_to_as = {
+      create_fn = function (name) return make_pfx_to_as_map(name, ipv6) end,
+      logger_module = 'IPv6 prefix to AS mapper'
    }
 }
 
