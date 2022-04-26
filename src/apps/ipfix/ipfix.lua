@@ -17,6 +17,7 @@ local shm      = require("core.shm")
 local counter  = require("core.counter")
 local datagram = require("lib.protocol.datagram")
 local ether    = require("lib.protocol.ethernet")
+local dot1q    = require("lib.protocol.dot1q")
 local ipv4     = require("lib.protocol.ipv4")
 local ipv6     = require("lib.protocol.ipv6")
 local udp      = require("lib.protocol.udp")
@@ -843,7 +844,16 @@ function selftest()
                              collector_ip = "192.168.1.1",
                              collector_port = 4739,
                              flush_timeout = 0,
-                             scan_time = 1})
+                             scan_time = 1,
+                             templates = {
+                              'v4_extended', 'v6_extended'
+                             },
+                             maps = {
+                               mac_to_as = "apps/ipfix/test/mac_to_as",
+                               vlan_to_ifindex = "apps/ipfix/test/vlan_to_ifindex",
+                               pfx4_to_as = "apps/ipfix/test/pfx4_to_as.csv",
+                               pfx6_to_as = "apps/ipfix/test/pfx6_to_as.csv"
+                             }})
    ipfix.shm = shm.create_frame("apps/ipfix", ipfix.shm)
 
    -- Mock input and output.
@@ -853,13 +863,19 @@ function selftest()
    local ipv4_flows, ipv6_flows = unpack(ipfix.flow_sets)
 
    -- Test helper that supplies a packet with some given fields.
-   local function test(src_ip, dst_ip, src_port, dst_port)
+   local function test(src_ip, dst_ip, src_port, dst_port, vlan_id)
       local is_ipv6 = not not src_ip:match(':')
       local proto = is_ipv6 and ethertype_ipv6 or ethertype_ipv4
       local eth = ether:new({ src = ether:pton("00:11:22:33:44:55"),
-                              dst = ether:pton("55:44:33:22:11:00"),
+                              dst = ether:pton("50:44:33:22:11:00"),
                               type = proto })
+      local vlan      
       local ip
+
+      if vlan_id then
+         eth:type(dot1q.TPID)
+         vlan = dot1q:new{ id = vlan_id, type = proto }
+      end
 
       if is_ipv6 then
          ip = ipv6:new({ src = ipv6:pton(src_ip), dst = ipv6:pton(dst_ip),
@@ -873,6 +889,7 @@ function selftest()
 
       dg:push(udp)
       dg:push(ip)
+      if vlan then dg:push(vlan) end
       dg:push(eth)
 
       link.transmit(input, dg:packet())
@@ -880,7 +897,7 @@ function selftest()
    end
 
    -- Populate with some known flows.
-   test("192.168.1.1", "192.168.1.25", 9999, 80)
+   test("192.168.1.1", "192.168.1.25", 9999, 80, 1)
    test("192.168.1.25", "192.168.1.1", 3653, 23552)
    test("192.168.1.25", "8.8.8.8", 58342, 53)
    test("8.8.8.8", "192.168.1.25", 53, 58342)
@@ -909,6 +926,12 @@ function selftest()
    local result = ipv4_flows.table:lookup_ptr(key)
    assert(result, "key not found")
    assert(result.value.packetDeltaCount == 1)
+   assert(result.value.bgpSourceAsNumber == 1234)
+   assert(result.value.bgpDestinationAsNumber == 5678)
+   assert(result.value.ingressInterface == 2)
+   assert(result.value.egressInterface == 3)
+   assert(result.value.bgpPrevAdjacentAsNumber == 321)
+   assert(result.value.bgpNextAdjacentAsNumber == 654)
 
    -- make sure the count is incremented on the same flow
    test("192.168.1.1", "192.168.1.25", 9999, 80)
@@ -926,6 +949,8 @@ function selftest()
    local result = ipv6_flows.table:lookup_ptr(key)
    assert(result, "key not found")
    assert(result.value.packetDeltaCount == 1)
+   assert(result.value.bgpSourceAsNumber == 1234)
+   assert(result.value.bgpDestinationAsNumber == 5678)
 
    -- sanity check
    ipv4_flows.table:selfcheck()
