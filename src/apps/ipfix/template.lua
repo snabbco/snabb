@@ -569,15 +569,15 @@ local function v4_extended_extract (self, pkt, timestamp, entry)
    extended_extract(self, pkt, md, timestamp, entry, extract_v4_addr)
 
    local pfx_to_as = self.maps.pfx_to_as
-   local asn = pfx_to_as.map:lookup32(entry.key.sourceIPv4Address)
-   if asn ~= 0 then
+   local asn = pfx_to_as.map:search_bytes(entry.key.sourceIPv4Address)
+   if asn then
       entry.value.bgpSourceAsNumber = asn
    elseif can_log(pfx_to_as.logger) then
       pfx_to_as.logger:log("missing AS for source "
                               ..ipv4:ntop(entry.key.sourceIPv4Address))
    end
-   local asn = pfx_to_as.map:lookup32(entry.key.destinationIPv4Address)
-   if asn ~= 0 then
+   local asn = pfx_to_as.map:search_bytes(entry.key.destinationIPv4Address)
+   if asn then
       entry.value.bgpDestinationAsNumber = asn
    elseif can_log(pfx_to_as.logger) then
       pfx_to_as.logger:log("missing AS for destination "

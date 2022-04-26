@@ -74,15 +74,21 @@ end
 -- used by the Geo2Lite database provided by MaxMind:
 -- http://geolite.maxmind.com/download/geoip/database/GeoLite2-ASN-CSV.zip
 local function make_pfx_to_as_map(name)
-   local table = poptrie.new{direct_pointing=true}
+   local table = { pt = poptrie.new{direct_pointing=true},
+                   asn = {},
+                   search_bytes = function (self, a)
+                     return self.asn[self.pt:lookup32(a)]
+                   end }
    for line in assert(io.lines(name)) do
       if not line:match("^network") then
          local cidr, asn = line:match("([^,]*),(%d+),")
          asn = tonumber(asn)
-         assert(cidr and asn and asn == bit.band(asn, 0xffff),
-                "Prefix-to-AS map: invalid line: "..line)
+         assert(cidr and asn, "Prefix-to-AS map: invalid line: "..line)
+         local id = #asn+1
+         assert(id < 2^16, "Prefix-to-AS map: poptrie overflow")
+         table.asn[id] = asn
          local pfx, len = ipv4:pton_cidr(cidr)
-         table:add(pfx, len, asn)
+         table:add(pfx, len, id)
       end
    end
    table:build()
