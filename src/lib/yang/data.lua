@@ -464,7 +464,7 @@ local function array_parser(keyword, element_type, ctype)
    local array_t = ctype and ffi.typeof('$[?]', elt_t)
    local function finish(out)
       -- FIXME check min-elements
-      if array_t then
+      if out and array_t then
          out = util.ffi_array(array_t(#out, out), elt_t)
       end
       return out
