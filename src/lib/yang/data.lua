@@ -616,10 +616,8 @@ local function table_parser(keyword, keys, values, native_key, key_ctype,
    local function parse(P, assoc)
       local struct = parse1(P)
       local key, value = {}, {}
-      if not native_key then
          if key_t then key = key_t() end
          if value_t then value = value_t() end
-      end
       for k,_ in pairs(keys) do
          local id = normalize_id(k)
          key[id] = struct[id]
@@ -2090,7 +2088,6 @@ function selftest()
       numbered { id 2; }
    ]])
    assert(natnumkey_data.numbered[-1])
-   assert(type(natnumkey_data.numbered[-1]) == 'table')
    assert(natnumkey_data.numbered[2])
 
    influxdb_printer_tests()
