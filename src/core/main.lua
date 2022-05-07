@@ -168,8 +168,7 @@ function initialize ()
 end
 
 function handler (reason)
-   print(reason)
-   print(STP.stacktrace())
+   print(debug.traceback(reason))
    if debug_on_error then debug.debug() end
    os.exit(1)
 end
