@@ -1,0 +1,271 @@
+module snabb-snabbflow-v1 {
+  yang-version 1.1;
+  namespace snabb:snabbflow-v1;
+  prefix snabbflow;
+
+  import ietf-inet-types { prefix inet; }
+  import ietf-yang-types { prefix yang; }
+
+  organization "Snabb";
+  contact "Max Rottenkolber <max@mr.gy>";
+  description
+   "Configuration for the Snabbflow IPFIX exporter.";
+
+  revision 2022-04-27 {
+    description
+      "Initial draft.";
+  }
+
+  container snabbflow-config {
+    description
+     "Configuration for the Snabbflow IPFIX exporter.";
+
+    list interfaces {
+      key "device";
+
+      leaf device {
+        type string;
+        description "PCI address of NIC.";
+      }
+      leaf name {
+        type string;
+        description "XXX";
+      }
+      leaf description {
+        type string;
+        description "XXX";
+      }
+      leaf vlan-tag {
+        type uint16 { range 0..4095; }
+        description "802.1Q Ethernet VLAN tag for this interface.";
+      }
+      leaf receive-queue-size { // config
+        type uint32 { range 512|1024|2048|4096|8192; }
+        default 2048;
+        description "Receive queue size.";
+      }
+    }
+
+    container rss {
+      leaf hardware-scaling { // hw_rss_scaling
+        type uint32 { range 1..64; }
+        default 1;
+        description "n-way hardware-assisted RSS scaling.";
+      }
+
+      // leaf-list cpu-pool {
+      //   type uint32;
+      //   description "CPU cores used by Snabbflow.";
+      // }
+
+      container software-scaling {
+        leaf default-class {
+          type boolean;
+          default true;
+          description "XXX";
+        }
+
+        list classes {
+          key "name order";
+          ordered-by user; // XXX not yet implemented, hence the 'order' leaf
+
+          leaf name {
+            type string;
+            description "XXX";
+          }
+          leaf order {
+            type uint32;
+            description "XXX";
+          }
+          leaf filter {
+            mandatory true;
+            type string;
+            description "XXX";
+          }
+          leaf continue {
+            type boolean;
+            default false;
+            description "XXX";
+          }
+        }
+
+        leaf remove-extension-headers {
+          type boolean;
+          default true;
+          description "XXX";
+        }
+      }
+
+      // leaf pin-cpu {
+      //   type boolean;
+      //   default false;
+      //   description "XXX";
+      // }
+    }
+
+    container ipfix {
+
+      leaf idle-timeout {
+        type decimal64;
+        default 300;
+      }
+      
+      leaf active-timeout {
+        type decimal64;
+        default 120;
+      }
+
+      leaf flush-timeout {
+        type decimal64;
+        default 10;
+      }
+
+      leaf cache-size {
+        type uint32;
+        default 20000;
+      }
+
+      leaf max-load-factor {
+        type decimal64;
+        default 0.4;
+      }
+      
+      container scan-protection {
+        leaf threshold-rate {
+          type decimal64;
+          default 10000;
+        }
+        leaf export-rate {
+          type decimal64;
+          default 500;
+        }
+      }
+
+      leaf scan-time {
+        type decimal64;
+        default 10;
+      }
+
+      leaf template-refresh-interval {
+        type decimal64;
+        default 600;
+      }
+
+      leaf version {
+        type uint32;
+        default 10;
+      }
+
+      leaf mtu {
+        type uint32;
+        default 512;
+      }
+
+      leaf exporter-ip {
+        type inet:ipv4-address;
+        default "10.0.0.1";
+      }
+
+      container maps {
+        container pfx4-to-as { leaf file { mandatory true; type string; } }
+        container pfx6-to-as { leaf file { mandatory true; type string; } }
+        container vlan-to-ifindex { leaf file { mandatory true; type string; } }
+        container mac-to-as { leaf file { mandatory true; type string; } }
+      }
+
+      leaf maps-logfile {
+        type string;
+      }
+
+      leaf add-packet-metadata {
+        type boolean;
+        default true;
+      }
+
+      leaf log-date {
+        type boolean;
+        default true;
+      }
+
+      list collector-pools {
+        key "name";
+
+        leaf name { 
+          mandatory true;
+          type string;
+        }
+
+        list pool {
+          key "ip port";
+
+          leaf ip { 
+            mandatory true;
+            type inet:ipv4-address;
+          }
+          leaf port {
+            mandatory true;
+            type uint16;
+          }
+        }
+      }
+
+      leaf observation-domain-base {
+        type uint32;
+        default 256;
+        description "XXX";
+      }
+
+      list exporters {
+        key "name";
+
+        leaf name {
+          type string;
+        }
+
+        leaf-list templates {
+          type string;
+        }
+
+        leaf rss-class {
+          type string;
+          default "default";
+        }
+
+        leaf collector-pool {
+          type string;
+        }
+
+        leaf use-maps {
+          type boolean;
+          default false;
+        }
+
+        leaf map-log-directory {
+          type string;
+        }
+
+        list instances {
+          key "id";
+
+          leaf id {
+            type uint32;
+          }
+
+          leaf embed {
+            type boolean;
+            default true;
+          }
+
+          leaf weight {
+            type decimal64;
+            default 1;
+          }
+
+          // busywait = { default = nil },
+          // pin_cpu = { default = false },
+
+        }
+      }
+    }
+  }
+}
