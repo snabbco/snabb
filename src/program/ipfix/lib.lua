@@ -160,6 +160,31 @@ probe_config = {
    scan_protection = { default = {} }
 }
 
+local function mk_ipfix_config (config)
+   return { active_timeout = config.active_timeout,
+            idle_timeout = config.idle_timeout,
+            flush_timeout = config.flush_timeout,
+            cache_size = config.cache_size,
+            max_load_factor = config.max_load_factor,
+            scan_time = config.scan_time,
+            observation_domain = config.observation_domain,
+            template_refresh_interval =
+               config.template_refresh_interval,
+            ipfix_version = config.ipfix_version,
+            exporter_ip = config.exporter_ip,
+            collector_ip = config.collector_ip,
+            collector_port = config.collector_port,
+            mtu = config.mtu - 14,
+            templates = config.templates,
+            maps = config.maps,
+            maps_log_fh = config.maps_logfile and
+               assert(io.open(config.maps_logfile, "a")) or nil,
+            instance = config.instance,
+            add_packet_metadata = config.add_packet_metadata,
+            log_date = config.log_date,
+            scan_protection = config.scan_protection }
+end
+
 function configure_graph (arg, in_graph)
    local config = lib.parse(arg, probe_config)
 
@@ -179,32 +204,7 @@ function configure_graph (arg, in_graph)
       tap_config.mtu = config.mtu
    end
 
-   local function mk_ipfix_config()
-      return { active_timeout = config.active_timeout,
-               idle_timeout = config.idle_timeout,
-               flush_timeout = config.flush_timeout,
-               cache_size = config.cache_size,
-               max_load_factor = config.max_load_factor,
-               scan_time = config.scan_time,
-               observation_domain = config.observation_domain,
-               template_refresh_interval =
-                  config.template_refresh_interval,
-               ipfix_version = config.ipfix_version,
-               exporter_ip = config.exporter_ip,
-               collector_ip = config.collector_ip,
-               collector_port = config.collector_port,
-               mtu = config.mtu - 14,
-               templates = config.templates,
-               maps = config.maps,
-               maps_log_fh = config.maps_logfile and
-                  assert(io.open(config.maps_logfile, "a")) or nil,
-               instance = config.instance,
-               add_packet_metadata = config.add_packet_metadata,
-               log_date = config.log_date,
-               scan_protection = config.scan_protection }
-   end
-
-   local ipfix_config = mk_ipfix_config()
+   local ipfix_config = mk_ipfix_config(config)
    local ipfix_name = "ipfix"..config.instance
    local out_name = "out"..config.instance
    local sink_name = "sink"..config.instance
@@ -251,6 +251,10 @@ function configure_graph (arg, in_graph)
                      ..sink_name..".input")
    end
 
+   return graph, config
+end
+
+function setup_graph_ifmib_mac (graph, config)
    engine.configure(graph)
 
    if config.input_type and config.input_type == "pci" then
@@ -272,14 +276,14 @@ function configure_graph (arg, in_graph)
       assert(S.sysctl(tap_sysctl_base.."/accept_local", '1'))
       assert(S.sysctl(tap_sysctl_base.."/forwarding", '1'))
       local out_stats = engine.app_table[out_name].shm
-      local ipfix_config = mk_ipfix_config()
+      local ipfix_config = mk_ipfix_config(config)
       ipfix_config.exporter_eth_dst =
          tostring(macaddress:new(counter.read(out_stats.macaddr)))
       app_graph.app(graph, ipfix_name, ipfix.IPFIX, ipfix_config)
       engine.configure(graph)
    end
 
-   return config, graph
+   return graph, config
 end
 
 function parse_jit_option_fn (jit)
@@ -342,7 +346,7 @@ end
 
 -- Run an instance of the ipfix probe
 function run (arg, duration, busywait, cpu, jit)
-   local config = configure_graph(arg)
+   local _, config = setup_graph_ifmib_mac(configure_graph(arg))
 
    if cpu then numa.bind_to_cpu(cpu) end
    set_jit_options(jit)
@@ -382,6 +386,26 @@ function run_rss(config, inputs, outputs, duration, busywait, cpu, jit, log_date
    if cpu then numa.bind_to_cpu(cpu) end
    set_jit_options(jit)
 
+   local graph, in_app_specs = configure_rss_graph(config, inputs, outputs, 'setup')
+
+   engine.configure(graph)
+   for _, spec in ipairs(in_app_specs) do
+      create_ifmib(engine.app_table[spec.name].stats,
+                   spec.ifname, spec.ifalias, log_date)
+   end
+   require("jit").flush()
+
+   local engine_opts = { no_report = true, measure_latency = false }
+   if duration ~= 0 then engine_opts.duration = duration end
+   if busywait ~= nil then
+      engine.busywait = busywait
+   end
+   engine.main(engine_opts)
+
+   clear_jit_options(jit)
+end
+
+function configure_rss_graph (config, inputs, outputs, setup)
    local graph = app_graph.new()
    app_graph.app(graph, "rss", rss.rss, config)
 
@@ -423,25 +447,14 @@ function run_rss(config, inputs, outputs, duration, busywait, cpu, jit, log_date
          --   args       probe configuration
          --   instance   # of embedded instance
          output.args.instance = output.instance
-         local config = configure_graph(output.args, graph)
+         local graph, config = configure_graph(output.args, graph)
+         if setup then
+            setup_graph_ifmib_mac(graph, config)
+         end
          app_graph.link(graph, "rss."..output.link_name
                            .." -> ipfix"..output.instance..".input")
       end
    end
-
-   engine.configure(graph)
-   for _, spec in ipairs(in_app_specs) do
-      create_ifmib(engine.app_table[spec.name].stats,
-                   spec.ifname, spec.ifalias, log_date)
-   end
-   require("jit").flush()
-
-   local engine_opts = { no_report = true, measure_latency = false }
-   if duration ~= 0 then engine_opts.duration = duration end
-   if busywait ~= nil then
-      engine.busywait = busywait
-   end
-   engine.main(engine_opts)
-
-   clear_jit_options(jit)
+   
+   return graph, in_app_specs
 end
