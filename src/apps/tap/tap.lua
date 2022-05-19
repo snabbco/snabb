@@ -28,7 +28,8 @@ Tap._config = {
    mtu_fixup = { default = true },
    mtu_offset = { default = 14 },
    mtu_set = { default = nil },
-   overwrite_src_mac = { default = false }
+   overwrite_src_mac = { default = false },
+   forwarding = { default = false }
 }
 
 -- Get or set the MTU of a tap device.  Return the current value.
@@ -141,6 +142,13 @@ function Tap:new (conf)
    end
 
    local mac = _macaddr(sock, ifr)
+
+   if conf.forwarding then
+      local tap_sysctl_base = "net/ipv4/conf/"..conf.name
+      assert(S.sysctl(tap_sysctl_base.."/rp_filter", '0'))
+      assert(S.sysctl(tap_sysctl_base.."/accept_local", '1'))
+      assert(S.sysctl(tap_sysctl_base.."/forwarding", '1'))
+   end
 
    return setmetatable({fd = fd,
                         sock = sock,
