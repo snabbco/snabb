@@ -202,6 +202,8 @@ function configure_graph (arg, in_graph)
    if config.output_type == "tap_routed" then
       local tap_config = out_app[2]
       tap_config.mtu = config.mtu
+      tap_config.overwrite_src_mac = true
+      tap_config.forwarding = true
    end
 
    local ipfix_config = mk_ipfix_config(config)
@@ -266,21 +268,6 @@ function setup_graph_ifmib_mac (graph, config)
       create_ifmib(engine.app_table[out_name].shm, config.output,
                    "IPFIX Observation Domain "..config.observation_domain,
                    config.log_date)
-   end
-
-   if config.output_type == "tap_routed" then
-      local tap_config = out_app[2]
-      local name = tap_config.name
-      local tap_sysctl_base = "net/ipv4/conf/"..name
-      assert(S.sysctl(tap_sysctl_base.."/rp_filter", '0'))
-      assert(S.sysctl(tap_sysctl_base.."/accept_local", '1'))
-      assert(S.sysctl(tap_sysctl_base.."/forwarding", '1'))
-      local out_stats = engine.app_table[out_name].shm
-      local ipfix_config = mk_ipfix_config(config)
-      ipfix_config.exporter_eth_dst =
-         tostring(macaddress:new(counter.read(out_stats.macaddr)))
-      app_graph.app(graph, ipfix_name, ipfix.IPFIX, ipfix_config)
-      engine.configure(graph)
    end
 
    return graph, config
