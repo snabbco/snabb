@@ -190,6 +190,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
       for i, interface in ipairs(main.interfaces) do
          local input = lib.parse(interface, interface_config)
          input.rxq = rssq
+         input.receive_queue_size = input.config.recvq_size
          table.insert(inputs, input)
 
          -- The mellanox driver requires a master process that sets up
@@ -324,20 +325,7 @@ local function create_workers (probe_config, duration, busywait, jit, logger, lo
 
    end
 
-   -- Create a trivial app graph that only contains the control apps
-   -- for the Mellanox driver, which sets up the queues and
-   -- maintains interface counters.
-   local ctrl_graph = app_graph.new()
-   for device, spec in pairs(mellanox) do
-      local conf = {
-         pciaddress = device,
-         queues = spec.queues,
-         recvq_size = spec.recvq_size
-      }
-      local driver = pci.device_info(device).driver
-      app_graph.app(ctrl_graph, "ctrl_"..device,
-                    require(driver).ConnectX, conf)
-   end
+   local ctrl_graph = probe.configure_mlx_ctrl_graph(mellanox, log_date)
 
    for _, spec in ipairs(workers) do
       local child_pid = worker.start(spec.name, spec.expr)
@@ -444,11 +432,6 @@ function run (parameters)
    engine.busywait = false
    engine.Hz = 10
    engine.configure(ctrl_graph)
-
-   for device, spec in pairs(mellanox) do
-      probe.create_ifmib(engine.app_table["ctrl_"..device].stats,
-                         spec.ifName, spec.ifAlias, log_date)
-   end
 
    engine.main({ duration = duration })
 

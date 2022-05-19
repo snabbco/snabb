@@ -241,26 +241,20 @@ function run (args)
       print("Launched IPFIX worker process #"..child_pid)
    end
 
-   local ctrl_graph = app_graph.new()
+   local ctrl_graph
    if mellanox_qs then
-      local conf = {
-         pciaddress = input,
-         queues = mellanox_qs,
-         recvq_size = 8192
+      ctrl_graph = probe.configure_mlx_ctrl_graph{
+         [input] = {
+            queues = mellanox_qs,
+            recvq_size = 8192,
+            ifName = (input:gsub("[:%.]", "_"))
       }
-      local driver = pci.device_info(input).driver
-      app_graph.app(ctrl_graph, "ctrl_"..input,
-                    require(driver).ConnectX, conf)
+   }
    end
 
    engine.busywait = false
    engine.Hz = 10
    engine.configure(ctrl_graph)
-
-   if mellanox_qs then
-      probe.create_ifmib(engine.app_table["ctrl_"..input].stats,
-                         (input:gsub("[:%.]", "_")))
-   end
 
    engine.main({ duration = duration })
 

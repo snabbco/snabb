@@ -2,7 +2,6 @@ module(..., package.seeall)
 
 local now        = require("core.app").now
 local lib        = require("core.lib")
-local shm        = require("core.shm")
 local counter    = require("core.counter")
 local app_graph  = require("core.config")
 local link       = require("core.link")
@@ -10,18 +9,15 @@ local pci        = require("lib.hardware.pci")
 local numa       = require("lib.numa")
 local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
-local macaddress = require("lib.macaddress")
 local S          = require("syscall")
 local basic      = require("apps.basic.basic_apps")
 local arp        = require("apps.ipv4.arp")
 local ipfix      = require("apps.ipfix.ipfix")
 local template   = require("apps.ipfix.template")
 local rss        = require("apps.rss.rss")
-local ifmib      = require("lib.ipc.shmem.iftable_mib")
+local iftable    = require("apps.snmp.iftable")
 local Transmitter = require("apps.interlink.transmitter")
 
-
-local ifmib_dir = '/ifmib'
 
 -- apps that can be used as an input or output for the exporter
 local in_apps, out_apps = {}, {}
@@ -72,15 +68,14 @@ function in_apps.interlink (name)
    { require("apps.interlink.receiver"), nil }
 end
 
-function in_apps.pci (spec)
-   local device, rxq = unpack(parse_spec(spec, '/'))
+function in_apps.pci (input)
+   local device, rxq = input.device, input.rxq or 0
    local device_info = pci.device_info(device)
    local conf = { pciaddr = device }
    if device_info.driver == 'apps.intel_mp.intel_mp' then
-      local rxq = (rxq and tonumber(rxq)) or 0
       conf.rxq = rxq
       conf.rxcounter = rxq
-      conf.ring_buffer_size = 32768
+      conf.ring_buffer_size = input.receive_queue_size
    elseif device_info.driver == 'apps.mellanox.connectx' then
       conf = {
          pciaddress = device,
@@ -91,20 +86,6 @@ function in_apps.pci (spec)
           { require(device_info.driver).driver, conf }
 end
 out_apps.pci = in_apps.pci
-
-function create_ifmib(stats, ifname, ifalias, log_date)
-   -- stats can be nil in case this process is not the master
-   -- of the device
-   if not stats then return end
-   if not shm.exists(ifmib_dir) then
-      shm.mkdir(ifmib_dir)
-   end
-   ifmib.init_snmp( { ifDescr = ifname,
-                      ifName = ifname,
-                      ifAlias = ifalias or "NetFlow input", },
-      ifname:gsub('/', '-'), stats,
-      shm.root..ifmib_dir, 5, log_date)
-end
 
 function value_to_string (value, string)
    string = string or ''
@@ -253,21 +234,21 @@ function configure_graph (arg, in_graph)
                      ..sink_name..".input")
    end
 
-   return graph, config
-end
-
-function setup_graph_ifmib_mac (graph, config)
-   engine.configure(graph)
-
    if config.input_type and config.input_type == "pci" then
       local pciaddr = unpack(parse_spec(config.input, '/'))
-      create_ifmib(engine.app_table['in'].stats, (pciaddr:gsub("[:%.]", "_")),
-                   config.log_date)
+      app_graph.app(graph, "nic_ifmib", iftable.MIB, {
+         target_app = "in", stats = 'stats',
+         ifname = (pciaddr:gsub("[:%.]", "_")),
+         log_date = config.log_date
+      })
    end
    if config.output_type == "tap_routed" then
-      create_ifmib(engine.app_table[out_name].shm, config.output,
-                   "IPFIX Observation Domain "..config.observation_domain,
-                   config.log_date)
+      app_graph.app(graph, "tap_ifmib", iftable.MIB, {
+         target_app = out_name,
+         ifname = config.output,
+         ifalias = "IPFIX Observation Domain "..config.observation_domain,
+         log_date = config.log_date
+      })
    end
 
    return graph, config
@@ -333,7 +314,8 @@ end
 
 -- Run an instance of the ipfix probe
 function run (arg, duration, busywait, cpu, jit)
-   local _, config = setup_graph_ifmib_mac(configure_graph(arg))
+   local graph, config = configure_graph(arg)
+   engine.configure(graph)
 
    if cpu then numa.bind_to_cpu(cpu) end
    set_jit_options(jit)
@@ -373,13 +355,9 @@ function run_rss(config, inputs, outputs, duration, busywait, cpu, jit, log_date
    if cpu then numa.bind_to_cpu(cpu) end
    set_jit_options(jit)
 
-   local graph, in_app_specs = configure_rss_graph(config, inputs, outputs, 'setup')
+   local graph = configure_rss_graph(config, inputs, outputs, log_date)
 
    engine.configure(graph)
-   for _, spec in ipairs(in_app_specs) do
-      create_ifmib(engine.app_table[spec.name].stats,
-                   spec.ifname, spec.ifalias, log_date)
-   end
    require("jit").flush()
 
    local engine_opts = { no_report = true, measure_latency = false }
@@ -392,7 +370,7 @@ function run_rss(config, inputs, outputs, duration, busywait, cpu, jit, log_date
    clear_jit_options(jit)
 end
 
-function configure_rss_graph (config, inputs, outputs, setup)
+function configure_rss_graph (config, inputs, outputs, log_date)
    local graph = app_graph.new()
    app_graph.app(graph, "rss", rss.rss, config)
 
@@ -401,8 +379,7 @@ function configure_rss_graph (config, inputs, outputs, setup)
    for n, input in ipairs(inputs) do
       local suffix = #inputs > 1 and n or ''
       local input_name = "input"..suffix
-      local in_link, in_app = in_apps.pci(input.device.."/"..input.rxq)
-      input.config.pciaddr = input.device
+      local in_link, in_app = in_apps.pci(input)
       table.insert(in_app_specs,
                    { pciaddr = input.device,
                      name = input_name,
@@ -434,14 +411,45 @@ function configure_rss_graph (config, inputs, outputs, setup)
          --   args       probe configuration
          --   instance   # of embedded instance
          output.args.instance = output.instance
-         local graph, config = configure_graph(output.args, graph)
-         if setup then
-            setup_graph_ifmib_mac(graph, config)
-         end
+         local graph = configure_graph(output.args, graph)
          app_graph.link(graph, "rss."..output.link_name
                            .." -> ipfix"..output.instance..".input")
       end
    end
+
+   for _, spec in ipairs(in_app_specs) do
+      app_graph.app(graph, "nic_ifmib_"..spec.name, iftable.MIB, {
+         target_app = spec.name, stats = 'stats',
+         ifname = spec.ifname,
+         ifalias = spec.ifalias,
+         log_date = log_date
+      })
+   end
    
-   return graph, in_app_specs
+   return graph
+end
+
+function configure_mlx_ctrl_graph (mellanox, log_date)
+   -- Create a trivial app graph that only contains the control apps
+   -- for the Mellanox driver, which sets up the queues and
+   -- maintains interface counters.
+   local ctrl_graph, need_ctrl = app_graph.new(), false
+   for device, spec in pairs(mellanox) do
+      local conf = {
+         pciaddress = device,
+         queues = spec.queues,
+         recvq_size = spec.recvq_size
+      }
+      local driver = pci.device_info(device).driver
+      app_graph.app(ctrl_graph, "ctrl_"..device,
+                    require(driver).ConnectX, conf)
+      app_graph.app(ctrl_graph, "nic_ifmib_"..device, iftable.MIB, {
+         target_app = "ctrl_"..device, stats = 'stats',
+         ifname = spec.ifName or (device:gsub("[:%.]", "_")),
+         ifalias = spec.ifAlias,
+         log_date = log_date
+      })
+      need_ctrl = true
+   end
+   return ctrl_graph, need_ctrl
 end

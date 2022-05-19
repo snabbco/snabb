@@ -120,10 +120,13 @@ function setup_workers (config)
    for rssq = 0, rss.hardware_scaling-1 do
       local inputs, outputs = {}, {}
       for device, opt in pairs(interfaces) do
-         local device = device
          local input = lib.deepcopy(opt)
+         input.device = device
          input.rxq = rssq
-         inputs[device] = input
+         input.config = {
+            recvq_size = input.receive_queue_size
+         }
+         table.insert(inputs, input)
 
          -- The mellanox driver requires a master process that sets up
          -- all queues for the interface. We collect all queues per
@@ -223,8 +226,6 @@ function setup_workers (config)
             table.insert(outputs, output)
          end
       end
- 
-      -- XXX ifmib not created for workers (above and below)
 
       -- local cpu = cpu_for_node(rss.pin_cpu) -- XXX not honored
       local rss_config = {
@@ -245,8 +246,7 @@ function setup_workers (config)
          class.order = nil
          --print(class.name, class.filter, "continue="..tostring(class.continue))
       end
-      --- XXX missing ifmib setup and finding Tap MACs
-      workers["rss"..rssq] = probe.configure_rss_graph(rss_config, inputs, outputs)
+      workers["rss"..rssq] = probe.configure_rss_graph(rss_config, inputs, outputs, ipfix.log_date)
    end
 
    -- for k,v in pairs(mellanox) do
@@ -259,18 +259,7 @@ function setup_workers (config)
    -- Create a trivial app graph that only contains the control apps
    -- for the Mellanox driver, which sets up the queues and
    -- maintains interface counters.
-   local ctrl_graph, need_ctrl = app_graph.new(), false
-   for device, spec in pairs(mellanox) do
-      local conf = {
-         pciaddress = device,
-         queues = spec.queues,
-         recvq_size = spec.recvq_size
-      }
-      local driver = pci.device_info(device).driver
-      app_graph.app(ctrl_graph, "ctrl_"..device,
-                    require(driver).ConnectX, conf)
-      need_ctrl = true
-   end
+   local ctrl_graph, need_ctrl = probe.configure_mlx_ctrl_graph(mellanox, ipfix.log_date)
 
    if need_ctrl then
       workers["mlx_ctrl"] = ctrl_graph
