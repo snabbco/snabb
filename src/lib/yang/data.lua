@@ -211,7 +211,7 @@ function data_grammar_from_schema(schema, is_config)
    handlers['leaf-list'] = function(node)
       if node.config ~= is_config then return end
       local t = elide_unions(node.type)
-      return {type='array', element_type=t, ctype=value_ctype(t),
+      return {type='array', element_type=t,
               min_elements=node.min_elements, max_elements=node.max_elements}
    end
    function handlers.list(node)
