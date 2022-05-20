@@ -61,6 +61,8 @@ local manager_config_spec = {
    rpc_trace_file = {},
    cpuset = {default=cpuset.global_cpuset()},
    Hz = {default=100},
+   restart_intensity = {default=0}, -- How many restarts are permitted...
+   restart_period = {default=0} -- ...within period seconds.
 }
 
 local function ensure_absolute(file_name)
@@ -90,11 +92,18 @@ function new_manager (conf)
    ret.period = 1/conf.Hz
    ret.worker_default_scheduling = conf.worker_default_scheduling
    ret.workers = {}
+   ret.worker_app_graphs = {}
    ret.state_change_listeners = {}
    -- name->{aggregated=counter, active=pid->counter, archived=uint64[1]}
    ret.counters = {}
    -- name->{aggregated=gauge, active=pid->gauge}
    ret.gauges = {}
+   ret.restart = {
+      period = conf.restart_period,
+      intensity = conf.restart_intensity,
+      count = 0,
+      previous = false
+   }
 
    if conf.rpc_trace_file then
       ret:info("Logging RPCs to %s", conf.rpc_trace_file)
@@ -171,6 +180,8 @@ function Manager:set_initial_configuration (configuration)
    for id, worker_app_graph in pairs(worker_app_graphs) do
       self:start_worker_for_graph(id, worker_app_graph)
    end
+
+   self.worker_app_graphs = worker_app_graphs
 end
 
 function Manager:start ()
@@ -250,12 +261,12 @@ function Manager:run_scheduler()
    self.sched:run(engine.now())
 end
 
-function Manager:start_worker(sched_opts)
+function Manager:start_worker(id, sched_opts)
    local code = {
       scheduling.stage(sched_opts),
       "require('lib.ptree.worker').main()"
    }
-   return worker.start("worker", table.concat(code, "\n"))
+   return worker.start(id, table.concat(code, "\n"))
 end
 
 function Manager:stop_worker(id)
@@ -284,6 +295,44 @@ function Manager:remove_stale_workers()
       end
       self.workers[id] = nil
 
+   end
+end
+
+function Manager:can_restart()
+   local now = engine.now()
+   local expired = 0
+   if self.restart.previous then
+      local elapsed = now - self.restart.previous
+      expired = (elapsed / self.restart.period) * self.restart.intensity
+   end
+   self.restart.count = math.max(0, self.restart.count - expired) + 1
+   self.restart.previous = now
+   self:info('Restart intensity is at: %.1f/%.1f',
+             self.restart.count, self.restart.intensity)
+   return self.restart.count <= self.restart.intensity
+end
+
+function Manager:restart_crashed_workers()
+   for id, proc in pairs(worker.status()) do
+      local worker = self.workers[id]
+      if worker and not worker.shutting_down then
+         if not proc.alive then
+            self:warn('Worker %s crashed!', id)
+            self:state_change_event('worker_stopped', id)
+            if self.workers[id].scheduling.cpu then
+               self.cpuset:release(self.workers[id].scheduling.cpu)
+            end
+            self.workers[id] = nil
+            if self:can_restart() then
+               self:info('Restarting worker %s.', id)
+               self:start_worker_for_graph(id, self.worker_app_graphs[id])
+            else
+               self:warn('Too many worker crashes, exiting!')
+               self:stop()
+               os.exit(1)
+            end
+         end
+      end
    end
 end
 
@@ -458,7 +507,7 @@ function Manager:start_worker_for_graph(id, graph)
    local scheduling = self:compute_scheduling_for_worker(id, graph)
    self:info('Starting worker %s.', id)
    self.workers[id] = { scheduling=scheduling,
-                        pid=self:start_worker(scheduling),
+                        pid=self:start_worker(id, scheduling),
                         queue={}, graph=graph,
                         cancel=cond.new() }
    self:state_change_event('worker_starting', id)
@@ -597,6 +646,7 @@ function Manager:update_configuration (update_fn, verb, path, ...)
       self.support.update_mutable_objects_embedded_in_app_initargs (
          self.current_in_place_dependencies, new_graphs, self.schema_name,
          verb, path, ...)
+   self.worker_app_graphs = new_graphs
 end
 
 function Manager:handle_rpc_update_config (args, verb, compute_update_fn)
@@ -886,6 +936,7 @@ function Manager:main (duration)
       next_time = now + self.period
       if timer.ticks then timer.run_to_time(now * 1e9) end
       self:remove_stale_workers()
+      self:restart_crashed_workers()
       self:run_scheduler()
       self:send_messages_to_workers()
       self:receive_alarms_from_workers()
