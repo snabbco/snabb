@@ -19,7 +19,7 @@ function setup_ipfix (conf)
    return setup_workers(conf)
 end
 
-function start (confpath)
+function start (name, confpath)
    local conf = yang.load_configuration(confpath, {schema_name=ipfix_schema})
    update_cpuset(conf.snabbflow_config.rss.cpu_pool)
    return ptree.new_manager{
@@ -27,13 +27,15 @@ function start (confpath)
       initial_configuration = conf,
       schema_name = ipfix_schema,
       cpuset = probe_cpuset,
+      name = name
    }
 end
 
 function run (args)
-   local confpath = assert(args[1])
+   local name = assert(args[1])
+   local confpath = assert(args[2])
    -- print("Confpath is:", confpath)
-   local manager = start(confpath)
+   local manager = start(name, confpath)
    manager:main()
 end
 
