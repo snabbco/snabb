@@ -3,7 +3,7 @@ module(..., package.seeall)
 local yang = require("lib.yang.yang")
 local yang_util = require("lib.yang.util")
 local ptree = require("lib.ptree.ptree")
-local numa = require("lib.numa")
+local cpuset = require("lib.cpuset")
 local pci = require("lib.hardware.pci")
 local lib = require("core.lib")
 local app_graph = require("core.config")
@@ -12,6 +12,8 @@ local probe = require("program.ipfix.lib")
 
 local ipfix_schema = 'snabb-snabbflow-v1'
 
+local probe_cpuset = cpuset.new()
+
 function setup_ipfix (conf)
    -- yang.print_config_for_schema_by_name(ipfix_schema, conf, io.stdout)
    return setup_workers(conf)
@@ -19,10 +21,12 @@ end
 
 function start (confpath)
    local conf = yang.load_configuration(confpath, {schema_name=ipfix_schema})
+   update_cpuset(conf.snabbflow_config.rss.cpu_pool)
    return ptree.new_manager{
       setup_fn = setup_ipfix,
       initial_configuration = conf,
       schema_name = ipfix_schema,
+      cpuset = probe_cpuset,
    }
 end
 
@@ -47,6 +51,23 @@ for _, key in ipairs({
       "instance"
 }) do
    ipfix_default_config[key] = nil
+end
+
+function update_cpuset (cpu_pool)
+   local cpu_set = {}
+   if cpu_pool then
+      for _, cpu in ipairs(cpu_pool.cpu) do
+         if not probe_cpuset:contains(cpu) then
+            probe_cpuset:add(cpu)
+         end
+         cpu_set[cpu] = true
+      end
+      for _, cpu in ipairs(probe_cpuset:list()) do
+         if not cpu_set[cpu] then
+            probe_cpuset:remove(cpu)
+         end
+      end
+   end
 end
 
 function setup_workers (config)
@@ -82,40 +103,7 @@ function setup_workers (config)
    local mellanox = {}
    local observation_domain = ipfix.observation_domain_base
 
-   -- Determine NUMA affinity for the input interfaces
-   -- local pci_addrs = {}
-   -- for device in pairs(interfaces) do
-   --    table.insert(pci_addrs, device)
-   -- end
-   -- local node = numa.choose_numa_node_for_pci_addresses(pci_addrs)
-   -- local cpu_pool = {}
-   -- Copy cpu_pool ffi array from config into local Lua table
-   -- for _, core in ipairs(rss.cpu_pool) do
-   --    table.insert(cpu_pool, core)
-   -- end
-   -- local cpu_pool_size = #cpu_pool
-   -- local function cpu_for_node (activate)
-   --    if not activate then return nil end
-   --    for n, cpu in ipairs(cpu_pool) do
-   --       local cpu_node =  numa.cpu_get_numa_node(cpu)
-   --       if cpu_node == node then
-   --          return table.remove(cpu_pool, n)
-   --       end
-   --    end
-   --    return nil
-   -- end
-   -- local function log_cpu_choice (pid, cpu, activate)
-   --    if cpu_pool_size == 0 or not activate then return end
-   --    if cpu then
-   --       logger:log(string.format("Binding #%d to CPU %d, "
-   --                                   .."NUMA node %d",
-   --                                pid, cpu, node))
-   --    else
-   --       logger:log(string.format("Not binding #%d to any CPU "
-   --                                .."(no match found in pool for "
-   --                                   .."NUMA node %d)", pid, node))
-   --    end
-   -- end
+   update_cpuset(rss.cpu_pool)
 
    for rssq = 0, rss.hardware_scaling-1 do
       local inputs, outputs = {}, {}

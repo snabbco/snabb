@@ -53,10 +53,12 @@ module snabb-snabbflow-v1 {
         description "n-way hardware-assisted RSS scaling.";
       }
 
-      // leaf-list cpu-pool {
-      //   type uint32;
-      //   description "CPU cores used by Snabbflow.";
-      // }
+      container cpu-pool {
+        leaf-list cpu {
+          type uint32;
+          description "CPU cores used by Snabbflow.";
+        }
+      }
 
       container software-scaling {
         leaf default-class {
