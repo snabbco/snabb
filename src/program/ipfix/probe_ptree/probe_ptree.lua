@@ -27,7 +27,9 @@ function start (name, confpath)
       initial_configuration = conf,
       schema_name = ipfix_schema,
       cpuset = probe_cpuset,
-      name = name
+      name = name,
+      restart_intensity = 5,
+      restart_period = 30
    }
 end
 
