@@ -10,22 +10,23 @@ local app_graph = require("core.config")
 
 local probe = require("program.ipfix.lib")
 
-local ipfix_schema = 'snabb-snabbflow-v1'
+local probe_schema = 'snabb-snabbflow-v1'
 
 local probe_cpuset = cpuset.new()
 
 function setup_ipfix (conf)
-   -- yang.print_config_for_schema_by_name(ipfix_schema, conf, io.stdout)
+   -- yang.print_config_for_schema_by_name(probe_schema, conf, io.stdout)
    return setup_workers(conf)
 end
 
 function start (name, confpath)
-   local conf = yang.load_configuration(confpath, {schema_name=ipfix_schema})
+   local conf = yang.load_configuration(confpath, {schema_name=probe_schema})
    update_cpuset(conf.snabbflow_config.rss.cpu_pool)
    return ptree.new_manager{
+      log_level = 'INFO',
       setup_fn = setup_ipfix,
       initial_configuration = conf,
-      schema_name = ipfix_schema,
+      schema_name = probe_schema,
       cpuset = probe_cpuset,
       name = name,
       restart_intensity = 5,
