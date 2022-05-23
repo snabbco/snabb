@@ -246,6 +246,19 @@ module snabb-snabbflow-v1 {
           type string;
         }
 
+        container restart {
+          description
+            "Restart policy for exporter instances with embed: false.";
+          leaf intensity {
+            type decimal64 { range 0..max; }
+            default 5;
+          }
+          leaf period {
+            type decimal64 { range 0..max; }
+            default 30;
+          }
+        }
+
         list instances {
           key "id";
 

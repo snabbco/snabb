@@ -28,9 +28,7 @@ function start (name, confpath)
       initial_configuration = conf,
       schema_name = probe_schema,
       cpuset = probe_cpuset,
-      name = name,
-      restart_intensity = 5,
-      restart_period = 30
+      name = name
    }
 end
 
@@ -104,6 +102,7 @@ function setup_workers (config)
    end
 
    local workers = {}
+   local worker_opts = {}
 
    local mellanox = {}
    local observation_domain = ipfix.observation_domain_base
@@ -213,8 +212,12 @@ function setup_workers (config)
                iconfig.input_type = "interlink"
                iconfig.input = rss_link
 
-               -- local cpu = cpu_for_node(instance.pin_cpu) -- XXX not honored
                workers[rss_link] = probe.configure_graph(iconfig)
+               -- Dedicated exporter processes are restartable
+               worker_opts[rss_link] = {
+                  restart_intensity = exporter.restart.intensity,
+                  restart_period = exporter.restart.period
+               }
             end
             table.insert(outputs, output)
          end
@@ -270,5 +273,5 @@ function setup_workers (config)
       end
    end
 
-   return workers
+   return workers, worker_opts
 end
