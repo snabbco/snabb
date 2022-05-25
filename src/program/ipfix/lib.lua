@@ -183,7 +183,7 @@ function configure_graph (arg, in_graph)
    if config.output_type == "tap_routed" then
       local tap_config = out_app[2]
       tap_config.mtu = config.mtu
-      tap_config.overwrite_src_mac = true
+      tap_config.overwrite_dst_mac = true
       tap_config.forwarding = true
    end
 

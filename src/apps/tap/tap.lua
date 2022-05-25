@@ -28,7 +28,7 @@ Tap._config = {
    mtu_fixup = { default = true },
    mtu_offset = { default = 14 },
    mtu_set = { default = nil },
-   overwrite_src_mac = { default = false },
+   overwrite_dst_mac = { default = false },
    forwarding = { default = false }
 }
 
@@ -158,7 +158,7 @@ function Tap:new (conf)
                         status_timer = lib.throttle(0.1),
                         pkt = packet.allocate(),
                         eth = ethernet:new{},
-                        overwrite_src_mac = conf.overwrite_src_mac,
+                        overwrite_dst_mac = conf.overwrite_dst_mac,
                         shm = { rxbytes   = {counter},
                                 rxpackets = {counter},
                                 rxmcast   = {counter},
@@ -213,9 +213,9 @@ function Tap:pull ()
    end
 end
 
-function Tap:set_src_mac (p)
+function Tap:set_dst_mac (p)
    local eth = self.eth:new_from_mem(p.data, p.length)
-   eth:src(self.mac.bytes)
+   eth:dst(self.mac.bytes)
 end
 
 function Tap:push ()
@@ -224,8 +224,8 @@ function Tap:push ()
       -- The write might have blocked so don't dequeue the packet from the link
       -- until the write has completed.
       local p = link.front(l)
-      if self.overwrite_src_mac then
-         self:set_src_mac(p)
+      if self.overwrite_dst_mac then
+         self:set_dst_mac(p)
       end
       local len, err = S.write(self.fd, p.data, p.length)
       -- errno == EAGAIN indicates that the write would of blocked
