@@ -81,6 +81,8 @@ function CSVStatsTimer:resolve_app(deferred)
          link_name = link_name,
          txpackets = link.txpackets,
          txbytes = link.txbytes,
+         avg_mpps = nil,
+         avg_gbps = nil
       }
       if not self.hydra_mode then
          local h = (',%s MPPS,%s Gbps'):format(link_name, link_name)
@@ -116,6 +118,7 @@ end
 function CSVStatsTimer:stop()
    self:tick() -- ?
    timer.cancel(self.tick_timer)
+   self:summary()
 end
 
 function CSVStatsTimer:is_ready()
@@ -159,6 +162,8 @@ function CSVStatsTimer:tick()
       local diff_txbytes = tonumber(txbytes - data.prev_txbytes) * 8 / dt / 1e9
       data.prev_txpackets = txpackets
       data.prev_txbytes = txbytes
+      data.avg_mpps = (data.avg_mpps and (data.avg_mpps + diff_txpackets) / 2) or diff_txpackets
+      data.avg_gbps = (data.avg_gbps and (data.avg_gbps + diff_txbytes) / 2) or diff_txbytes
       if self.hydra_mode then
          -- Hydra reports seem to prefer integers for the X (time) axis.
          self.file:write(('%s_mpps,%.f,%f,mpps\n'):format(
@@ -174,4 +179,17 @@ function CSVStatsTimer:tick()
       self.file:write('\n')
    end
    self.file:flush()
+end
+
+function CSVStatsTimer:summary()
+   if not self.hydra_mode then
+      for _,data in ipairs(self.link_data) do
+         if data.avg_mpps then
+            self.file:write(('%s avg. Mpps: %f\n'):format(data.link_name, data.avg_mpps))
+         end
+         if data.avg_gbps then
+            self.file:write(('%s avg. Gbps: %f\n'):format(data.link_name, data.avg_gbps))
+         end
+      end
+   end
 end
