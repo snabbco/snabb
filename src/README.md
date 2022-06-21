@@ -55,7 +55,7 @@ these in a desired way using *links* and finally pass the resulting app
 network on to the Snabb engine. The engine's job is to:
 
  * Pump traffic through the app network
- * Keep the app network running (e.g. restart failed apps)
+ * Apply, and inform apps of configuration and link changes
  * Report on the network status
 
 
@@ -117,11 +117,24 @@ will be used to validate the app’s arg when it is configured using
 `config.app`.
 
 
-— Method **myapp:link**
+— Method **myapp:link** *dir* *name*
 
-*Optional*. Called any time the app’s links may have been changed (including on
-start-up). Guaranteed to be called before `pull` and `push` are called with new
-links.
+*Optional*. Called during `engine.configure()` when a link of the app is
+added. Unless `unlink` is specified this method is also called when a link
+is removed.
+Guaranteed to be called before `pull` and `push` are called with new links. 
+
+*Dir* is either `'input'` or `'output'`, and *name* is the string name
+of the link. I.e., the added link can be accessed at `self[dir][name]`.
+
+
+— Method **myapp:unlink** *dir* *name*
+
+*Optional*. Called during `engine.configure()` when a link of the app is
+removed.
+
+*Dir* is either `'input'` or `'output'`, and *name* is the string name
+of the link.
 
 
 — Method **myapp:pull**
@@ -135,6 +148,53 @@ transmitting them to output ports.
 — Method **myapp:push**
 
 *Optional*. Push packets through the system.
+
+For example: Move packets from input ports to output ports or to a
+network adapter.
+
+— Field **myapp.push_link**
+
+*Optional*. When specified must be a table of per-link `push()` methods
+that take an input link as an argument. For example an app could specify
+a **push_link** method for its input link *foo*:
+
+```
+Myapp = { push_link={} }
+function Myapp.push_link:foo (input)
+  while not link.empty(input) do something() end
+end
+```
+
+**Push_link** methods are copied to a fresh table when the app is started,
+and it is valid to create **push_link** methods dynamically during `link()`,
+for example like so:
+
+```
+Myapp = { push_link={} }
+function Myapp:link (dir, name)
+  -- NB: Myapp.push_link ~= self.push_link
+  if dir == 'input' then
+    self.push_link[name] = function (self, input)
+      while not link.empty(input) do something() end
+    end
+  end
+end
+function Myapp:unlink (dir, name)
+  if dir == 'input' then
+    self.push_link[name] = nil
+  end
+end
+```
+
+**Push** is not called when an app has **push_link** methods
+for *all* of its input links. If, however, an app at least one input link
+without an associated **push_link** method then **push** is called
+in addition to the **push_link** methods.
+
+
+— Method **myapp:tick**
+
+*Optional*. Called periodically at **engine.tick_Hz** frequency.
 
 For example: Move packets from input ports to output ports or to a
 network adapter.
@@ -284,6 +344,13 @@ traffic. The value can be overridden with a constant integer saying
 how many times per second to poll.
 
 This setting is not used when engine.busywait is true.
+
+— Variable **engine.tick_Hz**
+
+Frequency at which to call **app:tick** methods. The default value is
+1000 (call `tick()`s every millisecond).
+
+A value of 0 effectively disables `tick()` methods.
 
 ## Link (core.link)
 

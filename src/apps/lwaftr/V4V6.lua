@@ -193,17 +193,19 @@ local function test_join ()
    config.app(c, 'v4v6', V4V6)
    config.app(c, 'sink', basic_apps.Sink)
 
-   config.link(c, 'source.output -> v4v6.v4')
-   config.link(c, 'source.output -> v4v6.v6')
+   config.link(c, 'source.v4 -> v4v6.v4')
+   config.link(c, 'source.v6 -> v4v6.v6')
    config.link(c, 'v4v6.output -> sink.input')
 
    engine.configure(c)
-   link.transmit(engine.app_table.source.output.output, arp_pkt())
-   link.transmit(engine.app_table.source.output.output, ipv4_pkt())
-   link.transmit(engine.app_table.source.output.output, ipv6_pkt())
+   for _, output in ipairs{'v4', 'v6'} do
+      link.transmit(engine.app_table.source.output[output], arp_pkt())
+      link.transmit(engine.app_table.source.output[output], ipv4_pkt())
+      link.transmit(engine.app_table.source.output[output], ipv6_pkt())
+   end
    engine.main({duration = 0.1, noreport = true})
 
-   assert(link.stats(engine.app_table.sink.input.input).rxpackets == 3)
+   assert(link.stats(engine.app_table.sink.input.input).rxpackets == 3*2)
 end
 
 function selftest ()

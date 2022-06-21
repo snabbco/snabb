@@ -135,8 +135,7 @@ function selftest_run (stateful, expected, tolerance, native)
 
    print(("Run for 1 second (stateful = %s)..."):format(stateful))
 
-   local deadline = lib.timeout(1.0)
-   repeat app.breathe() until deadline()
+   app.main{duration=1}
 
    app.report({showlinks=true})
    local sent     = link.stats(app.app_table.pcap_filter.input.input).rxpackets

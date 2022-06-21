@@ -12,9 +12,10 @@ local lib      = require("core.lib")
 local memory   = require("core.memory")
 local shm      = require("core.shm")
 local counter  = require("core.counter")
-local sync     = require("core.sync")
 
 require("core.packet_h")
+
+local group_freelist = require("core.group_freelist")
 
 local packet_t = ffi.typeof("struct packet")
 local packet_ptr_t = ffi.typeof("struct packet *")
@@ -55,9 +56,8 @@ local max_packets = 1e6
 
 ffi.cdef([[
 struct freelist {
-    int32_t lock[1];
-    uint64_t nfree;
-    uint64_t max;
+    int nfree;
+    int max;
     struct packet *list[]]..max_packets..[[];
 };
 ]])
@@ -98,14 +98,6 @@ local function freelist_nfree(freelist)
    return freelist.nfree
 end
 
-local function freelist_lock(freelist)
-   sync.lock(freelist.lock)
-end
-
-local function freelist_unlock(freelist)
-   sync.unlock(freelist.lock)
-end
-
 local packet_allocation_step = 1000
 local packets_allocated = 0
  -- Initialized on demand.
@@ -119,19 +111,39 @@ end
 -- Call to ensure group freelist is enabled.
 function enable_group_freelist ()
    if not group_fl then
-      group_fl = freelist_create("group/packets.freelist")
+      group_fl = group_freelist.freelist_create("group/packets.freelist")
    end
 end
 
+-- Cache group_freelist.chunksize
+local group_fl_chunksize = group_freelist.chunksize
+
 -- Return borrowed packets to group freelist.
-function rebalance_freelists ()
-   if group_fl and freelist_nfree(packets_fl) > packets_allocated then
-      freelist_lock(group_fl)
-      while freelist_nfree(packets_fl) > packets_allocated
-      and not freelist_full(group_fl) do
-         freelist_add(group_fl, freelist_remove(packets_fl))
+function rebalance_step ()
+   local chunk, seq = group_freelist.start_add(group_fl)
+   if chunk then
+      chunk.nfree = group_fl_chunksize
+      for i=0, chunk.nfree-1 do
+         chunk.list[i] = freelist_remove(packets_fl)
       end
-      freelist_unlock(group_fl)
+      group_freelist.finish(chunk, seq)
+   else
+      error("group freelist overflow")
+   end
+end
+
+function need_rebalance ()
+   return freelist_nfree(packets_fl) >= (packets_allocated + group_fl_chunksize)
+end
+
+-- Reclaim packets from group freelist.
+function reclaim_step ()
+   local chunk, seq = group_freelist.start_remove(group_fl)
+   if chunk then
+      for i=0, chunk.nfree-1 do
+         freelist_add(packets_fl, chunk.list[i])
+      end
+      group_freelist.finish(chunk, seq)
    end
 end
 
@@ -142,19 +154,14 @@ shm.register(
    {open = function (name) return shm.open(name, "struct freelist") end}
 )
 ffi.metatype("struct freelist", {__tostring = function (freelist)
-   return ("%d/%d"):format(tonumber(freelist.nfree), tonumber(freelist.max))
+   return ("%d/%d"):format(freelist.nfree, freelist.max)
 end})
 
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
       if group_fl then
-         freelist_lock(group_fl)
-         while freelist_nfree(group_fl) > 0
-         and freelist_nfree(packets_fl) < packets_allocated do
-            freelist_add(packets_fl, freelist_remove(group_fl))
-         end
-         freelist_unlock(group_fl)
+         reclaim_step()
       end
       if freelist_nfree(packets_fl) == 0 then
          preallocate_step()
@@ -169,15 +176,19 @@ end
 -- process termination.
 function shutdown (pid)
    local in_group, group_fl = pcall(
-      freelist_open, "/"..pid.."/group/packets.freelist"
+      group_freelist.freelist_open, "/"..pid.."/group/packets.freelist"
    )
    if in_group then
       local packets_fl = freelist_open("/"..pid.."/engine/packets.freelist")
-      freelist_lock(group_fl)
       while freelist_nfree(packets_fl) > 0 do
-         freelist_add(group_fl, freelist_remove(packets_fl))
+         local chunk, seq = group_freelist.start_add(group_fl)
+         assert(chunk, "group freelist overflow")
+         chunk.nfree = math.min(group_fl_chunksize, freelist_nfree(packets_fl))
+         for i=0, chunk.nfree-1 do
+            chunk.list[i] = freelist_remove(packets_fl)
+         end
+         group_freelist.finish(chunk, seq)
       end
-      freelist_unlock(group_fl)
    end
 end
 
@@ -282,6 +293,9 @@ local free_internal, account_free =
 function free (p)
    account_free(p)
    free_internal(p)
+   if group_fl and need_rebalance() then
+      rebalance_step()
+   end
 end
 
 -- Set packet data length.
@@ -293,7 +307,8 @@ function resize (p, len)
 end
 
 function preallocate_step()
-   assert(packets_allocated + packet_allocation_step <= max_packets,
+   assert(packets_allocated + packet_allocation_step
+            <= max_packets - group_fl_chunksize,
           "packet allocation overflow")
 
    for i=1, packet_allocation_step do

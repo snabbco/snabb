@@ -54,12 +54,10 @@ function new(args)
 end
 
 function IngressDropMonitor:sample ()
-   local app_array = engine.breathe_push_order
    local sum = self.current_value
    sum[0] = 0
-   for i = 1, #app_array do
-      local app = app_array[i]
-      if app.get_rxstats and not app.dead then
+   for _, app in pairs(engine.app_table) do
+      if app.get_rxstats then
          sum[0] = sum[0] + app:get_rxstats().dropped
       end
    end
