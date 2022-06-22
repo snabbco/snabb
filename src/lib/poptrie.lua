@@ -37,13 +37,19 @@ end
 
 function new (init)
    local self = setmetatable({}, {__index=Poptrie})
+   if init.leaf_t ~= nil then
+      self.leaf_t = init.leaf_t
+      assert(self.leaf_t == ffi.typeof("uint16_t") or
+             self.leaf_t == ffi.typeof("uint32_t"),
+             "Unsupported leaf type: "..tostring(self.leaf_t))
+   end
    if init.leaves and init.nodes then
       self.leaves, self.num_leaves = init.leaves, assert(init.num_leaves)
       self.nodes, self.num_nodes = init.nodes, assert(init.num_nodes)
    elseif init.nodes or init.leaves or init.directmap then
       error("partial init")
    else
-      self.leaves = array(Poptrie.leaf_t, Poptrie.num_leaves)
+      self.leaves = array(self.leaf_t, Poptrie.num_leaves)
       self.nodes = array(Poptrie.node_t, Poptrie.num_nodes)
    end
    if init.directmap then
@@ -67,8 +73,8 @@ end
 local asm_cache = {}
 
 function Poptrie:configure_lookup ()
-   local config = ("leaf_compression=%s,direct_pointing=%s,s=%s")
-      :format(self.leaf_compression, self.direct_pointing, self.s)
+   local config = ("leaf_compression=%s,direct_pointing=%s,s=%s,leaf_t=%s")
+      :format(self.leaf_compression, self.direct_pointing, self.s, self.leaf_t)
    if not asm_cache[config] then
       asm_cache[config] = {
          poptrie_lookup.generate(self, 32),
@@ -89,7 +95,7 @@ end
 
 function Poptrie:grow_leaves ()
    self.num_leaves = self.num_leaves * 2
-   local new_leaves = array(Poptrie.leaf_t, self.num_leaves)
+   local new_leaves = array(self.leaf_t, self.num_leaves)
    ffi.copy(new_leaves, self.leaves, ffi.sizeof(self.leaves))
    self.leaves = new_leaves
 end
@@ -439,6 +445,19 @@ function selftest ()
    assert(t:lookup128(s(0x3F)) == 5)
    assert(t:lookup128(s(0xFF)) == 4)
    assert(t:lookup128(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F)) == 6)
+   -- Test 32-bit leaves
+   local t = new{direct_pointing=true, s=8, leaf_t=ffi.typeof("uint32_t")}
+   t:add(s(0xff,0x00), 9, 0xffffffff)
+   t:add(s(0xff,0x01), 9, 0xfffffffe)
+   t:build()
+   assert(t:lookup(s(0xff,0x00)) == 0xffffffff)
+   assert(t:lookup(s(0xff,0x01)) == 0xfffffffe)
+   assert(t:lookup32(s(0xff,0x00)) == 0xffffffff)
+   assert(t:lookup32(s(0xff,0x01)) == 0xfffffffe)
+   assert(t:lookup64(s(0xff,0x00)) == 0xffffffff)
+   assert(t:lookup64(s(0xff,0x01)) == 0xfffffffe)
+   assert(t:lookup128(s(0xff,0x00)) == 0xffffffff)
+   assert(t:lookup128(s(0xff,0x01)) == 0xfffffffe)
 
    -- Random testing
    local function reproduce (cases, config)

@@ -52,26 +52,26 @@ function RawSocket:pull ()
    local l = self.output.tx
    if l == nil then return end
    local limit = engine.pull_npackets
-   while limit > 0 and self:can_receive() do
+   while limit > 0 and self:try_read() do
       limit = limit - 1
       link.transmit(l, self:receive())
    end
 end
 
-function RawSocket:can_receive ()
-   local t, err = S.select({readfds = {self.sock}}, 0)
-   while not t and (err.AGAIN or err.INTR) do
-      t, err = S.select({readfds = {self.sock}}, 0)
+function RawSocket:try_read ()
+   local rxp = self.rx_p
+   local bytes = S.read(self.sock, rxp.data, packet.max_payload)
+   if bytes then
+      rxp.length = bytes
+      return true
+   else
+      return false
    end
-   assert(t, err)
-   return t.count == 1
 end
 
 function RawSocket:receive ()
    local p = self.rx_p
-   local sz = assert(S.read(self.sock, p.data, packet.max_payload))
-   p.length = sz
-   counter.add(self.shm.rxbytes, sz)
+   counter.add(self.shm.rxbytes, p.length)
    counter.add(self.shm.rxpackets)
    if ethernet:is_mcast(p.data) then
       counter.add(self.shm.rxmcast)
@@ -85,34 +85,33 @@ end
 function RawSocket:push ()
    local l = self.input.rx
    if l == nil then return end
-   while not link.empty(l) and self:can_transmit() do
-      local p = link.receive(l)
-      self:transmit(p)
-      counter.add(self.shm.txbytes, p.length)
-      counter.add(self.shm.txpackets)
-      if ethernet:is_mcast(p.data) then
-         counter.add(self.shm.txmcast)
+   while not link.empty(l) do
+      local p = link.front(l)
+      if self:try_transmit(p) then
+         link.receive(l)
+         counter.add(self.shm.txbytes, p.length)
+         counter.add(self.shm.txpackets)
+         if ethernet:is_mcast(p.data) then
+            counter.add(self.shm.txmcast)
+         end
+         if ethernet:is_bcast(p.data) then
+            counter.add(self.shm.txbcast)
+         end
+         packet.free(p)
+      else
+         break
       end
-      if ethernet:is_bcast(p.data) then
-         counter.add(self.shm.txbcast)
-      end
-      packet.free(p)
    end
 end
 
-function RawSocket:can_transmit ()
-   local t, err = S.select({writefds = {self.sock}}, 0)
-   while not t and (err.AGAIN or err.INTR) do
-      t, err = S.select({writefds = {self.sock}}, 0)
-   end
-   assert(t, err)
-   return t.count == 1
-end
-
-function RawSocket:transmit (p)
+function RawSocket:try_transmit (p)
    local sz, err = S.write(self.sock, p.data, p.length)
+   if (not sz and err.AGAIN) then
+      return false
+   end
    assert(sz, err)
    assert(sz == p.length)
+   return true
 end
 
 function RawSocket:stop()

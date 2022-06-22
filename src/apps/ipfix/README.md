@@ -33,10 +33,30 @@ idle and available for expiry.  The default is 300 seconds.
 *Optional*.  Period at which an active, non-idle flow should produce
 export records.  The default is 120 seconds.
 
+— Key **flush_timeout**
+
+*Optional*.  Maximum number of seconds after which queued data records
+are exported.  If set to a positive value, data records are queued
+until a flow export packet of maximum size according to the configured
+**mtu** can be generated or **flush_timeout** seconds have passed
+since the last export packet was generated, whichever occurs first.
+If set to zero, data records are exported immediately after each scan
+of the flow cache.  The default is 10 seconds.
+
 — Key **cache_size**
 
 *Optional*.  Initial size of flow tables, in terms of number of flows.
 The default is 20000.
+
+— Key **scan_time**
+
+*Optional*.  The flow cache for every configured template is scanned
+continously to check for entries eligible for export based on the
+**idle_timeout** and **active_timeout** parameters.  The **scan_time**
+determines the interval in seconds that a scan of the entire flow
+cache will take.  The implementation uses a token bucket mechanism by
+which access to the tables is distributed evenly over the time
+interval.  The default is 10 seconds.
 
 — Key **template_refresh_interval**
 
