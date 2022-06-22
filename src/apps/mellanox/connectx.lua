@@ -223,6 +223,7 @@ local queue_config = {
    id   = { required = true },
    mac  = { default = nil },
    vlan = { default = nil },
+   enable_counters = { default = true },
 }
 
 function ConnectX:new (conf)
@@ -352,7 +353,7 @@ function ConnectX:new (conf)
       -- Create the queue objects
       local tis = hca:create_tis(0, tdomain)
       local counter_set_id
-      if self.mlx > 4 then
+      if self.mlx > 4 and queue.enable_counters then
          counter_set_id = hca:alloc_q_counter()
          table.insert(q_counters, { counter_id = counter_set_id,
                                     queue_id   = queue.id })
