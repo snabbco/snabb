@@ -6,6 +6,10 @@ snabb lwaftr generate-configuration <ipv4> <num_ipv4s> <br_address> <b4> <psid_l
 Arguments:
 
    --output <filename>     Output filename (snabb-softwire-v3 configuration file).
+   --pcap-v4 <filename>    Generate test input PCAPs for filenames.
+   --pcap-v6 <filename>
+   --packet-size <size>    Size of packets in generated PCAPs
+   --npackets <num>        Number of packets in generated PCAPs
 
 Examples:
 

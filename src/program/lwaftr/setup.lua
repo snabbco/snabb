@@ -261,22 +261,30 @@ function config_connectx(c, name, opt, lwconfig)
    end
    local device = lwutil.parse_instance(lwconfig)
    local queues = {}
+   local queue_counters, queue_counters_max = 0, 24
    for id, queue in pairs(lwconfig.softwire_config.instance[device].queue) do
+      queue_counters = queue_counters + 2
       queues[#queues+1] = {
          id = queue_id(queue.external_interface, id),
          mac = ethernet:ntop(queue.external_interface.mac),
-         vlan = queue.external_interface.vlan_tag
+         vlan = queue.external_interface.vlan_tag,
+         enable_counters = queue_counters <= queue_counters_max
       }
       queues[#queues+1] = {
          id = queue_id(queue.internal_interface, id),
          mac = ethernet:ntop(queue.internal_interface.mac),
-         vlan = queue.internal_interface.vlan_tag
+         vlan = queue.internal_interface.vlan_tag,
+         enable_counters = queue_counters <= queue_counters_max
       }
    end
    if lwutil.is_lowest_queue(lwconfig) then
       config.app(c, "ConnectX_"..opt.pci:gsub("[%.:]", "_"), connectx.ConnectX, {
          pciaddress = opt.pci,
-         queues = queues
+         queues = queues,
+         sendq_size = 4096,
+         recvq_size = 4096,
+         fc_rx_enable = false,
+         fc_tx_enable = false
       })
    end
    config.app(c, name, connectx.IO, {

@@ -216,7 +216,7 @@ function bind_to_cpu (cpu, skip_perf_checks)
 end
 
 function unbind_numa_node ()
-   if supports_numa() then
+   if has_numa() then
       assert(S.set_mempolicy('default'))
    end
    bound_numa_node = nil
@@ -227,7 +227,7 @@ function bind_to_numa_node (node, policy)
    if not node then return unbind_numa_node() end
    assert(not bound_numa_node, "already bound")
 
-   if supports_numa() then
+   if has_numa() then
       assert(S.set_mempolicy(policy or 'preferred', node))
 
       -- Migrate any pages that might have the wrong affinity.
