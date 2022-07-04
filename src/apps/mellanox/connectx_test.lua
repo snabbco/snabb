@@ -40,8 +40,10 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       end
    end
    -- Instantiate app network
-   local nic0 = connectx.ConnectX:new({pciaddress=pci0, queues=queues})
-   local nic1 = connectx.ConnectX:new({pciaddress=pci1, queues=queues})
+   local nic0 = connectx.ConnectX:new(lib.parse({pciaddress=pci0, queues=queues},
+                                                connectx.ConnectX.config))
+   local nic1 = connectx.ConnectX:new(lib.parse({pciaddress=pci1, queues=queues},
+                                                connectx.ConnectX.config))
    local io0 = {}               -- io apps on nic0
    local io1 = {}               -- io apps on nic1
    print(("creating %d queues per device..."):format(#queues))
@@ -315,6 +317,12 @@ function basic_match (pci0, pci1)
    config.link(c, "tee.output2 -> match.comparator")
 
    engine.configure(c)
+
+   print("waiting for linkup...")
+   lib.waitfor(function ()
+      return engine.app_table.nic0.hca:linkup()
+         and engine.app_table.nic1.hca:linkup()
+   end)
 
    engine.main({duration = 1, report = false})
    engine.report_links()

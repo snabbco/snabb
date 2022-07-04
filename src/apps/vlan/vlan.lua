@@ -28,7 +28,8 @@ Untagger = {
 VlanMux = {
    config = {
       encapsulation = default_encap,
-   }
+   },
+   push_link = {}
 }
 
 local tpids = { dot1q = 0x8100, dot1ad = 0x88A8 }
@@ -127,62 +128,74 @@ function Untagger:push ()
 end
 
 function VlanMux:new (conf)
-   local o = setmetatable({}, {__index=VlanMux})
+   local o = setmetatable({ vlan_links = {} }, {__index=VlanMux})
    return new_aux(o, conf)
 end
 
-function VlanMux:link ()
-   local from_vlans, to_vlans = {}, {}
-   for name, l in pairs(self.input) do
-      if string.match(name, "vlan%d+") then
-         local vid = check_tag(tonumber(string.sub(name, 5)))
-         to_vlans[vid] = self.output[name]
-         table.insert(from_vlans, { link = l, vid = vid })
-      elseif name == "native" then
-         to_vlans[0] = self.output.native
-      elseif type(name) == "string" and name ~= "trunk" then
-         error("invalid link name "..name)
-      end
+function VlanMux:link (dir, name)
+   local vid = self:link_vid(dir, name)
+   if dir == 'output' and vid then
+      self.vlan_links[vid] = self[dir][name]
+   elseif dir == 'input' and vid then
+      local tag = build_tag(vid, self.tpid)
+      self.push_link[name] = self:make_push_from_vlan(tag)
    end
-   self.from_vlans = from_vlans
-   self.to_vlans = to_vlans
 end
 
-function VlanMux:push ()
-   local from, to = self.from_vlans, self.to_vlans
+function VlanMux:unlink (dir, name)
+   local vid = self:link_vid(dir, name)
+   if dir == 'output' and vid then
+      self.vlan_links[vid] = nil
+   end
+end
+
+function VlanMux:link_vid (dir, name)
+   local vid = name:match("vlan(%d+)")
+   if vid then
+      return check_tag(tonumber(vid))
+   elseif name == 'native' then
+      return ({output=0, input=nil})[dir]
+   elseif name == 'trunk' then
+      return nil
+   else
+      error("invalid link name "..name)
+   end
+end
+
+function VlanMux:make_push_from_vlan (tag)
+   return function (self, lin)
+      self:push_from_vlan(lin, tag)
+   end
+end
+
+function VlanMux:push_from_vlan (lin, tag)
+   local otrunk = assert(self.output.trunk)
+   for _ = 1, link.nreadable(lin) do
+      self:transmit(otrunk, push_tag(receive(lin), tag))
+   end
+end
+
+function VlanMux.push_link:native (lin)
+   local otrunk = assert(self.output.trunk)
+   for _ = 1, link.nreadable(lin) do
+      self:transmit(otrunk, receive(lin))
+   end
+end
+
+function VlanMux.push_link:trunk (itrunk)
+   local links = self.vlan_links
    local tpid = self.tpid
-   local l_in = self.input.trunk
-   assert(l_in)
-   while not empty(l_in) do
-      local p = receive(l_in)
+   for _ = 1, link.nreadable(itrunk) do
+      local p = receive(itrunk)
       local ethertype = cast("uint16_t*", p.data
                                 + o_ethernet_ethertype)[0]
       if ethertype == htons(tpid) then
          -- dig out TCI field
          local tci = extract_tci(p)
          local vid = tci_to_vid(tci)
-         self:transmit(to[vid], pop_tag(p))
+         self:transmit(links[vid], pop_tag(p))
       else -- untagged, send to native output
-         self:transmit(to[0], p)
-      end
-   end
-
-   local l_out = self.output.trunk
-   local i = 1
-   while from[i] do
-      local from = from[i]
-      local l_in = from.link
-      while not empty(l_in) do
-         local p = receive(l_in)
-         self:transmit(l_out, push_tag(p, build_tag(from.vid, tpid)))
-      end
-      i = i + 1
-   end
-
-   local l_in = self.input.native
-   if l_in then
-      while not empty(l_in) do
-         self:transmit(l_out, receive(l_in))
+         self:transmit(links[0], p)
       end
    end
 end
@@ -241,15 +254,17 @@ function selftest()
    app.configure(c)
    app.main({duration = 1})
 
-   print("vlan sent: "
-            ..link.stats(app.app_table.vlan_source.output.output).txpackets)
-   print("native sent: "
-            ..link.stats(app.app_table.native_source.output.output).txpackets)
-   print("trunk received: "
-            ..link.stats(app.app_table.trunk_sink.input.input).rxpackets)
-   print("trunk sent: "
-            ..link.stats(app.app_table.trunk_source.output.output).txpackets)
-   print("native received: "
-            ..link.stats(app.app_table.native_sink.input.input).rxpackets)
+   local vsent = link.stats(app.app_table.vlan_source.output.output).txpackets
+   local nsent = link.stats(app.app_table.native_source.output.output).txpackets
+   local trecv = link.stats(app.app_table.trunk_sink.input.input).rxpackets
+   local tsent = link.stats(app.app_table.trunk_source.output.output).txpackets
+   local nrecv = link.stats(app.app_table.native_sink.input.input).rxpackets
+   print("vlan sent: "..vsent)
+   print("native sent: "..nsent)
+   print("trunk received: "..trecv)
+   assert(trecv == vsent + nsent)
+   print("trunk sent: "..tsent)
+   print("native received: "..nrecv)
+   assert(nrecv == tsent)
    test_tag_untag()
 end

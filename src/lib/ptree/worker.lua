@@ -105,6 +105,8 @@ function Worker:main ()
 
    if not engine.auditlog_enabled then engine.enable_auditlog() end
 
+   engine.enable_tick()
+
    engine.setvmprofile("engine")
    repeat
       self.breathe()

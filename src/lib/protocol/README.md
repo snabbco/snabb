@@ -45,8 +45,9 @@ IPv4 or IPv6 header class.
 ### Ethernet (lib.protocol.ethernet)
 
 The `lib.protocol.ethernet` module contains a class for representing
-*Ethernet headers*. The `ethernet` protocol class supports two upper
-layer protocols: `lib.protocol.ipv4` and `lib.protocol.ipv6`.
+*Ethernet headers*. The `ethernet` protocol class supports three upper
+layer protocols: `lib.protocol.ipv4`, `lib.protocol.ipv6`,
+and `lib.protocol.dot1q`.
 
 — Method **ethernet:new** *config*
 
@@ -111,6 +112,35 @@ Returns a true value if *mac* address denotes a [Broadcast address](https://en.w
 
 Returns the MAC address for IPv6 multicast *ip* as defined by RFC2464,
 section 7.
+
+### IEEE 802.1Q VLAN (lib.protocol.dot1q)
+
+The `lib.protocol.dot1q` module contains a class for representing
+[IEEE 802.1Q](https://en.wikipedia.org/wiki/IEEE_802.1Q) VLAN headers.
+The `dot1q` protocol class supports two upper layer protocols:
+`lib.protocol.ipv4` and `lib.protocol.ipv6`.
+
+— Method **dot1q:new** *config*
+
+Returns a new VLAN header for *config*. *Config* must a be a table
+which may contain the following keys:
+
+* `id` - VLAN id (PCP/DEI/VID) encoded in host byte order. Default is 0.
+* `type` - Either `0x0800` or `0x86dd` for IPv4/6 individually. Default
+  is `0x0`.
+
+— Method **dot1q:id** *mac*
+
+— Method **dot1q:type** *type*
+
+Combined accessor and setter methods. These methods set the values of the
+id and type fields of the VLAN header. If no argument
+is given the current value is returned.
+
+— Constant **dot1q.TPID**
+
+The value `0x8100`. Used as the type in `lib.protocol.ethernet` to
+indicate that a IEEE 802.1Q VLAN header follows.
 
 
 ### IPv4 (lib.protocol.ipv4)
@@ -205,6 +235,12 @@ Returns the binary representation of IPv4 address denoted by *string*.
 
 Returns the string representation of *ip* address.
 
+— Function **ipv4:pton_cidr** *string*
+
+Returns the binary representation of the IPv4 address prefix and prefix length
+encoded denoted by *string* of the form `<ipv4address>/<length>`.
+See [CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing).
+
 
 ### IPv6 (lib.protocol.ipv6)
 
@@ -288,6 +324,12 @@ Returns the binary representation of IPv6 address denoted by *string*.
 — Function **ipv6:ntop** *ip*
 
 Returns the string representation of *ip* address.
+
+— Function **ipv6:pton_cidr** *string*
+
+Returns the binary representation of the IPv6 address prefix and prefix length
+encoded denoted by *string* of the form `<ipv6address>/<length>`.
+See [CIDR notation](https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing).
 
 — Function **ipv6:solicited_node_mcast** *ip*
 

@@ -814,16 +814,21 @@ function S.setegid(egid) return S.setresgid(-1, egid, -1) end
 -- note currently all returned as strings, may want to list which should be numbers
 function S.sysctl(name, new)
   name = "/proc/sys/" .. name:gsub("%.", "/")
-  local flag = c.O.RDONLY
-  if new then flag = c.O.RDWR end
-  local fd, err = S.open(name, flag)
+  local fd, err = S.open(name, c.O.RDONLY)
   if not fd then return nil, err end
   local len = 1024
   local old, err = S.read(fd, nil, len)
   if not old then return nil, err end
   old = old:sub(1, #old - 1) -- remove trailing newline
+  local ok, err = S.close(fd)
+  if not ok then return nil, err end
   if not new then return old end
+  -- Reopen fd because we want to write at pos 0
+  local fd, err = S.open(name, c.O.WRONLY)
+  if not fd then return nil, err end
   local ok, err = S.write(fd, new)
+  if not ok then return nil, err end
+  local ok, err = S.close(fd)
   if not ok then return nil, err end
   return old
 end

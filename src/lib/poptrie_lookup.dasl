@@ -19,7 +19,7 @@ local anchor = {}
 -- (leaf_t *leaves, node_t *nodes, uint8_t *key, base_t *directmap)
 -- NB: this type is hardcoded here to avoid filling up the ctype table
 local prototype = ffi.typeof(
-   "uint16_t (*) (void *, void *, uint8_t *, void *)"
+   "uint32_t (*) (void *, void *, uint8_t *, void *)"
 )
 
 -- Assemble a lookup routine
@@ -30,7 +30,6 @@ function generate (Poptrie, keysize)
       assert(Poptrie.s <= 32)
       assert(Poptrie.leaf_tag == bit.lshift(1, 31))
    end
-   assert(ffi.sizeof(Poptrie.leaf_t) == 2)
    assert(ffi.sizeof(Poptrie.vector_t) == 8)
    assert(ffi.sizeof(Poptrie.base_t) == 4)
    assert(ffi.offsetof(Poptrie.node_t, 'leafvec') == 0)
@@ -177,6 +176,10 @@ function lookup (Dst, Poptrie, keysize)
    -- return leaves[base + bc - 1]
    | mov index, dword [node+16] -- nodes[index].base0
    | add index, eax -- index = base + bc
-   | movzx eax, word [leaves+index*2-2] -- leaves[index - 1]
+   if ffi.sizeof(Poptrie.leaf_t) == 2 then
+      | movzx eax, word [leaves+index*2-2] -- leaves[index - 1]
+   elseif ffi.sizeof(Poptrie.leaf_t) == 4 then
+      | mov eax, dword [leaves+index*4-4] -- leaves[index - 1]
+   else error("NYI") end
    | ret
 end

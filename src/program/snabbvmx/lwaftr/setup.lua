@@ -434,10 +434,12 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
 
       config.app(c, "vm_v4v6", V4V6, { description = "vm_v4v6",
                                        mirror = false })
+      config.app(c, "nh_fwd6_join", basic_apps.Join)
       config.link(c, "nh_fwd6.vm -> vm_v4v6.v6")
-      config.link(c, "vm_v4v6.v6 -> nh_fwd6.vm")
+      config.link(c, "vm_v4v6.v6 -> nh_fwd6_join.vm1")
       config.link(c, "nh_fwd4.vm -> vm_v4v6.v4")
-      config.link(c, "vm_v4v6.v4 -> nh_fwd6.vm")
+      config.link(c, "vm_v4v6.v4 -> nh_fwd6_join.vm2")
+      config.link(c, "nh_fwd6_join.output -> nh_fwd6.vm")
 
       config.app(c, "DummyVhost", basic_apps.Sink)
       config.link(c, "DummyVhost.tx -> vm_v4v6.input")

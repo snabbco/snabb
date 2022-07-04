@@ -50,6 +50,7 @@ local band, bor, shl, shr, bswap, bnot =
    bit.band, bit.bor, bit.lshift, bit.rshift, bit.bswap, bit.bnot
 local cast, typeof = ffi.cast, ffi.typeof
 
+local debug_info    = false     -- Print into messages
 local debug_trace   = false     -- Print trace messages
 local debug_hexdump = false     -- Print hexdumps (in Linux mlx5 format)
 
@@ -149,14 +150,13 @@ local cxq_t = ffi.typeof([[
 
     // Transmit state
     struct packet *tx[64*1024]; // packets queued for transmit
-    uint16_t next_tx_wqeid;           // work queue ID for next transmit descriptor
+    uint16_t next_tx_wqeid;     // work queue ID for next transmit descriptor
     uint64_t *bf_next, *bf_alt; // "blue flame" to ring doorbell (alternating)
 
     // Receive state
     struct packet *rx[64*1024]; // packets queued for receive
-    uint16_t next_rx_wqeid;           // work queue ID for next receive descriptor
-    uint16_t next_rx_cqeid;          // completion queue ID of next completed packet
-    int rx_mine;                // CQE ownership value that means software-owned
+    uint16_t next_rx_wqeid;     // work queue ID for next receive descriptor
+    uint32_t rx_cqcc;           // consumer counter of RX CQ
   }
 ]])
 
@@ -209,17 +209,39 @@ local mlx_types = {
    ["0x101d" ] = 6, -- ConnectX6
 }
 
+ConnectX.config = {
+   pciaddress   = { required = true },
+   sendq_size   = { default  = 1024 },
+   recvq_size   = { default  = 1024 },
+   mtu          = { default  = 9500 },
+   fc_rx_enable = { default  = false },
+   fc_tx_enable = { default  = false },
+   queues       = { required = true },
+   macvlan      = { default  = false },
+}
+local queue_config = {
+   id   = { required = true },
+   mac  = { default = nil },
+   vlan = { default = nil },
+   enable_counters = { default = true },
+}
+
 function ConnectX:new (conf)
    local self = setmetatable({}, self)
+   local queues = {}
+   for _, queue in ipairs(conf.queues) do
+      table.insert(queues, lib.parse(queue, queue_config))
+   end
+
    local pciaddress = pci.qualified(conf.pciaddress)
    local device_info = pci.device_info(pciaddress)
    self.mlx = assert(mlx_types[device_info.device],
                      "Unsupported device "..device_info.device)
 
-   local sendq_size = conf.sendq_size or 1024
-   local recvq_size = conf.recvq_size or 1024
+   local sendq_size = conf.sendq_size
+   local recvq_size = conf.recvq_size
 
-   local mtu = conf.mtu or 9500
+   local mtu = conf.mtu
 
    -- Perform a hard reset of the device to bring it into a blank state.
    --
@@ -265,6 +287,8 @@ function ConnectX:new (conf)
    hca:set_port_mtu(mtu)
    hca:modify_nic_vport_context(mtu, true, true, true)
 
+   hca:set_port_flow_control(conf.fc_rx_enable, conf.fc_tx_enable)
+
    -- Create basic objects that we need
    --
    local uar = hca:alloc_uar()
@@ -280,8 +304,9 @@ function ConnectX:new (conf)
    local rqlist = {}
    local rqs = {}
 
-   -- List of queue counter IDs (ConnectX5 and up)
-   local counter_set_ids = {}
+   -- List of queue counter IDs and their corresponding queue IDs from
+   -- the configuration (ConnectX5 and up)
+   local q_counters = {}
 
    -- Enable MAC/VLAN switching?
    local usemac = false
@@ -328,9 +353,10 @@ function ConnectX:new (conf)
       -- Create the queue objects
       local tis = hca:create_tis(0, tdomain)
       local counter_set_id
-      if self.mlx > 4 then
+      if self.mlx > 4 and queue.enable_counters then
          counter_set_id = hca:alloc_q_counter()
-         table.insert(counter_set_ids, counter_set_id)
+         table.insert(q_counters, { counter_id = counter_set_id,
+                                    queue_id   = queue.id })
       end
       -- XXX order check
       cxq.sqn = hca:create_sq(scqn, pd, sq_stride, sendq_size,
@@ -513,6 +539,11 @@ function ConnectX:new (conf)
       txdrop    = {counter},
       txerrors  = {counter},
    }
+   -- Create per-queue drop counters named by the queue identifiers in
+   -- the configuration.
+   for _, queue in ipairs(conf.queues) do
+      frame["rxdrop_"..queue.id] = {counter}
+   end
    self.stats = shm.create_frame("pci/"..pciaddress, frame)
 
    -- Create separate HCAs to retreive port statistics.  Those
@@ -558,17 +589,18 @@ function ConnectX:new (conf)
    }
 
    -- Empty for ConnectX4
-   for _, id in ipairs(counter_set_ids) do
+   for _, q_counter in ipairs(q_counters) do
+      local per_q_rxdrop = self.stats["rxdrop_"..q_counter.queue_id]
       table.insert(self.stats_reqs,
                    {
                       start_fn = HCA.query_q_counter_start,
                       finish_fn = HCA.query_q_counter_finish,
-                      args = { set_id = id },
+                      args = q_counter.counter_id,
                       process_fn = function(r, stats)
                          -- Incremental update relies on query_q_counter to
                          -- clear the counter after read.
-                         counter.set(stats.rxdrop,
-                                     counter.read(stats.rxdrop) + r.out_of_buffer)
+                         counter.add(stats.rxdrop, r.out_of_buffer)
+                         counter.add(per_q_rxdrop, r.out_of_buffer)
                       end
       })
    end
@@ -617,6 +649,7 @@ function ConnectX:new (conf)
    function self:pull ()
       if self.sync_timer() then
          self:sync_stats()
+         eq:poll()
       end
    end
 
@@ -779,6 +812,9 @@ end
 -- Provide the NIC with freshly allocated memory.
 function HCA:alloc_pages (num_pages)
    assert(num_pages > 0)
+   if debug_info then
+      print(("Allocating %d pages to HW"):format(num_pages))
+   end
    self:command("MANAGE_PAGES", 0x14 + num_pages*8, 0x0C)
       :input("opcode",            0x00, 31, 16, 0x108)
       :input("opmod",             0x04, 15, 0, 1) -- allocate mode
@@ -789,6 +825,20 @@ function HCA:alloc_pages (num_pages)
       self:input(nil, 0x14 + i*8, 31, 12, ptrbits(phy, 31, 12))
    end
    self:execute()
+end
+
+function HCA:free_pages (num_pages)
+   assert(num_pages > 0)
+   if debug_info then
+      print(("Reclaiming %d pages from HW"):format(num_pages))
+   end
+   self:command("MANAGE_PAGES", 0x0C, 0x10 + num_pages*8)
+      :input("opcode",            0x00, 31, 16, 0x108)
+      :input("opmod",             0x04, 15, 0, 2) -- return pages
+      :input("input_num_entries", 0x0C, 31, 0, num_pages, "input_num_entries")
+      :execute()
+   local num_entries = self:output(0x08, 31, 0)
+   -- TODO: deallocate DMA pages
 end
 
 -- Query the NIC capabilities (maximum or current setting).
@@ -884,67 +934,145 @@ end
 -- Event queues
 ---------------------------------------------------------------
 
+-- Event Queue Entry (EQE)
+local eqe_t = ffi.typeof([[
+  struct {
+    uint8_t  reserved1;
+    uint8_t  event_type;
+    uint8_t  reserved2;
+    uint8_t  event_sub_type;
+    uint32_t reserved3[7];
+    uint32_t event_data[7];
+    uint16_t reserved4;
+    uint8_t  signature;
+    uint8_t  owner;
+  }
+]])
+
 -- Create an event queue that can be accessed via the given UAR page number.
 function HCA:create_eq (uar)
    local numpages = 1
    local log_eq_size = 7 -- 128 entries
-   local ptr, phy = memory.dma_alloc(4096, 4096) -- memory for entries
+   local byte_size = 2^log_eq_size * ffi.sizeof(eqe_t)
+   local ptr, phy = memory.dma_alloc(byte_size, 4096) -- memory for entries
+   events = bits({
+         CQError         = 0x04,
+         PortStateChange = 0x09,
+         PageRequest     = 0x0B,
+   })
    self:command("CREATE_EQ", 0x10C + numpages*8, 0x0C)
       :input("opcode",        0x00,        31, 16, 0x301)
+      :input("oi",            0x10 + 0x00, 17, 17, 1)   -- overrun ignore
       :input("log_eq_size",   0x10 + 0x0C, 28, 24, log_eq_size)
       :input("uar_page",      0x10 + 0x0C, 23,  0, uar)
       :input("log_page_size", 0x10 + 0x18, 28, 24, 2) -- XXX best value? 0 or max?
-      :input("event bitmask", 0x10 + 0x5C, 31,  0, bits({PageRequest=0xB})) -- XXX more events?
+      :input("event bitmask", 0x5C, 31,  0, events)
       :input("pas[0] high",   0x110,       31,  0, ptrbits(phy, 63, 32))
       :input("pas[0] low",    0x114,       31,  0, ptrbits(phy, 31,  0))
       :execute()
    local eqn = self:output(0x08, 7, 0)
-   return eq:new(eqn, ptr, 2^log_eq_size)
+   return eq:new(eqn, ptr, log_eq_size, self)
 end
-
--- Event Queue Entry (EQE)
-local eqe_t = ffi.typeof([[
-  struct {
-    uint16_t event_type;
-    uint16_t event_sub_type;
-    uint32_t event_data;
-    uint16_t pad;
-    uint8_t signature;
-    uint8_t owner;
-  } ]] )
 
 eq = {}
 eq.__index = eq
 
 -- Create event queue object.
-function eq:new (eqn, pointer, nentries)
+function eq:new (eqn, pointer, log_size, hca)
+   local nentries = 2^log_size
    local ring = ffi.cast(ffi.typeof("$*", eqe_t), pointer)
-   for i = 0, nentries-1 do
+   for i = 0, nentries - 1 do
+      -- Owner = HW
       ring[i].owner = 1
    end
+   local mask = nentries - 1
    return setmetatable({eqn = eqn,
                         ring = ring,
                         index = 0,
-                        n = nentries},
+                        log_size = log_size,
+                        mask = nentries - 1,
+                        hca = hca,
+                       },
       self)
 end
 
+function eq:sw_value ()
+   return band(shr(self.index, self.log_size), 1)
+end
+
+function eq:entry ()
+   local slot = band(self.index, self.mask)
+   return self.ring[slot]
+end
+
 -- Poll the queue for events.
-function eq:poll()
-   print("Polling EQ")
-   local eqe = self.ring[self.index]
-   while eqe.owner == 0 and eqe.event_type ~= 0xFF do
+function eq:poll ()
+   local eqe = self:entry()
+   while eqe.owner == self:sw_value() do
+      self:handle_event(eqe)
       self.index = self.index + 1
-      eqe = self.ring[self.index % self.n]
-      self:event(eqe)
+      eqe = self:entry()
    end
-   print("done polling EQ")
 end
 
 -- Handle an event.
-function eq:event ()
-   print(("Got event %s.%s"):format(eqe.event_type, eqe.event_sub_type))
-   error("Event handling not yet implemented")
+local event_page_req = ffi.cdef([[
+   struct event_page_req {
+     uint16_t reserved1;
+     uint16_t function_id;
+     uint32_t num_pages;
+     uint32_t reserved2[5];
+   }
+]])
+local event_port_change = ffi.cdef([[
+   struct event_port_change {
+     uint32_t reserved1[2];
+     uint8_t  port_num;
+     uint8_t  reserved2[3];
+     uint32_t reserved2[4];
+   }
+]])
+local port_status = {
+   [1] = "down",
+   [4] = "up"
+}
+local event_cq_error = ffi.cdef([[
+   struct event_cq_error {
+     uint32_t cqn;
+     uint32_t reserved1;
+     uint8_t  reserved2[3];
+     uint8_t  syndrome;
+     uint32_t reserved3[4];
+   }
+]])
+local cq_errors = {
+   [1] = "overrun",
+   [2] = "access violation"
+}
+function eq:handle_event (eqe)
+   if eqe.event_type == 0x04 then
+      local cq_error = cast(typeof("struct event_cq_error *"), eqe.event_data)
+      local cqn = bswap(cq_error.cqn)
+      error(("Error on completion queue #%d: %s"):format(cqn, cq_errors[cq_error.syndrome]))
+   elseif eqe.event_type == 0x09 then
+      if debug_info then
+         local port_change = cast(typeof("struct event_port_change *"), eqe.event_data)
+         local port = shr(port_change.port_num, 4)
+         print(("Port %d changed state to %s"):format(port, port_status[eqe.event_sub_type]))
+      end
+   elseif eqe.event_type == 0xB then
+      local page_req = cast(typeof("struct event_page_req *"), eqe.event_data)
+      local num_pages = bswap(page_req.num_pages)
+      if num_pages < 0 then
+         num_pages = -num_pages
+         self.hca:free_pages(num_pages)
+      else
+         self.hca:alloc_pages(num_pages)
+      end
+   else
+      error(("Received unexpected event type 0x%02x, subtype 0x%02x"):format(eqe.event_type,
+                                                                             eqe.event_sub_type))
+   end
 end
 
 ---------------------------------------------------------------
@@ -1242,6 +1370,12 @@ IO.__index = IO
 -- lib.hardware.pci.device_info
 driver = IO
 
+IO.config = {
+   pciaddress = {required=true},
+   queue = {required=true},
+   packetblaster = {default=false}
+}
+
 function IO:new (conf)
    local self = setmetatable({}, self)
 
@@ -1328,6 +1462,17 @@ function IO:new (conf)
       close()
    end
 
+   -- Configure self as packetblaster?
+   if conf.packetblaster then
+      self.push = nil
+      self.pull = function (self)
+         if activate() then
+            sq:blast(self.input.input or self.input.rx)
+            deactivate()
+         end
+      end
+   end
+
    return self
 end
 
@@ -1340,9 +1485,11 @@ function RQ:new (cxq)
    local rq = {}
 
    local mask = cxq.rqsize - 1
-   -- Return the transmit queue slot for the given WQE ID.
-   local function slot (wqeid)
-      return band(wqeid, mask)
+   -- Return the queue slot for the given consumer counter for either
+   -- the CQ or the WQ. This assumes that both queues have the same
+   -- size.
+   local function slot (cc)
+      return band(cc, mask)
    end
 
    -- Refill with buffers
@@ -1366,40 +1513,44 @@ function RQ:new (cxq)
       end
    end
 
+   local log2_rqsize = log2size(cxq.rqsize)
+   local function sw_owned ()
+      -- The value of the ownership flag that indicates owned by SW for
+      -- the current consumer counter is flipped every time the counter
+      -- wraps around the receive queue.
+      return band(shr(cxq.rx_cqcc, log2_rqsize), 1)
+   end
+
    local function have_input ()
-      local c = cxq.rcq[cxq.next_rx_cqeid]
+      local c = cxq.rcq[slot(cxq.rx_cqcc)]
       local owner = bit.band(1, c.u8[0x3F])
-      return owner == cxq.rx_mine
+      return owner == sw_owned()
    end
 
    function rq:receive (l)
       local limit = engine.pull_npackets
-      while have_input() and limit > 0 and not link.full(l) do
+      while limit > 0 and have_input() do
          -- Find the next completion entry.
-         local c = cxq.rcq[cxq.next_rx_cqeid]
+         local c = cxq.rcq[slot(cxq.rx_cqcc)]
          limit = limit - 1
          -- Advance to next completion.
          -- Note: assumes sqsize == cqsize
-         cxq.next_rx_cqeid = slot(cxq.next_rx_cqeid + 1)
-         -- Toggle the ownership value if the CQ wraps around.
-         if cxq.next_rx_cqeid == 0 then
-            cxq.rx_mine = (cxq.rx_mine + 1) % 2
-         end
+         cxq.rx_cqcc = cxq.rx_cqcc + 1
          -- Decode the completion entry.
          local opcode = shr(c.u8[0x3F], 4)
          local len = bswap(c.u32[0x2C/4])
          local wqeid = shr(bswap(c.u32[0x3C/4]), 16)
          local idx = slot(wqeid)
-         if opcode == 0 or opcode == 2 then
+         if band(opcode, 0xfd) == 0 then -- opcode == 0 or opcode == 2
             -- Successful receive
             local p = cxq.rx[idx]
-            assert(p ~= nil)
+            -- assert(p ~= nil)
             p.length = len
             link.transmit(l, p)
             cxq.rx[idx] = nil
          elseif opcode == 13 or opcode == 14 then
             -- Error on receive
-            assert(cxq.rx[idx] ~= nil)
+            -- assert(cxq.rx[idx] ~= nil)
             packet.free(cxq.rx[idx])
             cxq.rx[idx] = nil
             local syndromes = {
@@ -1420,10 +1571,6 @@ function RQ:new (cxq)
             error(("Unexpected CQE opcode: %d (0x%x)"):format(opcode, opcode))
          end
       end
-   end
-
-   function rq:ring_doorbell ()
-      doorbell[0].receive = bswap(next_buffer)
    end
 
    return rq
@@ -1482,7 +1629,7 @@ function SQ:new (cxq, mmio)
       end
       -- Ring the doorbell if we enqueued new packets.
       if cxq.next_tx_wqeid ~= start_wqeid then
-         local current_packet = slot(cxq.next_tx_wqeid + cxq.sqsize-1)
+         local current_packet = slot(cxq.next_tx_wqeid + mask)
          cxq.doorbell.send = bswap(cxq.next_tx_wqeid)
          cxq.bf_next[0] = cxq.swq[current_packet].u64[0]
          -- Switch next/alternate blue flame register for next time
@@ -1496,12 +1643,77 @@ function SQ:new (cxq, mmio)
       local opcode = cxq.scq[0].u8[0x38]
       if opcode == 0x0A then
          local wqeid = shr(bswap(cxq.scq[0].u32[0x3C/4]), 16)
-         while next_reclaim ~= wqeid % cxq.sqsize do
-            assert(cxq.tx[next_reclaim] ~= nil)
+         while next_reclaim ~= slot(wqeid) do
+            -- assert(cxq.tx[next_reclaim] ~= nil)
             packet.free(cxq.tx[next_reclaim])
             cxq.tx[next_reclaim] = nil
-            next_reclaim = tonumber(slot(next_reclaim + 1))
+            next_reclaim = slot(next_reclaim + 1)
          end
+      end
+   end
+
+   -- Packetblaster: blast packets from link out of send queue.
+   function sq:blast (l)
+      local kickoff = sq:blast_load(l)
+
+      -- Get current send queue tail (hardware controlled)
+      local opcode = cxq.scq[0].u8[0x38]
+      if opcode == 0x0A then
+         local wqeid = shr(bswap(cxq.scq[0].u32[0x3C/4]), 16)
+
+         -- Keep send queue topped up
+         local next_slot = slot(cxq.next_tx_wqeid)
+         while next_slot ~= slot(wqeid) do
+            local wqe = cxq.swq[next_slot]
+            -- Update control segment
+            wqe.u32[0] = bswap(shl(cxq.next_tx_wqeid, 8) + 0x0A)
+            -- Advance counters
+            cxq.next_tx_wqeid = cxq.next_tx_wqeid + 1
+            next_slot = slot(cxq.next_tx_wqeid)
+         end
+      end
+
+      if opcode == 0x0A or kickoff then
+         -- Ring the doorbell
+         local current_packet = slot(cxq.next_tx_wqeid + mask)
+         cxq.doorbell.send = bswap(cxq.next_tx_wqeid)
+         cxq.bf_next[0] = cxq.swq[current_packet].u64[0]
+         -- Switch next/alternate blue flame register for next time
+         cxq.bf_next, cxq.bf_alt = cxq.bf_alt, cxq.bf_next
+      end
+   end
+
+   -- Packetblaster: load packets from link into send queue.
+   local loaded = 0
+   function sq:blast_load (l)
+      while loaded < cxq.sqsize and not link.empty(l) do
+         local p = link.receive(l)
+         local next_slot = slot(cxq.next_tx_wqeid)
+         local wqe = cxq.swq[next_slot]
+
+         -- Construct a 64-byte transmit descriptor.
+         -- This is in three parts: Control, Ethernet, Data.
+         -- The Ethernet part includes some inline data.
+
+         -- Control segment
+         wqe.u32[0] = bswap(shl(cxq.next_tx_wqeid, 8) + 0x0A)
+         wqe.u32[1] = bswap(shl(cxq.sqn, 8) + 4)
+         wqe.u32[2] = bswap(shl(2, 2)) -- completion always
+         -- Ethernet segment
+         local ninline = 16
+         wqe.u32[7] = bswap(shl(ninline, 16))
+         ffi.copy(wqe.u8 + 0x1E, p.data, ninline)
+         -- Send Data Segment (inline data)
+         wqe.u32[12] = bswap(p.length - ninline)
+         wqe.u32[13] = bswap(cxq.rlkey)
+         local phy = memory.virtual_to_physical(p.data + ninline)
+         wqe.u32[14] = bswap(tonumber(shr(phy, 32)))
+         wqe.u32[15] = bswap(tonumber(band(phy, 0xFFFFFFFF)))
+         -- Advance counters
+         cxq.next_tx_wqeid = cxq.next_tx_wqeid + 1
+         loaded = loaded + 1
+         -- Kickoff?
+         return loaded == cxq.sqsize
       end
    end
 
@@ -1670,6 +1882,7 @@ end
 PMTU  = 0x5003
 PTYS  = 0x5004 -- Port Type and Speed
 PAOS  = 0x5006 -- Port Administrative & Operational Status
+PFCC  = 0x5007 -- Port Flow Control Configuration
 PPCNT = 0x5008 -- Ports Performance Counters
 PPLR  = 0x5018 -- Port Physical Loopback Register
 
@@ -1839,6 +2052,37 @@ function HCA:get_port_stats_finish ()
    return port_stats
 end
 
+function HCA:set_port_flow_control (rx_enable, tx_enable)
+   self:command("ACCESS_REGISTER", 0x1C, 0x1C)
+      :input("opcode", 0x00, 31, 16, 0x805)
+      :input("opmod",  0x04, 15,  0, 0) -- write
+      :input("register_id", 0x08, 15,  0, PFCC)
+      :input("local_port", 0x10, 23, 16, 1)
+      :input("pptx",       0x10 + 0x08, 31, 31, tx_enable and 1 or 0)
+      :input("pprx",       0x10 + 0x0C, 31, 31, rx_enable and 1 or 0)
+      :execute()
+end
+
+local fc_status = {}
+function HCA:get_port_flow_control ()
+   self:command("ACCESS_REGISTER", 0x10, 0x1C)
+      :input("opcode", 0x00, 31, 16, 0x805)
+      :input("opmod",  0x04, 15,  0, 1) -- read
+      :input("register_id", 0x08, 15,  0, PFCC)
+      :input("local_port", 0x10, 23, 16, 1)
+      :execute()
+   fc_status.pptx = self:output(0x10 + 0x08, 31, 31)
+   fc_status.aptx = self:output(0x10 +0x08, 30, 30)
+   fc_status.pfctx = self:output(0x10 + 0x08, 23, 16)
+   fc_status.fctx_disabled = self:output(0x10 +0x08, 8, 8)
+   fc_status.pprx = self:output(0x10 + 0x0c, 31, 31)
+   fc_status.aprx = self:output(0x10 + 0x0c, 30, 30)
+   fc_status.pfcrx = self:output(0x10 +0x0c, 23, 16)
+   fc_status.stall_minor_watermark = self:output(0x10 +0x10, 31, 16)
+   fc_status.stall_crit_watermark = self:output(0x10 +0x10, 15, 0)
+   return fc_status
+end
+
 function HCA:alloc_q_counter()
    self:command("ALLOC_Q_COUNTER", 0x18, 0x10C)
       :input("opcode", 0x00, 31, 16, 0x771)
@@ -1849,13 +2093,13 @@ end
 local q_stats = {
    out_of_buffer = 0ULL
 }
-function HCA:query_q_counter_start (args)
+function HCA:query_q_counter_start (id)
    self:command("QUERY_Q_COUNTER", 0x20, 0x10C)
       :input("opcode",        0x00, 31, 16, 0x773)
    -- Clear the counter after reading. This allows us to
    -- update the rxdrop stat incrementally.
       :input("clear",         0x18, 31,  31, 1)
-      :input("counter_set_id",0x1c,  7,   0, args.set_id)
+      :input("counter_set_id",0x1c,  7,   0, id)
       :execute_async()
 end
 
@@ -2360,8 +2604,8 @@ function selftest ()
    io1.output = { output = link.new('output1') }
    -- Exercise the IO apps before the NIC is initialized.
    io0:pull() io0:push() io1:pull() io1:push()
-   local nic0 = ConnectX:new{pciaddress = pcidev0, queues = {{id='a'}}}
-   local nic1 = ConnectX:new{pciaddress = pcidev1, queues = {{id='b'}}}
+   local nic0 = ConnectX:new(lib.parse({pciaddress = pcidev0, queues = {{id='a'}}}, ConnectX.config))
+   local nic1 = ConnectX:new(lib.parse({pciaddress = pcidev1, queues = {{id='b'}}}, ConnectX.config))
 
    print("selftest: waiting for both links up")
    while (nic0.hca:query_vport_state().oper_state ~= 1) or

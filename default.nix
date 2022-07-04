@@ -19,11 +19,7 @@ stdenv.mkDerivation rec {
 
   patchPhase = ''
     patchShebangs .
-
-    # some hardcodeism
-    for f in $(find src/program/snabbnfv/ -type f); do
-      substituteInPlace $f --replace "/bin/bash" "${bash}/bin/bash"
-    done
+    
   '' + lib.optionalString supportOpenstack ''
     # We need a way to pass $PATH to the scripts
     sed -i '2iexport PATH=${git}/bin:${mariadb}/bin:${which}/bin:${procps}/bin:${coreutils}/bin' src/program/snabbnfv/neutron_sync_master/neutron_sync_master.sh.inc

@@ -55,6 +55,10 @@ Optional entries that may be present in the *parameters* table include:
  * `resize_callback`: An optional function that is called after the
    table has been resized.  The function is called with two arguments:
    the ctable object and the old size. By default, no callback is used.
+ * `max_displacement_limit`: An upper limit to extra slots allocated
+   for displaced entries. By default we allocate `size*2` slots.
+   If you carefully read *ctable.lua* you can set this to say 30 and
+   thereby reduce memory usage to `size+2*30` slots.
 
 — Function **ctable.load** *stream* *parameters*
 

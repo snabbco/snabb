@@ -9,3 +9,12 @@
 *.dmp
 *.swp
 .tags
+*.dwo
+/src/lj_bcdef.h
+/src/lj_ffdef.h
+/src/lj_folddef.h
+/src/lj_libdef.h
+/src/lj_recdef.h
+/src/lj_vm.S
+/src/raptorjit
+/src/host/buildvm_arch.h

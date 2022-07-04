@@ -17,7 +17,7 @@ local iftypes = {
    [0x1003] = 136, -- l3ipvlan
 }
 
-function init_snmp (objs, name, counters, directory, interval)
+function init_snmp (objs, name, counters, directory, interval, log_date)
    -- Rudimentary population of a row in the ifTable MIB.  Allocation
    -- of the ifIndex is delegated to the SNMP agent via the name of
    -- the interface in ifDescr.
@@ -30,7 +30,8 @@ function init_snmp (objs, name, counters, directory, interval)
    end
    local ifTable = mib:new({ directory = directory or nil,
                              filename = name })
-   local logger = logger.new({ module = 'iftable_mib' })
+   local logger = logger.new({ date = log_date,
+                               module = 'iftable_mib' })
    -- ifTable
    ifTable:register('ifDescr', 'OctetStr', objs.ifDescr)
    ifTable:register('ifType', 'Integer32')
