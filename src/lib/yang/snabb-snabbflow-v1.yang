@@ -20,7 +20,7 @@ module snabb-snabbflow-v1 {
     description
      "Configuration for the Snabbflow IPFIX exporter.";
 
-    list interfaces {
+    list interface {
       key "device";
 
       leaf device {
@@ -67,7 +67,7 @@ module snabb-snabbflow-v1 {
           description "XXX";
         }
 
-        list classes {
+        list class {
           key "name order";
           ordered-by user; // XXX not yet implemented, hence the 'order' leaf
 
@@ -189,7 +189,7 @@ module snabb-snabbflow-v1 {
         default true;
       }
 
-      list collector-pools {
+      list collector-pool {
         key "name";
 
         leaf name { 
@@ -197,7 +197,7 @@ module snabb-snabbflow-v1 {
           type string;
         }
 
-        list pool {
+        list collector {
           key "ip port";
 
           leaf ip { 
@@ -217,7 +217,7 @@ module snabb-snabbflow-v1 {
         description "XXX";
       }
 
-      list exporters {
+      list exporter {
         key "name";
 
         leaf name {
@@ -259,7 +259,7 @@ module snabb-snabbflow-v1 {
           }
         }
 
-        list instances {
+        list instance {
           key "id";
 
           leaf id {

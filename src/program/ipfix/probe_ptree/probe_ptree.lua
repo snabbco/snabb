@@ -75,14 +75,14 @@ end
 
 function setup_workers (config)
    local main = config.snabbflow_config
-   local interfaces = main.interfaces
+   local interfaces = main.interface
    local ipfix = main.ipfix
    local rss = main.rss
 
    local collector_pools = {}
-   for name, p in pairs(ipfix.collector_pools) do
+   for name, p in pairs(ipfix.collector_pool) do
       local collectors = {}
-      for entry in p.pool:iterate() do
+      for entry in p.collector:iterate() do
          table.insert(collectors, {
             ip = yang_util.ipv4_ntop(entry.key.ip),
             port = entry.key.port
@@ -138,7 +138,7 @@ function setup_workers (config)
       end
 
       local embedded_instance = 1
-      for name, exporter in pairs(ipfix.exporters) do
+      for name, exporter in pairs(ipfix.exporter) do
          local config = {}
          for key in pairs(ipfix_default_config) do
             config[key] = ipfix[key]
@@ -161,10 +161,10 @@ function setup_workers (config)
          end
 
          local num_instances = 0
-         for _ in pairs(exporter.instances) do
+         for _ in pairs(exporter.instance) do
             num_instances = num_instances + 1
          end
-         for id, instance in pairs(exporter.instances) do
+         for id, instance in pairs(exporter.instance) do
             -- Create a clone of the configuration for parameters
             -- specific to the instance
             local iconfig = lib.deepcopy(config)
@@ -229,7 +229,7 @@ function setup_workers (config)
          classes = {},
          remove_extension_headers = rss.software_scaling.remove_extension_headers
       }
-      for key, class in pairs(rss.software_scaling.classes) do
+      for key, class in pairs(rss.software_scaling.class) do
          table.insert(rss_config.classes, {
             name = key.name,
             order = key.order,
