@@ -173,10 +173,13 @@ module snabb-snabbflow-v1 {
         container pfx6-to-as { leaf file { mandatory true; type string; } }
         container vlan-to-ifindex { leaf file { mandatory true; type string; } }
         container mac-to-as { leaf file { mandatory true; type string; } }
-      }
-
-      leaf maps-logfile {
-        type string;
+        leaf log-directory {
+          type string;
+          description
+            "Path in which to create log files for map failures.
+            If given, failed lookups in maps will be logged to
+            <log-directory>/<observation-domain>.log";
+        }
       }
 
       leaf add-packet-metadata {
@@ -224,7 +227,7 @@ module snabb-snabbflow-v1 {
           type string;
         }
 
-        leaf-list templates {
+        leaf-list template {
           type string;
         }
 
@@ -240,10 +243,6 @@ module snabb-snabbflow-v1 {
         leaf use-maps {
           type boolean;
           default false;
-        }
-
-        leaf map-log-directory {
-          type string;
         }
 
         container restart {
@@ -275,9 +274,6 @@ module snabb-snabbflow-v1 {
             type decimal64;
             default 1;
           }
-
-          // busywait = { default = nil },
-          // pin_cpu = { default = false },
 
         }
       }

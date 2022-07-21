@@ -146,7 +146,7 @@ function setup_workers (config)
          config.exporter_ip = yang_util.ipv4_ntop(ipfix.exporter_ip)
 
          config.collector_pool = exporter.collector_pool
-         config.templates = exporter.templates
+         config.templates = exporter.template
 
          config.output_type = "tap_routed"
          config.instance = nil
@@ -186,9 +186,9 @@ function setup_workers (config)
             observation_domain = observation_domain + 1
             iconfig.observation_domain = od
             iconfig.output = "ipfixexport"..od
-            if exporter.maps_log_dir then
+            if ipfix.maps.log_directory then
                iconfig.maps_logfile =
-                  exporter.maps_log_dir.."/"..od..".log"
+                  ipfix.maps.log_directory.."/"..od..".log"
             end
 
             -- Scale the scan protection parameters by the number of
