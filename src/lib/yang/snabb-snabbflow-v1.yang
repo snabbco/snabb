@@ -362,10 +362,7 @@ module snabb-snabbflow-v1 {
           type string;
         }
 
-        leaf use-maps {
-          type boolean;
-          default false;
-        }
+        
 
         container restart {
           description

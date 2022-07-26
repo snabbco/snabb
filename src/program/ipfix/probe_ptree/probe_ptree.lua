@@ -152,7 +152,7 @@ function setup_workers (config)
          config.instance = nil
          config.add_packet_metadata = false
 
-         if exporter.use_maps then
+         if true then -- use_maps=true
             local maps = {}
             for name, map in pairs(ipfix.maps) do
                maps[name] = map.file
