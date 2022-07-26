@@ -389,10 +389,7 @@ module snabb-snabbflow-v1 {
             default true;
           }
 
-          leaf weight {
-            type decimal64;
-            default 1;
-          }
+          
 
         }
       }

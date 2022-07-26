@@ -168,7 +168,7 @@ function setup_workers (config)
             -- Create a clone of the configuration for parameters
             -- specific to the instance
             local iconfig = lib.deepcopy(config)
-            local rss_link = rss_link_name(exporter.rss_class, instance.weight)
+            local rss_link = rss_link_name(exporter.rss_class, 1)
             local od = observation_domain
 
             -- Select the collector ip and port from the front of the
