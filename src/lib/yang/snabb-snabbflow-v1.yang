@@ -246,7 +246,7 @@ module snabb-snabbflow-v1 {
 
       leaf mtu {
         type uint32;
-        default 512;
+        default 1500;
         description
           "MTU for exported UDP packets.";
       }
