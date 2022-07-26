@@ -262,6 +262,7 @@ module snabb-snabbflow-v1 {
         description
           "Maps to translate various protocol fields to additional flow metadata.";
         // XXX: YANGify? Document formats.
+        // XXX: make optional, default to empty maps.
         container pfx4-to-as { leaf file { mandatory true; type string; } }
         container pfx6-to-as { leaf file { mandatory true; type string; } }
         container vlan-to-ifindex { leaf file { mandatory true; type string; } }
@@ -333,7 +334,7 @@ module snabb-snabbflow-v1 {
 
         description
           "Set of configured exporters. Each exporter receives traffic
-          matching a single class defined in 'software-scaling',
+          matching a single class defined in 'rss/software-scaling',
           aggregates flows according to a set of templates, and
           exports them to a specified 'collector-pool'.
           Exporters can be instantiated and thereby scaled across
@@ -355,42 +356,68 @@ module snabb-snabbflow-v1 {
         leaf rss-class {
           type string;
           default "default";
+          description
+            "A class defined in 'rss/software-scaling. The exporter will
+            process packets matching this class.
+            If 'rss/software-scaling/default-class' is set to true then
+            this can be the implicit 'default' class which matches all
+            packets not matched by any other class.";
         }
 
         leaf collector-pool {
           type string;
+          description
+            "The 'name' of a 'collector-pool' to be used as an endpoint
+            for this exporter.";
         }
-
-        
 
         container restart {
           description
-            "Restart policy for exporter instances with embed: false.";
+            "Restart policy for exporter instances with embed: false.
+            Exporter processes will be restarted if they crash unless they
+            would exceed the configured restart policy.
+            The restart policy is expressed as follows: a process may be
+            restarted up to 'intensity' times within 'period' seconds.
+            Setting 'intensity' to 0 effectively disables restarts.";
           leaf intensity {
             type decimal64 { range 0..max; }
             default 5;
+            description
+              "The number of restarts permitted within a given time period.
+              Setting the intensity to 0 effectively disables restarts.";
           }
           leaf period {
             type decimal64 { range 0..max; }
             default 30;
+            description
+              "The duration of the time period in seconds.";
           }
         }
 
         list instance {
           key "id";
 
+          description
+            "Exporter instances. Each exporter can have multiple instances
+            that each receive a portion of the matched traffic as ";
+
           leaf id {
             type uint32;
+            description
+              "The identifier used to refer to this exporter instance.";
           }
 
           leaf embed {
             type boolean;
             default true;
+            description
+              "If this is set to false, this instance will not be assigned
+              a dedicated process (and CPU core), but will instead be
+              embedded within one of the processes used to
+              realize 'hardware-scaling'.";
           }
-
-          
-
         }
+        
       }
     }
   }
