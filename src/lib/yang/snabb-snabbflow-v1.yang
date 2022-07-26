@@ -47,7 +47,7 @@ module snabb-snabbflow-v1 {
           "802.1Q Ethernet VLAN tag for this interface.";
       }
       leaf receive-queue-size {
-        type uint32 { range 512|1024|2048|4096|8192; }
+        type uint32 { range 512|1024|2048|4096|8192|16384|32768; }
         default 2048;
         description
           "Receive queue size.";
@@ -417,7 +417,7 @@ module snabb-snabbflow-v1 {
               realize 'hardware-scaling'.";
           }
         }
-        
+
       }
     }
   }

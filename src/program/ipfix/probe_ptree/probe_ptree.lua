@@ -115,9 +115,6 @@ function setup_workers (config)
          local input = lib.deepcopy(opt)
          input.device = device
          input.rxq = rssq
-         input.config = {
-            recvq_size = input.receive_queue_size
-         }
          table.insert(inputs, input)
 
          -- The mellanox driver requires a master process that sets up
@@ -134,6 +131,10 @@ function setup_workers (config)
                mellanox[device] = spec
             end
             table.insert(spec.queues, { id = rssq })
+         else
+            -- Silently truncate receive-queue-size for other drivers.
+            -- (We are not sure what they can handle.)
+            input.receive_queue_size = math.min(input.receive_queue_size, 8192)
          end
       end
 
