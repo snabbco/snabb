@@ -231,7 +231,7 @@ function setup_workers (config)
          classes = {},
          remove_extension_headers = rss.software_scaling.remove_extension_headers
       }
-      for key, class in pairs(rss.software_scaling.class) do
+      for key, class in pairs(rss.software_scaling.class or {}) do
          table.insert(rss_config.classes, {
             name = key.name,
             order = key.order,
