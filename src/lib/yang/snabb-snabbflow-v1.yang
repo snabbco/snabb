@@ -193,6 +193,12 @@ module snabb-snabbflow-v1 {
           address and port range scans.
           The options below can be used to limit the rate at which
           these flows are exported by suppressing them.";
+        leaf enable {
+          type boolean;
+          default false;
+          description
+            "If set to true, scan protection will be enabled.";
+        }
         leaf threshold-rate {
           type decimal64;
           default 10000;

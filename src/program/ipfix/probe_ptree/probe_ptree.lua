@@ -195,6 +195,7 @@ function setup_workers (config)
             -- ipfix instances in this RSS class
             local scale_factor = rss.hardware_scaling * num_instances
             iconfig.scan_protection = {
+               enable = ipfix.scan_protection.enable,
                threshold_rate = ipfix.scan_protection.threshold_rate / scale_factor,
                export_rate = ipfix.scan_protection.export_rate / scale_factor,
             }
