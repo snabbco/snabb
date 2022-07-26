@@ -275,13 +275,6 @@ module snabb-snabbflow-v1 {
         }
       }
 
-      leaf add-packet-metadata {
-        type boolean;
-        default true;
-        description
-          "XXX: what does this do, functionally?";
-      }
-
       leaf log-date {
         type boolean;
         default true;
