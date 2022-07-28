@@ -563,38 +563,40 @@ function FlowSet:sync_stats()
    end
 end
 
-IPFIX = {}
-local ipfix_config_params = {
-   idle_timeout = { default = 300 },
-   active_timeout = { default = 120 },
-   flush_timeout = { default = 10 },
-   cache_size = { default = 20000 },
-   max_load_factor = { default = 0.4 },
-   scan_protection = { default = {} },
-   scan_time = { default = 10 },
-   -- RFC 5153 §6.2 recommends a 10-minute template refresh
-   -- configurable from 1 minute to 1 day.
-   template_refresh_interval = { default = 600 },
-   -- Valid values: 9 or 10.
-   ipfix_version = { default = 10 },
-   -- RFC 7011 §10.3.3 specifies that if the PMTU is unknown, a
-   -- maximum of 512 octets should be used for UDP transmission.
-   mtu = { default = 512 },
-   observation_domain = { default = 256 },
-   exporter_ip = { required = true },
-   exporter_eth_src = { default = '00:00:00:00:00:00' },
-   exporter_eth_dst = { default = '00:00:00:00:00:00' },
-   collector_ip = { required = true },
-   collector_port = { required = true },
-   templates = { default = { "v4", "v6" } },
-   maps = { default = {} },
-   maps_log_fh = { default = nil },
-   -- Used to distinguish instances of the app running in the same
-   -- process
-   instance = { default = 1 },
-   add_packet_metadata = { default = true },
-   log_date = { default = true }
+IPFIX = {
+   config = {
+      idle_timeout = { default = 300 },
+      active_timeout = { default = 120 },
+      flush_timeout = { default = 10 },
+      cache_size = { default = 20000 },
+      max_load_factor = { default = 0.4 },
+      scan_protection = { default = {} },
+      scan_time = { default = 10 },
+      -- RFC 5153 §6.2 recommends a 10-minute template refresh
+      -- configurable from 1 minute to 1 day.
+      template_refresh_interval = { default = 600 },
+      -- Valid values: 9 or 10.
+      ipfix_version = { default = 10 },
+      -- RFC 7011 §10.3.3 specifies that if the PMTU is unknown, a
+      -- maximum of 512 octets should be used for UDP transmission.
+      mtu = { default = 512 },
+      observation_domain = { default = 256 },
+      exporter_ip = { required = true },
+      exporter_eth_src = { default = '00:00:00:00:00:00' },
+      exporter_eth_dst = { default = '00:00:00:00:00:00' },
+      collector_ip = { required = true },
+      collector_port = { required = true },
+      templates = { default = { "v4", "v6" } },
+      maps = { default = {} },
+      maps_log_fh = { default = nil },
+      -- Used to distinguish instances of the app running in the same
+      -- process
+      instance = { default = 1 },
+      add_packet_metadata = { default = true },
+      log_date = { default = true }
+   }
 }
+local ipfix_config_params = IPFIX.config
 
 local scan_protection_params = {
    enable = { default = false },
@@ -656,8 +658,8 @@ function IPFIX:new(config)
                   -- Non-wrapping sequence number (see add_ipfix_header() for a
                   -- brief description of the semantics for IPFIX and Netflowv9)
                   sequence_number = { counter, 1 },
-                  version = { counter },
-                  observation_domain = { counter },
+                  version = { counter, config.ipfix_version },
+                  observation_domain = { counter, config.observation_domain },
                }
    }
    o = setmetatable(o, { __index = IPFIX })
@@ -666,8 +668,6 @@ function IPFIX:new(config)
 end
 
 function IPFIX:reconfig(config)
-   config = lib.parse(config, ipfix_config_params)
-
    self.template_refresh_interval = config.template_refresh_interval
    self.version = config.ipfix_version
    self.observation_domain = config.observation_domain
@@ -677,8 +677,10 @@ function IPFIX:reconfig(config)
                                      module = ("[%5d]"):format(S.getpid())
                                         .." IPFIX exporter"})
 
-   counter.set(self.shm.version, self.version)
-   counter.set(self.shm.observation_domain, self.observation_domain)
+   if self.shm.path then -- shm frame initialized?
+      counter.set(self.shm.version, self.version)
+      counter.set(self.shm.observation_domain, self.observation_domain)
+   end
 
    if self.version == 9 then
       self.header_t = netflow_v9_packet_header_t
