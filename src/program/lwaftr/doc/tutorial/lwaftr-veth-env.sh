@@ -3,7 +3,7 @@
 
 # Example and test environment for Snabb lwAFTR
 #
-# Use with: lwaftr-start.conf.yang
+# Use with: lwaftr-start.conf
 #
 # This script creates two network namespaces, 'aftrint' and 'aftrext',
 # that simulate the external network (public internet) and the internal,
@@ -26,11 +26,11 @@ create() { set -x
     # Create two veth pairs for the internal and external Snabb lwAFTR interfaces
 
     ip link add aftrv6 type veth peer name internal
-    ip link set aftrv6 address 02:00:00:00:00:02
+    ip link set aftrv6 address 02:00:00:00:00:02 # lwAFTR internal-interface/mac
     ip link set aftrv6 up
 
     ip link add aftrv4 type veth peer name external
-    ip link set aftrv4 address 02:00:00:00:00:01
+    ip link set aftrv4 address 02:00:00:00:00:01 # lwAFTR external-interface/mac
     ip link set aftrv4 up
 
     # Configure internal network namespace
@@ -42,7 +42,7 @@ create() { set -x
     # Configure internal interface
 
     ip netns exec aftrint ethtool --offload internal  rx off tx off
-    ip netns exec aftrint ip address add dev internal local fd10::10/16
+    ip netns exec aftrint ip address add dev internal local fd10::10/16 # lwAFTR internal-interface/next-hop
     ip netns exec aftrint ip link set internal mtu 1540
     ip netns exec aftrint ip link set internal up
     sleep 3
@@ -58,7 +58,7 @@ create() { set -x
     # Configure external interface
 
     ip netns exec aftrext ethtool --offload external  rx off tx off
-    ip netns exec aftrext ip address add dev external local 10.77.0.10/24
+    ip netns exec aftrext ip address add dev external local 10.77.0.10/24 # lwAFTR external-interface/next-hop
     ip netns exec aftrext ip link set external mtu 1500
     ip netns exec aftrext ip link set external up
     sleep 3
@@ -68,7 +68,7 @@ create() { set -x
     # Configure tunneled endpoint in the internal network namespace
     # 
     # Here we configure the softwire as defined in the binding table entry in
-    # lwaftr-start.conf.yang
+    # lwaftr-start.conf
     #
     #   softwire {
     #     ipv4 198.18.0.1;
@@ -111,7 +111,7 @@ elif [ "$1" = "examples" ]; then
     cat <<EOF
 
 Run Snabb lwAFTR on aftrint/internal and aftrext/external:
-  sudo src/snabb lwaftr run --name testaftr --v6 aftrv6 --v4 aftrv4 --conf lwaftr-start.conf.yang &
+  sudo src/snabb lwaftr run --name testaftr --v6 aftrv6 --v4 aftrv4 --conf lwaftr-start.conf &
 
 Ping Snabb lwAFTR instance from aftrint/internal:
   sudo ip netns exec aftrint ping -c 1 fd10::1 
