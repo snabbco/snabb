@@ -5,7 +5,7 @@
 Clone the Snabb repository to get the latest [release](https://github.com/snabbco/snabb/releases/):
 
 ```
-$ git clone https://github.com/snabbco/snabb.git
+$ git clone https://github.com/eugeneia/snabb.git # XXX: change to upstream once fixes landed
 ```
 
 If you don’t have `git` you can also download a Zip archive or Tarball of the latest release and unpack that.
