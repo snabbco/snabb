@@ -32,14 +32,14 @@ local function migrate_device_on_config(config, v4, v6)
           "Unable to specialize config for specified NIC(s) as"..
              "there are no instances configured.")
 
-   if v4 and v4 ~= device then
-      print("Migrating instance '"..device.."' to '"..v4.."'")
-      config.softwire_config.instance[v4] = instance
+   if v6 and v6 ~= device then
+      print("Migrating instance '"..device.."' to '"..v6.."'")
+      config.softwire_config.instance[v6] = instance
       config.softwire_config.instance[device] = nil
    end
 
-   if v6 then
-      instance.external_device = v6
+   if v4 then
+      instance.external_device = v4
    end
 end
 
