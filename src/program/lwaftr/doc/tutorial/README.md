@@ -66,11 +66,13 @@ The command line options mean:
 
 You can try out Snabb lwAFTR on virtual Linux interfaces.
 There is an example setup described in [src/program/lwaftr/doc/tutorial/lwaftr-veth-env.sh](lwaftr-veth-env.sh).
-Read the script to understand the setup, I promise it .
+Read the script to understand the setup, I promise it is not overly complicated.
 
 Use can use this script to create an two Linux network namespaces simulating
 an internal and an external network bridged by Snabb lwAFTR using the example
 configuration [src/program/lwaftr/doc/tutorial/lwaftr-start.conf](lwaftr-start.conf).
+
+![Test environment flowchart](flowchart.png)
 
 To create the tutorial environment:
 ```
