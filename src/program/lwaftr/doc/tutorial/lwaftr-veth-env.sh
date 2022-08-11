@@ -43,10 +43,10 @@ create() { set -x
 
     ip netns exec aftrint ethtool --offload internal  rx off tx off
     ip netns exec aftrint ip address add dev internal local fd10::10/16 # lwAFTR internal-interface/next-hop
-    ip netns exec aftrint ip link set internal mtu 1540
+    ip netns exec aftrint ip link set internal mtu 1540 # lwAFTR internal-interface/mtu
     ip netns exec aftrint ip link set internal up
     sleep 3
-    ip netns exec aftrint ip route add 2003::0/16 via fd10::1 src fd10::10 dev internal
+    # Default route to lwAFTR
     ip netns exec aftrint ip route add default via fd10::1 dev internal
 
     # Configure external network namespace
@@ -59,11 +59,13 @@ create() { set -x
 
     ip netns exec aftrext ethtool --offload external  rx off tx off
     ip netns exec aftrext ip address add dev external local 10.77.0.10/24 # lwAFTR external-interface/next-hop
-    ip netns exec aftrext ip link set external mtu 1500
+    ip netns exec aftrext ip link set external mtu 1500 # lwAFTR external-interface/mtu
     ip netns exec aftrext ip link set external up
     sleep 3
+    # Route to 198.18.0.0/16 (internal v4 nodes) via lwAFTR
     ip netns exec aftrext ip route add 198.18.0.0/16 via 10.77.0.1 src 10.77.0.10 dev external
-    ip netns exec aftrext ip route add default via 10.77.0.1 dev external
+    # Default route to lwAFTR
+    ip netns exec aftrext ip route add default via 10.77.0.1 dev external 
 
     # Configure tunneled endpoint in the internal network namespace
     # 
@@ -93,6 +95,8 @@ create() { set -x
     ip netns exec aftrint ip link set softwire0 up
     # Route from internal endpoint (ipv4) to public network (10.77.0.0/16) via softwire
     ip netns exec aftrint ip route add 10.77.0.0/16 src 198.18.0.1 dev softwire0
+    # Route to br-address via lwAFTR
+    ip netns exec aftrint ip route add 2003::0/16 via fd10::1 src fd10::10 dev internal
 }
 
 destroy() { set -x
@@ -111,7 +115,7 @@ elif [ "$1" = "examples" ]; then
     cat <<EOF
 
 Run Snabb lwAFTR on aftrint/internal and aftrext/external:
-  sudo src/snabb lwaftr run --name testaftr --v6 aftrv6 --v4 aftrv4 --conf lwaftr-start.conf &
+  sudo src/snabb lwaftr run --name testaftr --conf src/program/lwaftr/doc/tutorial/lwaftr-start.conf &
 
 Ping Snabb lwAFTR instance from aftrint/internal:
   sudo ip netns exec aftrint ping -c 1 fd10::1 
