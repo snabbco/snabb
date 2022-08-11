@@ -60,7 +60,94 @@ The command line options mean:
 
 ## Supporting programs: snabb config get/set/get-state
 
-> XXX: TODO
+### snabb config get
+
+You can use `snabb config get` to query the current configuration of a running Snabb lwAFTR instance.
+In its simplest form you would do the following:
+
+```
+$ sudo src/snabb config get my-lwaftr /
+```
+
+The command line arguments are explained as follows:
+
+- `my-lwaftr` is the name of the Snabb lwAFTR instance (see `--name` in _“Running Snabb lwAFTR”_)
+- `/` is the YANG xpath used for the query (`/` designates the root, meaning the whole configuration)
+
+Note that by default Snabb lwAFTR exposes the [ietf-softwire-br](https://datatracker.ietf.org/doc/html/draft-ietf-softwire-yang-16#section-7) Schema (translated from/to our native schema).
+If you want to query or configure Snabb lwAFTR using its native YANG schema [snabb-softwire-v3](https://github.com/snabbco/snabb/blob/master/src/lib/yang/snabb-softwire-v3.yang) you need to request to use this schema explicitly via `--schema snabb-softwire-v3`. For example:
+
+```
+$ sudo src/snabb config get --schema snabb-softwire-v3 testaftr /softwire-config/instance[device="aftrv6"]
+
+external-device aftrv4;
+queue {
+  id 0;
+  external-interface {
+    ip 10.77.0.1;
+    mac 02:00:00:00:00:01;
+    next-hop {
+      ip 10.77.0.10;
+    }
+  }
+  internal-interface {
+    ip fd10::1;
+    mac 02:00:00:00:00:02;
+    next-hop {
+      ip fd10::10;
+    }
+  }
+}
+```
+
+### snabb config set
+
+You can use `snabb config set` to change the configuration of a running Snabb lwAFTR instance.
+The arguments behave like `config get`, with the addition of an argument following the xpath which is the value to substitute at the specified location.
+For example, you could update the encapsulation flow label of the Snabb lwAFTR instance _testaftr_ like so:
+
+```
+$ sudo src/snabb config set --schema snabb-softwire-v3 testaftr /softwire-config/internal-interface/flow-label 1234
+```
+
+You can also replace the whole configuration at once (if the value argument is omitted, it will be read from standard input):
+
+```
+$ sudo src/snabb config set --schema snabb-softwire-v3 testaftr / < src/program/lwaftr/doc/tutorial/lwaftr-start.conf
+```
+
+It is also possible to change portions of the configuration:
+
+```
+$ sudo src/snabb config set --schema snabb-softwire-v3 testaftr /softwire-config/instance[device="aftrv6"]/queue[id="0"]/internal-interface <<EOF
+
+ip fd10::1;
+mac 02:00:00:00:00:02;
+next-hop {
+  ip fd10::10;
+}
+EOF
+```
+
+### snabb config get-state
+
+You can use `snabb config get-state` to query statistics counters collected by a running Snabb lwAFTR instance.
+For example:
+
+```
+$ sudo src/snabb config get-state --schema snabb-softwire-v3 testaftr /softwire-state
+discontinuity-time 2022-08-11T11:21:52Z;
+drop-all-ipv4-iface-bytes 0;
+drop-all-ipv4-iface-packets 0;
+drop-all-ipv6-iface-bytes 0;
+drop-all-ipv6-iface-packets 0;
+…
+```
+
+You should see counters for ICMP, ARP, and ND traffic towards Snabb lwAFTR,
+as well as counters for routed packets: `in-ipv4-packets`, `out-ipv6-packets`,
+`in-ipv6-packets`, and `out-ipv4-packets`.
+Packets that could not be routed will be counted in various `drop-*` counters.
 
 ## Example: testing Snabb lwAFTR within a virtual Linux network namespace
 
@@ -181,56 +268,15 @@ PING 10.77.0.10 (10.77.0.10) 56(84) bytes of data.
 rtt min/avg/max/mdev = 1.094/1.094/1.094/0.000 ms
 ```
 
-Furthermore, let’s look at statistics counters collected by Snabb lwAFTR (the usage of `grep` is to exclude zero counters from the output):
+Furthermore, let’s look at statistics counters collected by Snabb lwAFTR.
+How many IPv6 frames did Snabb lwAFTR send?
+
 ```
-$ sudo src/snabb config get-state -s snabb-softwire-v3 testaftr /softwire-state | grep -v ' 0;'
-discontinuity-time 2022-07-29T14:58:46Z;
-in-arp-reply-bytes 42;
-in-arp-reply-packets 1;
-in-arp-request-bytes 84;
-in-arp-request-packets 2;
-in-icmpv4-echo-bytes 98;
-in-icmpv4-echo-packets 1;
-in-icmpv6-echo-bytes 118;
-in-icmpv6-echo-packets 1;
-in-ipv4-bytes 196;
-in-ipv4-frag-reassembly-unneeded 6;
-in-ipv4-packets 2;
-in-ipv6-bytes 812;
-in-ipv6-frag-reassembly-unneeded 24;
-in-ipv6-packets 6;
-in-ndp-na-bytes 554;
-in-ndp-na-packets 7;
-in-ndp-ns-bytes 860;
-in-ndp-ns-packets 10;
-memuse-ipv4-frag-reassembly-buffer 728203264;
-memuse-ipv6-frag-reassembly-buffer 11378176;
-out-arp-reply-bytes 84;
-out-arp-reply-packets 2;
-out-arp-request-bytes 42;
-out-arp-request-packets 1;
-out-icmpv4-echo-bytes 98;
-out-icmpv4-echo-packets 1;
-out-icmpv4-error-bytes 296;
-out-icmpv4-error-packets 4;
-out-icmpv6-echo-bytes 118;
-out-icmpv6-echo-packets 1;
-out-ipv4-bytes 492;
-out-ipv4-frag-not 10;
-out-ipv4-packets 6;
-out-ipv6-bytes 276;
-out-ipv6-frag-not 8;
-out-ipv6-packets 2;
-out-ndp-na-bytes 344;
-out-ndp-na-packets 4;
-out-ndp-ns-bytes 86;
-out-ndp-ns-packets 1;
+$ sudo src/snabb config get-state -s snabb-softwire-v3 testaftr /softwire-state/out-ipv6-packets
+2
 ```
 
-You should see counters for ICMP, ARP, and ND traffic towards Snabb lwAFTR,
-as well as counters for routed packets: `in-ipv4-packets`, `out-ipv6-packets`,
-`in-ipv6-packets`, and `out-ipv4-packets`.
-Packets that could not be routed will be counted in various `drop-*` counters.
+Two? Yep, one encapsulated ICMP request and one reply (`10.77.0.10 > 198.18.0.1`).
 
 Finally, let’s tidy up and tear down our test environment:
 ```
