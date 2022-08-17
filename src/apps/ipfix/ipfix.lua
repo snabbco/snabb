@@ -588,7 +588,7 @@ IPFIX = {
       collector_port = { required = true },
       templates = { default = { "v4", "v6" } },
       maps = { default = {} },
-      maps_log_fh = { default = nil },
+      maps_logfile = { default = nil },
       -- Used to distinguish instances of the app running in the same
       -- process
       instance = { default = 1 },
@@ -711,7 +711,8 @@ function IPFIX:reconfig(config)
                            flush_timeout = config.flush_timeout,
                            parent = self,
                            maps = config.maps,
-                           maps_log_fh = config.maps_log_fh,
+                           maps_log_fh = config.maps_logfile and
+                                       assert(io.open(config.maps_logfile, "a")) or nil,
                            instance = config.instance,
                            log_date = config.log_date }
 

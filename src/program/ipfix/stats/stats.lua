@@ -161,6 +161,9 @@ function run (args)
    local ctrls = {}
 
    for _, pid in ipairs(pids) do
+      if not shm.exists('/'..pid.."/config-worker-channel") then
+	goto continue
+      end
       for _, dir in ipairs(shm.children('/'..pid)) do
          if dir == 'ipfix_templates' then
             table.insert(ipfix, ipfix_info(tonumber(pid)))
@@ -180,6 +183,7 @@ function run (args)
             end
          end
       end
+      ::continue::
    end
 
    if #ipfix == 0 then

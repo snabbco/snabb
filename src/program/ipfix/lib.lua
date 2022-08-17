@@ -158,8 +158,7 @@ local function mk_ipfix_config (config)
             mtu = config.mtu - 14,
             templates = config.templates,
             maps = config.maps,
-            maps_log_fh = config.maps_logfile and
-               assert(io.open(config.maps_logfile, "a")) or nil,
+            maps_logfile = config.maps_logfile,
             instance = config.instance,
             add_packet_metadata = config.add_packet_metadata,
             log_date = config.log_date,
