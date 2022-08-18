@@ -371,6 +371,11 @@ function run_rss(config, inputs, outputs, duration, busywait, cpu, jit, log_date
 end
 
 function configure_rss_graph (config, inputs, outputs, log_date)
+   local input_type = 'pci'
+   if type(inputs) == 'string' then
+      input_type = 'pcap'
+      inputs = {inputs}
+   end
    local graph = app_graph.new()
    app_graph.app(graph, "rss", rss.rss, config)
 
@@ -379,13 +384,15 @@ function configure_rss_graph (config, inputs, outputs, log_date)
    for n, input in ipairs(inputs) do
       local suffix = #inputs > 1 and n or ''
       local input_name = "input"..suffix
-      local in_link, in_app = in_apps.pci(input)
-      table.insert(in_app_specs,
-                   { pciaddr = input.device,
-                     name = input_name,
-                     ifname = input.name or
-                        (input.device:gsub("[:%.]", "_")),
-                     ifalias = input.description })
+      local in_link, in_app = in_apps[input_type](input)
+      if input_type == 'pci' then
+         table.insert(in_app_specs,
+                      { pciaddr = input.device,
+                        name = input_name,
+                        ifname = input.name or
+                           (input.device:gsub("[:%.]", "_")),
+                        ifalias = input.description })
+      end
       app_graph.app(graph, input_name, unpack(in_app))
       local link_name = "input"..suffix
       if input.tag then
