@@ -125,12 +125,15 @@ local function encoder()
       self:string(name)
    end
    function encoder:config(class, arg)
+      local ad_hoc_encodable = {
+            table=true, cdata=true, number=true, string=true, boolean=true
+      }
       local file_name
       if class.yang_schema then
          file_name = random_file_name()
          yang.compile_config_for_schema_by_name(class.yang_schema, arg,
                                                 file_name)
-      elseif type(arg) == 'table' then
+      elseif ad_hoc_encodable[type(arg)] then
          file_name = random_file_name()
          binary.compile_ad_hoc_lua_data_to_file(file_name, arg)
       elseif arg == nil then
