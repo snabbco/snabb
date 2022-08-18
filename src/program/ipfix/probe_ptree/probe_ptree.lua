@@ -14,8 +14,6 @@ local probe_schema = 'snabb-snabbflow-v1'
 
 local probe_cpuset = cpuset.new()
 
-local TEST_in = nil
-
 function setup_ipfix (conf)
    -- yang.print_config_for_schema_by_name(probe_schema, conf, io.stdout)
    return setup_workers(conf)
@@ -37,10 +35,9 @@ end
 function run (args)
    local name = assert(args[1])
    local confpath = assert(args[2])
-   TEST_in = args[3]
    -- print("Confpath is:", confpath)
    local manager = start(name, confpath)
-   manager:main(TEST_in and 5)
+   manager:main()
 end
 
 local ipfix_default_config = lib.deepcopy(probe.probe_config)
@@ -156,10 +153,6 @@ function setup_workers (config)
          config.instance = nil
          config.add_packet_metadata = false
 
-         if TEST_in then
-            config.output_type = "pcap"
-         end
-
          if true then -- use_maps=true
             local maps = {}
             for name, map in pairs(ipfix.maps) do
@@ -194,9 +187,6 @@ function setup_workers (config)
             observation_domain = observation_domain + 1
             iconfig.observation_domain = od
             iconfig.output = "ipfixexport"..od
-            if TEST_in then
-               iconfig.output = iconfig.output..".pcap"
-            end
             if ipfix.maps.log_directory then
                iconfig.maps_logfile =
                   ipfix.maps.log_directory.."/"..od..".log"
@@ -254,7 +244,7 @@ function setup_workers (config)
          class.order = nil
          --print(class.name, class.filter, "continue="..tostring(class.continue))
       end
-      workers["rss"..rssq] = probe.configure_rss_graph(rss_config, TEST_in or inputs, outputs, ipfix.log_date)
+      workers["rss"..rssq] = probe.configure_rss_graph(rss_config, inputs, outputs, ipfix.log_date)
    end
 
    -- for k,v in pairs(mellanox) do
