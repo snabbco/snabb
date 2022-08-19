@@ -421,4 +421,164 @@ module snabb-snabbflow-v1 {
       }
     }
   }
+
+  container snabbflow-state {
+    config false;
+    description
+     "State counters for the Snabbflow IPFIX exporter.";
+
+    list interface {
+      key "device";
+      description
+        "Network device statistics";
+
+      leaf device {
+        type string;
+        description
+          "PCI address of the network device.";
+      }
+
+      leaf packets-received {
+        type yang:zero-based-counter64;
+        description
+          "Count of packets received.";
+      }
+
+      leaf packets-dropped {
+        type yang:zero-based-counter64;
+        description
+          "Count of incoming packets that were dropped.";
+      }
+    }
+
+    list instance {
+      key "observation-domain";
+      description
+        "Statistics for individual IPFIX exporter instances.";
+
+      leaf observation-domain {
+        type uint32;
+        description
+          "Observation Domain of this IPFIX exporter instance.";
+      }
+
+      leaf packets-received {
+        type yang:zero-based-counter64;
+        description
+          "Count of packets received.";
+      }
+
+      leaf packets-dropped  {
+        type yang:zero-based-counter64;
+        description
+          "Count of incoming packets that were dropped.";
+      }
+
+      leaf packets-ignored  {
+        type yang:zero-based-counter64;
+        description
+          "Count of incoming packets that were ignored.";
+      }
+
+      leaf template-packets-transmitted {
+        type yang:zero-based-counter64;
+        description
+          "Number of template packets transmitted.";
+      }
+
+      leaf sequence-number  {
+        type yang:zero-based-counter64;
+        description
+          "Current IPFIX sequence number. counts the cumulative number of data records
+           transmitted (i.e. excluding template and option records).";
+      }
+
+      list template {
+        key "id";
+        description
+          "Statistics for individual IPFIX templates exported by this instance.";
+
+        leaf id {
+          type uint32;
+          description
+            "Template identifier. See apps/ipfix/README.templates.md.";
+        }
+
+        leaf packets-processed {
+          type yang:zero-based-counter64;
+          description
+            "Number of packets processed by this template.";
+        }
+
+        leaf flows-exported {
+          type yang:zero-based-counter64;
+          description
+            "Count of flows exported for this template.";
+        }
+
+        leaf flow-export-packets {
+          type yang:zero-based-counter64;
+          description
+            "Number of packets emitted for flow exports by this template.";
+        }
+
+        container flow-table {
+          description
+            "Statistics for the table used to track active flows for this template.";
+
+          leaf last-scan-time {
+            type uint64;
+            description
+              "Seconds elapsed from start to completion of the last full flow table scan.";
+          }
+
+          uses table-state;
+        }
+
+        container flow-export-rate-table {
+          description
+            "Statistics for the table used to track flow export rates for this template.";
+          
+          uses table-state;
+        }
+
+        grouping table-state {
+          description
+            "Various data describing a table’s dimensions in memory.";
+
+          leaf occupancy {
+            type uint64;
+            description
+              "Number of entries stored in the table.";
+          }
+
+          leaf size {
+            type uint64;
+            description
+              "Current size of the table in entries.";
+          }
+
+          leaf byte-size {
+            type uint64;
+            description
+              "Current size of the table in bytes.";
+          }
+
+          leaf load-factor {
+            type decimal64;
+            description
+              "Ratio of table occupancy/size.";
+          }
+
+          leaf max-displacement {
+            type uint64;
+            description
+              "The most entries that currently map to a single hash bucket.
+              Large 'max-displacement' values indicate an unnaturally unbalanced table.";
+          }
+        }
+
+      }
+    }
+  }
 }
