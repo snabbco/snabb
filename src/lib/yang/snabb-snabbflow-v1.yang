@@ -74,24 +74,54 @@ module snabb-snabbflow-v1 {
         }
       }
 
-      leaf hardware-scaling { // hw_rss_scaling
-        type uint32 { range 1..64; }
-        default 1;
-        description
-          "N-way hardware-assisted RSS scaling.";
+      container hardware-scaling {
+        leaf rss-groups {
+          type uint32 { range 1..64; }
+          default 1;
+          description
+            "N-way hardware-assisted RSS scaling.";
+        }
       }
 
       container software-scaling {
         description
           "Software RSS configuration.";
 
-        leaf default-class {
-          type boolean;
-          default true;
+        list exporter {
+          key name;
           description
-            "If this is set to false, packets not matching any class
-            are dropped.";
+            "XXX";
+
+          leaf name {
+            type string;
+          }
+
+          leaf class {
+            type string;
+            default "default";
+            description
+          }
+          
+          leaf instances {
+            type uint32 { range 1..64; }
+            default 1;
+            description
+              "XXX";
+          }
+
+          leaf embed {
+            type boolean;
+            default true;
+            description
+              "If this is set to false, this instance will not be assigned
+              a dedicated process (and CPU core), but will instead be
+              embedded within one of the processes used to
+              realize 'hardware-scaling'.";
+          }
         }
+      }
+
+      container traffic-classes {
 
         list class {
           key "name order";
@@ -107,11 +137,13 @@ module snabb-snabbflow-v1 {
               "Identifier of the class. This is used to refer to a class in
               the exporter configuration.";
           }
+
           leaf order {
             type uint32;
             description
               "Processing order of this class.";
           }
+          
           leaf filter {
             mandatory true;
             type string;
@@ -119,6 +151,7 @@ module snabb-snabbflow-v1 {
               "pcap-filter(7) expression that specifies
               packets matching this class.";
           }
+
           leaf continue {
             type boolean;
             default false;
@@ -127,14 +160,23 @@ module snabb-snabbflow-v1 {
               further consecutive classes (in processing order).";
           }
         }
+      }
 
-        leaf remove-extension-headers {
-          type boolean;
-          default true;
-          description
-            "IPv6 extention headers are stripped from packets unless this
-            is set to false.";
-        }
+      leaf default-traffic-class {
+        type boolean;
+        default true;
+        description
+          "If this is set to false, packets not matching any class
+          are dropped, and the catch-all traffic class 'default' is
+          not created.";
+      }
+
+      leaf remove-ipv6-extension-headers {
+        type boolean;
+        default true;
+        description
+          "IPv6 extention headers are stripped from packets unless this
+          is set to false.";
       }
     }
 
@@ -331,7 +373,6 @@ module snabb-snabbflow-v1 {
 
       list exporter {
         key "name";
-
         description
           "Set of configured exporters. Each exporter receives traffic
           matching a single class defined in 'rss/software-scaling',
@@ -351,17 +392,6 @@ module snabb-snabbflow-v1 {
           description
             "The set of templates used to aggregate flows.
             The available templates are described in apps/ipfix/README.templates.md.";
-        }
-
-        leaf rss-class {
-          type string;
-          default "default";
-          description
-            "A class defined in 'rss/software-scaling. The exporter will
-            process packets matching this class.
-            If 'rss/software-scaling/default-class' is set to true then
-            this can be the implicit 'default' class which matches all
-            packets not matched by any other class.";
         }
 
         leaf collector-pool {
@@ -393,31 +423,6 @@ module snabb-snabbflow-v1 {
               "The duration of the time period in seconds.";
           }
         }
-
-        list instance {
-          key "id";
-
-          description
-            "Exporter instances. Each exporter can have multiple instances
-            that each receive a portion of the matched traffic as ";
-
-          leaf id {
-            type uint32;
-            description
-              "The identifier used to refer to this exporter instance.";
-          }
-
-          leaf embed {
-            type boolean;
-            default true;
-            description
-              "If this is set to false, this instance will not be assigned
-              a dedicated process (and CPU core), but will instead be
-              embedded within one of the processes used to
-              realize 'hardware-scaling'.";
-          }
-        }
-
       }
     }
   }
@@ -431,7 +436,75 @@ module snabb-snabbflow-v1 {
       key "device";
       description
         "Network device statistics";
+      uses interface-state;
+    }
 
+    list exporter {
+      key "name";
+      description
+        "Exporter statistics."
+
+      leaf name {
+        type string;
+      }
+
+      uses exporter-state;
+
+      list template {
+        key "id";
+
+        leaf id {
+          type uint32;
+        }
+
+        uses template-state;
+      }
+    }
+
+    list rss-group {
+      key id;
+
+      leaf id {
+        type uint32;
+      }
+
+      uses worker-state;
+
+      list exporter {
+        key "name";
+        description
+          "Exporter statistics."
+
+        leaf name {
+          type string;
+        }
+
+        list instance {
+          key id;
+
+          leaf id {
+            type uint32;
+          }
+
+          uses worker-state;
+          uses exporter-state;
+          uses exporter-instance-state;
+
+          list template {
+            key "id";
+
+            leaf id {
+              type uint32;
+            }
+
+            uses template-state;
+            uses template-instance-state;
+          }
+        }
+      }
+    }
+
+    grouping interface-state {
       leaf device {
         type string;
         description
@@ -451,11 +524,7 @@ module snabb-snabbflow-v1 {
       }
     }
 
-    list instance {
-      key "observation-domain";
-      description
-        "Statistics for individual IPFIX exporter instances.";
-
+    grouping exporter-state {
       leaf observation-domain {
         type uint32;
         description
@@ -485,100 +554,102 @@ module snabb-snabbflow-v1 {
         description
           "Number of template packets transmitted.";
       }
+    }
 
-      leaf sequence-number  {
+    grouping exporter-instance-state {
+      leaf sequence-number {
         type yang:zero-based-counter64;
         description
           "Current IPFIX sequence number. counts the cumulative number of data records
            transmitted (i.e. excluding template and option records).";
       }
+    }
 
-      list template {
-        key "id";
+    grouping worker-state {
+      leaf pid {
+        type uint32;
         description
-          "Statistics for individual IPFIX templates exported by this instance.";
-
-        leaf id {
-          type uint32;
-          description
-            "Template identifier. See apps/ipfix/README.templates.md.";
-        }
-
-        leaf packets-processed {
-          type yang:zero-based-counter64;
-          description
-            "Number of packets processed by this template.";
-        }
-
-        leaf flows-exported {
-          type yang:zero-based-counter64;
-          description
-            "Count of flows exported for this template.";
-        }
-
-        leaf flow-export-packets {
-          type yang:zero-based-counter64;
-          description
-            "Number of packets emitted for flow exports by this template.";
-        }
-
-        container flow-table {
-          description
-            "Statistics for the table used to track active flows for this template.";
-
-          leaf last-scan-time {
-            type uint64;
-            description
-              "Seconds elapsed from start to completion of the last full flow table scan.";
-          }
-
-          uses table-state;
-        }
-
-        container flow-export-rate-table {
-          description
-            "Statistics for the table used to track flow export rates for this template.";
-          
-          uses table-state;
-        }
-
-        grouping table-state {
-          description
-            "Various data describing a table’s dimensions in memory.";
-
-          leaf occupancy {
-            type uint64;
-            description
-              "Number of entries stored in the table.";
-          }
-
-          leaf size {
-            type uint64;
-            description
-              "Current size of the table in entries.";
-          }
-
-          leaf byte-size {
-            type uint64;
-            description
-              "Current size of the table in bytes.";
-          }
-
-          leaf load-factor {
-            type decimal64;
-            description
-              "Ratio of table occupancy/size.";
-          }
-
-          leaf max-displacement {
-            type uint64;
-            description
-              "The most entries that currently map to a single hash bucket.
-              Large 'max-displacement' values indicate an unnaturally unbalanced table.";
-          }
-        }
-
+          "Process identifier of this exporter instance.";
       }
     }
+
+    grouping table-state {
+      leaf packets-processed {
+        type yang:zero-based-counter64;
+        description
+          "Number of packets processed by this template.";
+      }
+
+      leaf flows-exported {
+        type yang:zero-based-counter64;
+        description
+          "Count of flows exported for this template.";
+      }
+
+      leaf flow-export-packets {
+        type yang:zero-based-counter64;
+        description
+          "Number of packets emitted for flow exports by this template.";
+      }
+    }
+
+    grouping template-instance-state {
+      container flow-table {
+        description
+          "Statistics for the table used to track active flows for this template.";
+
+        leaf last-scan-time {
+          type uint64;
+          description
+            "Seconds elapsed from start to completion of the last full flow table scan.";
+        }
+
+        uses table-state;
+      }
+
+      container flow-export-rate-table {
+        description
+          "Statistics for the table used to track flow export rates for this template.";
+          
+        uses table-state;
+      }
+    }
+
+    grouping table-state {
+      description
+        "Various data describing a table’s dimensions in memory.";
+
+      leaf occupancy {
+        type uint64;
+        description
+          "Number of entries stored in the table.";
+      }
+
+      leaf size {
+        type uint64;
+        description
+          "Current size of the table in entries.";
+      }
+
+      leaf byte-size {
+        type uint64;
+        description
+          "Current size of the table in bytes.";
+      }
+
+      leaf load-factor {
+        type decimal64;
+        description
+          "Ratio of table occupancy/size.";
+      }
+
+      leaf max-displacement {
+        type uint64;
+        description
+          "The most entries that currently map to a single hash bucket.
+          Large 'max-displacement' values indicate an unnaturally unbalanced table.";
+      }
+    }
+
   }
 }
