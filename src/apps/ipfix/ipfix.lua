@@ -276,6 +276,7 @@ function FlowSet:new (spec, args)
    end
    add_table_counters('table', o.table)
    add_table_counters('rate_table', o.sp.table)
+   assert(not shm.exists(shm_name.."/packets_in"))
    o.shm = shm.create_frame(shm_name, frame_init)
 
    -- Template-specific counters
