@@ -109,7 +109,7 @@ function setup_workers (config)
 
    update_cpuset(rss.cpu_pool)
 
-   for rssq = 0, rss.hardware_scaling-1 do
+   for rssq = 0, rss.hardware_scaling.rss_groups-1 do
       local inputs, outputs = {}, {}
       for device, opt in pairs(interfaces) do
          local input = lib.deepcopy(opt)
@@ -161,6 +161,9 @@ function setup_workers (config)
             config.maps = maps
          end
 
+         local software_scaling = rss.software_scaling.exporter[name]
+                               or default_software_scaling(name)
+         -- XXX
          local num_instances = 0
          for _ in pairs(exporter.instance) do
             num_instances = num_instances + 1
