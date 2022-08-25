@@ -24,7 +24,7 @@ module snabb-snabbflow-v1 {
      "Configuration for the Snabbflow IPFIX exporter.";
 
     list interface {
-      key "device";
+      key device;
 
       description
         "Interaces serving as IPFIX Observation Points.";
@@ -101,7 +101,7 @@ module snabb-snabbflow-v1 {
           one or more exporter instances in each RSS group.";
 
         list exporter {
-          key "name";
+          key name;
           description
             "Sofware RSS configuration for the selected exporter.";
 
@@ -158,75 +158,85 @@ module snabb-snabbflow-v1 {
           }
         }
       }
+    }
 
-      container flow-director {
+    container flow-director {
+      description
+        "Snabbflow supports distinct sets of flows being processed by
+        any number of exporters. Flows are matched into traffic classes
+        which are in turn processed by exporters.";
+      
+      container default-class {
         description
-          "Snabbflow supports distinct sets of flows being processed by
-          any number of exporters.
+          "The default class matches all flows not matched by
+          any other traffic class.";
+
+        leaf exporter {
+          type string-name;
+          description
+            "An exporter defined in /snabbflow-config/ipfix/exporter.
+            Flows matched by the default class are processed by this
+            exporter. If none is given, then flows matched by the
+            default class are dropped and not processed by any exporter.";
+        }
+      }
+
+      list class {
+        key exporter;
+        unique order;
+        description
+          "Traffic classes match packets making up the sets of flows
+          processed by indivdual exporters.
           
-          Each exporter selects a traffic class matching the set of flows
-          it should process. A traffic class can be processed by multple
-          exporters. The 'default' class matches all packets.";
+          Each class specifies a single exporter which processes the
+          matched flows, and exporters can only process a single
+          traffic class each.
+          
+          Classes are ordered and matched in sequence. Packets may match
+          multiple classes via use of the 'continue' option. When a packet
+          matches multiple classes, it is duplicated for each class and
+          thereby flows can be processed by multiple exporters.";
+
+        ordered-by user; // XXX not yet implemented, hence the 'order' leaf
+
+        leaf exporter {
+          type string-name;
+          description
+            "An exporter defined in /snabbflow-config/ipfix/exporter.
+            Packets matched by the class are processed by this exporter.";
+        }
+
+        leaf order {
+          type uint32 { range 1..max; }
+          description
+            "Match order of this class.";
+        }
         
-        leaf default-class {
+        leaf filter {
+          mandatory true;
+          type string;
+          description
+            "pcap-filter(7) expression that specifies
+            packets matching this class.";
+        }
+
+        leaf continue {
           type boolean;
-          default true;
+          default false;
           description
-            "If this is set to false, packets not matching any other class
-            are dropped, and the catch-all traffic class 'default' does not
-            match any packets/flows.";
+            "If set to true, a packet matching this class can also match
+            further consecutive classes (in match order).
+            By default the matching of a packet to a class terminates
+            the matching process.";
         }
+      }
 
-        list class {
-          key "name order";
-          description
-            "A traffic class matches packets making up a set of flows.
-            
-            Classes are ordered and matched in sequence. Packets may match
-            multiple classes unless a previous match terminates matching of
-            the packet.";
-
-          ordered-by user; // XXX not yet implemented, hence the 'order' leaf
-
-          leaf name {
-            type string-name;
-            description
-              "Identifier of the class. This is used to select the class in
-              /snabbflow-config/ipfix/exporter.";
-          }
-
-          leaf order {
-            type uint32;
-            description
-              "Match order of this class.";
-          }
-          
-          leaf filter {
-            mandatory true;
-            type string;
-            description
-              "pcap-filter(7) expression that specifies
-              packets matching this class.";
-          }
-
-          leaf continue {
-            type boolean;
-            default false;
-            description
-              "If set to true, a packet matching this class can also match
-              further consecutive classes (in match order)
-              By default the matching of a packet to a class terminates
-              the matching process.";
-          }
-        }
-
-        leaf remove-ipv6-extension-headers {
-          type boolean;
-          default true;
-          description
-            "IPv6 extention headers are stripped from packets unless this
-            is set to false.";
-        }
+      leaf remove-ipv6-extension-headers {
+        type boolean;
+        default true;
+        description
+          "IPv6 extention headers are stripped from packets unless this
+          is set to false.";
       }
     }
 
@@ -377,7 +387,7 @@ module snabb-snabbflow-v1 {
       }
 
       list collector-pool {
-        key "name";
+        key name;
 
         description
           "Named pools of collector endpoints. Exporter instances
@@ -422,9 +432,9 @@ module snabb-snabbflow-v1 {
       }
 
       list exporter {
-        key "name";
+        key name;
         description
-          "Set of configured exporters. Each exporter receives flows
+          "Set of configured exporters. Each exporter receives packets
           matching a single class defined in /snabbflow-config/rss/flow-director,
           aggregates flows according to a set of templates, and
           exports them to a specified /snabbflow-config/ipfix/collector-pool.";
@@ -434,13 +444,6 @@ module snabb-snabbflow-v1 {
           description
             "The name used to refer to this exporter in
             /snabbflow-config/rss/software-scaling.";
-        }
-
-        leaf traffic-class {
-          type string-name;
-          default "default";
-          description
-            "A traffic class defined in /snabbflow-config/rss/flow-director.";
         }
 
         leaf-list template {
@@ -469,7 +472,7 @@ module snabb-snabbflow-v1 {
   }
 
   typedef numeric-id {
-    type uint32 { range "1..max"; }
+    type uint32 { range 1..max; }
     description
       "A numeric identifier.";
   }
@@ -491,7 +494,7 @@ module snabb-snabbflow-v1 {
      "Inspectable state for the Snabbflow IPFIX exporter.";
 
     list interface {
-      key "device";
+      key device;
       description
         "Network device statistics";
 
@@ -499,7 +502,7 @@ module snabb-snabbflow-v1 {
     }
 
     list exporter {
-      key "name";
+      key name;
       description
         "Exporter statistics.";
 
@@ -512,7 +515,7 @@ module snabb-snabbflow-v1 {
       uses exporter-state;
 
       list template {
-        key "id";
+        key id;
         description
           "Template statistics.";
 
@@ -521,7 +524,7 @@ module snabb-snabbflow-v1 {
     }
 
     list rss-group {
-      key "pid";
+      key pid;
       description
         "Statistics for the RSS group workers defined in
         /snabbflow-config/rss/hardware-scaling.";
@@ -529,7 +532,7 @@ module snabb-snabbflow-v1 {
       uses worker-state;
 
       list exporter {
-        key "name";
+        key name;
         description
           "Exporter statistics for this RSS group as per
           /snabbflow-config/rss/software-scaling.";
@@ -541,7 +544,7 @@ module snabb-snabbflow-v1 {
         }
 
         list instance {
-          key "pid";
+          key pid;
           description
             "Statistics for exporter instance workers for this RSS group.";
 
@@ -550,7 +553,7 @@ module snabb-snabbflow-v1 {
           uses exporter-instance-state;
 
           list template {
-            key "id";
+            key id;
             description
               "Statistics for template instances.";
 

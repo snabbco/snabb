@@ -187,9 +187,9 @@ function configure_graph (arg, in_graph)
    end
 
    local ipfix_config = mk_ipfix_config(config)
-   local ipfix_name = "ipfix"..config.instance
-   local out_name = "out"..config.instance
-   local sink_name = "sink"..config.instance
+   local ipfix_name = "ipfix_"..config.instance
+   local out_name = "out_"..config.instance
+   local sink_name = "sink_"..config.instance
 
    local graph = in_graph or app_graph.new()
    if config.input then
@@ -208,7 +208,7 @@ function configure_graph (arg, in_graph)
    -- to a pcap writer or a routed tap interface
    if (config.output_type ~= "pcap" and
        config.output_type ~= "tap_routed") then
-      local arp_name = "arp"..config.instance
+      local arp_name = "arp_"..config.instance
       local arp_config    = { self_mac = config.exporter_mac and
                                  ethernet:pton(config.exporter_mac),
                               self_ip = ipv4:pton(config.exporter_ip),
@@ -242,7 +242,7 @@ function configure_graph (arg, in_graph)
       })
    end
    if config.output_type == "tap_routed" then
-      app_graph.app(graph, "tap_ifmib", iftable.MIB, {
+      app_graph.app(graph, "tap_ifmib_"..config.instance, iftable.MIB, {
          target_app = out_name,
          ifname = config.output,
          ifalias = "IPFIX Observation Domain "..config.observation_domain,
@@ -336,7 +336,7 @@ function run (arg, duration, busywait, cpu, jit)
    clear_jit_options(jit)
 
    local t2 = now()
-   local stats = link.stats(engine.app_table['ipfix'..config.instance].input.input)
+   local stats = link.stats(engine.app_table['ipfix_'..config.instance].input.input)
    print("IPFIX probe stats:")
    local comma = lib.comma_value
    print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
@@ -409,10 +409,10 @@ function configure_rss_graph (config, inputs, outputs, log_date)
          --   link_name  name of the link
          --   args       probe configuration
          --   instance   # of embedded instance
-         output.args.instance = output.instance
+         output.args.instance = output.instance or output.args.instance
          local graph = configure_graph(output.args, graph)
          app_graph.link(graph, "rss."..output.link_name
-                           .." -> ipfix"..output.instance..".input")
+                           .." -> ipfix_"..output.args.instance..".input")
       end
    end
 
