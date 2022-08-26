@@ -19,9 +19,9 @@ local function collect_pci_states (pid)
    return states
 end
 
-local function collect_template_states (pid, app, instance)
+local function collect_template_states (pid, app, exporter)
    local states = {}
-   local templates_path = "/"..pid.."/ipfix_templates/"..instance
+   local templates_path = "/"..pid.."/ipfix_templates/"..exporter
    for _, id in ipairs(shm.children(templates_path)) do
       local id = assert(tonumber(id))
       local stats = shm.open_frame(templates_path.."/"..id)
@@ -35,7 +35,6 @@ local function collect_template_states (pid, app, instance)
          return state
       end
       states[id] = {
-         id = id,
          packets_processed = counter.read(stats.packets_in),
          flows_exported = counter.read(stats.exported_flows),
          flow_export_packets = counter.read(stats.flow_export_packets),
@@ -60,25 +59,22 @@ end
 
 local function collect_ipfix_states (pid, rss_links)
    local states = {}
-   local instances = {}
    for _, app in ipairs(shm.children("/"..pid.."/apps")) do
-      local instance = app:match("ipfix(%d+)")
-      if instance then
-         instances[app] = instance
+      local exporter = app:match("ipfix_([%w_]+)")
+      if exporter then
+         local stats = shm.open_frame("/"..pid.."/apps/"..app)
+         local state = {
+            pid = pid,
+            observation_domain = tonumber(counter.read(stats.observation_domain)),
+            packets_received = counter.read(stats.received_packets),
+            packets_ignored = counter.read(stats.ignored_packets),
+            template_packets_transmitted = counter.read(stats.template_packets),
+            sequence_number = counter.read(stats.sequence_number)
+         }
+         state.template = collect_template_states(pid, app, exporter)
+         rss_links[find_rss_link(pid, app)] = state.observation_domain
+         states[exporter] = state
       end
-   end
-   for app, instance in pairs(instances) do
-      local stats = shm.open_frame("/"..pid.."/apps/"..app)
-      local state = {
-         observation_domain = tonumber(counter.read(stats.observation_domain)),
-         packets_received = counter.read(stats.received_packets),
-         packets_ignored = counter.read(stats.ignored_packets),
-         template_packets_transmitted = counter.read(stats.template_packets),
-         sequence_number = counter.read(stats.sequence_number)
-      }
-      state.template = collect_template_states(pid, app, instance)
-      rss_links[find_rss_link(pid, app)] = state.observation_domain
-      table.insert(states, state)
    end
    return states
 end
@@ -91,10 +87,11 @@ function collect_rss_states (pid, rss_links)
          or (link:match("-> *"..rss_link:gsub("%.output$", ".input").."$")) -- interlink
          then
             local stats = shm.open_frame("/"..pid.."/links/"..link)
-            table.insert(states, {
-               link = rss_link,
+            local observation_domain = rss_links[rss_link]
+            states[observation_domain] = {
+               pid = pid,
                txdrop = counter.read(stats.txdrop)
-            })
+            }
             break
          end
       end
@@ -110,24 +107,83 @@ end
 local function process_states (pids)
    local state = {
       interface = {},
-      instance = {}
+      exporter = {},
+      rss_group = {}
    }
-   local rss_links = {}
+   -- Collect PCI device states
    for _, pid in ipairs(pids) do
-      local pci_states = collect_pci_states(pid)
-      for _, pci_state in ipairs(pci_states) do
+      local states = collect_pci_states(pid)
+      for _, pci_state in ipairs(states) do
          state.interface[pci_state.device] = pci_state
       end
-      local ipfix_states = collect_ipfix_states(pid, rss_links)
-      for _, ipfix_state in ipairs(ipfix_states) do
-         state.instance[ipfix_state.observation_domain] = ipfix_state
+   end
+   -- Mapping between software RSS links and IPFIX instances
+   local rss_links = {}
+   -- Collect IPFIX instance states
+   local ipfix_states = {}
+   for _, pid in ipairs(pids) do
+      local states = collect_ipfix_states(pid, rss_links)
+      for exporter, ipfix_state in pairs(states) do
+         ipfix_states[exporter] = ipfix_states[exporter] or {}
+         table.insert(ipfix_states[exporter], ipfix_state)
       end
    end
+   -- Collect RSS states
+   local rss_states = {}
    for _, pid in ipairs(pids) do
-      local rss_states = collect_rss_states(pid, rss_links)
-      for _, rss_state in ipairs(rss_states) do
-         local observation_domain = rss_links[rss_state.link]
-         state.instance[observation_domain].packets_dropped = rss_state.txdrop
+      local states = collect_rss_states(pid, rss_links)
+      for observation_domain, rss_state in pairs(states) do
+         rss_states[observation_domain] = rss_state
+      end
+   end
+   -- Enrich IPFIX instance states with software RSS link drop counts
+   for _, states in pairs(ipfix_states) do
+      for _, ipfix_state in ipairs(states) do
+         local observation_domain = ipfix_state.observation_domain
+         ipfix_state.packets_dropped = rss_states[observation_domain].txdrop
+      end
+   end
+   -- Aggregate IPFIX exporter states
+   local function agg (tdst, tsrc, field)
+      tdst[field] = (tdst[field] or 0ULL) + tsrc[field]
+   end
+   for exporter, states in pairs(ipfix_states) do
+      state.exporter[exporter] = state.exporter[exporter] or {}
+      local exporter = state.exporter[exporter]
+      exporter.template = exporter.template or {}
+      local templates = exporter.template
+      for _, ipfix_state in ipairs(states) do
+         agg(exporter, ipfix_state, 'packets_received')
+         agg(exporter, ipfix_state, 'packets_dropped')
+         agg(exporter, ipfix_state, 'packets_ignored')
+         agg(exporter, ipfix_state, 'template_packets_transmitted')
+         for id, template_state in pairs(ipfix_state.template) do
+            templates[id] = templates[id] or {}
+            agg(templates[id], template_state, 'packets_processed')
+            agg(templates[id], template_state, 'flows_exported')
+            agg(templates[id], template_state, 'flow_export_packets')
+         end
+      end
+   end
+   -- Arrange RSS group -> IPFIX instance tree
+   for exporter, states in pairs(ipfix_states) do
+      for _, ipfix_state in ipairs(states) do
+         local observation_domain = ipfix_state.observation_domain
+         local rss_state = rss_states[observation_domain]
+         if not state.rss_group[rss_state.pid] then
+            state.rss_group[rss_state.pid] = {
+               pid = rss_state.pid,
+               exporter = {}
+            }
+         end
+         local rss_group = state.rss_group[rss_state.pid]
+         if not rss_group.exporter[exporter] then
+            rss_group.exporter[exporter] = {
+               instance = {}
+            }
+         end
+         local instances = rss_group.exporter[exporter].instance
+         instances[ipfix_state.pid] = ipfix_state
       end
    end
    return {snabbflow_state=state}

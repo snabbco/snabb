@@ -165,21 +165,6 @@ module snabb-snabbflow-v1 {
         "Snabbflow supports distinct sets of flows being processed by
         any number of exporters. Flows are matched into traffic classes
         which are in turn processed by exporters.";
-      
-      container default-class {
-        description
-          "The default class matches all flows not matched by
-          any other traffic class.";
-
-        leaf exporter {
-          type string-name;
-          description
-            "An exporter defined in /snabbflow-config/ipfix/exporter.
-            Flows matched by the default class are processed by this
-            exporter. If none is given, then flows matched by the
-            default class are dropped and not processed by any exporter.";
-        }
-      }
 
       list class {
         key exporter;
@@ -228,6 +213,21 @@ module snabb-snabbflow-v1 {
             further consecutive classes (in match order).
             By default the matching of a packet to a class terminates
             the matching process.";
+        }
+      }
+
+      container default-class {
+        description
+          "The default class matches all flows not matched by
+          any other traffic class.";
+
+        leaf exporter {
+          type string-name;
+          description
+            "An exporter defined in /snabbflow-config/ipfix/exporter.
+            Flows matched by the default class are processed by this
+            exporter. If none is given, then flows matched by the
+            default class are dropped and not processed by any exporter.";
         }
       }
 
@@ -585,12 +585,6 @@ module snabb-snabbflow-v1 {
     }
 
     grouping exporter-state {
-      leaf observation-domain {
-        type uint32;
-        description
-          "Observation Domain of this IPFIX exporter instance.";
-      }
-
       leaf packets-received {
         type yang:zero-based-counter64;
         description
@@ -617,6 +611,12 @@ module snabb-snabbflow-v1 {
     }
 
     grouping exporter-instance-state {
+      leaf observation-domain {
+        type uint32;
+        description
+          "Observation Domain of this IPFIX exporter instance.";
+      }
+
       leaf sequence-number {
         type yang:zero-based-counter64;
         description
