@@ -3,181 +3,186 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
+local band, bor, lshift, rshift = bit.band, bit.bor, bit.lshift, bit.rshift
+local min, max = math.min, math.max
 
 local Heap = {
-   chunk_size = 32,
-   bucket_size = 8,
-   growth_factor = 2,
-   shrink_factor = 2
+   line_size = 128,
+   block_lines = 64,
+   block_size = 64*128, -- 8KB
 }
 
 -- NB: `a' must be a power of two
-local function padding (a, l) return bit.band(-l, a-1) end
-local function padded (a, l) return l + padding(a, l) end
+local function pad (a, l) return band(-l, a-1) end
+local function padded (a, l) return l + pad(a, l) end
 
-assert(Heap.chunk_size == 32)
-assert(Heap.bucket_size == 8)
-local function divchunk (n) return bit.rshift(n, 5) end
-local function divbucket (n) return bit.rshift(n, 3) end
-local function mulchunk (n) return bit.lshift(n, 5) end
-local function mulbucket (n) return bit.lshift(n, 3) end
+local block_t = ffi.typeof(([[
+   struct {
+      uint8_t ref[%d];
+      uint8_t mem[%d];
+   }
+]]):format(Heap.block_lines, Heap.block_size))
 
-function Heap:new (initial_size)
-   local default_initial_size = mulchunk(32)
-   if initial_size then
-      assert(initial_size > 0)
-      initial_size = padded(self.chunk_size, initial_size)
-   else
-      initial_size = default_initial_size
-   end
+function Heap:new ()
    local heap = {
-      size = initial_size,
-      hstart = 0,
-      hlen = initial_size,
-      buffer = self:new_buffer(initial_size),
-      dirtybits = self:new_dirtybits(initial_size)
+      _blocks = {
+         [0] = ffi.new(block_t)
+      },
+      _free = 0, _maxfree = Heap.block_size,
+      _recycle = nil, _maxrecycle = nil,
+      _overflow = nil, _maxoverflow = nil
    }
    return setmetatable(heap, {__index=Heap})
 end
 
-function Heap:new_buffer (size)
-   return ffi.new("uint8_t[?]", size)
+local _block_pow = 13
+assert(Heap.block_size == lshift(1,_block_pow))
+
+function Heap:_block (o)
+   local block = rshift(o, _block_pow)
+   local offset = band(o, lshift(1, _block_pow)-1)
+   return block, offset
 end
 
-function Heap:nchunks (bytes)
-   bytes = bytes or self.size
-   return divchunk(padded(self.bucket_size, bytes))
-end
-
-function Heap:nbuckets (bytes)
-   return divbucket(padded(self.bucket_size, self:nchunks(bytes)))
-end
-
-function Heap:new_dirtybits (size)
-   print("new_dirtybits", self:nbuckets(size))
-   return ffi.new("uint8_t[?]", self:nbuckets(size))
-end
-
-function Heap:resize (new_size)
-   local new_buffer = self:new_buffer(new_size)
-   ffi.copy(new_buffer, self.buffer, ffi.sizeof(self.buffer))
-   local new_dirtybits = self:new_dirtybits(new_size)
-   ffi.copy(new_dirtybits, self.dirtybits, ffi.sizeof(self.dirtybits))
-   self.buffer, self.dirtybits = new_buffer, new_dirtybits
-   self.hstart, self.hlen = self.size, new_size - self.size
-   self.size = new_size
-end
-
-function Heap:grow (min_size)
-   local new_size = self.size
-   repeat
-      new_size = new_size * self.growth_factor
-   until new_size >= min_size
-   self:resize(new_size)
-end
-
-function Heap:ptr (offset)
-   return self.buffer + mulchunk(offset)
-end
-
-function Heap:do_dirtybits (offset, nchunks, f)
-   while nchunks > 0 do
-      local bucket = divbucket(offset)
-      local o = padding(self.bucket_size, padding(self.bucket_size, offset))
-      local n = math.min(nchunks, self.bucket_size - o)
-      f(self, bucket, o, n)
-      offset, nchunks = offset + o, nchunks - n
+function Heap:_bump_alloc (bytes)
+   local o, new_free = self._free, self._free + bytes
+   if new_free <= self._maxfree then
+      self._free = new_free
+      return o
    end
 end
 
-function Heap:mark_bucket (bucket, o, n)
-   local marker = bit.lshift(bit.lshift(1ULL, n) - 1, o)
-   self.dirtybits[bucket] = bit.bor(self.dirtybits[bucket], marker)
+local _line_pow = 7
+assert(Heap.line_size == lshift(1, _line_pow))
+
+function Heap:_ref (o, bytes, c)
+   local block, offset = self:_block(o)
+   local b = self._blocks[block]
+   while bytes > 0 do
+      local ref = rshift(offset, _line_pow)
+      b.ref[ref] = b.ref[ref] + c
+      local lbytes = Heap.line_size-pad(Heap.line_size, offset)
+      local rbytes = math.min(bytes, lbytes)
+      offset = offset + rbytes
+      bytes = bytes - rbytes
+   end
 end
 
-function Heap:unmark_bucket (bucket, o, n)
-   local eraser = bit.bnot(bit.lshift(bit.lshift(1ULL, n) - 1, o))
-   self.dirtybits[bucket] = bit.band(self.dirtybits[bucket], eraser)
+function Heap:_has_ref (l)
+   local block, offset = self:_block(l)
+   local b = self._blocks[block]
+   local ref = rshift(offset, _line_pow)
+   return b.ref[ref] > 0
 end
 
-function Heap:mark (offset, nchunks)
-   self:do_dirtybits(offset, nchunks, Heap.mark_bucket)
+function Heap:_find_hole (recycle)
+   local block = self:_block(recycle)
+   while recycle < lshift(block+1, _block_pow) do
+      if not self:_has_ref(recycle) then
+         return recycle
+      end
+      recycle = recycle + Heap.line_size
+   end
 end
 
-function Heap:unmark (offset, nchunks)
-   self:do_dirtybits(offset, nchunks, Heap.unmark_bucket)
+function Heap:_find_recycle (recycle)
+   local hole
+   local block = self:_block(recycle)
+   while not hole and block <= #self._blocks do
+      hole = self:_find_hole(recycle)
+      block = block + 1
+      recycle = lshift(block, _block_pow)
+   end
+   if hole then
+      return hole, hole + Heap.line_size
+   end
 end
 
-function Heap:find_hole (nchunks)
-   local need = divbucket(nchunks)
-   local from, to
-   for bucket = 0, self:nbuckets()-1 do
-      if self.dirtybits[bucket] == 0 then
-         from = from or bucket
-         to = bucket
-      elseif from and (need <= to-from) then
-         break
-      else
-         from, to = nil, nil
+function Heap:_overflow_alloc (bytes)
+   local o, new_overflow = self._overflow, self._overflow + bytes
+   if new_overflow <= self._maxoverflow then
+      self._overflow = new_overflow
+      return o
+   end
+end
+
+function Heap:_recycle_alloc (bytes)
+   if bytes > Heap.line_size then
+      return self:_overflow_alloc(bytes)
+   end
+   local o, new_recycle = self._recycle, self._recycle + bytes
+   if new_recycle <= self._maxrecycle then
+      self._recycle = new_recycle
+      return o
+   else
+      local next_line = padded(Heap.line_size, self._recycle)
+      self._recycle, self._maxrecycle = self:_find_recycle(next_line)
+      if self._recycle then
+         return self:_recycle_alloc(bytes)
       end
    end
-   if from and (need <= to-from) then
-      self.hstart = mulchunk(mulbucket(from))
-      self.hlen = mulchunk(mulbucket(1+to-from))
-      return true
+end
+
+function Heap:_new_block ()
+   local block = #self._blocks+1
+   self._blocks[block] = ffi.new(block_t)
+   local o = lshift(block, _block_pow)
+   return o, o + Heap.block_size
+end
+
+function Heap:_collect ()
+   self._recycle, self._maxrecycle = self:_find_recycle(0)
+   if self._recycle then
+      self._overflow, self._maxoverflow = self:_new_block()
    end
+   self._free, self._maxfree = self:_new_block()
 end
 
 function Heap:allocate (bytes)
-   bytes = padded(self.chunk_size, bytes)
-   local nchunks = divchunk(bytes)
-   if bytes > self.hlen then
-      if not self:find_hole(nchunks) then
-         self:grow(self.size + bytes)
-      end
+   assert(bytes <= Heap.block_size)
+   local o = (self._recycle and self:_recycle_alloc(bytes))
+          or self:_bump_alloc(bytes)
+   if o then
+      self:_ref(o, bytes, 1)
+      return o
+   else
+      self:_collect()
+      return self:allocate(bytes)
    end
-   local offset = divchunk(self.hstart)
-   self:mark(offset, nchunks)
-   self.hstart, self.hlen = self.hstart + bytes, self.hlen - bytes
-   return offset
 end
 
-function Heap:free (offset, bytes)
-   bytes = padded(self.chunk_size, bytes)
-   local nchunks = divchunk(bytes)
-   self:unmark(offset, nchunks)
+function Heap:free (o, bytes)
+   assert(bytes <= Heap.block_size)
+   self:_ref(o, bytes, -1)
+end
+
+function Heap:ptr (o)
+   local block, offset = self:_block(o)
+   return self._blocks[block].mem + offset
 end
 
 function selftest ()
    local h = Heap:new()
-   local s1 = "foo"
-   local o1 = h:allocate(#s1)
-   ffi.copy(h:ptr(o1), s1, #s1)
-   print("dirtybits[0]", ("%X"):format(h.dirtybits[0]))
-   local s2 = "bar"
-   local o2 = h:allocate(#s2)
-   ffi.copy(h:ptr(o2), s2, #s2)
-   print("dirtybits[0]", ("%X"):format(h.dirtybits[0]))
-   assert(ffi.string(h:ptr(o1), #s1) == s1)
-   h:free(o1, #s1)
-   print("dirtybits[0]", ("%X"):format(h.dirtybits[0]))
-   -- h:free(o2, #s2)
-   -- print("dirtybits[0]", ("%X"):format(h.dirtybits[0]))
-   assert(h:find_hole(1))
-   assert(h.hstart == h.chunk_size*h.bucket_size)
-   assert(h.hlen == h.size-h.hstart)
-   local s3 = "flute"
-   local o3 = h:allocate(#s3)
-   ffi.copy(h:ptr(o3), s3, #s3)
-   print("dirtybits[1]", ("%X"):format(h.dirtybits[1]))
-   h:free(o2, #s2)
-   print("dirtybits[0]", ("%X"):format(h.dirtybits[0]))
-   assert(h:find_hole(1))
-   assert(h.hstart == 0)
-   assert(h.hlen == h.bucket_size*h.chunk_size)
-   local old_size, min_new_size = h.size, h.size*2
-   h:grow(min_new_size)
-   assert(h.size >= min_new_size)
-   assert(h.hstart == old_size)
-   assert(h.hlen == h.size-h.hstart)
+   local o1 = h:allocate(Heap.line_size/2)
+   assert(h:_has_ref(0*Heap.line_size))
+   local o2 = h:allocate(Heap.line_size*1)
+   assert(h:_has_ref(0*Heap.line_size))
+   assert(h:_has_ref(1*Heap.line_size))
+   h:free(o2, Heap.line_size*1)
+   assert(h:_has_ref(0*Heap.line_size))
+   assert(not h:_has_ref(1*Heap.line_size))
+   h:free(o1, Heap.line_size/2)
+   assert(not h:_has_ref(0*Heap.line_size))
+   local o1 = h:allocate(Heap.block_size)
+   local o1_b, o1_o = h:_block(o1)
+   assert(o1_b == 1 and o1_o == 0)
+   assert(#h._blocks == 2)
+   assert(h._recycle == 0)
+   assert(h._maxrecycle == Heap.line_size)
+   assert(h._overflow == Heap.block_size*2)
+   assert(h._maxoverflow == Heap.block_size*2)
+   assert(h._free == Heap.block_size*2)
+   assert(h._maxfree == Heap.block_size*3)
+   local o2 = h:allocate(Heap.line_size/2)
+   local o3 = h:allocate(Heap.line_size)
 end
