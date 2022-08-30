@@ -317,7 +317,7 @@ function List:copy_scalar (dst, src, fields)
    for _, spec in ipairs(fields) do
       local name, type = unpack(spec)
       if type ~= 'string' then
-         dst[name] = src[name]
+         dst[name] = assert(src[name], "Missing member: "..name)
       end
    end
 end
@@ -337,6 +337,7 @@ function List:tostruct (s, t, fields)
    for _, spec in ipairs(fields) do
       local name, type = unpack(spec)
       if type == 'string' then
+         assert(t[name], "Missing member: "..name)
          s[name] = self:alloc_str(t[name])
       end
    end
@@ -385,7 +386,7 @@ function List:node_occupied (node, index, newval)
    if newval == true then
       node.occupied = bor(node.occupied, lshift(1, index))
    elseif newval == false then
-      node.occupied = bor(node.occupied, bnot(lshift(1, index)))
+      node.occupied = band(node.occupied, bnot(lshift(1, index)))
    end
    return band(1, rshift(node.occupied, index)) == 1
 end
@@ -394,7 +395,7 @@ function List:node_leaf (node, index, newval)
    if newval == true then
       node.leaf = bor(node.leaf, lshift(1, index))
    elseif newval == false then
-      node.leaf = bor(node.leaf, bnot(lshift(1, index)))
+      node.leaf = band(node.leaf, bnot(lshift(1, index)))
    end
    return band(1, rshift(node.leaf, index)) == 1
 end
@@ -416,7 +417,7 @@ function List:insert_leaf (o, r, d, s, h)
    local index = band(self.node_entries-1, rshift(h, d))
    if self:node_occupied(node, index) then
       -- Child slot occupied, advance hash parameters
-      d, s, h = self:next_hash_parameters()
+      d, s, h = self:next_hash_parameters(d, s, h)
       if self:node_leaf(node, index) then
          -- Occupied by leaf, replace with node and insert
          -- both existing and new leaves into new node.
@@ -451,8 +452,8 @@ function List:find_leaf (k, r, d, s, h)
          return node.children[index]
       else
          -- Continue searching in child node.
-         d, s, h = self:next_hash_parameters()
-         self:find_leaf(k, node.children[index], d, s, h)
+         d, s, h = self:next_hash_parameters(d, s, h)
+         return self:find_leaf(k, node.children[index], d, s, h)
       end
    else
       -- Not present!
@@ -494,21 +495,38 @@ function selftest_list ()
       {{'id', 'uint32'}, {'name', 'string'}},
       {{'value', 'decimal64'}, {'description', 'string'}}
    )
-   print("leaf_t", ffi.sizeof(l.leaf_t))
-   print("node_t", ffi.sizeof(l.node_t))
-   l:add_entry{
+   -- print("leaf_t", ffi.sizeof(l.leaf_t))
+   -- print("node_t", ffi.sizeof(l.node_t))
+   l:add_entry {
       id=42, name="foobar",
       value=3.14, description="PI"
    }
    local root = l:node(l.root)
-   print(l.root, root.occupied, root.leaf, root.children[12])
-   local e1 = l:find_entry{
+   assert(root.occupied == lshift(1, 14))
+   assert(root.occupied == root.leaf)
+   -- print(l.root, root.occupied, root.leaf, root.children[14])
+   local e1 = l:find_entry {
       id=42, name="foobar"
    }
    assert(e1)
-   for k,v in pairs(e1) do
-      print(k,v)
-   end
+   -- for k,v in pairs(e1) do print(k,v) end
+   
+   -- Test collisions
+   local lc = List:new({{'id', 'uint64'}}, {})
+   -- print("leaf_t", ffi.sizeof(lc.leaf_t))
+   -- print("node_t", ffi.sizeof(lc.node_t))
+   lc:add_entry {id=0ULL}
+   lc:add_entry {id=4895842651ULL}
+   local root = lc:node(lc.root)
+   assert(root.leaf == 0)
+   assert(root.occupied == lshift(1, 12))
+   -- print(lc.root, root.occupied, root.leaf, root.children[12])
+   local e1 = lc:find_entry {id=0ULL}
+   local e2 = lc:find_entry {id=4895842651ULL}
+   assert(e1)
+   assert(e2)
+   assert(e1.id == 0ULL)
+   assert(e2.id == 4895842651ULL)
 end
 
 
