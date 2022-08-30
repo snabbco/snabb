@@ -32,8 +32,7 @@ function Heap:new ()
          [0] = ffi.new(block_t)
       },
       _free = 0, _maxfree = Heap.block_size,
-      _recycle = nil, _maxrecycle = nil,
-      _overflow = nil, _maxoverflow = nil
+      _recycle = nil, _maxrecycle = nil
    }
    return setmetatable(heap, {__index=Heap})
 end
@@ -91,7 +90,9 @@ end
 function Heap:_find_recycle (recycle)
    local hole
    local block = self:_block(recycle)
-   while not hole and block <= #self._blocks do
+   local free_block = self:_block(self._free)
+   -- NB: scan only blocks before current free block
+   while not hole and block < free_block do
       hole = self:_find_hole(recycle)
       block = block + 1
       recycle = lshift(block, _block_pow)
@@ -101,18 +102,8 @@ function Heap:_find_recycle (recycle)
    end
 end
 
-function Heap:_overflow_alloc (bytes)
-   local o, new_overflow = self._overflow, self._overflow + bytes
-   if new_overflow <= self._maxoverflow then
-      self._overflow = new_overflow
-      return o
-   end
-end
-
 function Heap:_recycle_alloc (bytes)
-   if bytes > Heap.line_size then
-      return self:_overflow_alloc(bytes)
-   end
+   assert(bytes <= Heap.line_size)
    local o, new_recycle = self._recycle, self._recycle + bytes
    if new_recycle <= self._maxrecycle then
       self._recycle = new_recycle
@@ -134,17 +125,19 @@ function Heap:_new_block ()
 end
 
 function Heap:_collect ()
-   self._recycle, self._maxrecycle = self:_find_recycle(0)
-   if self._recycle then
-      self._overflow, self._maxoverflow = self:_new_block()
-   end
    self._free, self._maxfree = self:_new_block()
+   self._recycle, self._maxrecycle = self:_find_recycle(0)
 end
 
 function Heap:allocate (bytes)
    assert(bytes <= Heap.block_size)
-   local o = (self._recycle and self:_recycle_alloc(bytes))
-          or self:_bump_alloc(bytes)
+   local o
+   if self._recycle and bytes <= Heap.line_size then
+      o = self:_recycle_alloc(bytes)
+   end
+   if not o then
+      o = self:_bump_alloc(bytes)
+   end
    if o then
       self:_ref(o, bytes, 1)
       -- Allocated space is zeroed. We are civilized, after all.
@@ -181,15 +174,15 @@ local function selftest_heap ()
    local o1 = h:allocate(Heap.block_size)
    local o1_b, o1_o = h:_block(o1)
    assert(o1_b == 1 and o1_o == 0)
-   assert(#h._blocks == 2)
+   assert(#h._blocks == 1)
    assert(h._recycle == 0)
    assert(h._maxrecycle == Heap.line_size)
-   assert(h._overflow == Heap.block_size*2)
-   assert(h._maxoverflow == Heap.block_size*2)
    assert(h._free == Heap.block_size*2)
-   assert(h._maxfree == Heap.block_size*3)
+   assert(h._maxfree == Heap.block_size*2)
    local o2 = h:allocate(Heap.line_size/2)
+   assert(h._recycle == Heap.line_size/2)
    local o3 = h:allocate(Heap.line_size)
+   assert(h._recycle == h._maxrecycle)
 end
 
 
