@@ -461,6 +461,45 @@ function List:find_leaf (k, r, d, s, h)
    end
 end
 
+function List:remove_leaf (k, r, d, s, h)
+   r = r or self.root
+   d = d or 0
+   s = s or 0
+   h = h or self:entry_hash(k, s)
+   local node = self:node(r)
+   local index = band(self.node_entries-1, rshift(h, d))
+   if self:node_occupied(node, index) then
+      if self:node_leaf(node, index) then
+         -- Remove
+         local o = node.children[index]
+         self:node_occupied(node, index, false)
+         self:node_leaf(node, index, false)
+         node.children[index] = 0
+         return o
+      else
+         -- Continue searching in child node.
+         d, s, h = self:next_hash_parameters(d, s, h)
+         local o = self:remove_leaf(k, node.children[index], d, s, h)
+         if o then
+            -- Removed from child node.
+            local child = self:node(node.children[index])
+            if child.occupied == 0 then
+               self:node_occupied(node, index, false)
+               self:free_node(node.children[index])
+               node.children[index] = 0
+            end
+            return o
+         else
+            -- Not found.
+            return nil
+         end
+      end
+   else
+      -- Not present!
+      return nil
+   end
+end
+
 function List:append_leaf (o, prev)
    local leaf = self:leaf(o)
    local pleaf = self:leaf(prev)
@@ -469,24 +508,57 @@ function List:append_leaf (o, prev)
    pleaf.list.next = o
 end
 
+function List:leaf_entry (o)
+   local leaf = self:leaf(o)
+   local ret = {}
+   self:totable(ret, leaf.keys, self.keys)
+   self:totable(ret, leaf.members, self.members)
+   return ret
+end
+
 function List:add_entry (e)
    local o = self:new_leaf(e)
    self:insert_leaf(o)
    if self.last then
       self:append_leaf(o, self.last)
    else
-      self.last = o
+      self.first, self.last = o, o
    end
 end
 
 function List:find_entry (k)
    local o = self:find_leaf(k)
    if o then
+      return self:leaf_entry(o)
+   end
+end
+
+function List:remove_entry (k)
+   local o = self:remove_leaf(k)
+   if o then
+      -- Unlink in list
       local leaf = self:leaf(o)
-      local ret = {}
-      self:totable(ret, leaf.keys, self.keys)
-      self:totable(ret, leaf.members, self.members)
-      return ret
+      local prev = self:leaf(leaf.list.prev)
+      local next = self:leaf(leaf.list.next)
+      prev.list.next = leaf.list.next
+      next.list.prev = leaf.list.prev
+      self:free_leaf(o)
+      return true
+   end
+end
+
+function List:iterator ()
+   local n = 1
+   local o = self.first
+   return function ()
+      if o == 0 then
+         return
+      end
+      local i = n
+      local e = self:leaf_entry(o)
+      n = n + 1
+      o = self:leaf(o).list.next
+      return i, e
    end
 end
 
@@ -505,11 +577,25 @@ function selftest_list ()
    assert(root.occupied == lshift(1, 14))
    assert(root.occupied == root.leaf)
    -- print(l.root, root.occupied, root.leaf, root.children[14])
-   local e1 = l:find_entry {
-      id=42, name="foobar"
-   }
+   local e1 = l:find_entry {id=42, name="foobar"}
    assert(e1)
+   assert(e1.id == 42 and e1.name == "foobar")
+   assert(not l:find_entry {id=43, name="foobar"})
+   assert(not l:find_entry {id=42, name="foo"})
    -- for k,v in pairs(e1) do print(k,v) end
+   l:add_entry {
+      id=127, name="hey",
+      value=1/0, description="inf"
+   }
+   for i, e in l:iterator() do
+      if i == 1 then
+         assert(e.id == 42)
+      elseif i == 2 then
+         assert(e.id == 127)
+      else
+         error("unexpected index: "..i)
+      end
+   end
    
    -- Test collisions
    local lc = List:new({{'id', 'uint64'}}, {})
@@ -527,6 +613,9 @@ function selftest_list ()
    assert(e2)
    assert(e1.id == 0ULL)
    assert(e2.id == 4895842651ULL)
+   assert(lc:remove_entry {id=0ULL})
+   assert(lc:remove_entry {id=4895842651ULL})
+   assert(root.occupied == 0)
 end
 
 
