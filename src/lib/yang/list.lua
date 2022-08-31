@@ -678,9 +678,68 @@ function selftest_list ()
 end
 
 
+local ListMeta = {}
+
+function new (keys, members)
+   return setmetatable({list=List:new(keys, members)}, ListMeta)
+end
+
+function ListMeta:__len ()
+   return self.list.length
+end
+
+function ListMeta:__index (k)
+   return self.list:find_entry(k)
+end
+
+function ListMeta:__newindex (k, members)
+   if members ~= nil then
+      self.list:add_entry(k, 'update', members)
+   else
+      self.list:remove_entry(k)
+   end
+end
+
+function ListMeta:__ipairs ()
+   return self.list:ipairs()
+end
+
+ListMeta.__pairs = ListMeta.__ipairs
+
+function ListMeta:__call (method, ...)
+   local f = assert(self.list[method], "No such method: "..method)
+   return f(self.list, ...)
+end
+
+local function selftest_listmeta ()
+   local l1 = new(
+      {{'id', 'uint32'}, {'name', 'string'}},
+      {{'value', 'decimal64'}, {'description', 'string'}}   
+   )
+   l1[{id=0, name='foo'}] = {value=1.5, description="yepyep"}
+   l1[{id=1, name='bar'}] = {value=3.14, description="PI"}
+   assert(#l1 == 2)
+   assert(l1[{id=0, name='foo'}].value == 1.5)
+   for i, entry in ipairs(l1) do
+      if i == 1 then
+         assert(entry.name == 'foo')
+      elseif i == 2 then
+         assert(entry.name == 'bar')
+      else
+         error("unexpected entry: "..i)
+      end
+   end
+   l1[{id=0, name='foo'}] = nil
+   assert(l1[{id=0, name='foo'}] == nil)
+   assert(l1('find_entry', {id=1, name='bar'}).value == 3.14)
+end
+
+
 function selftest ()
    print("Selftest: Heap")
    selftest_heap()
    print("Selftest: List")
    selftest_list()
+   print("Selftest: ListMeta")
+   selftest_listmeta()
 end
