@@ -4,6 +4,7 @@ module(..., package.seeall)
 
 local murmur = require("lib.hash.murmur")
 local ffi = require("ffi")
+local C = ffi.C
 local band, bor, bnot, lshift, rshift =
    bit.band, bit.bor, bit.bnot, bit.lshift, bit.rshift
 local min, max =
@@ -186,7 +187,7 @@ local function selftest_heap ()
 end
 
 
-List = {
+local List = {
    trie_width = 4,
    hash_width = 32,
    node_entries = 16
@@ -242,6 +243,7 @@ function List:new (keys, members)
    self.first, self.last = nil, nil -- empty
    self.root = self:alloc_node() -- heap obj=0 reserved for root node
    self.hashin = ffi.new(self.keys_t)
+   self.length = 0
    return self
 end
 
@@ -313,6 +315,14 @@ function List:tostring(str)
    return ffi.string(str.str, str.len)
 end
 
+function List:str_equal_string (o, s)
+   local str = self:str(o)
+   if not str.len == #s then
+      return false
+   end
+   return C.memcmp(str.str, s, str.len) == 0
+end
+
 function List:copy_scalar (dst, src, fields)
    for _, spec in ipairs(fields) do
       local name, type = unpack(spec)
@@ -339,6 +349,15 @@ function List:tostruct (s, t, fields)
       if type == 'string' then
          assert(t[name], "Missing member: "..name)
          s[name] = self:alloc_str(t[name])
+      end
+   end
+end
+
+function List:free_struct_str (s, fields)
+   for _, spec in ipairs(fields) do
+      local name, type = unpack(spec)
+      if type == 'string' then
+         self:free_str(s[name])
       end
    end
 end
@@ -372,14 +391,20 @@ function List:leaf_hash (keys, seed)
    return hash32(self.hashin, ffi.sizeof(self.keys_t), seed)
 end
 
-function List:new_leaf (e, prev, next)
+function List:new_leaf (e, members, prev, next)
    local o = self:alloc_leaf()
    local leaf = self:leaf(o)
    leaf.list.prev = prev or 0 --  NB: obj=0 is root node, can not be a leaf!
    leaf.list.next = next or 0
    self:tostruct(leaf.keys, e, self.keys)
-   self:tostruct(leaf.members, e, self.members)
+   self:tostruct(leaf.members, members or e, self.members)
    return o
+end
+
+function List:destroy_leaf (o)
+   self:free_struct_str(self:leaf(o).keys, self.keys)
+   self:free_struct_str(self:leaf(o).members, self.members)
+   self:free_leaf(o)
 end
 
 function List:node_occupied (node, index, newval)
@@ -408,6 +433,22 @@ function List:next_hash_parameters (d, s, h)
    end
 end
 
+function List:entry_keys_equal (e, o)
+   local keys = self:leaf(o).keys
+   for _, spec in ipairs(self.keys) do
+      local name, type = unpack(spec)
+      if type == 'string' then
+         if not self:str_equal_string(keys[name], e[name]) then
+            return false
+         end
+      elseif not (keys[name] == e[name]) then
+         return false
+      end
+   end
+   return true
+end
+
+-- NB: does not handle already existing identical keys!
 function List:insert_leaf (o, r, d, s, h)
    r = r or self.root
    d = d or 0
@@ -429,7 +470,7 @@ function List:insert_leaf (o, r, d, s, h)
          self:insert_leaf(o, n, d, s, h)
       else
          -- Occupied by node, insert into it.
-         self:insert_leaf(o, r, d, s, h)
+         self:insert_leaf(o, node.children[index], d, s, h)
       end
    else
       -- Not occupied, insert leaf.
@@ -439,6 +480,7 @@ function List:insert_leaf (o, r, d, s, h)
    end
 end
 
+-- NB: finds any leaf matching the keys hash!
 function List:find_leaf (k, r, d, s, h)
    r = r or self.root
    d = d or 0
@@ -461,26 +503,25 @@ function List:find_leaf (k, r, d, s, h)
    end
 end
 
-function List:remove_leaf (k, r, d, s, h)
+-- NB: does not handle non-existing keys!
+function List:remove_leaf (o, r, d, s, h)
    r = r or self.root
    d = d or 0
    s = s or 0
-   h = h or self:entry_hash(k, s)
+   h = h or self:leaf_hash(self:leaf(o).keys, s)
    local node = self:node(r)
    local index = band(self.node_entries-1, rshift(h, d))
    if self:node_occupied(node, index) then
       if self:node_leaf(node, index) then
          -- Remove
-         local o = node.children[index]
          self:node_occupied(node, index, false)
          self:node_leaf(node, index, false)
          node.children[index] = 0
-         return o
+         return true
       else
          -- Continue searching in child node.
          d, s, h = self:next_hash_parameters(d, s, h)
-         local o = self:remove_leaf(k, node.children[index], d, s, h)
-         if o then
+         if self:remove_leaf(o, node.children[index], d, s, h) then
             -- Removed from child node.
             local child = self:node(node.children[index])
             if child.occupied == 0 then
@@ -488,7 +529,8 @@ function List:remove_leaf (k, r, d, s, h)
                self:free_node(node.children[index])
                node.children[index] = 0
             end
-            return o
+            -- XXX - move leaf up if child.occupied == 1
+            return true
          else
             -- Not found.
             return nil
@@ -501,11 +543,26 @@ function List:remove_leaf (k, r, d, s, h)
 end
 
 function List:append_leaf (o, prev)
+   prev = prev or self.last
+   if not prev then
+      self.first, self.last = o, o
+   else
    local leaf = self:leaf(o)
    local pleaf = self:leaf(prev)
    leaf.list.prev = prev
    leaf.list.next = pleaf.list.next
    pleaf.list.next = o
+end
+   self.length = self.length + 1
+end
+
+function List:unlink_leaf (o)
+   local leaf = self:leaf(o)
+   local prev = self:leaf(leaf.list.prev)
+   local next = self:leaf(leaf.list.next)
+   prev.list.next = leaf.list.next
+   next.list.prev = leaf.list.prev
+   self.length = self.length - 1
 end
 
 function List:leaf_entry (o)
@@ -516,38 +573,40 @@ function List:leaf_entry (o)
    return ret
 end
 
-function List:add_entry (e)
-   local o = self:new_leaf(e)
-   self:insert_leaf(o)
-   if self.last then
-      self:append_leaf(o, self.last)
+function List:add_entry (e, update, members)
+   local o = self:find_leaf(e)
+   if o and self:entry_keys_equal(e, o) then
+      if update then
+         self:update_leaf(o, members or e)
+         return true
+      else
+         return
+      end
    else
-      self.first, self.last = o, o
+      local o = self:new_leaf(e, members)
+   self:insert_leaf(o)
+      self:append_leaf(o)
    end
 end
 
 function List:find_entry (k)
    local o = self:find_leaf(k)
-   if o then
+   if o and self:entry_keys_equal(k, o) then
       return self:leaf_entry(o)
    end
 end
 
 function List:remove_entry (k)
-   local o = self:remove_leaf(k)
-   if o then
-      -- Unlink in list
-      local leaf = self:leaf(o)
-      local prev = self:leaf(leaf.list.prev)
-      local next = self:leaf(leaf.list.next)
-      prev.list.next = leaf.list.next
-      next.list.prev = leaf.list.prev
-      self:free_leaf(o)
+   local o = self:find_leaf(k)
+   if o and self:entry_keys_equal(k, o) then
+      self:remove_leaf(o)
+      self:unlink_leaf(o)
+      self:destroy_leaf(o)
       return true
    end
 end
 
-function List:iterator ()
+function List:ipairs ()
    local n = 1
    local o = self.first
    return function ()
@@ -587,7 +646,7 @@ function selftest_list ()
       id=127, name="hey",
       value=1/0, description="inf"
    }
-   for i, e in l:iterator() do
+   for i, e in l:ipairs() do
       if i == 1 then
          assert(e.id == 42)
       elseif i == 2 then
