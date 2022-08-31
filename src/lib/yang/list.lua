@@ -401,9 +401,16 @@ function List:new_leaf (e, members, prev, next)
    return o
 end
 
+function List:update_leaf (o, members)
+   local leaf = self:leaf(o)
+   self:free_struct_str(leaf.members, self.members)
+   self:tostruct(leaf.members, members, self.members)
+end
+
 function List:destroy_leaf (o)
-   self:free_struct_str(self:leaf(o).keys, self.keys)
-   self:free_struct_str(self:leaf(o).members, self.members)
+   local leaf = self:leaf(o)
+   self:free_struct_str(leaf.keys, self.keys)
+   self:free_struct_str(leaf.members, self.members)
    self:free_leaf(o)
 end
 
@@ -576,17 +583,19 @@ end
 function List:add_entry (e, update, members)
    local o = self:find_leaf(e)
    if o and self:entry_keys_equal(e, o) then
-      if update then
-         self:update_leaf(o, members or e)
-         return true
-      else
-         return
+      if not update then
+         error("Attempting to add duplicate entry to list")
       end
+         self:update_leaf(o, members or e)
    else
       local o = self:new_leaf(e, members)
    self:insert_leaf(o)
       self:append_leaf(o)
    end
+end
+
+function List:add_or_update_entry (e, members)
+   self:add_entry(e, true, members)
 end
 
 function List:find_entry (k)
@@ -656,6 +665,23 @@ function selftest_list ()
       end
    end
    
+   -- Test update
+   local ok = pcall(function ()
+      l:add_entry {
+         id=127, name="hey",
+         value=1, description="one"
+      }
+   end)
+   assert(not ok)
+   l:add_or_update_entry {
+      id=127, name="hey",
+      value=1, description="one"
+   }
+   local e_updated = l:find_entry {id=127, name="hey"}
+   assert(e_updated)
+   assert(e_updated.value == 1)
+   assert(e_updated.description == "one")
+   
    -- Test collisions
    local lc = List:new({{'id', 'uint64'}}, {})
    -- print("leaf_t", ffi.sizeof(lc.leaf_t))
@@ -694,7 +720,7 @@ end
 
 function ListMeta:__newindex (k, members)
    if members ~= nil then
-      self.list:add_entry(k, 'update', members)
+      self.list:add_or_update_entry(k, members)
    else
       self.list:remove_entry(k)
    end
