@@ -599,12 +599,12 @@ function List:append_leaf (o, prev)
    if not prev then
       self.first, self.last = o, o
    else
-   local leaf = self:leaf(o)
-   local pleaf = self:leaf(prev)
-   leaf.list.prev = prev
-   leaf.list.next = pleaf.list.next
-   pleaf.list.next = o
-end
+      local leaf = self:leaf(o)
+      local pleaf = self:leaf(prev)
+      leaf.list.prev = prev
+      leaf.list.next = pleaf.list.next
+      pleaf.list.next = o
+   end
    self.length = self.length + 1
 end
 
@@ -631,10 +631,10 @@ function List:add_entry (e, update, members)
       if not update then
          error("Attempting to add duplicate entry to list")
       end
-         self:update_leaf(o, members or e)
+      self:update_leaf(o, members or e)
    else
       local o = self:new_leaf(e, members)
-   self:insert_leaf(o)
+      self:insert_leaf(o)
       self:append_leaf(o)
    end
 end
@@ -805,6 +805,36 @@ local function selftest_listmeta ()
    assert(l1('find_entry', {id=1, name='bar'}).value == 3.14)
 end
 
+function selftest_ip ()
+   local yang_util = require("lib.yang.util")
+   local l = List:new(
+      {{'ip', 'string'}, {'port', 'uint16'}},
+      {}
+   )
+   math.randomseed(0)
+   for i=1, 1e5 do
+      l:add_entry{
+         ip = yang_util.ipv4_ntop(math.random(0xffffffff)),
+         port = i
+      }
+   end
+   print("added "..l.length.." entries")
+   local middle = math.floor(l.length/2)
+   local entry
+   for i, e in l:ipairs() do
+      if i == middle then
+         entry = e
+         print("Iterated to entry #"..middle)
+         assert(e.ip == l:find_entry(e).ip)
+         print("Looked up middle entry with ip="..e.ip)
+         break
+      end
+   end
+   l:remove_entry(entry)
+   print("Removed middle entry")
+   assert(not l:find_entry(entry))
+   print("Asserted entry is no longer present")
+end
 
 function selftest ()
    print("Selftest: Heap")
@@ -813,4 +843,6 @@ function selftest ()
    selftest_list()
    print("Selftest: ListMeta")
    selftest_listmeta()
+   print("Selftest: ip bench")
+   selftest_ip()
 end
