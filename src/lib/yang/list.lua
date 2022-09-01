@@ -229,7 +229,7 @@ end
 local List = {
    trie_width = 4,
    hash_width = 32,
-   node_entries = 16
+   node_children = 16
 }
 
 List.type_map = {
@@ -253,6 +253,7 @@ end
 List.node_t = List:cached_type [[
    struct {
       uint16_t occupied, leaf;
+      uint32_t parent;
       uint32_t children[16];
    }
 ]]
@@ -454,7 +455,7 @@ function List:destroy_leaf (o)
    self:free_leaf(o)
 end
 
-local node_index_mask = List.node_entries - 1
+local node_index_mask = List.node_children - 1
 function List:node_index (node, d, h)
    return band(node_index_mask, rshift(h, d))
 end
@@ -478,10 +479,18 @@ function List:node_leaf (node, index, newval)
 end
 
 function List:next_hash_parameters (d, s, h)
-   if d + 4 < self.hash_width then
-      return d + 4, s, h
+   if d + self.trie_width < self.hash_width then
+      return d + self.trie_width, s, h
    else
       return 0, s + 1, nil
+   end
+end
+
+function List:prev_hash_parameters (d, s, h)
+   if d >= self.trie_width then
+      return d - self.trie_width, s, h
+   else
+      return self.hash_width - self.trie_width, s - 1, nil
    end
 end
 
@@ -500,97 +509,108 @@ function List:entry_keys_equal (e, o)
    return true
 end
 
--- NB: does not handle already existing identical keys!
-function List:insert_leaf (o, r, d, s, h)
-   r = r or self.root
-   d = d or 0
-   s = s or 0
-   h = h or self:leaf_hash(self:leaf(o).keys, s)
-   local node = self:node(r)
-   local index = self:node_index(node, d, h)
-   if self:node_occupied(node, index) then
-      -- Child slot occupied, advance hash parameters
-      d, s, h = self:next_hash_parameters(d, s, h)
-      if self:node_leaf(node, index) then
-         -- Occupied by leaf, replace with node and insert
-         -- both existing and new leaves into new node.
-         local l = node.children[index]
-         local n = self:alloc_node()
-         node.children[index] = n
-         self:node_leaf(node, index, false)
-         self:insert_leaf(l, n, d, s, nil)
-         self:insert_leaf(o, n, d, s, h)
-      else
-         -- Occupied by node, insert into it.
-         self:insert_leaf(o, node.children[index], d, s, h)
-      end
-   else
-      -- Not occupied, insert leaf.
-      self:node_occupied(node, index, true)
-      self:node_leaf(node, index, true)
-      node.children[index] = o
-   end
-end
-
--- NB: finds any leaf matching the keys hash!
-function List:find_leaf (k, r, d, s, h)
+-- NB: finds any node matching the keys hash!
+function List:find_node (k, r, d, s, h)
    r = r or self.root
    d = d or 0
    s = s or 0
    h = h or self:entry_hash(k, s)
    local node = self:node(r)
    local index = self:node_index(node, d, h)
-   if self:node_occupied(node, index) then
-      if self:node_leaf(node, index) then
-         -- Found!
-         return node.children[index]
-      else
-         -- Continue searching in child node.
-         d, s, h = self:next_hash_parameters(d, s, h)
-         return self:find_leaf(k, node.children[index], d, s, h)
-      end
+   if self:node_occupied(node, index) and
+      not self:node_leaf(node, index)
+   then
+      -- Continue searching in child node.
+      d, s, h = self:next_hash_parameters(d, s, h)
+      return self:find_node(k, node.children[index], d, s, h)
    else
-      -- Not present!
-      return nil
+      -- Found!
+      return r, d, s, h
    end
 end
 
--- NB: does not handle non-existing keys!
-function List:remove_leaf (o, r, d, s, h)
-   r = r or self.root
-   d = d or 0
-   s = s or 0
+-- NB: finds leaf with matching keys in node.
+function List:find_leaf (k, n, d, s, h)
+   local node = self:node(n)
+   local index = self:node_index(node, d, h)
+   if self:node_occupied(node, index) then
+      assert(self:node_leaf(node, index))
+      local o = node.children[index]
+      if self:entry_keys_equal(k, o) then
+         return o
+      end
+   end
+end
+
+-- NB: does not handle already existing identical keys!
+function List:insert_leaf (o, r, d, s, h)
    h = h or self:leaf_hash(self:leaf(o).keys, s)
    local node = self:node(r)
    local index = self:node_index(node, d, h)
    if self:node_occupied(node, index) then
-      if self:node_leaf(node, index) then
-         -- Remove
-         self:node_occupied(node, index, false)
-         self:node_leaf(node, index, false)
-         node.children[index] = 0
-         return true
-      else
-         -- Continue searching in child node.
-         d, s, h = self:next_hash_parameters(d, s, h)
-         if self:remove_leaf(o, node.children[index], d, s, h) then
-            -- Removed from child node.
-            local child = self:node(node.children[index])
-            if child.occupied == 0 then
-               self:node_occupied(node, index, false)
-               self:free_node(node.children[index])
-               node.children[index] = 0
-            end
-            -- XXX - move leaf up if child.occupied == 1
-            return true
-         else
-            -- Not found.
-            return nil
-         end
-      end
+      assert(self:node_leaf(node, index))
+      -- Occupied by leaf, replace with node and insert
+      -- both existing and new leaves into new node.
+      local l = node.children[index]
+      local n = self:alloc_node()
+      self:node(n).parent = r
+      node.children[index] = n
+      self:node_leaf(node, index, false)
+      d, s, h = self:next_hash_parameters(d, s, h)
+      self:insert_leaf(l, n, d, s, nil)
+      self:insert_leaf(o, n, d, s, h)
    else
-      -- Not present!
-      return nil
+      -- Not occupied, insert leaf.
+      self:node_occupied(node, index, true)
+      self:node_leaf(node, index, true)
+      node.children[index] = o
+   end      
+end
+
+-- NB: does not handle non-existing keys!
+function List:remove_child (k, r, d, s, h)
+   local node = self:node(r)
+   local index = self:node_index(node, d, h)
+   assert(self:node_occupied(node, index))
+   assert(self:node_leaf(node, index))
+   -- Remove
+   self:node_occupied(node, index, false)
+   self:node_leaf(node, index, false)
+   node.children[index] = 0
+   self:remove_obsolete_nodes(k, r, d, s, h)
+end
+
+function List:remove_obsolete_nodes (k, r, d, s, h)
+   if r == self.root then
+      -- Node is the root, and never obsolete.
+      return
+   end
+   local node = self:node(r)
+   local d, s, h = self:prev_hash_parameters(d, s, h)
+   h = h or self:entry_hash(k, s)
+   local parent = self:node(node.parent)
+   local parent_index = self:node_index(parent, d, h)
+   if node.occupied == 0 then
+      -- Node is now empty, remove from parent.
+      error("unreachable")
+      parent.children[parent_index] = 0
+      self:node_occupied(parent, parent_index, false)
+      self:free_node(r)
+      return self:remove_obsolete_nodes(k, node.parent, d, s, h)
+   elseif band(node.occupied, node.occupied-1) == 0 then
+      -- Node has only one child, move it to parent.
+      local index = 0
+      while not self:node_occupied(node, index) do
+         index = index + 1
+      end
+      parent.children[parent_index] = node.children[index]
+      if self:node_leaf(node, index) then
+         self:node_leaf(parent, parent_index, true)
+      else
+         self:node(node.children[index]).parent = node.parent
+      end
+      self:free_node(r)
+      return self:remove_obsolete_nodes(k, node.parent, d, s, h)
    end
 end
 
@@ -626,15 +646,17 @@ function List:leaf_entry (o)
 end
 
 function List:add_entry (e, update, members)
-   local o = self:find_leaf(e)
-   if o and self:entry_keys_equal(e, o) then
-      if not update then
+   local n, d, s, h = self:find_node(e)
+   local o = self:find_leaf(e, n, d, s, h)
+   if o then
+      if update then
+         self:update_leaf(o, members or e)
+      else
          error("Attempting to add duplicate entry to list")
       end
-      self:update_leaf(o, members or e)
    else
       local o = self:new_leaf(e, members)
-      self:insert_leaf(o)
+      self:insert_leaf(o, n, d, s, h)
       self:append_leaf(o)
    end
 end
@@ -644,16 +666,17 @@ function List:add_or_update_entry (e, members)
 end
 
 function List:find_entry (k)
-   local o = self:find_leaf(k)
-   if o and self:entry_keys_equal(k, o) then
+   local o = self:find_leaf(k, self:find_node(k))
+   if o then
       return self:leaf_entry(o)
    end
 end
 
 function List:remove_entry (k)
-   local o = self:find_leaf(k)
-   if o and self:entry_keys_equal(k, o) then
-      self:remove_leaf(o)
+   local n, d, s, h = self:find_node(k)
+   local o = self:find_leaf(k, n, d, s, h)
+   if o then
+      self:remove_child(k, n, d, s, h)
       self:unlink_leaf(o)
       self:destroy_leaf(o)
       return true
@@ -745,6 +768,7 @@ function selftest_list ()
    assert(e2.id == 4895842651ULL)
    assert(lc:remove_entry {id=0ULL})
    assert(lc:remove_entry {id=4895842651ULL})
+   assert(lc.length == 0)
    assert(root.occupied == 0)
 end
 
