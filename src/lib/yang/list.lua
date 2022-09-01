@@ -303,8 +303,8 @@ function List:build_leaf_type (keys_ts, members_ts)
       :format(self.list_ts, keys_ts, members_ts)
 end
 
-local function ptrcast (t, ptr)
-   return ffi.cast(ffi.typeof('$*', t), ptr)
+function List:heap_cast (t, o)
+   return ffi.cast(ffi.typeof('$*', t), self.heap:ptr(o))
 end
 
 function List:alloc_node ()
@@ -317,7 +317,7 @@ function List:free_node (o)
 end
 
 function List:node (o)
-   return ptrcast(self.node_t, self.heap:ptr(o))
+   return self:heap_cast(self.node_t, o)
 end
 
 function List:alloc_leaf ()
@@ -330,27 +330,28 @@ function List:free_leaf (o)
 end
 
 function List:leaf (o)
-   return ptrcast(self.leaf_t, self.heap:ptr(o))
+   return self:heap_cast(self.leaf_t, o)
 end
 
 function List:alloc_str (s)
    local o = self.heap:allocate(ffi.sizeof(self.string_t)+#s-1)
-   local str = ptrcast(self.string_t, self.heap:ptr(o))
+   local str = self:str(o)
    ffi.copy(str.str, s, #s)
    str.len = #s
    return o
 end
 
 function List:free_str (o)
-   local str = ptrcast(self.string_t, self.heap:ptr(o))
+   local str = self:str(o)
    self.heap:free(o, ffi.sizeof(self.string_t)+str.len-1)
 end
 
 function List:str (o)
-   return ptrcast(self.string_t, self.heap:ptr(o))
+   return self:heap_cast(self.string_t, o)
 end
 
-function List:tostring(str)
+function List:tostring(o)
+   local str = self:str(o)
    return ffi.string(str.str, str.len)
 end
 
@@ -376,7 +377,7 @@ function List:totable (t, s, fields)
    for _, spec in ipairs(fields) do
       local name, type = unpack(spec)
       if type == 'string' then
-         t[name] = self:tostring(self:str(s[name]))
+         t[name] = self:tostring(s[name])
       end
    end
 end
