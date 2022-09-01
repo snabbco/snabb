@@ -64,10 +64,9 @@ function Heap:_ref (o, bytes, c)
    while bytes > 0 do
       local ref = rshift(offset, _line_pow)
       b.ref[ref] = b.ref[ref] + c
-      local lbytes = Heap.line_size-pad(Heap.line_size, offset)
-      local rbytes = math.min(bytes, lbytes)
-      offset = offset + rbytes
-      bytes = bytes - rbytes
+      local next_offset = lshift(ref+1, _line_pow)
+      bytes = bytes - (next_offset - offset)
+      offset = next_offset
    end
 end
 
@@ -184,6 +183,46 @@ local function selftest_heap ()
    assert(h._recycle == Heap.line_size/2)
    local o3 = h:allocate(Heap.line_size)
    assert(h._recycle == h._maxrecycle)
+
+   -- Stress
+   local h = Heap:new()
+   local obj = {}
+   math.randomseed(0)
+   local function alloc_obj ()
+      local size = math.random(10*Heap.line_size)
+      local s = ffi.new("char[?]", size)
+      for i=0, size-1 do
+         s[i] = math.random(127)
+      end
+      local o = h:allocate(size)
+      assert(not obj[o])
+      ffi.copy(h:ptr(o), s, size)
+      obj[o] = s
+      return o
+   end
+   local function free_obj ()
+      for o, s in pairs(obj) do
+         if math.random(10) == 1 then
+            h:free(o, ffi.sizeof(s))
+            obj[o] = nil
+         end
+      end
+   end
+   local function check_obj ()
+      for o, s in pairs(obj) do
+         if C.memcmp(h:ptr(o), s, ffi.sizeof(s)) ~= 0 then
+            return o
+         end
+      end
+   end
+   for i=1, 100000 do
+      local o = alloc_obj()
+      local err = check_obj()
+      if err then
+         error("error after allocation "..i.." ("..o..") in object "..err)
+      end
+      free_obj()
+   end
 end
 
 
