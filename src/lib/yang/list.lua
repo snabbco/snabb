@@ -454,13 +454,18 @@ function List:destroy_leaf (o)
    self:free_leaf(o)
 end
 
+local node_index_mask = List.node_entries - 1
+function List:node_index (node, d, h)
+   return band(node_index_mask, rshift(h, d))
+end
+
 function List:node_occupied (node, index, newval)
    if newval == true then
       node.occupied = bor(node.occupied, lshift(1, index))
    elseif newval == false then
       node.occupied = band(node.occupied, bnot(lshift(1, index)))
    end
-   return band(1, rshift(node.occupied, index)) == 1
+   return band(node.occupied, lshift(1, index)) > 0
 end
 
 function List:node_leaf (node, index, newval)
@@ -469,7 +474,7 @@ function List:node_leaf (node, index, newval)
    elseif newval == false then
       node.leaf = band(node.leaf, bnot(lshift(1, index)))
    end
-   return band(1, rshift(node.leaf, index)) == 1
+   return band(node.leaf, lshift(1, index)) > 0
 end
 
 function List:next_hash_parameters (d, s, h)
@@ -502,7 +507,7 @@ function List:insert_leaf (o, r, d, s, h)
    s = s or 0
    h = h or self:leaf_hash(self:leaf(o).keys, s)
    local node = self:node(r)
-   local index = band(self.node_entries-1, rshift(h, d))
+   local index = self:node_index(node, d, h)
    if self:node_occupied(node, index) then
       -- Child slot occupied, advance hash parameters
       d, s, h = self:next_hash_parameters(d, s, h)
@@ -534,7 +539,7 @@ function List:find_leaf (k, r, d, s, h)
    s = s or 0
    h = h or self:entry_hash(k, s)
    local node = self:node(r)
-   local index = band(self.node_entries-1, rshift(h, d))
+   local index = self:node_index(node, d, h)
    if self:node_occupied(node, index) then
       if self:node_leaf(node, index) then
          -- Found!
@@ -557,7 +562,7 @@ function List:remove_leaf (o, r, d, s, h)
    s = s or 0
    h = h or self:leaf_hash(self:leaf(o).keys, s)
    local node = self:node(r)
-   local index = band(self.node_entries-1, rshift(h, d))
+   local index = self:node_index(node, d, h)
    if self:node_occupied(node, index) then
       if self:node_leaf(node, index) then
          -- Remove
