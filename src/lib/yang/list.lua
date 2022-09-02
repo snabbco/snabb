@@ -798,7 +798,25 @@ function ListMeta:__len ()
 end
 
 function ListMeta:__index (k)
-   return self.list:find_entry(k)
+   if type(k) == 'table' then
+      return self.list:find_entry(k)
+   else
+      -- Fall back to ListMeta or List instance members
+      return ListMeta[k] or self.list[k]
+   end
+end
+
+function ListMeta:inherit_method (name, method)
+   ListMeta[name] = function (self, ...)
+      return method(self.list, ...)
+   end
+end
+
+-- Inherit List methods into ListMeta
+for name, method in pairs(List) do
+   if type(method) == 'function' then
+      ListMeta:inherit_method(name, method)
+   end
 end
 
 function ListMeta:__newindex (k, members)
@@ -815,11 +833,6 @@ end
 
 ListMeta.__pairs = ListMeta.__ipairs
 
-function ListMeta:__call (method, ...)
-   local f = assert(self.list[method], "No such method: "..method)
-   return f(self.list, ...)
-end
-
 local function selftest_listmeta ()
    local l1 = new(
       {{'id', 'uint32'}, {'name', 'string'}},
@@ -827,7 +840,12 @@ local function selftest_listmeta ()
    )
    l1[{id=0, name='foo'}] = {value=1.5, description="yepyep"}
    l1[{id=1, name='bar'}] = {value=3.14, description="PI"}
+   local ok, err = pcall (function()
+      l1:add_entry {id=0, name='foo', value=0, description="should fail"}
+   end)
+   assert(not ok and err:match("Attempting to add duplicate entry to list"))
    assert(#l1 == 2)
+   assert(#l1 == l1.length)
    assert(l1[{id=0, name='foo'}].value == 1.5)
    for i, entry in ipairs(l1) do
       if i == 1 then
@@ -840,37 +858,37 @@ local function selftest_listmeta ()
    end
    l1[{id=0, name='foo'}] = nil
    assert(l1[{id=0, name='foo'}] == nil)
-   assert(l1('find_entry', {id=1, name='bar'}).value == 3.14)
+   assert(l1:find_entry({id=1, name='bar'}).value == 3.14)
 end
 
 function selftest_ip ()
    local yang_util = require("lib.yang.util")
-   local l = List:new(
+   local l = new(
       {{'ip', 'string'}, {'port', 'uint16'}},
       {}
    )
    math.randomseed(0)
    for i=1, 1e5 do
-      l:add_entry{
+      l:add_entry {
          ip = yang_util.ipv4_ntop(math.random(0xffffffff)),
-         port = i
+         port = bit.band(0xffff, i)
       }
    end
-   print("added "..l.length.." entries")
-   local middle = math.floor(l.length/2)
+   print("added "..#l.." entries")
+   local middle = math.floor(#l/2)
    local entry
-   for i, e in l:ipairs() do
+   for i, e in ipairs(l) do
       if i == middle then
          entry = e
          print("Iterated to entry #"..middle)
-         assert(e.ip == l:find_entry(e).ip)
+         assert(e.ip == l[e].ip)
          print("Looked up middle entry with ip="..e.ip)
          break
       end
    end
-   l:remove_entry(entry)
+   l[entry] = nil
    print("Removed middle entry")
-   assert(not l:find_entry(entry))
+   assert(not l[entry])
    print("Asserted entry is no longer present")
 end
 
