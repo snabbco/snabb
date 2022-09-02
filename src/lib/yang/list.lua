@@ -289,10 +289,10 @@ end
 
 function List:build_type (fields)
    local t = "struct { "
-   for _, spec in ipairs(fields) do
+   for name, spec in pairs(fields) do
       t = t..("%s %s; "):format(
-         assert(self.type_map[spec[2]], "NYI: "..spec[2]),
-         spec[1]
+         assert(self.type_map[spec.type], "NYI: "..spec.type),
+         name
       )
    end
    t = t.."} __attribute__((packed))"
@@ -365,9 +365,8 @@ function List:str_equal_string (o, s)
 end
 
 function List:copy_scalar (dst, src, fields)
-   for _, spec in ipairs(fields) do
-      local name, type = unpack(spec)
-      if type ~= 'string' then
+   for name, spec in pairs(fields) do
+      if spec.type ~= 'string' then
          dst[name] = assert(src[name], "Missing member: "..name)
       end
    end
@@ -375,9 +374,8 @@ end
 
 function List:totable (t, s, fields)
    self:copy_scalar(t, s, fields)
-   for _, spec in ipairs(fields) do
-      local name, type = unpack(spec)
-      if type == 'string' then
+   for name, spec in pairs(fields) do
+      if spec.type == 'string' then
          t[name] = self:tostring(s[name])
       end
    end
@@ -385,9 +383,8 @@ end
 
 function List:tostruct (s, t, fields)
    self:copy_scalar(s, t, fields)
-   for _, spec in ipairs(fields) do
-      local name, type = unpack(spec)
-      if type == 'string' then
+   for name, spec in pairs(fields) do
+      if spec.type == 'string' then
          assert(t[name], "Missing member: "..name)
          s[name] = self:alloc_str(t[name])
       end
@@ -395,9 +392,8 @@ function List:tostruct (s, t, fields)
 end
 
 function List:free_struct_str (s, fields)
-   for _, spec in ipairs(fields) do
-      local name, type = unpack(spec)
-      if type == 'string' then
+   for name, spec in pairs(fields) do
+      if spec.type == 'string' then
          self:free_str(s[name])
       end
    end
@@ -410,9 +406,8 @@ end
 
 function List:entry_hash (e, seed)
    self:copy_scalar(self.hashin, e, self.keys)
-   for _, spec in ipairs(self.keys) do
-      local name, type = unpack(spec)
-      if type == 'string' then
+   for name, spec in pairs(self.keys) do
+      if spec.type == 'string' then
          self.hashin[name] = hash32(e[name], #e[name], seed)
       end
    end
@@ -422,9 +417,8 @@ end
 -- Same as entry hash but for keys_t
 function List:leaf_hash (keys, seed)
    self:copy_scalar(self.hashin, keys, self.keys)
-   for _, spec in ipairs(self.keys) do
-      local name, type = unpack(spec)
-      if type == 'string' then
+   for name, spec in pairs(self.keys) do
+      if spec.type == 'string' then
          local str = self:str(keys[name])
          self.hashin[name] = hash32(str.str, str.len, seed)
       end
@@ -496,9 +490,8 @@ end
 
 function List:entry_keys_equal (e, o)
    local keys = self:leaf(o).keys
-   for _, spec in ipairs(self.keys) do
-      local name, type = unpack(spec)
-      if type == 'string' then
+   for name, spec in pairs(self.keys) do
+      if spec.type == 'string' then
          if not self:str_equal_string(keys[name], e[name]) then
             return false
          end
@@ -714,8 +707,8 @@ end
 
 function selftest_list ()
    local l = List:new(
-      {{'id', 'uint32'}, {'name', 'string'}},
-      {{'value', 'decimal64'}, {'description', 'string'}}
+      {id={type='uint32'}, name={type='string'}},
+      {value={type='decimal64'}, description={type='string'}}
    )
    -- print("leaf_t", ffi.sizeof(l.leaf_t))
    -- print("node_t", ffi.sizeof(l.node_t))
@@ -724,7 +717,7 @@ function selftest_list ()
       value=3.14, description="PI"
    }
    local root = l:node(l.root)
-   assert(root.occupied == lshift(1, 14))
+   assert(root.occupied == lshift(1, 8))
    assert(root.occupied == root.leaf)
    -- print(l.root, root.occupied, root.leaf, root.children[14])
    local e1 = l:find_entry {id=42, name="foobar"}
@@ -765,7 +758,7 @@ function selftest_list ()
    assert(e_updated.description == "one")
    
    -- Test collisions
-   local lc = List:new({{'id', 'uint64'}}, {})
+   local lc = List:new({id={type='uint64'}}, {})
    -- print("leaf_t", ffi.sizeof(lc.leaf_t))
    -- print("node_t", ffi.sizeof(lc.node_t))
    lc:add_entry {id=0ULL}
@@ -835,8 +828,8 @@ ListMeta.__pairs = ListMeta.__ipairs
 
 local function selftest_listmeta ()
    local l1 = new(
-      {{'id', 'uint32'}, {'name', 'string'}},
-      {{'value', 'decimal64'}, {'description', 'string'}}   
+      {id={type='uint32'}, name={type='string'}},
+      {value={type='decimal64'}, description={type='string'}}
    )
    l1[{id=0, name='foo'}] = {value=1.5, description="yepyep"}
    l1[{id=1, name='bar'}] = {value=3.14, description="PI"}
@@ -864,7 +857,7 @@ end
 function selftest_ip ()
    local yang_util = require("lib.yang.util")
    local l = new(
-      {{'ip', 'string'}, {'port', 'uint16'}},
+      {ip={type='string'}, port={type='uint16'}},
       {}
    )
    math.randomseed(0)
