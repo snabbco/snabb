@@ -580,6 +580,20 @@ function List:remove_child (k, r, d, s, h)
    self:remove_obsolete_nodes(k, r, d, s, h)
 end
 
+assert(ffi.abi("le"))
+local t = ffi.new("union { uint32_t u[2]; double d; }")
+local function msb_set (v)
+   -- https://graphics.stanford.edu/~seander/bithacks.html#IntegerLogIEEE64Float
+   -- "Finding integer log base 2 of an integer
+   -- (aka the position of the highest bit set)"
+   --
+   -- We use this function to find the only bit set. :-)
+   t.u[1] = 0x43300000
+   t.u[0] = v
+   t.d = t.d - 4503599627370496.0
+   return rshift(t.u[1], 20) - 0x3FF
+end
+
 function List:remove_obsolete_nodes (k, r, d, s, h)
    if r == self.root then
       -- Node is the root, and never obsolete.
@@ -593,16 +607,16 @@ function List:remove_obsolete_nodes (k, r, d, s, h)
    if node.occupied == 0 then
       -- Node is now empty, remove from parent.
       error("unreachable")
+      -- ^- This case never happens, because we only ever create
+      -- new nodes with at least two leaves (the new leaf, and
+      -- the displaced leaf).
       parent.children[parent_index] = 0
       self:node_occupied(parent, parent_index, false)
       self:free_node(r)
       return self:remove_obsolete_nodes(k, node.parent, d, s, h)
    elseif band(node.occupied, node.occupied-1) == 0 then
       -- Node has only one child, move it to parent.
-      local index = 0
-      while not self:node_occupied(node, index) do
-         index = index + 1
-      end
+      local index = msb_set(node.occupied)
       parent.children[parent_index] = node.children[index]
       if self:node_leaf(node, index) then
          self:node_leaf(parent, parent_index, true)
