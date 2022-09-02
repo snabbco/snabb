@@ -297,6 +297,7 @@ function setup_workers (config)
 
    if need_ctrl then
       workers["mlx_ctrl"] = ctrl_graph
+      worker_opts["mlx_ctrl"] = {acquire_cpu=false}
    end
 
    for name, graph in pairs(workers) do
