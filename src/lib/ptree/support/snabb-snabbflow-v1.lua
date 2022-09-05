@@ -83,7 +83,7 @@ local function collect_ipfix_states (pid, rss_links)
             template_packets_transmitted = counter.read(stats.template_packets),
             sequence_number = counter.read(stats.sequence_number)
          }
-         state.template = collect_template_states(pid, app, exporter..instance)
+         state.template = collect_template_states(pid, app, exporter.."_"..instance)
          rss_links[find_rss_link(pid, app)] = state.observation_domain
          states[exporter] = state
       end
