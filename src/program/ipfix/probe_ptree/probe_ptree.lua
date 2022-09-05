@@ -30,7 +30,18 @@ function start (name, confpath)
       initial_configuration = conf,
       schema_name = probe_schema,
       cpuset = probe_cpuset,
-      name = name
+      name = name,
+      worker_default_scheduling = {
+         busywait = false,
+         jit_opt = {
+            sizemcode=256,
+            maxmcode=8192,
+            maxtrace=8000,
+            maxrecord=50000,
+            maxsnap=20000,
+            maxside=10000
+         }
+      },
    }
 end
 
