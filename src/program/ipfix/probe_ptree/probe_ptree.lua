@@ -222,9 +222,9 @@ function setup_workers (config)
             local iconfig = lib.deepcopy(config)
 
             -- This is used to disambiguate multiple instances of the
-            -- ipfix app (possible using multiple instances of the same
+            -- ipfix app (possibly using multiple instances of the same
             -- template) within a single worker.
-            iconfig.instance = name
+            iconfig.instance = name.."_"..i
 
             local rss_link
             local class = flow_director.class[name]
@@ -297,8 +297,9 @@ function setup_workers (config)
             continue = class.continue
          })
       end
-      workers["rss"..rss_group] =
-         probe.configure_rss_graph(rss_config, inputs, outputs, ipfix.log_date)
+      workers["rss"..rss_group] = probe.configure_rss_graph(
+         rss_config, inputs, outputs, ipfix.log_date, rss_group
+      )
    end
 
    -- Create a trivial app graph that only contains the control apps

@@ -524,10 +524,16 @@ module snabb-snabbflow-v1 {
     }
 
     list rss-group {
-      key pid;
+      key id;
       description
         "Statistics for the RSS group workers defined in
         /snabbflow-config/rss/hardware-scaling.";
+
+      leaf id {
+        type numeric-id;
+        description
+          "RSS group identifier.";
+      }
 
       uses worker-state;
 
@@ -544,9 +550,15 @@ module snabb-snabbflow-v1 {
         }
 
         list instance {
-          key pid;
+          key id;
           description
             "Statistics for exporter instance workers for this RSS group.";
+
+          leaf id {
+            type numeric-id;
+            description
+              "Exporter instance identifier (within this RSS group).";
+          }
 
           uses worker-state;
           uses exporter-state;

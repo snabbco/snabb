@@ -369,9 +369,11 @@ function run_rss(config, inputs, outputs, duration, busywait, cpu, jit, log_date
    clear_jit_options(jit)
 end
 
-function configure_rss_graph (config, inputs, outputs, log_date)
+function configure_rss_graph (config, inputs, outputs, log_date, rss_group)
    local graph = app_graph.new()
-   app_graph.app(graph, "rss", rss.rss, config)
+
+   local rss_name = "rss"..(rss_group or '')
+   app_graph.app(graph, rss_name, rss.rss, config)
 
    -- An input describes a physical interface
    local tags, in_app_specs = {}, {}
@@ -393,7 +395,7 @@ function configure_rss_graph (config, inputs, outputs, log_date)
          link_name = "vlan"..tag
       end
       app_graph.link(graph, input_name.."."..in_link.output
-                        .." -> rss."..link_name)
+                        .." -> "..rss_name.."."..link_name)
    end
 
    -- An output describes either an interlink or a complete ipfix app
@@ -402,7 +404,7 @@ function configure_rss_graph (config, inputs, outputs, log_date)
          -- Keys
          --   link_name  name of the link
          app_graph.app(graph, output.link_name, Transmitter)
-         app_graph.link(graph, "rss."..output.link_name.." -> "
+         app_graph.link(graph, rss_name.."."..output.link_name.." -> "
                            ..output.link_name..".input")
       else
          -- Keys
@@ -411,7 +413,7 @@ function configure_rss_graph (config, inputs, outputs, log_date)
          --   instance   # of embedded instance
          output.args.instance = output.instance or output.args.instance
          local graph = configure_graph(output.args, graph)
-         app_graph.link(graph, "rss."..output.link_name
+         app_graph.link(graph, rss_name.."."..output.link_name
                            .." -> ipfix_"..output.args.instance..".input")
       end
    end
