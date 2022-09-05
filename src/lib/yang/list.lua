@@ -289,6 +289,7 @@ end
 
 function List:build_type (fields)
    local t = "struct { "
+   -- XXX - sort fields by power of 2 alignment, then name
    for name, spec in pairs(fields) do
       t = t..("%s %s; "):format(
          assert(self.type_map[spec.type], "NYI: "..spec.type),
