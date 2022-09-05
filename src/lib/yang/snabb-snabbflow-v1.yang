@@ -30,7 +30,7 @@ module snabb-snabbflow-v1 {
         "Interaces serving as IPFIX Observation Points.";
 
       leaf device {
-        type string;
+        type pci-address;
         description
           "PCI address of the network device.";
       }
@@ -536,6 +536,24 @@ module snabb-snabbflow-v1 {
       }
 
       uses worker-state;
+
+      list queue {
+        key device;
+        description
+          "Statistics for the receive queues used by this RSS group.";
+
+        leaf device {
+          type pci-address;
+          description
+            "PCI address of the network device.";
+        }
+
+        leaf packets-dropped {
+          type yang:zero-based-counter64;
+          description
+            "Count of incoming packets that were dropped.";
+        }
+      }
 
       list exporter {
         key name;

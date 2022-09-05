@@ -10,10 +10,21 @@ local function collect_pci_states (pid)
    local states = {}
    for _, device in ipairs(shm.children("/"..pid.."/pci")) do
       local stats = shm.open_frame("/"..pid.."/pci/"..device)
+      local queue_stats = {}
+      for name, c in pairs(stats) do
+         local queue = name:match("^rxdrop_(%d+)$") -- Connect-X
+                    or name:match("^q(%d+)_rxdrops$") -- Intel_mp
+         if queue then
+            queue_stats[tonumber(queue)] = {
+               packets_dropped = counter.read(c)
+            }
+         end
+      end
       table.insert(states, {
          device = device,
          packets_received = counter.read(stats.rxpackets),
-         packets_dropped = counter.read(stats.rxdrop)
+         packets_dropped = counter.read(stats.rxdrop),
+         queue = queue_stats
       })
    end
    return states
@@ -109,6 +120,13 @@ function collect_rss_states (pid, rss_links)
    return states
 end
 
+function collect_queue_state (interfaces, rxq)
+   local queue_state = {}
+   for device, interface in pairs(interfaces) do
+      queue_state[device] = interface.queue[rxq]
+   end
+   return queue_state
+end
 
 local function compute_pid_reader ()
    return function (pid) return pid end
@@ -184,6 +202,7 @@ local function process_states (pids)
             state.rss_group[rss_state.id] = {
                id = rss_state.id,
                pid = rss_state.pid,
+               queue = collect_queue_state(state.interface, rss_state.id-1),
                exporter = {}
             }
          end
