@@ -644,6 +644,7 @@ function ConnectX:new (conf)
          free_cxq(cxq)
          shm.unlink(shmpath)
       end
+      shm.delete_frame(self.stats)
    end
 
    function self:pull ()
@@ -1459,7 +1460,10 @@ function IO:new (conf)
 
    -- Detach from the NIC.
    function self:stop ()
-      close()
+      if cxq then
+         assert(sync.cas(cxq.state, IDLE, FREE))
+         close()
+      end
    end
 
    -- Configure self as packetblaster?
