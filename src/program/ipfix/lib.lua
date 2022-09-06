@@ -30,6 +30,10 @@ local function parse_spec (spec, delimiter)
    return t
 end
 
+local function normalize_pci_name (device)
+   return pci.qualified(device):gsub("[:%.]", "_")
+end
+
 function in_apps.pcap (path)
    return { input = "input",
             output = "output" },
@@ -237,7 +241,7 @@ function configure_graph (arg, in_graph)
       local pciaddr = unpack(parse_spec(config.input, '/'))
       app_graph.app(graph, "nic_ifmib", iftable.MIB, {
          target_app = "in", stats = 'stats',
-         ifname = (pciaddr:gsub("[:%.]", "_")),
+         ifname = normalize_pci_name(pciaddr),
          log_date = config.log_date
       })
    end
@@ -378,17 +382,16 @@ function configure_rss_graph (config, inputs, outputs, log_date, rss_group)
    -- An input describes a physical interface
    local tags, in_app_specs = {}, {}
    for n, input in ipairs(inputs) do
-      local suffix = #inputs > 1 and n or ''
-      local input_name = "input"..suffix
+      local pci_name = normalize_pci_name(input.device)
+      local input_name = "input_"..pci_name
       local in_link, in_app = in_apps.pci(input)
       table.insert(in_app_specs,
                    { pciaddr = input.device,
                      name = input_name,
-                     ifname = input.name or
-                        (input.device:gsub("[:%.]", "_")),
+                     ifname = input.name or pci_name,
                      ifalias = input.description })
       app_graph.app(graph, input_name, unpack(in_app))
-      local link_name = "input"..suffix
+      local link_name = pci_name
       if input.tag then
          local tag = input.tag
          assert(not(tags[tag]), "Tag not unique: "..tag)
@@ -441,12 +444,13 @@ function configure_mlx_ctrl_graph (mellanox, log_date)
          queues = spec.queues,
          recvq_size = spec.recvq_size
       }
+      local pci_name = normalize_pci_name(device)
       local driver = pci.device_info(device).driver
-      app_graph.app(ctrl_graph, "ctrl_"..device,
+      app_graph.app(ctrl_graph, "ctrl_"..pci_name,
                     require(driver).ConnectX, conf)
-      app_graph.app(ctrl_graph, "nic_ifmib_"..device, iftable.MIB, {
-         target_app = "ctrl_"..device, stats = 'stats',
-         ifname = spec.ifName or (device:gsub("[:%.]", "_")),
+      app_graph.app(ctrl_graph, "nic_ifmib_"..pci_name, iftable.MIB, {
+         target_app = "ctrl_"..pci_name, stats = 'stats',
+         ifname = spec.ifName or pci_name,
          ifalias = spec.ifAlias,
          log_date = log_date
       })
