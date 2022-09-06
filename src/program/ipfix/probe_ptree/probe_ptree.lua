@@ -162,9 +162,23 @@ function setup_workers (config)
 
    update_cpuset(rss.cpu_pool)
 
+   local function ensure_device_unique (device, interfaces)
+      for other in pairs(interfaces) do
+         if device ~= other then
+            if pci.qualified(device) == pci.qualified(other) then
+               error("Duplicate interfaces: "..device..", "..other..
+                     "\nNot applying configuration. Remove one of them via"..
+                     ("\n  snabb config remove <snabbflow> /snabbflow-config/interface[device=%q]")
+                        :format(other))
+            end
+         end
+      end
+   end
+
    for rss_group = 1, rss.hardware_scaling.rss_groups do
       local inputs, outputs = {}, {}
       for device, opt in pairs(interfaces) do
+         ensure_device_unique(device, interfaces)
          local input = lib.deepcopy(opt)
          input.device = device
          input.rxq = rss_group - 1
