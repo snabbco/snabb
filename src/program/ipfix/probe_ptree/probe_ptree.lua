@@ -326,15 +326,17 @@ function setup_workers (config)
       worker_opts["mlx_ctrl"] = {acquire_cpu=false}
    end
 
-   for name, graph in pairs(workers) do
-      print("worker", name)
-      print("", "apps:")
-      for name, _ in pairs(graph.apps) do
-         print("", "", name)
-      end
-      print("", "links:")
-      for spec in pairs(graph.links) do
-         print("", "", spec)
+   if false then -- enable to debug
+      for name, graph in pairs(workers) do
+         print("worker", name)
+         print("", "apps:")
+         for name, _ in pairs(graph.apps) do
+            print("", "", name)
+         end
+         print("", "links:")
+         for spec in pairs(graph.links) do
+            print("", "", spec)
+         end
       end
    end
 
