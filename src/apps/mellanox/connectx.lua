@@ -1461,7 +1461,9 @@ function IO:new (conf)
    -- Detach from the NIC.
    function self:stop ()
       if cxq then
-         assert(sync.cas(cxq.state, IDLE, FREE))
+         if not sync.cas(cxq.state, IDLE, FREE) then
+            assert(cxq.state[0] == DEAD, "illegal state detected")
+         end
          close()
       end
    end
