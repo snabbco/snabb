@@ -232,14 +232,52 @@ local List = {
    node_children = 16
 }
 
+-- YANG built-in types:
+--        +---------------------+-------------------------------------+
+--        | Name                | Description                         |
+--        +---------------------+-------------------------------------+
+--        | binary              | Any binary data                     |
+--        | bits                | A set of bits or flags              |
+--        | boolean             | "true" or "false"                   |
+--        | decimal64           | 64-bit signed decimal number        |
+--        | empty               | A leaf that does not have any value |
+--        | enumeration         | One of an enumerated set of strings |
+--        | identityref         | A reference to an abstract identity |
+--        | instance-identifier | A reference to a data tree node     |
+--        | int8                | 8-bit signed integer                |
+--        | int16               | 16-bit signed integer               |
+--        | int32               | 32-bit signed integer               |
+--        | int64               | 64-bit signed integer               |
+--        | leafref             | A reference to a leaf instance      |
+--        | string              | A character string                  |
+--        | uint8               | 8-bit unsigned integer              |
+--        | uint16              | 16-bit unsigned integer             |
+--        | uint32              | 32-bit unsigned integer             |
+--        | uint64              | 64-bit unsigned integer             |
+--        | union               | Choice of member types              |
+--        +---------------------+-------------------------------------+
+
 List.type_map = {
-   decimal64 = 'double',
-   boolean = 'bool',
-   uint16 = 'uint16_t',
-   uint32 = 'uint32_t',
-   uint64 = 'uint64_t',
-   string = 'uint32_t'
+   -- binary = {ctype='uint32_t', kind='bytes'},
+   -- bits = {ctype='uint64_t', kind='scalar'}, -- no more than 64 flags
+   boolean = {ctype='bool', kind='scalar'},
+   decimal64 = {ctype='double', kind='scalar'},
+   -- enumeration = {ctype='uint32_t', kind='scalar'}, -- ??
+   -- empty = {ctype=nil, kind='empty'}, -- no representation
+   int8 = {ctype='int8_t', kind='scalar'},
+   int16 = {ctype='int16_t', kind='scalar'},
+   int32 = {ctype='int32_t', kind='scalar'},
+   int64 = {ctype='int64_t', kind='scalar'},
+   string = {ctype='uint32_t', kind='string'}, -- pointer into heap
+   uint8 = {ctype='uint8_t', kind='scalar'},
+   uint16 = {ctype='uint16_t', kind='scalar'},
+   uint32 = {ctype='uint32_t', kind='scalar'},
+   uint64 = {ctype='uint64_t', kind='scalar'},
 }
+
+function List:type_info (type)
+   return assert(self.type_map[type], "Unsupported type: "..type)
+end
 
 List.type_cache = {}
 
@@ -271,9 +309,19 @@ List.string_t = List:cached_type [[
    } __attribute__((packed))
 ]]
 
+List.optional_ts = [[
+   struct {
+      %s value;
+      bool present;
+   } __attribute__((packed))
+]]
+
 function List:new (keys, members)
    local self = setmetatable({}, {__index=List})
-   local keys_ts = self:build_type(keys)
+   for name, spec in pairs(keys) do
+      assert(not spec.optional, "Keys can not be optional: "..name)
+   end
+   local keys_ts = self:build_type(keys, true)
    local members_ts = self:build_type(members)
    self.keys = keys
    self.members = members
@@ -291,10 +339,13 @@ function List:build_type (fields)
    local t = "struct { "
    -- XXX - sort fields by power of 2 alignment, then name
    for name, spec in pairs(fields) do
-      t = t..("%s %s; "):format(
-         assert(self.type_map[spec.type], "NYI: "..spec.type),
-         name
-      )
+      local ct = self:type_info(spec.type).ctype
+      if ct then
+         if spec.optional then
+            ct = self.optional_ts:format(ct)
+         end
+         t = t..("%s %s; "):format(ct, name)
+      end
    end
    t = t.."} __attribute__((packed))"
    return t
@@ -365,38 +416,128 @@ function List:str_equal_string (o, s)
    return C.memcmp(str.str, s, str.len) == 0
 end
 
-function List:copy_scalar (dst, src, fields)
-   for name, spec in pairs(fields) do
-      if spec.type ~= 'string' then
-         dst[name] = assert(src[name], "Missing member: "..name)
-      end
+function List:pack_mandatory (dst, name, type_info, value)
+   assert(value ~= nil, "Missing value: "..name)
+   if type_info.kind == 'scalar' then
+      dst[name] = value
+   elseif type_info.kind == 'string' then
+      dst[name] = self:alloc_str(value)
+   else
+      error("NYI: kind "..type_info.kind)
    end
 end
 
-function List:totable (t, s, fields)
-   self:copy_scalar(t, s, fields)
-   for name, spec in pairs(fields) do
-      if spec.type == 'string' then
-         t[name] = self:tostring(s[name])
-      end
+function List:unpack_mandatory (dst, name, type_info, value)
+   if type_info.kind == 'scalar' then
+      dst[name] = value
+   elseif type_info.kind == 'string' then
+      dst[name] = self:tostring(value)
+   else
+      error("NYI: kind "..type_info.kind)
    end
 end
 
-function List:tostruct (s, t, fields)
-   self:copy_scalar(s, t, fields)
-   for name, spec in pairs(fields) do
-      if spec.type == 'string' then
-         assert(t[name], "Missing member: "..name)
-         s[name] = self:alloc_str(t[name])
-      end
+function List:free_mandatory (value, type_info)
+   if type_info.kind == 'scalar' then
+      -- nop
+   elseif type_info.kind == 'string' then
+      self:free_str(value)
+   else
+      error("NYI: kind "..type_info.kind)
    end
 end
 
-function List:free_struct_str (s, fields)
+function List:equal_mandatory (packed, unpacked, type_info)
+   if type_info.kind == 'scalar' then
+      return packed == unpacked
+   elseif type_info.kind == 'string' then
+      return self:str_equal_string(packed, unpacked)
+   else
+      error("NYI: kind "..type_info.kind)
+   end
+end
+
+function List:pack_optional (dst, name, type_info, value)
+   if value ~= nil then
+      self:pack_mandatory(dst[name], 'value', type_info, value)
+      dst[name].present = true
+   else
+      dst[name].value = 0
+      dst[name].present = false
+   end
+end
+
+function List:unpack_optional (dst, name, type_info, value)
+   if value.present then
+      self:unpack_mandatory(dst, name, type_info, value.value)
+   end
+end
+
+function List:free_optional (value, type_info)
+   if value.present then
+      self:free_mandatory(value.value, type_info)
+   end
+end
+
+function List:equal_optional (packed, unpacked, type_info)
+   if packed.present then
+      return self:equal_mandatory(packed.value, unpacked, type_info)
+   else
+      return unpacked == nil
+   end
+end
+
+function List:pack_field (dst, name, spec, value)
+   local type_info = self:type_info(spec.type)
+   if spec.optional then
+      self:pack_optional(dst, name, type_info, value)
+   else
+      self:pack_mandatory(dst, name, type_info, value)
+   end
+end
+
+function List:unpack_field (dst, name, spec, value)
+   local type_info = self:type_info(spec.type)
+   if spec.optional then
+      self:unpack_optional(dst, name, type_info, value)
+   else
+      self:unpack_mandatory(dst, name, type_info, value)
+   end
+end
+
+function List:free_field (value, spec)
+   local type_info = self:type_info(spec.type)
+   if spec.optional then
+      self:free_optional(value, type_info)
+   else
+      self:free_mandatory(value, type_info)
+   end
+end
+
+function List:equal_field (packed, unpacked, spec)
+   local type_info = self:type_info(spec.type)
+   if spec.optional then
+      return self:equal_optional(packed, unpacked, type_info)
+   else
+      return self:equal_mandatory(packed, unpacked, type_info)
+   end
+end
+
+function List:pack_fields (s, t, fields)
    for name, spec in pairs(fields) do
-      if spec.type == 'string' then
-         self:free_str(s[name])
-      end
+      self:pack_field(s, name, spec, t[name])
+   end
+end
+
+function List:unpack_fields (t, s, fields)
+   for name, spec in pairs(fields) do
+      self:unpack_field(t, name, spec, s[name])
+   end
+end
+
+function List:free_fields (s, fields)
+   for name, spec in pairs(fields) do
+      self:free_field(s[name], spec)
    end
 end
 
@@ -406,10 +547,14 @@ local function hash32 (ptr, len, seed)
 end
 
 function List:entry_hash (e, seed)
-   self:copy_scalar(self.hashin, e, self.keys)
    for name, spec in pairs(self.keys) do
-      if spec.type == 'string' then
+      local type_info = self:type_info(spec.type)
+      if type_info.kind == 'scalar' then
+         self:pack_field(self.hashin, name, spec, e[name])
+      elseif type_info.kind == 'string' then
          self.hashin[name] = hash32(e[name], #e[name], seed)
+      else
+         error("NYI: kind "..type_info.kind)
       end
    end
    return hash32(self.hashin, ffi.sizeof(self.keys_t), seed)
@@ -417,11 +562,15 @@ end
 
 -- Same as entry hash but for keys_t
 function List:leaf_hash (keys, seed)
-   self:copy_scalar(self.hashin, keys, self.keys)
    for name, spec in pairs(self.keys) do
-      if spec.type == 'string' then
+      local type_info = self:type_info(spec.type)
+      if type_info.kind == 'scalar' then
+         self:pack_field(self.hashin, name, spec, keys[name])
+      elseif type_info.kind == 'string' then
          local str = self:str(keys[name])
          self.hashin[name] = hash32(str.str, str.len, seed)
+      else
+         error("NYI: kind "..type_info.kind)
       end
    end
    return hash32(self.hashin, ffi.sizeof(self.keys_t), seed)
@@ -432,21 +581,21 @@ function List:new_leaf (e, members, prev, next)
    local leaf = self:leaf(o)
    leaf.list.prev = prev or 0 --  NB: obj=0 is root node, can not be a leaf!
    leaf.list.next = next or 0
-   self:tostruct(leaf.keys, e, self.keys)
-   self:tostruct(leaf.members, members or e, self.members)
+   self:pack_fields(leaf.keys, e, self.keys)
+   self:pack_fields(leaf.members, members or e, self.members)
    return o
 end
 
 function List:update_leaf (o, members)
    local leaf = self:leaf(o)
-   self:free_struct_str(leaf.members, self.members)
-   self:tostruct(leaf.members, members, self.members)
+   self:free_fields(leaf.members, self.members)
+   self:pack_fields(leaf.members, members, self.members)
 end
 
 function List:destroy_leaf (o)
    local leaf = self:leaf(o)
-   self:free_struct_str(leaf.keys, self.keys)
-   self:free_struct_str(leaf.members, self.members)
+   self:free_fields(leaf.keys, self.keys)
+   self:free_fields(leaf.members, self.members)
    self:free_leaf(o)
 end
 
@@ -492,11 +641,7 @@ end
 function List:entry_keys_equal (e, o)
    local keys = self:leaf(o).keys
    for name, spec in pairs(self.keys) do
-      if spec.type == 'string' then
-         if not self:str_equal_string(keys[name], e[name]) then
-            return false
-         end
-      elseif not (keys[name] == e[name]) then
+      if not self:equal_field(keys[name], e[name], spec) then
          return false
       end
    end
@@ -648,8 +793,8 @@ end
 function List:leaf_entry (o)
    local leaf = self:leaf(o)
    local ret = {}
-   self:totable(ret, leaf.keys, self.keys)
-   self:totable(ret, leaf.members, self.members)
+   self:unpack_fields(ret, leaf.keys, self.keys)
+   self:unpack_fields(ret, leaf.members, self.members)
    return ret
 end
 
@@ -778,6 +923,37 @@ function selftest_list ()
    assert(lc:remove_entry {id=4895842651ULL})
    assert(lc.length == 0)
    assert(root.occupied == 0)
+
+   -- Test optional
+   local l = List:new(
+      {id={type='string'}},
+      {value={type='decimal64', optional=true},
+       description={type='string', optional=true}}
+   )
+   l:add_entry{
+      id="foo",
+      value=3.14,
+      description="PI"
+   }
+   l:add_entry{
+      id="foo1",
+      value=42
+   }
+   l:add_entry{
+      id="foo2",
+      description="none"
+   }
+   l:add_entry{
+      id="foo3"
+   }
+   assert(l:find_entry{id="foo"}.value == 3.14)
+   assert(l:find_entry{id="foo"}.description == "PI")
+   assert(l:find_entry{id="foo1"}.value == 42)
+   assert(l:find_entry{id="foo1"}.description == nil)
+   assert(l:find_entry{id="foo2"}.value == nil)
+   assert(l:find_entry{id="foo2"}.description == "none")
+   assert(l:find_entry{id="foo3"}.value == nil)
+   assert(l:find_entry{id="foo3"}.description == nil)
 end
 
 
