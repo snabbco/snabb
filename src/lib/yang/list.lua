@@ -335,10 +335,30 @@ function List:new (keys, members)
    return self
 end
 
+function List:field_order (fields)
+   local order = {}
+   for name in pairs(fields) do
+      table.insert(order, name)
+   end
+   local function order_fields (x, y)
+      -- 1. mandatory fields (< name)
+      -- 2. optional fields (< name)
+      if not fields[x].optional and fields[y.optional] then
+         return true
+      elseif fields[x].optional and not fields[y.optional] then
+         return false
+      else
+         return x < y
+      end
+   end
+   table.sort(order, order_fields)
+   return order
+end
+
 function List:build_type (fields)
    local t = "struct { "
-   -- XXX - sort fields by power of 2 alignment, then name
-   for name, spec in pairs(fields) do
+   for _, name in ipairs(self:field_order(fields)) do
+      local spec = fields[name]
       local ct = self:type_info(spec.type).ctype
       if ct then
          if spec.optional then
@@ -863,7 +883,7 @@ function selftest_list ()
       value=3.14, description="PI"
    }
    local root = l:node(l.root)
-   assert(root.occupied == lshift(1, 8))
+   assert(root.occupied == lshift(1, 14))
    assert(root.occupied == root.leaf)
    -- print(l.root, root.occupied, root.leaf, root.children[14])
    local e1 = l:find_entry {id=42, name="foobar"}
