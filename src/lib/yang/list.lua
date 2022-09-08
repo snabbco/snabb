@@ -258,12 +258,12 @@ local List = {
 --        +---------------------+-------------------------------------+
 
 List.type_map = {
-   -- binary = {ctype='uint32_t', kind='bytes'},
-   -- bits = {ctype='uint64_t', kind='scalar'}, -- no more than 64 flags
+   binary = {ctype='uint32_t', kind='string'}, -- same as string
+   bits = {ctype='uint64_t', kind='scalar'}, -- no more than 64 flags
    boolean = {ctype='bool', kind='scalar'},
    decimal64 = {ctype='double', kind='scalar'},
-   -- enumeration = {ctype='uint32_t', kind='scalar'}, -- ??
-   -- empty = {ctype=nil, kind='empty'}, -- no representation
+   enumeration = {ctype='int32_t', kind='scalar'},
+   empty = {ctype='bool', kind='empty'}, -- no representation (always true)
    int8 = {ctype='int8_t', kind='scalar'},
    int16 = {ctype='int16_t', kind='scalar'},
    int32 = {ctype='int32_t', kind='scalar'},
@@ -359,13 +359,13 @@ function List:build_type (fields)
    local t = "struct { "
    for _, name in ipairs(self:field_order(fields)) do
       local spec = fields[name]
+      assert(type(spec) == 'table' and type(spec.type) == 'string',
+         "Invalid field spec for "..name)
       local ct = self:type_info(spec.type).ctype
-      if ct then
-         if spec.optional then
-            ct = self.optional_ts:format(ct)
-         end
-         t = t..("%s %s; "):format(ct, name)
+      if spec.optional then
+         ct = self.optional_ts:format(ct)
       end
+      t = t..("%s %s; "):format(ct, name)
    end
    t = t.."} __attribute__((packed))"
    return t
@@ -442,6 +442,8 @@ function List:pack_mandatory (dst, name, type_info, value)
       dst[name] = value
    elseif type_info.kind == 'string' then
       dst[name] = self:alloc_str(value)
+   elseif type_info.kind == 'empty' then
+      dst[name] = true
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -452,6 +454,8 @@ function List:unpack_mandatory (dst, name, type_info, value)
       dst[name] = value
    elseif type_info.kind == 'string' then
       dst[name] = self:tostring(value)
+   elseif type_info.kind == 'empty' then
+      dst[name] = true
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -462,6 +466,8 @@ function List:free_mandatory (value, type_info)
       -- nop
    elseif type_info.kind == 'string' then
       self:free_str(value)
+   elseif type_info.kind == 'empty' then
+      -- nop
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -472,6 +478,8 @@ function List:equal_mandatory (packed, unpacked, type_info)
       return packed == unpacked
    elseif type_info.kind == 'string' then
       return self:str_equal_string(packed, unpacked)
+   elseif type_info.kind == 'empty' then
+      return true
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -573,6 +581,8 @@ function List:entry_hash (e, seed)
          self:pack_field(self.hashin, name, spec, e[name])
       elseif type_info.kind == 'string' then
          self.hashin[name] = hash32(e[name], #e[name], seed)
+      elseif type_info.kind == 'empty' then
+         self:pack_field(self.hashin, name, spec, e[name])
       else
          error("NYI: kind "..type_info.kind)
       end
@@ -589,6 +599,8 @@ function List:leaf_hash (keys, seed)
       elseif type_info.kind == 'string' then
          local str = self:str(keys[name])
          self.hashin[name] = hash32(str.str, str.len, seed)
+      elseif type_info.kind == 'empty' then
+         self:pack_field(self.hashin, name, spec, keys[name])
       else
          error("NYI: kind "..type_info.kind)
       end
@@ -974,6 +986,19 @@ function selftest_list ()
    assert(l:find_entry{id="foo2"}.description == "none")
    assert(l:find_entry{id="foo3"}.value == nil)
    assert(l:find_entry{id="foo3"}.description == nil)
+
+   -- Test empty type
+   local l = List:new(
+      {id={type='string'}, e={type='empty'}},
+      {value={type='empty', optional=true}}
+   )
+   l:add_entry {id="foo", e=true}
+   l:add_entry {id="foo1", e=true, value=true}
+   assert(l:find_entry{id="foo", e=true}.value == nil)
+   assert(l:find_entry{id="foo1", e=true}.value == true)
+   local ok, err = pcall(function () l:add_entry {id="foo2"} end)
+   assert(not ok)
+   assert(err:match("Missing value: e"))
 end
 
 
