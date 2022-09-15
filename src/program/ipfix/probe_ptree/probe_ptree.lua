@@ -16,6 +16,11 @@ local probe_schema = 'snabb-snabbflow-v1'
 
 local probe_cpuset = cpuset.new()
 
+local function warn (msg, ...)
+   io.stderr:write("Warning: "..msg:format(...).."\n")
+   io.stderr:flush()
+end
+
 function setup_ipfix (conf)
    -- yang.print_config_for_schema_by_name(probe_schema, conf, io.stdout)
    return setup_workers(conf)
@@ -249,6 +254,7 @@ function setup_workers (config)
             else
                -- No traffic class configured for exporter, do not create
                -- instances.
+               warn("No traffic class configured for exporter '%s'.", name)
                break
             end
 
@@ -305,6 +311,10 @@ function setup_workers (config)
       }
       for _, exporter in ipairs(class_order) do
          local class = flow_director.class[exporter]
+         if not ipfix.exporter[exporter] then
+            error(("Exporter '%s' referenced in traffic class %d is not defined.")
+               :format(exporter, class.order))
+         end
          table.insert(rss_config.classes, {
             name = class_name(exporter, class),
             filter = class.filter,
