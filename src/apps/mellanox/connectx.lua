@@ -315,7 +315,7 @@ function ConnectX:new (conf)
    -- Lists of receive queues by macvlan (used if usemac=true)
    local macvlan_rqlist = {}
 
-   for _, queue in ipairs(conf.queues) do
+   for _, queue in ipairs(queues) do
       -- Create a shared memory object for controlling the queue pair
       local shmpath = "group/pci/"..pciaddress.."/"..queue.id
       local cxq = shm.create(shmpath, cxq_t)
