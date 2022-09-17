@@ -273,8 +273,14 @@ List.type_map = {
    uint16 = {ctype='uint16_t', kind='scalar'},
    uint32 = {ctype='uint32_t', kind='scalar'},
    uint64 = {ctype='uint64_t', kind='scalar'},
+   ['ipv4-address'] = {ctype='uint32_t', kind='scalar'},
+   ['ipv6-address'] = {ctype='ipv6_addr_t', kind='bytes'},
    lvalue = {ctype='uint32_t', kind='lvalue'}
 }
+
+ffi.cdef[[
+   typedef uint8_t ipv6_addr_t[16];
+]]
 
 function List:type_info (type)
    return assert(self.type_map[type], "Unsupported type: "..type)
@@ -446,6 +452,8 @@ function List:pack_mandatory (dst, name, type_info, value)
       dst[name] = self:alloc_str(value)
    elseif type_info.kind == 'empty' then
       dst[name] = true
+   elseif type_info.kind == 'bytes' then
+      ffi.copy(dst[name], value, ffi.sizeof(type_info.ctype))
    elseif type_info.kind == 'lvalue' then
       local idx = #self.lvalues + 1
       self.lvalues[idx] = assert(value)
@@ -462,6 +470,8 @@ function List:unpack_mandatory (dst, name, type_info, value)
       dst[name] = self:tostring(value)
    elseif type_info.kind == 'empty' then
       dst[name] = true
+   elseif type_info.kind == 'bytes' then
+      dst[name] = value
    elseif type_info.kind == 'lvalue' then
       dst[name] = assert(self.lvalues[value])
    else
@@ -478,6 +488,8 @@ function List:free_mandatory (value, type_info)
       -- nop
    elseif type_info.kind == 'lvalue' then
       self.lvalues[value] = nil
+   elseif type_info.kind == 'bytes' then
+      -- nop
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -490,6 +502,8 @@ function List:equal_mandatory (packed, unpacked, type_info)
       return self:str_equal_string(packed, unpacked)
    elseif type_info.kind == 'empty' then
       return true
+   elseif type_info.kind == 'bytes' then
+      return C.memcmp(packed, unpacked, ffi.sizeof(type_info.ctype)) == 0
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -593,6 +607,8 @@ function List:entry_hash (e, seed)
          self.hashin[name] = hash32(e[name], #e[name], seed)
       elseif type_info.kind == 'empty' then
          self:pack_field(self.hashin, name, spec, e[name])
+      elseif type_info.kind == 'bytes' then
+         self:pack_field(self.hashin, name, spec, e[name])
       else
          error("NYI: kind "..type_info.kind)
       end
@@ -610,6 +626,8 @@ function List:leaf_hash (keys, seed)
          local str = self:str(keys[name])
          self.hashin[name] = hash32(str.str, str.len, seed)
       elseif type_info.kind == 'empty' then
+         self:pack_field(self.hashin, name, spec, keys[name])
+      elseif type_info.kind == 'bytes' then
          self:pack_field(self.hashin, name, spec, keys[name])
       else
          error("NYI: kind "..type_info.kind)
@@ -1102,15 +1120,19 @@ end
 
 function selftest_ip ()
    local yang_util = require("lib.yang.util")
+   local ipv6 = require("lib.protocol.ipv6")
    local l = new(
-      {ip={type='string'}, port={type='uint16'}},
-      {}
+      {ip={type='ipv4-address'}, port={type='uint16'}},
+      {b4_address={type='ipv6-address'}}
    )
    math.randomseed(0)
    for i=1, 1e5 do
+      local b4 = ffi.new("uint8_t[16]")
+      for j=0,15 do b4[j] = i end
       l:add_entry {
-         ip = yang_util.ipv4_ntop(math.random(0xffffffff)),
-         port = bit.band(0xffff, i)
+         ip = math.random(0xffffffff),
+         port = bit.band(0xffff, i),
+         b4_address = b4
       }
    end
    print("added "..#l.." entries")
@@ -1121,7 +1143,8 @@ function selftest_ip ()
          entry = e
          print("Iterated to entry #"..middle)
          assert(e.ip == l[e].ip)
-         print("Looked up middle entry with ip="..e.ip)
+         print("Looked up middle entry with ip="..yang_util.ipv4_ntop(e.ip))
+         print("B4 address is: "..ipv6:ntop(e.b4_address))
          break
       end
    end
