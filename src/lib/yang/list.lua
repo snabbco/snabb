@@ -273,6 +273,7 @@ List.type_map = {
    uint16 = {ctype='uint16_t', kind='scalar'},
    uint32 = {ctype='uint32_t', kind='scalar'},
    uint64 = {ctype='uint64_t', kind='scalar'},
+   lvalue = {ctype='uint32_t', kind='lvalue'}
 }
 
 function List:type_info (type)
@@ -332,6 +333,7 @@ function List:new (keys, members)
    self.root = self:alloc_node() -- heap obj=0 reserved for root node
    self.hashin = ffi.new(self.keys_t)
    self.length = 0
+   self.lvalues = {}
    return self
 end
 
@@ -444,6 +446,10 @@ function List:pack_mandatory (dst, name, type_info, value)
       dst[name] = self:alloc_str(value)
    elseif type_info.kind == 'empty' then
       dst[name] = true
+   elseif type_info.kind == 'lvalue' then
+      local idx = #self.lvalues + 1
+      self.lvalues[idx] = assert(value)
+      dst[name] = idx
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -456,6 +462,8 @@ function List:unpack_mandatory (dst, name, type_info, value)
       dst[name] = self:tostring(value)
    elseif type_info.kind == 'empty' then
       dst[name] = true
+   elseif type_info.kind == 'lvalue' then
+      dst[name] = assert(self.lvalues[value])
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -468,6 +476,8 @@ function List:free_mandatory (value, type_info)
       self:free_str(value)
    elseif type_info.kind == 'empty' then
       -- nop
+   elseif type_info.kind == 'lvalue' then
+      self.lvalues[value] = nil
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -999,6 +1009,20 @@ function selftest_list ()
    local ok, err = pcall(function () l:add_entry {id="foo2"} end)
    assert(not ok)
    assert(err:match("Missing value: e"))
+
+   -- Test lvalues
+   local l = List:new(
+      {id={type='string'}},
+      {value={type='lvalue'}}
+   )
+   l:add_entry {id="foo", value={}}
+   l:add_entry {id="foo1", value={bar=true}}
+   assert(#l:find_entry{id="foo"}.value == 0)
+   assert(l:find_entry{id="foo1"}.value.bar == true)
+   l:add_or_update_entry {id="foo1", value={bar=false}}
+   l:remove_entry {id="foo"}
+   assert(l.lvalues[1] == nil)
+   assert(l.lvalues[2].bar == false)
 end
 
 
