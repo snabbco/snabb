@@ -1046,34 +1046,12 @@ end
 
 local ListMeta = {}
 
-function new (keys, members)
-   return setmetatable({list=List:new(keys, members)}, ListMeta)
-end
-
 function ListMeta:__len ()
    return self.list.length
 end
 
 function ListMeta:__index (k)
-   if type(k) == 'table' then
-      return self.list:find_entry(k)
-   else
-      -- Fall back to ListMeta or List instance members
-      return ListMeta[k] or self.list[k]
-   end
-end
-
-function ListMeta:inherit_method (name, method)
-   ListMeta[name] = function (self, ...)
-      return method(self.list, ...)
-   end
-end
-
--- Inherit List methods into ListMeta
-for name, method in pairs(List) do
-   if type(method) == 'function' then
-      ListMeta:inherit_method(name, method)
-   end
+   return self.list:find_entry(k)
 end
 
 function ListMeta:__newindex (k, members)
@@ -1090,6 +1068,62 @@ end
 
 ListMeta.__pairs = ListMeta.__ipairs
 
+local function pairs_for_key (iter, key)
+   return function ()
+      local i, e = iter()
+      if i then
+         return e[key], e
+      end
+   end
+end
+
+local function make_mt_for_single_key (key)
+   local mt = {
+      __len = ListMeta.__len,
+      __ipairs = ListMeta.__ipairs
+   }
+   function mt:__index (k)
+      return ListMeta.__index(self, {[key]=k})
+   end
+   function mt:__newindex (k, members)
+      return ListMeta.__newindex(self, {[key]=k}, members)
+   end
+   function mt:__pairs ()
+      return pairs_for_key(ListMeta.__ipairs(self), key)
+   end
+   return mt
+end
+
+local list_mt_cache = {}
+local function mt_for_single_key (key)
+   if not list_mt_cache[key] then
+      list_mt_cache[key] = make_mt_for_single_key(key)
+   end
+   return list_mt_cache[key]
+end
+
+function new (keys, members)
+   local numkeys = 0
+   local key1
+   for key in pairs(keys) do
+      key1 = key1 or key
+      numkeys = numkeys + 1
+   end
+   local mt
+   if numkeys == 1 then
+      mt = mt_for_single_key(key1)
+   elseif numkeys > 1 then
+      mt = ListMeta
+   else
+      error("List needs at least one key")
+   end
+   return setmetatable({list=List:new(keys, members)}, mt)
+end
+
+function object (list)
+   return rawget(list, 'list')
+end
+
 local function selftest_listmeta ()
    local l1 = new(
       {id={type='uint32'}, name={type='string'}},
@@ -1098,11 +1132,14 @@ local function selftest_listmeta ()
    l1[{id=0, name='foo'}] = {value=1.5, description="yepyep"}
    l1[{id=1, name='bar'}] = {value=3.14, description="PI"}
    local ok, err = pcall (function()
-      l1:add_entry {id=0, name='foo', value=0, description="should fail"}
+      object(l1):add_entry {
+         id=0, name='foo',
+         value=0, description="should fail"
+      }
    end)
    assert(not ok and err:match("Attempting to add duplicate entry to list"))
    assert(#l1 == 2)
-   assert(#l1 == l1.length)
+   assert(#l1 == object(l1).length)
    assert(l1[{id=0, name='foo'}].value == 1.5)
    for i, entry in ipairs(l1) do
       if i == 1 then
@@ -1115,7 +1152,32 @@ local function selftest_listmeta ()
    end
    l1[{id=0, name='foo'}] = nil
    assert(l1[{id=0, name='foo'}] == nil)
-   assert(l1:find_entry({id=1, name='bar'}).value == 3.14)
+   assert(object(l1):find_entry({id=1, name='bar'}).value == 3.14)
+   -- Test single key meta
+   local l = new({id={type='string'}}, {value={type='string'}})
+   l.foo = {value="bar"}
+   assert(l.foo)
+   assert(l.foo.value == "bar")
+   assert(#l == 1)
+   l.foo = nil
+   assert(l.foo == nil)
+   assert(#l == 0)
+   local l = new({id={type='decimal64'}}, {value={type='string'}})
+   l[3] = {value="bar"}
+   assert(l[3])
+   assert(#l == 1)
+   for id, e in pairs(l) do
+      assert(id == 3)
+      assert(e.value == "bar")
+   end
+   for i, e in ipairs(l) do
+      assert(i == 1)
+      assert(e.id == 3)
+      assert(e.value == "bar")
+   end
+   l[3] = nil
+   assert(l[3] == nil)
+   assert(#l == 0)
 end
 
 function selftest_ip ()
@@ -1129,7 +1191,7 @@ function selftest_ip ()
    for i=1, 1e5 do
       local b4 = ffi.new("uint8_t[16]")
       for j=0,15 do b4[j] = i end
-      l:add_entry {
+      object(l):add_entry {
          ip = math.random(0xffffffff),
          port = bit.band(0xffff, i),
          b4_address = b4
