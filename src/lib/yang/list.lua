@@ -1223,6 +1223,18 @@ function object (list)
    end
 end
 
+function from_table(t, keys, members)
+   local l = new(keys, members)
+   for key1 in pairs(keys) do
+      assert(getmetatable(l) == mt_for_single_key(key1),
+         "from_table only supports single-keyed lists")
+   end
+   for k, e in pairs(t) do
+      l[k] = e
+   end
+   return l
+end
+
 local function selftest_listmeta ()
    local l1 = new(
       {id={type='uint32'}, name={type='string'}},
@@ -1281,6 +1293,16 @@ local function selftest_listmeta ()
    assert(object(l) == rawget(l, 'list'))
    assert(object({}) == nil)
    assert(object(42) == nil)
+   -- Test from_table()
+   local t = {{value=1}, {value=2}, {value=3}}
+   local l = from_table(t, {id={type='uint32'}}, {value={type='decimal64'}})
+   assert(l[2])
+   assert(l[2].value == 2)
+   local t = {foo={value=1}, bar={value=2}}
+   local l = from_table(t, {id={type='string'}}, {value={type='decimal64'}})
+   assert(l.foo)
+   assert(l.foo.value == 1)
+   assert(#l == 2)
 end
 
 function selftest_ip ()
