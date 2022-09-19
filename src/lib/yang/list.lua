@@ -20,17 +20,17 @@ local Heap = {
 local function pad (a, l) return band(-l, a-1) end
 local function padded (a, l) return l + pad(a, l) end
 
-local block_t = ffi.typeof(([[
+Heap.block_t = ffi.typeof(([[
    struct {
       uint8_t ref[%d];
       uint8_t mem[%d];
-   }
+   } __attribute__((packed))
 ]]):format(Heap.block_lines, Heap.block_size))
 
 function Heap:new ()
    local heap = {
       _blocks = {
-         [0] = ffi.new(block_t)
+         [0] = self.block_t()
       },
       _free = 0, _maxfree = Heap.block_size,
       _recycle = nil, _maxrecycle = nil
@@ -119,7 +119,7 @@ end
 
 function Heap:_new_block ()
    local block = #self._blocks+1
-   self._blocks[block] = ffi.new(block_t)
+   self._blocks[block] = self.block_t()
    local o = lshift(block, _block_pow)
    return o, o + Heap.block_size
 end
@@ -157,6 +157,40 @@ end
 function Heap:ptr (o)
    local block, offset = self:_block(o)
    return self._blocks[block].mem + offset
+end
+
+Heap.header_t = ffi.typeof[[
+   struct {
+      uint32_t maxblock;
+      double free, maxfree;
+      double recycle, maxrecycle;
+   } __attribute__((packed))
+]]
+
+function Heap:save (stream)
+   stream:write_struct(self.header_t, self.header_t(
+      #self._blocks,
+      self._free, self._maxfree,
+      self._recycle or -1, self._maxrecycle or -1
+   ))
+   for block=0, #self._blocks do
+      stream:write_struct(self.block_t, self._blocks[block])
+   end
+end
+
+function Heap:load (stream)
+   local header = stream:read_struct(nil, self.header_t)
+   local blocks = {}
+   for block=0, header.maxblock do
+      blocks[block] = stream:read_struct(nil, self.block_t)
+   end
+   local heap = {
+      _blocks = blocks,
+      _free = header.free, _maxfree = header.maxfree,
+      _recycle = (header.recycle >= 0 and header.recycle) or nil,
+      _maxrecycle = (header.maxrecycle >= 0 and header.maxrecycle) or nil
+   }
+   return setmetatable(heap, {__index=Heap})
 end
 
 local function selftest_heap ()
@@ -223,6 +257,20 @@ local function selftest_heap ()
       end
       free_obj()
    end
+
+   -- Test save
+   local memstream = require("lib.stream.mem")
+   local tmp = memstream.tmpfile()
+   h:save(tmp)
+   tmp:seek('set', 0)
+   h = Heap:load(tmp)
+   check_obj()
+   tmp:seek('set', 0)
+   Heap:new():save(tmp)
+   tmp:seek('set', 0)
+   local h = Heap:load(tmp)
+   assert(h._free == 0)
+   assert(h._recycle == nil)
 end
 
 
@@ -323,21 +371,26 @@ List.optional_ts = [[
    } __attribute__((packed))
 ]]
 
-function List:new (keys, members)
+function List:_new (keys, members)
    local self = setmetatable({}, {__index=List})
    for name, spec in pairs(keys) do
       assert(not spec.optional, "Keys can not be optional: "..name)
    end
-   local keys_ts = self:build_type(keys, true)
+   local keys_ts = self:build_type(keys)
    local members_ts = self:build_type(members)
    self.keys = keys
    self.members = members
    self.keys_t = self:cached_type(keys_ts)
    self.leaf_t = self:cached_type(self:build_leaf_type(keys_ts, members_ts))
+   self.hashin = self.keys_t()
+   return self
+end
+
+function List:new (keys, members)
+   local self = self:_new(keys, members)
    self.heap = Heap:new()
    self.first, self.last = nil, nil -- empty
    self.root = self:alloc_node() -- heap obj=0 reserved for root node
-   self.hashin = ffi.new(self.keys_t)
    self.length = 0
    self.lvalues = {}
    return self
@@ -911,6 +964,32 @@ function List:ipairs ()
    end
 end
 
+List.header_t = ffi.typeof[[
+   struct {
+      double first, last, length;
+   } __attribute__((packed))
+]]
+
+function List:save (stream)
+   stream:write_struct(self.header_t, self.header_t(
+      self.first or -1, self.last or -1, self.length
+   ))
+   self.heap:save(stream)
+   return self.lvalues
+end
+
+function List:load (stream, keys, members, lvalues)
+   local self = self:_new(keys, members)
+   local h = stream:read_struct(nil, self.header_t)
+   self.heap = Heap:load(stream)
+   self.first = (h.first >= 0 and h.first) or nil
+   self.last = (h.last >= 0 and h.last) or nil
+   self.root = 0 -- heap obj=0 reserved for root node
+   self.length = h.length
+   self.lvalues = lvalues
+   return self
+end
+
 function selftest_list ()
    local l = List:new(
       {id={type='uint32'}, name={type='string'}},
@@ -1041,6 +1120,20 @@ function selftest_list ()
    l:remove_entry {id="foo"}
    assert(l.lvalues[1] == nil)
    assert(l.lvalues[2].bar == false)
+
+   -- Test load/save
+   local keys = {id={type='string'}}
+   local members = {value={type='lvalue'}}
+   local l = List:new(keys, members)
+   l:add_entry {id="foo", value={}}
+   l:add_entry {id="foo1", value={bar=true}}
+   local memstream = require("lib.stream.mem")
+   local tmp = memstream.tmpfile()
+   local lvalues = l:save(tmp)
+   tmp:seek('set', 0)
+   local l = List:load(tmp, keys, members, lvalues)
+   assert(#l:find_entry{id="foo"}.value == 0)
+   assert(l:find_entry{id="foo1"}.value.bar == true)
 end
 
 
