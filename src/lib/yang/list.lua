@@ -1214,7 +1214,13 @@ function new (keys, members)
 end
 
 function object (list)
-   return rawget(list, 'list')
+   if type(list) == 'table' then
+      local o = rawget(list, 'list')
+      local mt = getmetatable(o)
+      if mt and mt.__index == List then
+         return o
+      end
+   end
 end
 
 local function selftest_listmeta ()
@@ -1271,6 +1277,10 @@ local function selftest_listmeta ()
    l[3] = nil
    assert(l[3] == nil)
    assert(#l == 0)
+   -- Test object()
+   assert(object(l) == rawget(l, 'list'))
+   assert(object({}) == nil)
+   assert(object(42) == nil)
 end
 
 function selftest_ip ()
