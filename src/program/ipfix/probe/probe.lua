@@ -21,17 +21,17 @@ local long_opts = {
    name = "n",
    busywait ="b",
    ["real-time"] = "r",
-   profile = "p"
+   ["no-profile"] = "p"
 }
 local opt = "hn:brp"
 local opt_handler = {}
 local name
-local busywait, real_time, profile = false, false, false
+local busywait, real_time, profile = false, false, true
 function opt_handler.h () print(usage) main.exit(0) end
 function opt_handler.n (arg) name = arg end
 function opt_handler.b () busywait = true end
 function opt_handler.r () real_time = true end
-function opt_handler.p () profile = true end
+function opt_handler.p () profile = false end
 
 function run (args)
    args = lib.dogetopt(args, opt_handler, opt, long_opts)
