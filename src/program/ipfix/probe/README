@@ -2,7 +2,10 @@ Usage: snabb ipfix probe [options] <config>
        snabb ipfix probe --help
 
 Available options:
-       -n, --name               Name of the Snabbflow instance.
+       -n, NAME --name NAME     Name of the Snabbflow instance.
+       -b, --busywait           Turn off idle sleep.
+       -r, --real-time          Enable real-time SCHED_FIFO scheduler.
+       -p, --profile            Enable VMProfile.
        -h, --help               Print this help text and exit.
 
 The mandatory argument <config> must be a path to the initial

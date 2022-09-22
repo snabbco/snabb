@@ -18,13 +18,20 @@ local usage = require("program.ipfix.probe.README_inc")
 
 local long_opts = {
    help = "h",
-   name = "n"
+   name = "n",
+   busywait ="b",
+   ["real-time"] = "r",
+   profile = "p"
 }
-local opt = "hn:"
+local opt = "hn:brp"
 local opt_handler = {}
 local name
-function opt_handler.n (arg) name = arg end
+local busywait, real_time, profile = false, false, false
 function opt_handler.h () print(usage) main.exit(0) end
+function opt_handler.n (arg) name = arg end
+function opt_handler.b () busywait = true end
+function opt_handler.r () real_time = true end
+function opt_handler.p () profile = true end
 
 function run (args)
    args = lib.dogetopt(args, opt_handler, opt, long_opts)
@@ -72,7 +79,9 @@ function start (name, confpath)
       cpuset = probe_cpuset,
       name = name,
       worker_default_scheduling = {
-         busywait = false,
+         busywait = busywait,
+         real_time = real_time,
+         profile = profile,
          jit_opt = {
             sizemcode=256,
             maxmcode=8192,
