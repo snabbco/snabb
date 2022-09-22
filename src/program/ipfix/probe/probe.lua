@@ -1,270 +1,364 @@
--- This module implements the `snabb flow_export` command
-
 module(..., package.seeall)
 
-local lib       = require("core.lib")
-local worker    = require("core.worker")
+local yang = require("lib.yang.yang")
+local yang_util = require("lib.yang.util")
+local path_data = require("lib.yang.path_data")
+local mem = require("lib.stream.mem")
+local ptree = require("lib.ptree.ptree")
+local cpuset = require("lib.cpuset")
+local pci = require("lib.hardware.pci")
+local lib = require("core.lib")
 local app_graph = require("core.config")
-local pci       = require("lib.hardware.pci")
-local probe     = require("program.ipfix.lib")
-local S         = require("syscall")
+
+local probe = require("program.ipfix.lib")
+
+local probe_schema = 'snabb-snabbflow-v1'
+
+local usage = require("program.ipfix.probe.README_inc")
 
 local long_opts = {
    help = "h",
-   jit = "j",
-   duration = "D",
-   port = "p",
-   transport = 1,
-   ["host-ip"] = "a",
-   ["input-type"] = "i",
-   ["output-type"] = "o",
-   ["mtu"] = 1,
-   ["rss-queues"] = 1,
-   ["netflow-v9"] = 0,
-   ["ipfix"] = 0,
-   ["active-timeout"] = 1,
-   ["idle-timeout"] = 1,
-   ["observation-domain"] = 1,
-   ["template-refresh"] = 1,
-   ["flush-timeout"] = 1,
-   ["cache-size"] = 1,
-   ["scan-time"] = 1,
-   ["pfx4-to-as"] = 1,
-   ["pfx6-to-as"] = 1,
-   ["maps-log"] = 1,
-   ["vlan-to-ifindex"] = 1,
-   ["mac-to-as"] = 1,
-   ["cpu"] = 1,
-   ["busy-wait"] = "b"
+   name = "n"
 }
+local opt = "hn:"
+local opt_handler = {}
+local name
+function opt_handler.n (arg) name = arg end
+function opt_handler.h () print(usage) main.exit(0) end
 
 function run (args)
-   local duration
-   local busywait = false
-   local jit = { opts = {} }
-
-   local input_type, output_type = "pci", "pci"
-
-   local host_mac
-   local host_ip = '10.0.0.1' -- Just to have a default.
-   local collector_ip = '10.0.0.2' -- Likewise.
-   local port = 4739
-   local mtu = 1514
-   local nqueues = 1
-
-   local active_timeout, idle_timeout, flush_timeout, scan_time
-   local observation_domain, template_refresh_interval
-   local cache_size
-   local ipfix_version = 10
-   local templates = {}
-   local maps = {}
-   local maps_logfile
-
-   local cpu
-
-   -- TODO: better input validation
-   local opt = {
-      h = function (arg)
-         print(require("program.ipfix.probe.README_inc"))
-         main.exit(0)
-      end,
-      D = function (arg)
-         duration = assert(tonumber(arg), "expected number for duration")
-      end,
-      i = function (arg)
-         input_type = arg
-      end,
-      o = function (arg)
-         output_type = arg
-      end,
-      p = function (arg)
-         port = assert(tonumber(arg), "expected number for port")
-      end,
-      m = function (arg)
-         host_mac = arg
-      end,
-      a = function (arg)
-         host_ip = arg
-      end,
-      c = function (arg)
-         collector_ip = arg
-      end,
-      b = function (arg)
-         busywait = true
-      end,
-      ["active-timeout"] = function (arg)
-         active_timeout =
-            assert(tonumber(arg), "expected number for active timeout")
-      end,
-      ["idle-timeout"] = function (arg)
-         idle_timeout =
-            assert(tonumber(arg), "expected number for idle timeout")
-      end,
-      ["flush-timeout"] = function (arg)
-         flush_timeout =
-            assert(tonumber(arg), "expected number for flush timeout")
-      end,
-      ["scan-time"] = function (arg)
-         scan_time =
-            assert(tonumber(arg), "expected number for scan time")
-      end,
-      ["observation-domain"] = function (arg)
-         observation_domain =
-            assert(tonumber(arg), "expected number for observation domain")
-      end,
-      ["template-refresh"] = function (arg)
-         template_refresh_interval =
-            assert(tonumber(arg), "expected number for template refresh interval")
-      end,
-      ["cache-size"] = function (arg)
-         cache_size =
-            assert(tonumber(arg), "expected number for cache size")
-      end,
-      ["pfx4-to-as"] = function (arg)
-         if arg then
-            maps.pfx4_to_as = arg
-         end
-      end,
-      ["pfx6-to-as"] = function (arg)
-         if arg then
-            maps.pfx6_to_as = arg
-         end
-      end,
-      ["vlan-to-ifindex"] = function (arg)
-         if arg then
-            maps.vlan_to_ifindex = arg
-         end
-      end,
-      ["mac-to-as"] = function (arg)
-         if arg then
-            maps.mac_to_as = arg
-         end
-      end,
-      ["maps-log"] = function (arg)
-         if arg ~= "" then
-            maps_logfile = arg
-         end
-      end,
-      ipfix = function (arg)
-         ipfix_version = 10
-      end,
-      ["netflow-v9"] = function (arg)
-         ipfix_version = 9
-      end,
-      ["mtu"] = function (arg)
-         mtu = tonumber(arg)
-      end,
-      ["rss-queues"] = function (arg)
-         nqueues = tonumber(arg)
-      end,
-      -- TODO: not implemented
-      ["transport"] = function (arg) end,
-      ["cpu"] = function (arg)
-         cpu = tonumber(arg)
-      end,
-      j = require("program.ipfix.lib").parse_jit_option_fn(jit)
-   }
-
-   args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:j:b", long_opts)
-   if #args < 2 then
-      print(require("program.ipfix.probe.README_inc"))
+   args = lib.dogetopt(args, opt_handler, opt, long_opts)
+   if #args ~= 1 then
+      print(usage)
       main.exit(1)
-   elseif #args == 2 then
-      table.insert(args, 'v4')
-      table.insert(args, 'v6')
    end
+   local confpath = args[1]
+   local manager = start(name, confpath)
+   manager:main()
+end
 
-   local input, output = args[1], args[2]
+local probe_cpuset = cpuset.new()
 
-   for i = 3, #args do
-      table.insert(templates, args[i])
+local function update_cpuset (cpu_pool)
+   local cpu_set = {}
+   if cpu_pool then
+      for _, cpu in ipairs(cpu_pool.cpu) do
+         if not probe_cpuset:contains(cpu) then
+            probe_cpuset:add(cpu)
+         end
+         cpu_set[cpu] = true
+      end
+      for _, cpu in ipairs(probe_cpuset:list()) do
+         if not cpu_set[cpu] then
+            probe_cpuset:remove(cpu)
+         end
+      end
    end
+end
 
-   local probe_config = {
-      active_timeout = active_timeout,
-      idle_timeout = idle_timeout,
-      flush_timeout = flush_timeout,
-      cache_size = cache_size,
-      scan_time = scan_time,
-      observation_domain = observation_domain,
-      template_refresh_interval = template_refresh_interval,
-      ipfix_version = ipfix_version,
-      exporter_ip = host_ip,
-      exporter_mac = host_mac,
-      collector_ip = collector_ip,
-      collector_port = port,
-      mtu = mtu,
-      templates = templates,
-      maps = maps,
-      maps_logfile = maps_logfile,
-      output_type = output_type,
-      output = output,
-      input_type = input_type,
-      input = input
+local function warn (msg, ...)
+   io.stderr:write("Warning: "..msg:format(...).."\n")
+   io.stderr:flush()
+end
+
+function start (name, confpath)
+   local conf = yang.load_configuration(confpath, {schema_name=probe_schema})
+   update_cpuset(conf.snabbflow_config.rss.cpu_pool)
+   return ptree.new_manager{
+      log_level = 'INFO',
+      setup_fn = setup_workers,
+      initial_configuration = conf,
+      schema_name = probe_schema,
+      cpuset = probe_cpuset,
+      name = name,
+      worker_default_scheduling = {
+         busywait = false,
+         jit_opt = {
+            sizemcode=256,
+            maxmcode=8192,
+            maxtrace=8000,
+            maxrecord=50000,
+            maxsnap=20000,
+            maxside=10000
+         }
+      },
    }
+end
 
-   local mellanox_qs
-   if input_type == "pci" then
-      local device_info = pci.device_info(input)
-      if device_info.driver == 'apps.mellanox.connectx' then
-         mellanox_qs = {}
+local ipfix_default_config = lib.deepcopy(probe.probe_config)
+for _, key in ipairs({
+      "collector_ip",
+      "collector_port",
+      "observation_domain",
+      "exporter_mac",
+      "templates",
+      "output_type",
+      "output",
+      "input_type",
+      "input",
+      "instance"
+}) do
+   ipfix_default_config[key] = nil
+end
+
+local software_scaling_parser = path_data.parser_for_schema_by_name(
+   probe_schema, '/snabbflow-config/rss/software-scaling/exporter[name=""]'
+)
+local default_software_scaling =
+   software_scaling_parser(mem.open_input_string(''))
+
+function setup_workers (config)
+   local interfaces = config.snabbflow_config.interface
+   local rss = config.snabbflow_config.rss
+   local flow_director = config.snabbflow_config.flow_director
+   local ipfix = config.snabbflow_config.ipfix
+
+   local collector_pools = {}
+   for name, p in pairs(ipfix.collector_pool) do
+      local collectors = {}
+      for entry in p.collector:iterate() do
+         table.insert(collectors, {
+            ip = yang_util.ipv4_ntop(entry.key.ip),
+            port = entry.key.port
+         })
+      end
+      collector_pools[name] = collectors
+   end
+
+   local function select_collector (pool)
+      -- Select the collector ip and port from the front of the
+      -- pool and rotate the pool's elements by one
+      assert(collector_pools[pool] and #collector_pools[pool] > 0,
+               "Undefined or empty collector pool: "..pool)
+      local collector = table.remove(collector_pools[pool], 1)
+      table.insert(collector_pools[pool], collector)
+      return collector
+   end
+
+   if flow_director.default_class.exporter then
+      assert(not flow_director.class[flow_director.default_class.exporter],
+         "Exporter for the default traffic class can not be the exporter for a defined class.")
+   end
+
+   local class_order = {}
+   for exporter in pairs(flow_director.class) do
+      table.insert(class_order, exporter)
+   end
+   table.sort(class_order, function (x, y)
+      return flow_director.class[x].order < flow_director.class[y].order
+   end)
+
+   local function class_name (exporter, class)
+      -- Including order in name to avoid name collision with 'default' class
+      return ("%s_%d"):format(exporter, class.order)
+   end
+
+   local rss_links = {}
+   local function rss_link_name (class)
+      if not rss_links[class] then
+         rss_links[class] = 0
+      end
+      local qno = rss_links[class] + 1
+      rss_links[class] = qno
+      return class.."_"..qno
+   end
+
+   local observation_domain = ipfix.observation_domain_base
+   local function next_observation_domain ()
+      local ret = observation_domain
+      observation_domain = observation_domain + 1
+      return ret
+   end
+   
+   local workers = {}
+   local worker_opts = {}
+
+   local mellanox = {}
+
+   update_cpuset(rss.cpu_pool)
+
+   local function ensure_device_unique (device, interfaces)
+      for other in pairs(interfaces) do
+         if device ~= other then
+            if pci.qualified(device) == pci.qualified(other) then
+               error("Duplicate interfaces: "..device..", "..other..
+                     "\nNot applying configuration. Remove one of them via"..
+                     ("\n  snabb config remove <snabbflow> /snabbflow-config/interface[device=%q]")
+                        :format(other))
+            end
+         end
       end
    end
 
-   for rssq = 0, nqueues - 1 do
+   for rss_group = 1, rss.hardware_scaling.rss_groups do
+      local inputs, outputs = {}, {}
+      for device, opt in pairs(interfaces) do
+         ensure_device_unique(device, interfaces)
+         local input = lib.deepcopy(opt)
+         input.device = device
+         input.rxq = rss_group - 1
+         table.insert(inputs, input)
 
-      local jit_c = lib.deepcopy(jit)
-
-      probe_config.input = input.."/"..rssq
-      if mellanox_qs then
-         table.insert(mellanox_qs, { id = rssq })
+         -- The mellanox driver requires a master process that sets up
+         -- all queues for the interface. We collect all queues per
+         -- device of this type here.
+         local device_info = pci.device_info(device)
+         if device_info.driver == 'apps.mellanox.connectx' then
+            local spec = mellanox[device]
+            if not spec then
+               spec = { ifName = input.name,
+                        ifAlias = input.description,
+                        queues = {},
+                        recvq_size = input.receive_queue_size }
+               mellanox[device] = spec
+            end
+            table.insert(spec.queues, { id = input.rxq })
+         else
+            -- Silently truncate receive-queue-size for other drivers.
+            -- (We are not sure what they can handle.)
+            input.receive_queue_size = math.min(input.receive_queue_size, 8192)
+         end
       end
 
-      if nqueues > 1 then
-         -- Create unique identifiers for config options that need to
-         -- be unique per instance
-         probe_config.observation_domain = observation_domain + rssq
-         if output_type == "tap_routed" then
-            probe_config.output = output..probe_config.observation_domain
+      for name, exporter in pairs(ipfix.exporter) do
+         local config = {}
+         for key in pairs(ipfix_default_config) do
+            config[key] = ipfix[key]
          end
-         if jit_c.dump and #jit_c.dump == 2 then
-            jit_c.dump[2] = jit_c.dump[2]..rssq
+         config.exporter_ip = yang_util.ipv4_ntop(ipfix.exporter_ip)
+
+         config.collector_pool = exporter.collector_pool
+         config.templates = exporter.template
+
+         config.output_type = "tap_routed"
+         config.add_packet_metadata = false
+
+         config.maps = {}
+         for name, map in pairs(ipfix.maps) do
+            config.maps[name] = map.file
+         end
+
+         local software_scaling = (rss.software_scaling.exporter and
+                                    rss.software_scaling.exporter[name])
+                               or default_software_scaling
+         local num_instances = 1
+         if not software_scaling.embed then
+            num_instances = software_scaling.instances
+         end
+         for i = 1, num_instances do
+            -- Create a clone of the configuration for parameters
+            -- specific to the instance
+            local iconfig = lib.deepcopy(config)
+
+            -- This is used to disambiguate multiple instances of the
+            -- ipfix app (possibly using multiple instances of the same
+            -- template) within a single worker.
+            iconfig.instance = name.."_"..i
+
+            local rss_link
+            local class = flow_director.class[name]
+            if class then
+               rss_link = rss_link_name(class_name(name, class))
+            elseif name == flow_director.default_class.exporter then
+               rss_link = rss_link_name('default')
+            else
+               -- No traffic class configured for exporter, do not create
+               -- instances.
+               warn("No traffic class configured for exporter '%s'.", name)
+               break
+            end
+
+            local collector = select_collector(config.collector_pool)
+            iconfig.collector_ip = collector.ip
+            iconfig.collector_port = collector.port
+            iconfig.collector_pool = nil
+
+            iconfig.log_date = ipfix.log_date
+            local od = next_observation_domain()
+            iconfig.observation_domain = od
+            iconfig.output = "ipfixexport"..od
+            if ipfix.maps.log_directory then
+               iconfig.maps_logfile =
+                  ipfix.maps.log_directory.."/"..od..".log"
+            end
+
+            -- Scale the scan protection parameters by the number of
+            -- ipfix instances in this RSS class
+            local scale_factor = rss.hardware_scaling.rss_groups * num_instances
+            iconfig.scan_protection = {
+               enable = ipfix.scan_protection.enable,
+               threshold_rate = ipfix.scan_protection.threshold_rate / scale_factor,
+               export_rate = ipfix.scan_protection.export_rate / scale_factor,
+            }
+
+            local output
+            if software_scaling.embed then
+               output = {
+                  link_name = rss_link,
+                  args = iconfig
+               }
+            else
+               output = { type = "interlink", link_name = rss_link }
+               iconfig.input_type = "interlink"
+               iconfig.input = rss_link
+               
+
+               workers[rss_link] = probe.configure_graph(iconfig)
+               -- Dedicated exporter processes are restartable
+               worker_opts[rss_link] = {
+                  restart_intensity = software_scaling.restart.intensity,
+                  restart_period = software_scaling.restart.period
+               }
+            end
+            table.insert(outputs, output)
          end
       end
 
-      local worker_expr = string.format(
-         'require("program.ipfix.lib").run(%s, %s, %s, nil, %s)',
-         probe.value_to_string(probe_config), tostring(duration),
-         tostring(busywait), probe.value_to_string(jit_c)
-      )
-      local child_pid = worker.start("ipfix"..rssq, worker_expr)
-      print("Launched IPFIX worker process #"..child_pid)
-   end
-
-   local ctrl_graph
-   if mellanox_qs then
-      ctrl_graph = probe.configure_mlx_ctrl_graph{
-         [input] = {
-            queues = mellanox_qs,
-            recvq_size = 8192,
-            ifName = (input:gsub("[:%.]", "_"))
+      local rss_config = {
+         default_class = flow_director.default_class.exporter ~= nil,
+         classes = {},
+         remove_extension_headers = flow_director.remove_ipv6_extension_headers
       }
-   }
+      for _, exporter in ipairs(class_order) do
+         local class = flow_director.class[exporter]
+         if not ipfix.exporter[exporter] then
+            error(("Exporter '%s' referenced in traffic class %d is not defined.")
+               :format(exporter, class.order))
+         end
+         table.insert(rss_config.classes, {
+            name = class_name(exporter, class),
+            filter = class.filter,
+            continue = class.continue
+         })
+      end
+      workers["rss"..rss_group] = probe.configure_rss_graph(
+         rss_config, inputs, outputs, ipfix.log_date, rss_group
+      )
    end
 
-   engine.busywait = false
-   engine.Hz = 10
-   engine.configure(ctrl_graph)
+   -- Create a trivial app graph that only contains the control apps
+   -- for the Mellanox driver, which sets up the queues and
+   -- maintains interface counters.
+   local ctrl_graph, need_ctrl = probe.configure_mlx_ctrl_graph(mellanox, ipfix.log_date)
 
-   engine.main({ duration = duration })
+   if need_ctrl then
+      workers["mlx_ctrl"] = ctrl_graph
+      worker_opts["mlx_ctrl"] = {acquire_cpu=false}
+   end
 
-   print("Waiting for workers to finish")
-   local alive
-   repeat
-      alive = false
-      for _, s in pairs(worker.status()) do
-         if s.alive then alive = true end
+   if false then -- enable to debug
+      for name, graph in pairs(workers) do
+         print("worker", name)
+         print("", "apps:")
+         for name, _ in pairs(graph.apps) do
+            print("", "", name)
+         end
+         print("", "links:")
+         for spec in pairs(graph.links) do
+            print("", "", spec)
+         end
       end
-   until not alive
+   end
 
+   return workers, worker_opts
 end
