@@ -8,9 +8,10 @@ local lib       = require("core.lib")
 local pci       = require("lib.hardware.pci")
 local LoadGen   = require("apps.intel_mp.loadgen").LoadGen
 local Intel82599 = require("apps.intel_mp.intel_mp").Intel82599
+local connectx = require("apps.mellanox.connectx")
 
 local function is_device_suitable (pcidev, patterns)
-   if not pcidev.usable or not pcidev.driver:match('intel') then
+   if not pcidev.usable then
       return false
    end
    if #patterns == 0 then
@@ -23,6 +24,48 @@ local function is_device_suitable (pcidev, patterns)
    end
 end
 
+local function configure_nic (c, n, device, use_loadgen)
+   if device.driver:match('intel') then
+      configure_intel_nic(c, n, device, use_loadgen)
+   elseif device.driver:match('connectx') then
+      configure_connectx_nic(c, n, device, use_loadgen)
+   else
+      error("Unsupported driver: "..device.driver)
+   end
+end
+
+function configure_intel_nic (c, n, device, use_loadgen)
+   local name = "nic"..n
+   if use_loadgen then
+      config.app(c, name, LoadGen, device.pciaddress)
+   else
+      config.app(c, name, Intel82599, {pciaddr = device.pciaddress})
+   end
+   config.link(c, "source."..name.."->"..name..".input")
+end
+
+function configure_connectx_nic (c, n, device, use_loadgen)
+   local name = "nic"..n
+   local numq = (use_loadgen and 16) or 1
+   local queues = {}
+   for q=0, numq-1 do
+      local ioname = name.."_q"..q
+      config.app(c, ioname, connectx.IO, {
+         pciaddress = device.pciaddress,
+         queue = q,
+         packetblaster = use_loadgen
+      })
+      config.link(c, "source."..ioname.."->"..ioname..".input")
+      table.insert(queues, {id=q})
+   end
+   config.app(c, name, connectx.ConnectX, {
+      pciaddress = device.pciaddress,
+      sendq_size = 4096,
+      queues = queues,
+      sync_stats_interval = 0.01
+   })
+end
+
 function run_loadgen (c, patterns, opts)
    assert(type(opts) == "table")
    local use_loadgen = opts.loop == nil or opts.loop
@@ -31,13 +74,7 @@ function run_loadgen (c, patterns, opts)
    for _,device in ipairs(pci.devices) do
       if is_device_suitable(device, patterns) then
          nics = nics + 1
-         local name = "nic"..nics
-         if use_loadgen then
-            config.app(c, name, LoadGen, device.pciaddress)
-         else
-            config.app(c, name, Intel82599, {pciaddr = device.pciaddress})
-         end
-         config.link(c, "source."..tostring(nics).."->"..name..".input")
+         configure_nic(c, nics, device, use_loadgen)
       end
    end
    assert(nics > 0, "<PCI> matches no suitable devices.")
