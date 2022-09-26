@@ -1,0 +1,128 @@
+#!../../../snabb
+
+-- A benchmark script for 'snabb ipfix probe'
+--[[
+   Example usage:
+
+sudo ./snabb snsh program/ipfix/tests/bench.snabb \
+   81:00.0 81:00.1 \
+   program/ipfix/tests/sanitized4k.pcap 10 \
+   program/ipfix/tests/bench_v4_v6.conf.template e1 \
+   6 # CPU cores to use
+
+]]--
+
+local ipfix_probe = require("program.ipfix.probe.probe")
+local loadgen_replay = require("program.packetblaster.replay.replay")
+local config_rpc = require("program.config.common")
+local worker = require("core.worker")
+local lib = require("core.lib")
+
+local function make_ipfix_config (template, pci0, cpus)
+   assert(#cpus > 0, "Need at least one CPU core")
+   local rss_groups = 0
+   local cpu_conf = ""
+   for _, cpu in ipairs(cpus) do
+      rss_groups = rss_groups + 1
+      cpu_conf = cpu_conf..("cpu %d; "):format(cpu)
+   end
+   local config_template = lib.readfile(template, "*a")
+   local tmpfile = os.tmpname()
+   local f = assert(io.open(tmpfile, "w+"))
+   f:write(config_template:format(pci0, cpu_conf, rss_groups))
+   assert(f:close())
+   return tmpfile
+end
+
+local function get_state (pid, path)
+   local opts = { command='get-state', with_path=true, is_config=false }
+   local args = config_rpc.parse_command_line({tostring(pid), path}, opts)
+   if args.error then
+      return args
+   end
+   local response = config_rpc.call_leader(
+      args.instance_id, 'get-state',
+      { schema = args.schema_name, revision = args.revision_date,
+        path = args.path, print_default = args.print_default,
+        format = args.format })
+   return response
+end
+
+local function exporter_is_ready (pid, exporter)
+   local r = get_state(
+      pid,
+      ("/snabbflow-state/exporter[name=%s]/template-packets-transmitted")
+         :format(exporter)
+   )
+   if not r.error then
+      return tonumber(r.state) > 0
+   end
+end
+
+local function print_state (pid, path)
+   local r = get_state(pid, path)
+   if r.error then
+      error(r.error)
+   else
+      print(r.state)
+   end
+end
+
+local function get_counter (pid, path)
+   local r = get_state(pid, path)
+   if r.error then
+      error(r.error)
+   else
+      return tonumber(r.state)
+   end
+end
+
+-- Script
+
+local pci0 = assert(table.remove(main.parameters, 1), "Need pci0")
+local pci1 = assert(table.remove(main.parameters, 1), "Need pci1")
+local pcap = assert(table.remove(main.parameters, 1), "Need pcap")
+local loadgen_duration = assert(tonumber(table.remove(main.parameters, 1)), "Need duration")
+local config_template = assert(table.remove(main.parameters, 1), "Need config template")
+local exporter_name = assert(table.remove(main.parameters, 1), "Need exporter name")
+local cpus = main.parameters
+
+local ipfix_confpath = make_ipfix_config(config_template, pci0, cpus)
+
+local probe_pid = worker.start('ipfix_probe',
+   ([[require("program.ipfix.probe.probe").run{
+      %q
+   }]]):format(ipfix_confpath))
+
+lib.waitfor2(
+   "probe_ready",
+   function () return exporter_is_ready(probe_pid, exporter_name) end,
+   10,
+   2*1000000 -- 2s interval
+)
+
+local loadgen_pid = worker.start('loadgen',
+   ([[require("program.packetblaster.replay.replay").run{
+      "-D", "%d", %q, %q
+   }]]):format(loadgen_duration, pcap, pci1))
+
+lib.waitfor2(
+   "loadgen_done",
+   function () return not worker.status()['loadgen'].alive end,
+   loadgen_duration,
+   2*1000000 -- 2s interval
+)
+
+print()
+print("snabbflow-state:")
+print_state(probe_pid, "/snabbflow-state")
+local packets_received = get_counter(
+   probe_pid,
+   ("/snabbflow-state/exporter[name=%s]/packets-received")
+      :format(exporter_name)
+)
+print(("%.3f"):format(packets_received/loadgen_duration/1e6), "Mpps")
+
+worker.stop('ipfix_probe')
+
+os.remove(ipfix_confpath)
