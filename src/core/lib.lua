@@ -71,8 +71,7 @@ function writefile (filename, value)
    local f = io.open(filename, "w")
    if f == nil then error("Unable to open file: " .. filename) end
    local result = f:write(value)
-   f:close()
-   return result
+   return f:close() and result
 end
 
 function readlink (path)
@@ -200,20 +199,23 @@ function hexdump(s)
    return string.format(frm, s:byte(1, #s))
 end
 
-function hexundump(h, n)
+function hexundump(h, n, error)
    local buf = ffi.new('char[?]', n)
    local i = 0
-   for b in h:gmatch('%x%x') do
+   for b in h:gmatch('%s*(%x%x)') do
       buf[i] = tonumber(b, 16)
       i = i+1
       if i >= n then break end
+   end
+   if error ~= false then
+      assert(i == n, error or "Wanted "..n.." bytes, but only got "..i)
    end
    return ffi.string(buf, n)
 end
 
 function comma_value(n) -- credit http://richard.warburton.it
    if type(n) == 'cdata' then
-      n = tonumber(n)
+      n = string.match(tostring(n), '^-?([0-9]+)U?LL$') or tonumber(n)
    end
    if n ~= n then return "NaN" end
    local left,num,right = string.match(n,'^([^%d]*%d)(%d*)(.-)$')
@@ -457,172 +459,6 @@ function root_check (message)
    end
 end
 
--- Backward compatibility
-token_bucket_new = require("lib.token_bucket").new
-
--- Simple rate-limited logging facility.  Usage:
---
---   local logger = lib.logger_new({ rate = <rate>,
---                                   discard_rate = <drate>,
---                                   fh = <fh>,
---                                   flush = true|false,
---                                   module = <module>,
---                                   date = true|false })
---   logger:log(message)
---
--- <rate>   maximum rate of messages per second.  Additional
---          messages are discarded. Default: 10
--- <drate>  maximum rate of logging of the number of discarded
---          messages.  Default: 0.5
--- <fh>     file handle to log to.  Default: io.stdout
--- flush    flush <fh> after each message if true
--- <module> name of the module to include in the message
--- date     include date in messages if true
---
--- The output format is
--- <date> <module>: message
---
--- The logger uses an automatic throttling mechanism to dynamically
--- lower the logging rate when the rate of discarded messages exceeds
--- the maximum log rate by a factor of 5 over one or multiple adjacent
--- intervals of 10 seconds.  For each such interval, the logging rate
--- is reduced by a factor of 2 with a lower bound of 0.1 Hz (i.e. one
--- message per 10 seconds).  For each 10-second interval for which the
--- rate of discarded messages is below the threshold, the logging rate
--- is increased by 1/4 of the original rate, i.e. it takes at least 40
--- seconds to ramp back up to the original rate.
---
--- The tables lib.logger_default and lib.logger_throttle are exposed
--- to the user as part of the API.
-logger_default = {
-   rate = 10,
-   discard_rate = 0.5,
-   fh = io.stdout,
-   flush = true,
-   module = '',
-   date = true,
-   date_fmt = "%b %d %Y %H:%M:%S ",
-}
-logger_throttle = {
-   interval = 10, -- Sampling interval for discard rate
-   excess = 5,   -- Multiple of rate at which to start throttling
-   increment = 4, -- Fraction of rate to increase for un-throttling
-   min_rate = 0.1, -- Minimum throttled rate
-}
-local logger = {
-   default = logger_default,
-   throttle = logger_throttle,
-}
-logger.mt = { __index = logger }
-
-function logger_new (config)
-   local config = config or logger.default
-   local l = setmetatable({}, logger.mt)
-   _config = setmetatable({}, { __index = logger.default })
-   for k, v in pairs(config) do
-      assert(_config[k], "Logger: unknown configuration option "..k)
-      _config[k] = v
-   end
-   l._config = _config
-   l._tb = token_bucket_new({ rate = _config.rate })
-   l._discard_tb = token_bucket_new({ rate = _config.discard_rate })
-   l._discards = 0
-   local _throttle = {
-      discards = 0,
-      tstamp = C.get_monotonic_time(),
-      rate = _config.rate * logger.throttle.excess,
-      increment = _config.rate/logger.throttle.increment,
-   }
-   l._throttle = setmetatable(_throttle, { __index = logger.throttle })
-   l._preamble = (l._config.module and l._config.module..': ') or ''
-   return l
-end
-
--- Log message <msg> unless the rate limit is exceeded.  Note that
--- <msg> is evaluated upon the method call in any case, which can have
--- a performance impact even when the message is discarded.  This can
--- be avoided by calling the can_log() method first, i.e.
---
---   if logger:can_log() then
---     logger:log('foo')
---   end
---
--- This framework should have very low processing overhead and should
--- be safe to call even form within packet-processing loops.  The
--- bottleneck currently is the call to clock_gettime().  Care has been
--- taken to make sure that this call is executed at most once in the
--- non-rate limited code path.
-
-function logger:log (msg)
-   if self._tb:take(1) then
-      local config = self._config
-      local throttle  = self._throttle
-      throttle.discards = throttle.discards + self._discards
-      local date = ''
-      if config.date then
-         date = os.date(config.date_fmt)
-      end
-      local preamble = date..self._preamble
-      local fh = config.fh
-      local now = C.get_monotonic_time()
-      local interval = now-throttle.tstamp
-      local samples = interval/throttle.interval
-      local drate = throttle.discards/interval
-      local current_rate = self._tb:rate()
-      if self._discards > 0 and self._discard_tb:take(1) then
-         fh:write(string.format(preamble.."%d messages discarded\n",
-                                self._discards))
-         throttle.discards = self._discards
-         self._discards = 0
-      end
-      if samples >= 1 then
-         if drate > throttle.rate then
-            local min_rate = throttle.min_rate
-            if current_rate > min_rate then
-               local throttle_rate = math.max(min_rate,
-                                              current_rate/2^samples)
-               fh:write(string.format(preamble.."message discard rate %.2f exceeds "
-                                      .."threshold (%.2f), throttling logging rate to "
-                                      .."%.2f Hz%s\n",
-                                   drate, throttle.rate, throttle_rate,
-                                   (throttle_rate == min_rate and ' (minimum)') or ''))
-               self._tb:rate(throttle_rate)
-            end
-         else
-            local configured_rate = config.rate
-            if current_rate < configured_rate then
-               local throttle_rate = math.min(configured_rate,
-                                              current_rate + throttle.increment*samples)
-               fh:write(string.format(preamble.."unthrottling logging rate to "
-                                      .."%.2f Hz%s\n",
-                                   throttle_rate,
-                                   (throttle_rate == configured_rate and ' (maximum)') or ''))
-               self._tb:rate(throttle_rate)
-            end
-         end
-         throttle.discards = 0
-         throttle.tstamp = now
-      end
-      fh:write(preamble..msg..'\n')
-      if config.flush then fh:flush() end
-   else
-      self._discards = self._discards + 1
-   end
-end
-
--- Return true if a message can be logged without being discarded,
--- false otherwise.  In the first case, it is guaranteed that the
--- token bucket for the logging rate-limiter contains at least one
--- token.  In the second case, the rate-limit is hit and the counter
--- of discarded messages is increased.
-function logger:can_log ()
-   if self._tb:can_take(1) then
-      return true
-   end
-   self._discards = self._discards + 1
-   return false
-end
-
 -- Wrapper around os.getenv which only returns the variable's value if it
 -- is non-empty.
 function getenv (name)
@@ -727,6 +563,17 @@ function set(...)
    local ret = {}
    for k, v in pairs({...}) do ret[v] = true end
    return ret
+end
+
+-- Check if 'name' is a kernel network interface.
+function is_iface (name)
+   local f = io.open('/proc/net/dev')
+   for line in f:lines() do
+      local iface = line:match("^%s*(%w+):")
+      if iface and iface == name then f:close() return true end
+   end
+   f:close()
+   return false
 end
 
 function selftest ()

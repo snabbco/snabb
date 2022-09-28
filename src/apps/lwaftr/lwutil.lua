@@ -7,6 +7,7 @@ local bit = require("bit")
 local ffi = require("ffi")
 local lib = require("core.lib")
 local cltable = require("lib.cltable")
+local binary = require("lib.yang.binary")
 
 local band = bit.band
 local cast = ffi.cast
@@ -21,19 +22,82 @@ local ntohs = lib.ntohs
 
 -- Return device PCI address, queue ID, and queue configuration.
 function parse_instance(conf)
-   local device, instance
-   for k, v in pairs(conf.softwire_config.instance) do
-      assert(device == nil, "configuration has more than one instance")
-      device, instance = k, v
+   if conf.worker_config then
+      local device = conf.worker_config.device
+      local id = conf.worker_config.queue_id
+      local queue = conf.softwire_config.instance[device].queue[id]
+      return device, id, queue
+   else
+      local device, id
+      for dev in pairs(conf.softwire_config.instance) do
+         assert(not device, "Config contains more than one device")
+         device = dev
+      end
+      for queue in pairs(conf.softwire_config.instance[device].queue) do
+         assert(not id, "Config contains more than one queue")
+         id = queue
+      end
+      return device, id, conf.softwire_config.instance[device].queue[id]
    end
-   assert(device ~= nil, "configuration has no instance")
-   local id, queue
-   for k, v in cltable.pairs(instance.queue) do
-      assert(id == nil, "configuration has more than one RSS queue")
-      id, queue = k.id, v
+end
+
+function is_on_a_stick(conf, device)
+   local instance = conf.softwire_config.instance[device]
+   if not instance.external_device then return true end
+   return device == instance.external_device
+end
+
+function is_lowest_queue(conf)
+   local device, id = parse_instance(conf)
+   for n in pairs(conf.softwire_config.instance[device].queue) do
+      if id > n then return false end
    end
-   assert(id ~= nil, "configuration has no RSS queues")
-   return device, id, queue
+   return true
+end
+
+function num_queues(conf)
+   local n = 0
+   local device, id = parse_instance(conf)
+   for _ in pairs(conf.softwire_config.instance[device].queue) do
+      n = n + 1
+   end
+   return n
+end
+
+function select_instance(conf)
+   local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v3')
+   local device, id = parse_instance(conf)
+   local copy = copier(conf)()
+   local instance = copy.softwire_config.instance
+   for other_device, queues in pairs(conf.softwire_config.instance) do
+      if other_device ~= device then
+         instance[other_device] = nil
+      else
+         for other_id, _ in pairs(queues.queue) do
+            if other_id ~= id then
+               instance[device].queue[other_id] = nil
+            end
+         end
+      end
+   end
+   return copy
+end
+
+function merge_instance (conf)
+   local function table_merge(t1, t2)
+      local ret = {}
+      for k,v in pairs(t1) do ret[k] = v end
+      for k,v in pairs(t2) do ret[k] = v end
+      return ret
+   end
+   local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v3')
+   local copy = copier(conf)()
+   local _, _, queue = parse_instance(conf)
+   copy.softwire_config.external_interface = table_merge(
+      conf.softwire_config.external_interface, queue.external_interface)
+   copy.softwire_config.internal_interface = table_merge(
+      conf.softwire_config.internal_interface, queue.internal_interface)
+   return copy
 end
 
 function get_ihl_from_offset(pkt, offset)

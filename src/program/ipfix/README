@@ -1,5 +1,5 @@
 Usage:
-  snabb ipfix probe
+  snabb ipfix probe | probe_rss | stats
 
 Use --help for per-command usage.
 Example:

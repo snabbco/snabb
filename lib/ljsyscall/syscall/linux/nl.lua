@@ -173,6 +173,10 @@ local rta_decode = {
     ir.cacheinfo = t.rta_cacheinfo()
     ffi.copy(ir.cacheinfo, buf, s.rta_cacheinfo)
   end,
+  [c.RTA.PREF] = function(ir, buf, len)
+    local i = pt.uint8(buf)
+    ir.pref = tonumber(i[0])
+  end,
   -- TODO some missing
 }
 
@@ -340,6 +344,44 @@ mt.iflink = {
   end
 }
 
+meth.ndmsg = {
+  index = {
+    family = function(i) return tonumber(i.ndmsg.ndm_family) end,
+    ifindex = function(i) return tonumber(i.ndmsg.ndm_ifindex) end,
+    state = function(i) return tonumber(i.ndmsg.ndm_state) end,
+    flags = function(i) return tonumber(i.ndmsg.ndm_flags) end,
+    type = function(i) return tonumber(i.ndmsg.ndm_type) end,
+    dest = function(i) return i.dst or addrtype(i.family) end,
+    -- might not be set in Lua table, so return nil
+    dst = function() return nil end,
+    lladdr = function() return nil end,
+  },
+  flags = {
+    [c.NTF.PROXY] = "proxy",
+    [c.NTF.ROUTER] = "router",
+  },
+  state = {
+    [c.NUD.INCOMPLETE] = "incomplete",
+    [c.NUD.REACHABLE] = "reachable",
+    [c.NUD.STALE] = "stale",
+    [c.NUD.DELAY] = "delay",
+    [c.NUD.PROBE] = "probe",
+    [c.NUD.FAILED] = "failed",
+    [c.NUD.NOARP] = "noarp",
+    [c.NUD.PERMANENT] = "permanent",
+  }
+}
+
+mt.ndmsg = {
+  __index = function(i, k)
+    if meth.ndmsg.index[k] then return meth.ndmsg.index[k](i) end
+  end,
+  __tostring = function(i) -- TODO make more like output of ip route
+    local s = "dst: " .. tostring(i.dest) .. " lladdr: " .. tostring(i.lladdr) .. " if: " .. i.ifindex
+    return s
+  end,
+}
+
 meth.rtmsg = {
   index = {
     family = function(i) return tonumber(i.rtmsg.rtm_family) end,
@@ -375,6 +417,17 @@ mt.rtmsg = {
   __tostring = function(i) -- TODO make more like output of ip route
     local s = "dst: " .. tostring(i.dest) .. "/" .. i.dst_len .. " gateway: " .. tostring(i.gw) .. " src: " .. tostring(i.source) .. "/" .. i.src_len .. " if: " .. (i.output or i.oif)
     return s
+  end,
+}
+
+
+mt.neighs = {
+  __tostring = function(is)
+    local s = {}
+    for k, v in ipairs(is) do
+      s[#s + 1] = tostring(v)
+    end
+    return table.concat(s, '\n')
   end,
 }
 
@@ -496,12 +549,12 @@ local function decode_route(buf, len)
 end
 
 local function decode_neigh(buf, len)
-  local rt = pt.rtmsg(buf)
-  buf = buf + nlmsg_align(s.rtmsg)
-  len = len - nlmsg_align(s.rtmsg)
+  local rt = pt.ndmsg(buf)
+  buf = buf + nlmsg_align(s.ndmsg)
+  len = len - nlmsg_align(s.ndmsg)
   local rtattr = pt.rtattr(buf)
-  local ir = setmetatable({rtmsg = t.rtmsg()}, mt.rtmsg)
-  ffi.copy(ir.rtmsg, rt, s.rtmsg)
+  local ir = setmetatable({ndmsg = t.ndmsg()}, mt.ndmsg)
+  ffi.copy(ir.ndmsg, rt, s.ndmsg)
   while rta_ok(rtattr, len) do
     if nda_decode[rtattr.rta_type] then
       nda_decode[rtattr.rta_type](ir, buf + rta_length(0), rta_align(rtattr.rta_len) - rta_length(0))
@@ -1051,7 +1104,9 @@ function nl.getneigh(index, tab, ...)
   if type(index) == 'table' then index = index.index end
   tab.ifindex = index
   local ndm = t.ndmsg(tab)
-  return nlmsg("getneigh", "request, dump", ndm.family, t.ndmsg, ndm, ...)
+  local n, err = nlmsg("getneigh", "request, dump", ndm.family, t.ndmsg, ndm, ...)
+  if not n then return nil, err end
+  return setmetatable(n, mt.neighs)
 end
 
 function nl.newneigh(index, tab, ...)

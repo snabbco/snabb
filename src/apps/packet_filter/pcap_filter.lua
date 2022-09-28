@@ -42,24 +42,15 @@ function PcapFilter:new (conf)
    }
    if conf.state_table then conntrack.define(conf.state_table) end
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='filtered-packets', alarm_type_qualifier=conf.alarm_type_qualifier}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description="Total number of filtered packets"
-      }
-   }
-   local alarm_key = {
-      resource=tostring(S.getpid()),
-      alarm_type_id='filtered-packets',
-      alarm_type_qualifier=conf.alarm_type_qualifier
-   }
-   local filtered_packets_alarm = alarms.declare_alarm {
-      [alarm_key] = {
-         perceived_severity = 'warning',
-         alarm_text = "More than 1,000,000 packets filtered per second",
-      }
-   }
+   alarms.add_to_inventory(
+      {alarm_type_id='filtered-packets', alarm_type_qualifier=conf.alarm_type_qualifier},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description="Total number of filtered packets"})
+   local filtered_packets_alarm = alarms.declare_alarm(
+      { resource=tostring(S.getpid()), alarm_type_id='filtered-packets',
+        alarm_type_qualifier=conf.alarm_type_qualifier },
+      { perceived_severity = 'warning',
+        alarm_text = "More than 1,000,000 packets filtered per second" })
    o.filtered_packets_alarm = CounterAlarm.new(filtered_packets_alarm,
       1, 1e6, o, 'rxerrors')
    return setmetatable(o, { __index = PcapFilter })
@@ -144,8 +135,7 @@ function selftest_run (stateful, expected, tolerance, native)
 
    print(("Run for 1 second (stateful = %s)..."):format(stateful))
 
-   local deadline = lib.timeout(1.0)
-   repeat app.breathe() until deadline()
+   app.main{duration=1}
 
    app.report({showlinks=true})
    local sent     = link.stats(app.app_table.pcap_filter.input.input).rxpackets

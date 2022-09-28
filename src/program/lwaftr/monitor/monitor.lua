@@ -5,11 +5,9 @@ local ipv4 = require("lib.protocol.ipv4")
 local lib = require("core.lib")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
-local top = require("program.top.top")
 local engine = require("core.app")
 
 local fatal = lwutil.fatal
-local select_snabb_instance = top.select_snabb_instance
 
 local long_opts = {
    help = "h",
@@ -43,7 +41,7 @@ local function find_mirror_path (pid)
    if not shm.exists(path) then
       fatal(("lwAFTR process '%d' is not running in mirroring mode"):format(pid))
    end
-   return path, pid
+   return path
 end
 
 local function set_mirror_address (address, path)
@@ -81,7 +79,10 @@ function run (args)
          fatal(("Couldn't find process with name '%s'"):format(opts.name))
       end
    end
-   local path, pid = find_mirror_path(top.select_snabb_instance(pid))
+   if not lwutil.dir_exists(shm.root..'/'..pid) then
+      fatal("No such Snabb instance: "..pid)
+   end
+   local path = find_mirror_path(pid)
    address = set_mirror_address(address, path)
    print(("Mirror address set to '%s' in PID '%s'"):format(address, pid))
 end

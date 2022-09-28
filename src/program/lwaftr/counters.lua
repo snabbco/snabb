@@ -8,7 +8,7 @@ local S = require('syscall')
 
 function counter_names ()
    local names = {}
-   local schema = schema.load_schema_by_name('snabb-softwire-v2')
+   local schema = schema.load_schema_by_name('snabb-softwire-v3')
    for k, node in pairs(schema.body['softwire-state'].body) do
       if node.kind == 'leaf' then
          names[k] = data.normalize_id(k)
@@ -18,7 +18,7 @@ function counter_names ()
 end
 
 function read_counters (pid)
-   local reader = state.state_reader_from_schema_by_name('snabb-softwire-v2')
+   local reader = state.state_reader_from_schema_by_name('snabb-softwire-v3')
    local s = reader(state.counters_for_pid(pid or S.getpid()))
    local ret = {}
    for k, id in pairs(counter_names()) do

@@ -147,7 +147,6 @@ int mkfifoat(int dirfd, const char *pathname, mode_t mode);
 int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags);
 int readlinkat(int dirfd, const char *pathname, char *buf, size_t bufsiz);
 int faccessat(int dirfd, const char *pathname, int mode, int flags);
-int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
 
 int futimens(int fd, const struct timespec times[2]);
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags);

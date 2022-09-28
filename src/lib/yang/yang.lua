@@ -5,8 +5,8 @@ local lib = require("core.lib")
 local schema = require("lib.yang.schema")
 local data = require("lib.yang.data")
 local binary = require("lib.yang.binary")
-local stream = require("lib.yang.stream")
-local util = require("lib.yang.util")
+local file = require("lib.stream.file")
+local path_data = require("lib.yang.path_data")
 
 load_schema = schema.load_schema
 load_schema_file = schema.load_schema_file
@@ -15,12 +15,19 @@ load_schema_by_name = schema.load_schema_by_name
 add_schema = schema.add_schema
 add_schema_file = schema.add_schema_file
 
-load_config_for_schema = data.load_config_for_schema
-load_config_for_schema_by_name = data.load_config_for_schema_by_name
+function load_config_for_schema (schema, stream)
+   local data = data.load_config_for_schema(schema, stream)
+   path_data.consistency_checker_from_schema(schema, true)(data)
+   return data
+end
+function load_config_for_schema_by_name(schema_name, stream)
+   local data = data.load_config_for_schema_by_name(schema_name, stream)
+   path_data.consistency_checker_from_schema_by_name(schema_name, true)(data)
+   return data
+end
 
 print_config_for_schema = data.print_config_for_schema
 print_config_for_schema_by_name = data.print_config_for_schema_by_name
-string_io_file = util.string_io_file
 
 compile_config_for_schema = binary.compile_config_for_schema
 compile_config_for_schema_by_name = binary.compile_config_for_schema_by_name
@@ -31,6 +38,7 @@ local params = {
    verbose = {},
    schema_name = {required=true},
    revision_date = {},
+   compiled_filename = {},
 }
 
 -- Load the configuration from FILENAME.  If it's compiled, load it
@@ -72,15 +80,18 @@ function load_configuration(filename, opts)
          return
       end
       local compiled = result
-      if opts.schema_name and opts.schema_name ~= compiled.schema_name then
+      local expected_revision = opts.revision_date or
+         load_schema_by_name(opts.schema_name).last_revision
+      if opts.schema_name ~= compiled.schema_name then
          log('expected schema name %s in compiled file, but got %s',
              opts.schema_name, compiled.schema_name)
          return
       end
-      if opts.revision_date and opts.revision_date ~= schema.revision_date then
-         log('expected schema revision date %s in compiled file, but got %s',
-             opts.revision_date, compiled.revision_date)
+      if expected_revision ~= compiled.revision_date then
+         log('expected schema revision date %s in compiled file, but got "%s"',
+             expected_revision, compiled.revision_date)
          return
+      else
       end
       if source_mtime then
          if (source_mtime.sec == compiled.source_mtime.sec and
@@ -96,17 +107,23 @@ function load_configuration(filename, opts)
       return compiled.data
    end
 
-   local source = stream.open_input_byte_stream(filename)
-   if binary.has_magic(source) then return load_compiled(source) end
+   local source = assert(file.open(filename))
+   if binary.has_magic(source) then
+      local conf = load_compiled(source)
+      if conf then return conf end
+   end
 
    -- If the file doesn't have the magic, assume it's a source file.
    -- First, see if we compiled it previously and saved a compiled file
    -- in a well-known place.
-   local compiled_filename = filename:gsub("%.conf$", "")..'.o'
-   local source_mtime = {sec=source.mtime_sec, nsec=source.mtime_nsec}
+   local stat = source.io.fd:stat()
+   local source_mtime = { sec=stat.st_mtime, nsec=stat.st_mtime_nsec }
+   local compiled_filename = opts.compiled_filename
+   if not compiled_filename then
+      compiled_filename = filename:gsub("%.conf$", "")..'.o'
+   end
    local use_compiled_cache = not lib.getenv("SNABB_RANDOM_SEED")
-   local compiled_stream = maybe(stream.open_input_byte_stream,
-                                 compiled_filename)
+   local compiled_stream = maybe(file.open, compiled_filename)
    if compiled_stream then
       if binary.has_magic(compiled_stream) and use_compiled_cache then
          log('loading compiled configuration from %s', compiled_filename)
@@ -117,12 +134,8 @@ function load_configuration(filename, opts)
    end
 
    -- Load and compile it.
-   local source_str = source:read_string()
-   source:close()
    log('loading source configuration')
-   local conf = load_config_for_schema_by_name(opts.schema_name, source_str,
-                                               filename)
-
+   local conf = load_config_for_schema_by_name(opts.schema_name, source)
    if use_compiled_cache then
       -- Save it, if we can.
       local success, err = pcall(binary.compile_config_for_schema_by_name,

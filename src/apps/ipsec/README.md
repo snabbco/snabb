@@ -1,21 +1,21 @@
 # IPsec Apps
 
-## AES128gcm (apps.ipsec.esp)
+## ESP Transport6 and Tunnel6 (apps.ipsec.esp)
 
-The `AES128gcm` implements ESP in transport mode using the AES-GCM-128
-cipher. It encrypts packets received on its `decapsulated` port and transmits
-them on its `encapsulated` port, and vice-versa. Packets arriving on the
-`decapsulated` port must have an IPv6 header, and packets arriving on the
-`encapsulated` port must have an IPv6 header followed by an ESP header,
-otherwise they will be discarded.
+The `Transport6` and `Tunnel6` apps implement ESP in transport and tunnel mode
+respectively. they encrypts packets received on their `decapsulated` port and
+transmit them on their `encapsulated` port, and vice-versa. Packets arriving on
+the `decapsulated` port must have Ethernet and IPv6 headers, and packets
+arriving on the `encapsulated` port must have an Ethernet and IPv6 headers
+followed by an ESP header, otherwise they will be discarded.
 
-    DIAGRAM: AES128gcm
-                   +-----------+
-    encapsulated   |           |
-              ---->* AES128gcm *<----
-              <----*           *---->
-                   |           |   decapsulated
-                   +-----------+
+    DIAGRAM: Transport6
+                   +------------+
+    encapsulated   |            |
+              ---->* Transport6 *<----
+              <----*  Tunnel6   *---->
+                   |            |   decapsulated
+                   +------------+
     
     encapsulated
               --------\   /----------
@@ -28,8 +28,22 @@ References:
 
 ### Configuration
 
-The `AES128gcm` app accepts a table as its configuration argument. The
-following keys are defined:
+The `Transport6` and `Tunnel6` apps accepts a table as its configuration
+argument. The following keys are defined:
+
+— Key **self_ip** (`Tunnel6` only)
+
+*Required*. Source address of the encapsulating IPv6 header.
+
+— Key **nexthop_ip** (`Tunnel6` only)
+
+*Required*. Destination address of the encapsulating IPv6 header.
+
+— Key **aead**
+
+*Optional*. The identifier of the AEAD to use for encryption and
+authentication. For now, only the default `"aes-gcm-16-icv"` (AES-GCM with a 16
+octet ICV) is supported.
 
 — Key **spi**
 

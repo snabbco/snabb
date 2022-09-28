@@ -75,7 +75,7 @@ local function ipv4_packet_has_valid_length(h, len)
    if len < ffi.sizeof(ether_ipv4_header_t) then return false end
    local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    if ihl < 5 then return false end
-   return ntohs(h.ipv4.total_length) == len - ether_header_len
+   return ntohs(h.ipv4.total_length) <= len - ether_header_len
 end
 
 -- IPv4 requires recalculating an embedded checksum.
@@ -163,19 +163,14 @@ function Reassembler:new(conf)
    o.scratch_reassembly = params.value_type()
    o.next_counter_update = -1
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='incoming-ipv4-fragments'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Incoming IPv4 fragments over N fragments/s',
-      }
-   }
-   local incoming_fragments_alarm = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='incoming-ipv4-fragments'}] = {
-         perceived_severity='warning',
-         alarm_text='More than 10,000 IPv4 fragments per second',
-      }
-   }
+   alarms.add_to_inventory(
+      {alarm_type_id='incoming-ipv4-fragments'},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description='Incoming IPv4 fragments over N fragments/s'})
+   local incoming_fragments_alarm = alarms.declare_alarm(
+      {resource=tostring(S.getpid()),alarm_type_id='incoming-ipv4-fragments'},
+      {perceived_severity='warning',
+       alarm_text='More than 10,000 IPv4 fragments per second'})
    o.incoming_ipv4_fragments_alarm = CounterAlarm.new(incoming_fragments_alarm,
       1, 1e4, o, "in-ipv4-frag-needs-reassembly")
 
@@ -301,8 +296,6 @@ end
 function Reassembler:push ()
    local input, output = self.input.input, self.output.output
 
-   self.incoming_ipv4_fragments_alarm:check()
-
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
@@ -327,6 +320,10 @@ function Reassembler:push ()
          packet.free(pkt)
       end
    end
+end
+
+function Reassembler:tick ()
+   self.incoming_ipv4_fragments_alarm:check()
 
    if self.next_counter_update < engine.now() then
       -- Update counters every second, but add a bit of jitter to smooth

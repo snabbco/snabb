@@ -1,0 +1,137 @@
+#!../../snabb snsh
+
+local worker = require("core.worker")
+local lib = require("core.lib")
+
+local mode = 'source-sink'
+local pci0, pci1
+local cores0, cores1
+local nworkers = 1
+local nqueues = 1
+local npackets = 100e6
+local pktsize = 64
+local nmacs
+local nvlans
+local mlxopts
+
+local long_opts = {
+   mode = "m",
+   ['pci-a'] = "a",
+   ['pci-b'] = "b",
+   ['cores-a'] = "A",
+   ['cores-b'] = "B",
+   nworkers = "w",
+   nqueues = "q",
+   npackets = "n",
+   pktsize = "s",
+   nmacs = "e",
+   nvlans = "v",
+   opt = "o",
+   help = "h",
+}
+local opts = "m:a:b:A:B:w:q:n:s:e:v:o:h"
+local function print_usage ()
+   for long, short in pairs(long_opts) do
+      print("--"..long, "-"..short)
+   end
+end
+
+local opt = {}
+function opt.m (arg) mode = arg end
+function opt.a (arg) pci0 = arg end
+function opt.b (arg) pci1 = arg end
+function opt.A (arg) cores0 = arg end
+function opt.B (arg) cores1 = arg end
+function opt.w (arg) nworkers = tonumber(arg) end
+function opt.q (arg) nqueues = tonumber(arg) end
+function opt.n (arg) npackets = tonumber(arg) end
+function opt.s (arg) pktsize = arg end
+function opt.e (arg) nmacs = tonumber(arg) end
+function opt.v (arg) nvlans = tonumber(arg) end
+function opt.o (arg) mlxopts = arg end
+function opt.h (arg) print_usage() main.exit(0) end
+
+main.parameters = lib.dogetopt(main.parameters, opt, opts, long_opts)
+
+assert(nworkers >= 1, "nworkers < 1")
+assert(nqueues >= 1, "nqueues < 1")
+assert(npackets >= 1, "npackets < 1")
+
+if type(pktsize) == 'string' then
+   pktsize = ("%q"):format(pktsize)
+end
+
+local macs, dmacs, vlans
+if nmacs and nmacs > 0 then
+   assert(nmacs <= 0xff, "nmacs too large")
+   macs = '{'
+   dmacs = '{'
+   for mac=1, nmacs do
+      macs = ("%s'02:01:00:00:00:%02X',"):format(macs, mac)
+      dmacs = ("%s'02:02:00:00:00:%02X',"):format(dmacs, mac)
+   end
+   macs = macs..'}'
+   dmacs = dmacs..'}'
+end
+if nvlans and nvlans > 0 then
+   vlans = '{'
+   for vlan=1, nvlans do
+      vlans = ("%s%d,"):format(vlans, vlan)
+   end
+   vlans = vlans..'}'
+end
+
+if mode == 'source-sink' then
+
+   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, %s, %s, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
+
+   worker.start("source", ('require("apps.mellanox.benchmark").source_linger(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
+      :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
+
+   engine.main{done = function ()
+      return not worker.status()["sink"].alive
+   end}
+
+elseif mode == 'source-fwd' then
+
+   worker.start("forward", ('require("apps.mellanox.benchmark").fwd(%q, %q, %d, %d, %s, %s, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
+
+   worker.start("source", ('require("apps.mellanox.benchmark").source_linger(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
+      :format(pci1, cores1, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
+
+   engine.main{done = function ()
+      return not worker.status()["forward"].alive
+   end}
+
+elseif mode == 'source' then
+
+   worker.start("source", ('require("apps.mellanox.benchmark").source(%q, %q, %d, %d, %s, %s, %s, %d, %s, %s)')
+      :format(pci0, cores0, nworkers, nqueues, macs, vlans, mlxopts, npackets, pktsize, dmacs))
+
+   engine.main{done = function ()
+      return not worker.status()["source"].alive
+   end}
+
+elseif mode == 'sink' then
+
+   worker.start("sink", ('require("apps.mellanox.benchmark").sink(%q, %q, %d, %d, %s, %s, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
+
+   engine.main{done = function ()
+      return not worker.status()["sink"].alive
+   end}
+
+elseif mode == 'fwd' then
+
+   worker.start("forward", ('require("apps.mellanox.benchmark").fwd(%q, %q, %d, %d, %s, %s, %s, %d)')
+      :format(pci0, cores0, nworkers, nqueues, dmacs, vlans, mlxopts, npackets))
+
+   engine.main{done = function ()
+      return not worker.status()["forward"].alive
+   end}
+
+else
+   error("NYI: mode "..mode)
+end

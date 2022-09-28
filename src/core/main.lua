@@ -8,7 +8,7 @@ package.path = ''
 
 local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
-local vmprofile = require("jit.vmprofile")
+local jit = require("jit")
 local lib = require("core.lib")
 local shm = require("core.shm")
 local C   = ffi.C
@@ -47,6 +47,10 @@ function main ()
       error("fatal: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
    end
    initialize()
+   -- Setup audit.log, vmprofile
+   engine.enable_auditlog()
+   engine.setvmprofile("program")
+   jit.vmprofile.start()
    if lib.getenv("SNABB_PROGRAM_LUACODE") then
       -- Run the given Lua code instead of the command-line
       local expr = lib.getenv("SNABB_PROGRAM_LUACODE")
@@ -54,8 +58,6 @@ function main ()
       if f == nil then
          error(("Failed to load $SNABB_PROGRAM_LUACODE: %q"):format(expr))
       else
-         engine.setvmprofile("program")
-         vmprofile.start()
          f()
       end
    else
@@ -65,12 +67,10 @@ function main ()
          print("unsupported program: "..program:gsub("_", "-"))
          usage(1)
       else
-         engine.setvmprofile("program")
-         vmprofile.start()
          require(modulename(program)).run(args)
       end
    end
-   vmprofile.stop()
+   jit.vmprofile.stop()
 end
 
 -- Take the program name from the first argument, unless the first
@@ -186,8 +186,13 @@ function shutdown (pid)
    safely(function () require("core.packet").shutdown(pid) end)
    safely(function () require("apps.interlink.receiver").shutdown(pid) end)
    safely(function () require("apps.interlink.transmitter").shutdown(pid) end)
+   safely(function () require("apps.mellanox.connectx").shutdown(pid) end)
    -- Parent process performs additional cleanup steps.
    -- (Parent is the process whose 'group' folder is not a symlink.)
+
+   -- Restore non-blocking flags on file descriptions, as these are
+   -- shared with the parent.
+   S.stdin:block(); S.stdout:block(); S.stderr:block()
    local st, err = S.lstat(shm.root.."/"..pid.."/group")
    local is_parent = st and st.isdir
    if is_parent then

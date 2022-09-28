@@ -29,21 +29,17 @@ local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6     = require("lib.protocol.ipv6")
 local alarms = require("lib.yang.alarms")
+local counter = require("core.counter")
 local S = require("syscall")
 
-alarms.add_to_inventory {
-   [{alarm_type_id='ndp-resolution'}] = {
-      resource=tostring(S.getpid()),
-      has_clear=true,
-      description='Raise up if NDP app cannot resolve IPv6 address'
-   }
-}
-local resolve_alarm = alarms.declare_alarm {
-   [{resource=tostring(S.getpid()), alarm_type_id='ndp-resolution'}] = {
-      perceived_severity = 'critical',
-      alarm_text = 'Make sure you can NDP resolve IP addresses on NIC',
-   },
-}
+alarms.add_to_inventory(
+   {alarm_type_id='ndp-resolution'},
+   {resource=tostring(S.getpid()), has_clear=true,
+    description='Raise up if NDP app cannot resolve IPv6 address'})
+local resolve_alarm = alarms.declare_alarm(
+   {resource=tostring(S.getpid()), alarm_type_id='ndp-resolution'},
+   {perceived_severity = 'critical',
+    alarm_text = 'Make sure you can NDP resolve IP addresses on NIC'})
 
 local htons, ntohs = lib.htons, lib.ntohs
 local htonl, ntohl = lib.htonl, lib.ntohl
@@ -150,13 +146,13 @@ local ipv6_unspecified_addr = ipv6:pton("0::0") -- aka ::/128
 -- Really just the first 13 bytes of the following...
 local ipv6_solicited_multicast = ipv6:pton("ff02:0000:0000:0000:0000:0001:ff00:00")
 
+local scratch_ph = ipv6_pseudoheader_t()
 local function checksum_pseudoheader_from_header(ipv6_fixed_header)
-   local ph = ipv6_pseudoheader_t()
-   ph.src_ip = ipv6_fixed_header.src_ip
-   ph.dst_ip = ipv6_fixed_header.dst_ip
-   ph.ulp_length = htonl(ntohs(ipv6_fixed_header.payload_length))
-   ph.next_header = htonl(ipv6_fixed_header.next_header)
-   return checksum.ipsum(ffi.cast('char*', ph),
+   scratch_ph.src_ip = ipv6_fixed_header.src_ip
+   scratch_ph.dst_ip = ipv6_fixed_header.dst_ip
+   scratch_ph.ulp_length = htonl(ntohs(ipv6_fixed_header.payload_length))
+   scratch_ph.next_header = htonl(ipv6_fixed_header.next_header)
+   return checksum.ipsum(ffi.cast('char*', scratch_ph),
                          ffi.sizeof(ipv6_pseudoheader_t), 0)
 end
 
@@ -224,18 +220,17 @@ local function make_na_packet(src_mac, dst_mac, src_ip, dst_ip, is_router)
 end
 
 -- Solicit a neighbor's address.
-local function make_ns_packet(src_mac, src_ip, dst_ip)
+local function make_ns_packet(src_mac, src_ip, dst_mac, dst_ip, target_ip)
    local message = ns_header_t()
    message.flags = 0
-   message.target_ip = dst_ip
+   message.target_ip = target_ip
 
    local option = ether_option_header_t()
    option.header.type = option_source_link_layer_address
    option.header.length = 1 -- One 8-byte unit.
    option.addr = src_mac
 
-   local broadcast_mac = ethernet:pton("ff:ff:ff:ff:ff:ff")
-   return make_ndp_packet(src_mac, broadcast_mac, src_ip, dst_ip, icmpv6_ns,
+   return make_ndp_packet(src_mac, dst_mac, src_ip, dst_ip, icmpv6_ns,
                           message, option)
 end
 
@@ -270,6 +265,17 @@ local function random_locally_administered_unicast_mac_address()
 end
 
 NDP = {}
+NDP.shm = {
+   ["next-hop-macaddr-v6"] = {counter},
+   ["in-ndp-ns-bytes"]  = {counter},
+   ["in-ndp-ns-packets"]  = {counter},
+   ["out-ndp-ns-bytes"]  = {counter},
+   ["out-ndp-ns-packets"]  = {counter},
+   ["in-ndp-na-bytes"]  = {counter},
+   ["in-ndp-na-packets"]  = {counter},
+   ["out-ndp-na-bytes"]  = {counter},
+   ["out-ndp-na-packets"]  = {counter},
+}
 local ndp_config_params = {
    -- Source MAC address will default to a random address.
    self_mac  = { default=false },
@@ -299,6 +305,21 @@ function NDP:new(conf)
       assert(o.next_ip, 'NDP needs next-hop IPv6 address to learn next-hop MAC')
       self.ns_interval = 3 -- Send a new NS every three seconds.
    end
+   if o.next_ip then
+      -- Construct Solicited-Node multicast address
+      -- https://datatracker.ietf.org/doc/html/rfc4861#section-2.3
+      o.solicited_node_mcast = ipv6:pton("ff02::1:ff00:0") -- /104
+      o.solicited_node_mcast[13] = o.next_ip[13]
+      o.solicited_node_mcast[14] = o.next_ip[14]
+      o.solicited_node_mcast[15] = o.next_ip[15]
+      -- Construct Ethernet multicast address
+      -- https://datatracker.ietf.org/doc/html/rfc2464#section-7
+      o.mac_mcast = ethernet:pton("33:33:00:00:00:00")
+      o.mac_mcast[2] = o.solicited_node_mcast[12]
+      o.mac_mcast[3] = o.solicited_node_mcast[13]
+      o.mac_mcast[4] = o.solicited_node_mcast[14]
+      o.mac_mcast[5] = o.solicited_node_mcast[15]
+   end
    return setmetatable(o, {__index=NDP})
 end
 
@@ -314,8 +335,12 @@ function NDP:maybe_send_ns_request (output)
    self.next_ns_time = self.next_ns_time or engine.now()
    if self.next_ns_time <= engine.now() then
       self:ndp_resolving(self.next_ip)
-      transmit(self.output.south,
-               make_ns_packet(self.self_mac, self.self_ip, self.next_ip))
+      local ns = make_ns_packet(self.self_mac, self.self_ip,
+                                self.mac_mcast, self.solicited_node_mcast,
+                                self.next_ip)
+      counter.add(self.shm["out-ndp-ns-bytes"], ns.length)
+      counter.add(self.shm["out-ndp-ns-packets"])
+      transmit(self.output.south, ns)
       self.next_ns_time = engine.now() + self.ns_interval
    end
 end
@@ -326,6 +351,11 @@ function NDP:ndp_resolved (ip, mac, provenance)
       resolve_alarm:clear()
    end
    self.next_mac = mac
+   if self.next_mac then
+      local buf = ffi.new('union { uint64_t u64; uint8_t bytes[6]; }')
+      buf.bytes = self.next_mac
+      counter.set(self.shm["next-hop-macaddr-v6"], buf.u64)
+   end
    if self.shared_next_mac_key then
       if provenance == 'remote' then
          -- If we are getting this information from a packet and not
@@ -370,6 +400,8 @@ function NDP:handle_ndp (pkt)
    if not verify_icmp_checksum(pkt) then return end
 
    if h.icmpv6.type == icmpv6_na then
+      counter.add(self.shm["in-ndp-na-bytes"], pkt.length)
+      counter.add(self.shm["in-ndp-na-packets"])
       -- Only process advertisements when we are looking for a
       -- next-hop MAC.
       if self.next_mac then return end
@@ -402,6 +434,8 @@ function NDP:handle_ndp (pkt)
       -- Advertisement Message Format.
       self:resolve_next_hop(copy_mac(h.ether.shost))
    elseif h.icmpv6.type == icmpv6_ns then
+      counter.add(self.shm["in-ndp-ns-bytes"], pkt.length)
+      counter.add(self.shm["in-ndp-ns-packets"])
       if pkt.length < ndp_header_len + ffi.sizeof(ns_header_t) then return end
       local ns = ffi.cast(ns_header_ptr_t, h.body)
       if is_address_multicast(ns.target_ip) then return end
@@ -429,9 +463,11 @@ function NDP:handle_ndp (pkt)
             end
          end
       end
-      link.transmit(self.output.south,
-                    make_na_packet(self.self_mac, h.ether.shost,
-                                   self.self_ip, dst_ip, self.is_router))
+      local na = make_na_packet(self.self_mac, h.ether.shost,
+                                self.self_ip, dst_ip, self.is_router)
+      counter.add(self.shm["out-ndp-na-bytes"], na.length)
+      counter.add(self.shm["out-ndp-na-packets"])
+      link.transmit(self.output.south, na)
    else
       -- Unhandled NDP packet; silently drop.
       return
@@ -496,7 +532,9 @@ function selftest()
    config.link(c, "sink2.tx -> nd2.north")
    config.link(c, "nd2.north -> sink2.rx")
    engine.configure(c)
-   engine.main({ duration = 0.1 })
+   local breaths = counter.read(engine.breaths)
+   local function done() return counter.read(engine.breaths)-breaths > 1 end
+   engine.main({ done = done })
 
    local function mac_eq(a, b) return ffi.C.memcmp(a, b, 6) == 0 end
    local nd1, nd2 = engine.app_table.nd1, engine.app_table.nd2

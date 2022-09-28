@@ -16,17 +16,25 @@ function test_lwaftr_pcap {
     rm $TEMP_PCAP
     exit 1
   fi
+  if ! which tcpdump; then
+    echo "Error: no tcpdump to compare packets"
+    rm $TEMP_PCAP
+    exit 43
+  fi
   cmp $TEMP_PCAP $PCAP
-  status=$?
+  tcpdump -venr $TEMP_PCAP | sort > $TEMP_PCAP.txt
   rm $TEMP_PCAP
-  if [ $status != 0 ]; then
-    echo "Error: lwaftr generated pcap differs from ${PCAP}"
+  diffies=$(tcpdump -venr $PCAP | sort | diff -u /dev/stdin $TEMP_PCAP.txt)
+  rm $TEMP_PCAP.txt
+  if test -n "$diffies"; then
+    echo "Error: lwaftr generated pcap differs from ${PCAP}:"
+    echo "$diffies"
     exit 1
   fi
 }
 
 test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_1.pcap --count 1
-test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_2.pcap --count 2 --vlan 100 --size 50
+test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_2.pcap --count 2 --vlan 100 --size 64
 
 # lwaftr tap test
 sudo ip netns add snabbtest || exit $TEST_SKIPPED

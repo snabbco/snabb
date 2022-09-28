@@ -18,6 +18,7 @@ ethernet._ulp = {
    class_map = {
                   [0x0800] = "lib.protocol.ipv4",
                   [0x86dd] = "lib.protocol.ipv6",
+                  [0x8100] = "lib.protocol.dot1q"
                 },
    method    = 'type' }
 ethernet:init(

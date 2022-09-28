@@ -1,0 +1,170 @@
+module(..., package.seeall)
+
+local bit = require("bit")
+local dasm = require("dasm")
+local lib = require("core.lib")
+local ffi = require('ffi')
+local C = ffi.C
+
+-- DynASM prelude.
+
+debug = false
+
+|.arch x64
+|.actionlist actions
+
+__anchor = {}
+mcode = {}
+size = 0
+
+function assemble (name, prototype, generator)
+   local Dst = dasm.new(actions)
+   generator(Dst)
+   local mcode, size = Dst:build()
+   table.insert(__anchor, mcode)
+   if debug then
+      print("mcode dump: "..name)
+      dasm.dump(mcode, size)
+   end
+   return ffi.cast(prototype, mcode)
+end
+
+local function gen_checksum ()
+   return function (Dst)
+      -- Prologue.
+      | push rbp
+      | mov rbp, rsp
+      -- Accumulative sum.
+      | mov rax, rdx                -- Dx (3rd argument: initial).
+      | xchg al, ah                 -- Swap to convert to host-bytes order.
+      | mov rcx, rsi                -- Rsi (2nd argument; size).
+      | xor r9, r9                  -- Clear out r9. Stores value of array.
+      | xor r8, r8                  -- Clear out r8. Stores array index.
+      | 1:
+      | cmp rcx, 32                 -- If index is less than 16.
+      | jl >2                       -- Jump to branch '2'.
+      | add rax, [rdi + r8]         -- Sum acc with qword[0].
+      | adc rax, [rdi + r8 + 8]     -- Sum with carry qword[1].
+      | adc rax, [rdi + r8 + 16]    -- Sum with carry qword[2].
+      | adc rax, [rdi + r8 + 24]    -- Sum with carry qword[3]
+      | adc rax, 0                  -- Sum carry-bit into acc.
+      | sub rcx, 32                 -- Decrease index by 8.
+      | add r8, 32                  -- Jump two qwords.
+      | jmp <1                      -- Go to beginning of loop.
+      | 2:
+      | cmp rcx, 16                 -- If index is less than 16.
+      | jl >3                       -- Jump to branch '2'.
+      | add rax, [rdi + r8]         -- Sum acc with qword[0].
+      | adc rax, [rdi + r8 + 8]     -- Sum with carry qword[1].
+      | adc rax, 0                  -- Sum carry-bit into acc.
+      | sub rcx, 16                 -- Decrease index by 8.
+      | add r8, 16                  -- Jump two qwords.
+      | 3:
+      | cmp rcx, 8                  -- If index is less than 8.
+      | jl >4                       -- Jump to branch '2'.
+      | add rax, [rdi + r8]         -- Sum acc with qword[0].
+      | adc rax, 0                  -- Sum carry-bit into acc.
+      | sub rcx, 8                  -- Decrease index by 8.
+      | add r8, 8                   -- Next 64-bit.
+      | 4:
+      | cmp rcx, 4                  -- If index is less than 4.
+      | jl >5                       -- Jump to branch '3'.
+      | mov r9d, dword [rdi + r8]   -- Fetch 32-bit from data + r8 into r9d.
+      | add rax, r9                 -- Sum acc with r9. Accumulate carry.
+      | adc rax, 0                  -- Sum carry-bit into acc.
+      | sub rcx, 4                  -- Decrease index by 4.
+      | add r8, 4                   -- Next 32-bit.
+      | 5:
+      | cmp rcx, 2                  -- If index is less than 2.
+      | jl >6                       -- Jump to branch '4'.
+      | movzx r9, word [rdi + r8]   -- Fetch 16-bit from data + r8 into r9.
+      | add rax, r9                 -- Sum acc with r9. Accumulate carry.
+      | adc rax, 0                  -- Sum carry-bit into acc.
+      | sub rcx, 2                  -- Decrease index by 2.
+      | add r8, 2                   -- Next 16-bit.
+      | 6:
+      | cmp rcx, 1                  -- If index is less than 1.
+      | jl >7                       -- Jump to branch '5'.
+      | movzx r9, byte [rdi + r8]   -- Fetch 8-bit from data + r8 into r9.
+      | add rax, r9                 -- Sum acc with r9. Accumulate carry.
+      | adc rax, 0                  -- Sum carry-bit into acc.
+      -- Fold 64-bit into 16-bit.
+      | 7:
+      | mov r9, rax                 -- Assign acc to r9.
+      | shr r9, 32                  -- Shift r9 32-bit. Stores higher part of acc.
+      | and rax, 0x00000000ffffffff -- Clear out higher-part of rax. Stores lower part of acc.
+      | add eax, r9d                -- 32-bit sum of acc and r9.
+      | adc eax, 0                  -- Sum carry to acc.
+      | mov r9d, eax                -- Repeat for 16-bit.
+      | shr r9d, 16
+      | and eax, 0x0000ffff
+      | add ax, r9w
+      | adc ax, 0
+      -- One's complement.
+      | not rax                     -- One-complement of rax.
+      | and rax, 0xffff             -- Clear out higher part of rax.
+      -- Swap.
+      | xchg al, ah
+      -- Epilogue.
+      | mov rsp, rbp
+      | pop rbp
+      -- Return.
+      | ret
+   end
+end
+
+-- Reference implementation in Lua.
+local function checksum_lua (data, size)
+   local function r16 (data)
+      return ffi.cast("uint16_t*", data)[0]
+   end
+   local csum = 0
+   local i = size
+   while i > 1 do
+      local word = r16(data + (size - i))
+      csum = csum + word
+      i = i - 2
+   end
+   if i == 1 then
+      csum = csum + data[size-1]
+   end
+   while true do
+      local carry = bit.rshift(csum, 16)
+      if carry == 0 then break end
+      csum = bit.band(csum, 0xffff) + carry
+   end
+   return bit.band(bit.bnot(csum), 0xffff)
+end
+
+checksum = assemble("checksum", "uint32_t(*)(uint8_t*, uint32_t, uint16_t)", gen_checksum())
+
+function selftest ()
+   print("selftest: checksum")
+   require("lib.checksum_h")
+   local function hex (num)
+      return ("0x%.2x"):format(num)
+   end
+   local function create_packet (size)
+      local pkt = {
+         data = ffi.new("uint8_t[?]", size),
+         length = size
+      }
+      for i=0,size-1 do
+         pkt.data[i] = math.random(255)
+      end
+      return pkt
+   end
+   local ntohs = lib.ntohs
+   for size=44,1500 do
+      local pkt = create_packet(size)
+      assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
+      assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
+   end
+   -- Test carry propagation
+   for l = 1, 63 do
+      local pkt = { data = ffi.new("uint8_t[?]", l), length = l }
+      for i = 0, l-2 do pkt.data[i]=0xff end; pkt.data[l-1] = 0x01
+      assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
+      assert(hex(checksum(pkt.data, pkt.length, 0)) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
+   end
+end

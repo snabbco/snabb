@@ -7,6 +7,7 @@ local lib = require("core.lib")
 local binary_search = require("lib.binary_search")
 local multi_copy = require("lib.multi_copy")
 local siphash = require("lib.hash.siphash")
+
 local min, max, floor, ceil = math.min, math.max, math.floor, math.ceil
 
 CTable = {}
@@ -127,7 +128,13 @@ local optional_params = {
    initial_size = 8,
    max_occupancy_rate = 0.9,
    min_occupancy_rate = 0.0,
-   resize_callback = false
+   resize_callback = false,
+   -- The default value for max_displacement_limit is infinity.
+   -- This is safe but uses lots of memory. An alternative
+   -- known-to-be-reasonable, virtually-infinite-in-practice value is: 30.
+   -- In practice, users of lib.ctable can use a lower max_displacement
+   -- to limit memory usage. See CTable:resize().
+   max_displacement_limit = 1/0
 }
 
 function new(params)
@@ -146,9 +153,11 @@ function new(params)
    ctab.size = 0
    ctab.max_displacement = 0
    ctab.occupancy = 0
+   ctab.lookup_helpers = {}
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
    ctab.resize_callback = params.resize_callback
+   ctab.max_displacement_limit = params.max_displacement_limit
    ctab = setmetatable(ctab, { __index = CTable })
    ctab:reseed_hash_function(params.hash_seed)
    ctab:resize(params.initial_size)
@@ -159,11 +168,14 @@ end
 -- hugepages, not this code.
 local try_huge_pages = true
 local huge_page_threshold = 1e6
+local huge_page_size = memory.get_huge_page_size()
 local function calloc(t, count)
    if count == 0 then return 0, 0 end
    local byte_size = ffi.sizeof(t) * count
+   local alloc_byte_size = byte_size
    local mem, err
    if try_huge_pages and byte_size > huge_page_threshold then
+      alloc_byte_size = ceil(byte_size/huge_page_size) * huge_page_size
       mem, err = S.mmap(nil, byte_size, 'read, write',
                         'private, anonymous, hugetlb')
       if not mem then
@@ -178,7 +190,7 @@ local function calloc(t, count)
       if not mem then error("mmap failed: " .. tostring(err)) end
    end
    local ret = ffi.cast(ffi.typeof('$*', t), mem)
-   ffi.gc(ret, function (ptr) S.munmap(ptr, byte_size) end)
+   ffi.gc(ret, function (ptr) S.munmap(ptr, alloc_byte_size) end)
    return ret, byte_size
 end
 
@@ -216,16 +228,25 @@ function CTable:resize(size)
    local old_size = self.size
    local old_max_displacement = self.max_displacement
 
-   -- Allocate double the requested number of entries to make sure there
-   -- is sufficient displacement if all hashes map to the last bucket.
-   self.entries, self.byte_size = calloc(self.entry_type, size * 2)
+   -- Theoretically, all hashes can map to the last bucket and
+   -- max_displacement could become as large as the table size. To be
+   -- safe, we should allocate twice as many entries as the size of
+   -- the table.  In practice, max_displacement is expected to always
+   -- be a small number.  We use max_displacement_limit as a cap for 
+   -- this value that "should be enough for everyone".  This is not
+   -- entirely safe, since an overrun can occur before the check for
+   -- the cap in maybe_increase_max_displacement(). The factor 2 here
+   -- reduces that risk but does not eliminate it.
+   local alloc_size = math.min(size*2, size + 2 * self.max_displacement_limit)
+   self.entries, self.byte_size = calloc(self.entry_type, alloc_size)
    self.size = size
    self.scale = self.size / HASH_MAX
    self.occupancy = 0
    self.max_displacement = 0
+   self.lookup_helper = self:make_lookup_helper()
    self.occupancy_hi = ceil(self.size * self.max_occupancy_rate)
    self.occupancy_lo = floor(self.size * self.min_occupancy_rate)
-   for i=0,self.size*2-1 do self.entries[i].hash = HASH_MAX end
+   for i=0,alloc_size-1 do self.entries[i].hash = HASH_MAX end
 
    if old_size ~= 0 then self:reseed_hash_function() end
 
@@ -255,7 +276,7 @@ struct {
 ]]
 
 function load(stream, params)
-   local header = stream:read_ptr(header_t)
+   local header = stream:read_struct(nil, header_t)
    local params_copy = {}
    for k,v in pairs(params) do params_copy[k] = v end
    params_copy.initial_size = header.size
@@ -265,26 +286,41 @@ function load(stream, params)
    params_copy.max_occupancy_rate = header.max_occupancy_rate
    local ctab = new(params_copy)
    ctab.occupancy = header.occupancy
-   ctab.max_displacement = header.max_displacement
+   ctab:maybe_increase_max_displacement(header.max_displacement)
    local entry_count = ctab.size + ctab.max_displacement
 
    -- Slurp the entries directly into the ctable's backing store.
    -- This ensures that the ctable is in hugepages.
-   C.memcpy(ctab.entries,
-            stream:read_array(ctab.entry_type, entry_count),
-            ffi.sizeof(ctab.entry_type) * entry_count)
+   stream:read_array(ctab.entries, ctab.entry_type, entry_count)
 
    return ctab
 end
 
 function CTable:save(stream)
-   stream:write_ptr(header_t(self.size, self.occupancy, self.max_displacement,
-                             self.hash_seed, self.max_occupancy_rate,
-                             self.min_occupancy_rate),
-                    header_t)
-   stream:write_array(self.entries,
-                      self.entry_type,
+   stream:write_struct(header_t,
+                       header_t(self.size, self.occupancy, self.max_displacement,
+                                self.hash_seed, self.max_occupancy_rate,
+                                self.min_occupancy_rate))
+   stream:write_array(self.entry_type,
+                      self.entries,
                       self.size + self.max_displacement)
+end
+
+function CTable:make_lookup_helper()
+   local entries_per_lookup = self.max_displacement + 1
+   local search = self.lookup_helpers[entries_per_lookup]
+   if search == nil then
+      search = binary_search.gen(entries_per_lookup, self.entry_type)
+      self.lookup_helpers[entries_per_lookup] = search
+   end
+   return search
+end
+
+function CTable:maybe_increase_max_displacement(displacement)
+   if displacement <= self.max_displacement then return end
+   assert(displacement <= self.max_displacement_limit)
+   self.max_displacement = displacement
+   self.lookup_helper = self:make_lookup_helper()
 end
 
 function CTable:add(key, value, updates_allowed)
@@ -331,7 +367,7 @@ function CTable:add(key, value, updates_allowed)
 
    assert(updates_allowed ~= 'required', "key not found in ctable")
 
-   self.max_displacement = max(self.max_displacement, index - start_index)
+   self:maybe_increase_max_displacement(index - start_index)
 
    if entries[index].hash ~= HASH_MAX then
       -- In a robin hood hash, we seek to spread the wealth around among
@@ -347,7 +383,7 @@ function CTable:add(key, value, updates_allowed)
       while empty > index do
          entries[empty] = entries[empty - 1]
          local displacement = empty - hash_to_index(entries[empty].hash, scale)
-         self.max_displacement = max(self.max_displacement, displacement)
+         self:maybe_increase_max_displacement(displacement)
          empty = empty - 1;
       end
    end
@@ -367,22 +403,24 @@ end
 function CTable:lookup_ptr(key)
    local hash = self.hash_fn(key)
    local entry = self.entries + hash_to_index(hash, self.scale)
+   entry = self.lookup_helper(entry, hash)
 
-   -- Fast path in case we find it directly.
-   if hash == entry.hash and self.equal_fn(key, entry.key) then
-      return entry
-   end
-
-   while entry.hash < hash do entry = entry + 1 end
-
-   while entry.hash == hash do
+   if hash == entry.hash then
+      -- Peel the first iteration of the loop; collisions will be rare.
       if self.equal_fn(key, entry.key) then return entry end
-      -- Otherwise possibly a collision.
       entry = entry + 1
+      if entry.hash ~= hash then return nil end
+      while entry.hash == hash do
+         if self.equal_fn(key, entry.key) then return entry end
+         -- Otherwise possibly a collision.
+         entry = entry + 1
+      end
+      -- Not found.
+      return nil
+   else
+      -- Not found.
+      return nil
    end
-
-   -- Not found.
-   return nil
 end
 
 function CTable:lookup_and_copy(key, entry)
@@ -429,6 +467,7 @@ function CTable:remove(key, missing_allowed)
 end
 
 function CTable:make_lookup_streamer(width)
+   assert(width > 0 and width <= 262144, "Width value out of range: "..width)
    local res = {
       all_entries = self.entries,
       width = width,
@@ -445,6 +484,9 @@ function CTable:make_lookup_streamer(width)
       -- more entry.
       stream_entries = self.type(width * (self.max_displacement + 1) + 1)
    }
+   -- Pointer to first entry key (cache to avoid cdata allocation.)
+   local key_offset = 4 -- Skip past uint32_t hash.
+   res.keys = ffi.cast('uint8_t*', res.entries) + key_offset
    -- Give res.pointers sensible default values in case the first lookup
    -- doesn't fill the pointers vector.
    for i = 0, width-1 do res.pointers[i] = self.entries end
@@ -467,13 +509,13 @@ end
 function LookupStreamer:stream()
    local width = self.width
    local entries = self.entries
+   local keys = self.keys
    local pointers = self.pointers
    local stream_entries = self.stream_entries
    local entries_per_lookup = self.entries_per_lookup
    local equal_fn = self.equal_fn
 
-   local key_offset = 4 -- Skip past uint32_t hash.
-   self.multi_hash(ffi.cast('uint8_t*', entries) + key_offset, self.hashes)
+   self.multi_hash(self.keys, self.hashes)
 
    for i=0,width-1 do
       local hash = self.hashes[i]
@@ -671,42 +713,16 @@ function selftest()
       -- Save the table out to disk, reload it, and run the same
       -- checks.
       local tmp = os.tmpname()
+      local file = require("lib.stream.file")
       do
-         local file = io.open(tmp, 'wb')
-         local function write(ptr, size)
-            file:write(ffi.string(ptr, size))
-         end
-         local stream = {}
-         function stream:write_ptr(ptr, type)
-            assert(ffi.sizeof(ptr) == ffi.sizeof(type))
-            write(ptr, ffi.sizeof(type))
-         end
-         function stream:write_array(ptr, type, count)
-            write(ptr, ffi.sizeof(type) * count)
-         end
+         local stream = file.open(tmp, 'wb')
          ctab:save(stream)
-         file:close()
+         stream:close()
       end
       do
-         local file = io.open(tmp, 'rb')
-         -- keep references to avoid GCing too early
-         local handle = {}
-         local function read(size)
-            local buf = ffi.new('uint8_t[?]', size)
-            ffi.copy(buf, file:read(size), size)
-            table.insert(handle, buf)
-            return buf
-         end
-         local stream = {}
-         function stream:read_ptr(type)
-            return ffi.cast(ffi.typeof('$*', type), read(ffi.sizeof(type)))
-         end
-         function stream:read_array(type, count)
-            return ffi.cast(ffi.typeof('$*', type),
-                            read(ffi.sizeof(type) * count))
-         end
+         local stream = file.open(tmp, 'rb')
          ctab = load(stream, params)
-         file:close()
+         stream:close()
       end         
       os.remove(tmp)
    end

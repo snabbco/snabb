@@ -2,71 +2,46 @@
 
 module(..., package.seeall)
 
-local now      = require("core.app").now
-local lib      = require("core.lib")
-local link     = require("core.link")
-local basic    = require("apps.basic.basic_apps")
-local arp      = require("apps.ipv4.arp")
-local ipfix    = require("apps.ipfix.ipfix")
-local pci      = require("lib.hardware.pci")
-local ipv4     = require("lib.protocol.ipv4")
-local ethernet = require("lib.protocol.ethernet")
-local numa     = require("lib.numa")
-
--- apps that can be used as an input or output for the exporter
-local in_apps, out_apps = {}, {}
-
-function in_apps.pcap (path)
-   return { input = "input",
-            output = "output" },
-          { require("apps.pcap.pcap").PcapReader, path }
-end
-
-function out_apps.pcap (path)
-   return { input = "input",
-            output = "output" },
-          { require("apps.pcap.pcap").PcapWriter, path }
-end
-
-function in_apps.raw (device)
-   return { input = "rx",
-            output = "tx" },
-          { require("apps.socket.raw").RawSocket, device }
-end
-out_apps.raw = in_apps.raw
-
-function in_apps.tap (device)
-   return { input = "input",
-            output = "output" },
-          { require("apps.tap.tap").Tap, device }
-end
-out_apps.tap = in_apps.tap
-
-function in_apps.pci (device)
-   local device_info = pci.device_info(device)
-   local conf = { pciaddr = device }
-   return { input = device_info.rx, output = device_info.tx },
-          { require(device_info.driver).driver, conf }
-end
-out_apps.pci = in_apps.pci
+local lib       = require("core.lib")
+local worker    = require("core.worker")
+local app_graph = require("core.config")
+local pci       = require("lib.hardware.pci")
+local probe     = require("program.ipfix.lib")
+local S         = require("syscall")
 
 local long_opts = {
    help = "h",
+   jit = "j",
    duration = "D",
    port = "p",
    transport = 1,
    ["host-ip"] = "a",
    ["input-type"] = "i",
    ["output-type"] = "o",
+   ["mtu"] = 1,
+   ["rss-queues"] = 1,
    ["netflow-v9"] = 0,
    ["ipfix"] = 0,
    ["active-timeout"] = 1,
    ["idle-timeout"] = 1,
-   ["cpu"] = 1
+   ["observation-domain"] = 1,
+   ["template-refresh"] = 1,
+   ["flush-timeout"] = 1,
+   ["cache-size"] = 1,
+   ["scan-time"] = 1,
+   ["pfx4-to-as"] = 1,
+   ["pfx6-to-as"] = 1,
+   ["maps-log"] = 1,
+   ["vlan-to-ifindex"] = 1,
+   ["mac-to-as"] = 1,
+   ["cpu"] = 1,
+   ["busy-wait"] = "b"
 }
 
 function run (args)
    local duration
+   local busywait = false
+   local jit = { opts = {} }
 
    local input_type, output_type = "pci", "pci"
 
@@ -74,9 +49,16 @@ function run (args)
    local host_ip = '10.0.0.1' -- Just to have a default.
    local collector_ip = '10.0.0.2' -- Likewise.
    local port = 4739
+   local mtu = 1514
+   local nqueues = 1
 
-   local active_timeout, idle_timeout
+   local active_timeout, idle_timeout, flush_timeout, scan_time
+   local observation_domain, template_refresh_interval
+   local cache_size
    local ipfix_version = 10
+   local templates = {}
+   local maps = {}
+   local maps_logfile
 
    local cpu
 
@@ -90,11 +72,9 @@ function run (args)
          duration = assert(tonumber(arg), "expected number for duration")
       end,
       i = function (arg)
-         assert(in_apps[arg], "unknown input type")
          input_type = arg
       end,
       o = function (arg)
-         assert(out_apps[arg], "unknown output type")
          output_type = arg
       end,
       p = function (arg)
@@ -109,6 +89,9 @@ function run (args)
       c = function (arg)
          collector_ip = arg
       end,
+      b = function (arg)
+         busywait = true
+      end,
       ["active-timeout"] = function (arg)
          active_timeout =
             assert(tonumber(arg), "expected number for active timeout")
@@ -117,83 +100,177 @@ function run (args)
          idle_timeout =
             assert(tonumber(arg), "expected number for idle timeout")
       end,
+      ["flush-timeout"] = function (arg)
+         flush_timeout =
+            assert(tonumber(arg), "expected number for flush timeout")
+      end,
+      ["scan-time"] = function (arg)
+         scan_time =
+            assert(tonumber(arg), "expected number for scan time")
+      end,
+      ["observation-domain"] = function (arg)
+         observation_domain =
+            assert(tonumber(arg), "expected number for observation domain")
+      end,
+      ["template-refresh"] = function (arg)
+         template_refresh_interval =
+            assert(tonumber(arg), "expected number for template refresh interval")
+      end,
+      ["cache-size"] = function (arg)
+         cache_size =
+            assert(tonumber(arg), "expected number for cache size")
+      end,
+      ["pfx4-to-as"] = function (arg)
+         if arg then
+            maps.pfx4_to_as = arg
+         end
+      end,
+      ["pfx6-to-as"] = function (arg)
+         if arg then
+            maps.pfx6_to_as = arg
+         end
+      end,
+      ["vlan-to-ifindex"] = function (arg)
+         if arg then
+            maps.vlan_to_ifindex = arg
+         end
+      end,
+      ["mac-to-as"] = function (arg)
+         if arg then
+            maps.mac_to_as = arg
+         end
+      end,
+      ["maps-log"] = function (arg)
+         if arg ~= "" then
+            maps_logfile = arg
+         end
+      end,
       ipfix = function (arg)
          ipfix_version = 10
       end,
       ["netflow-v9"] = function (arg)
          ipfix_version = 9
       end,
+      ["mtu"] = function (arg)
+         mtu = tonumber(arg)
+      end,
+      ["rss-queues"] = function (arg)
+         nqueues = tonumber(arg)
+      end,
       -- TODO: not implemented
       ["transport"] = function (arg) end,
       ["cpu"] = function (arg)
          cpu = tonumber(arg)
-      end
+      end,
+      j = require("program.ipfix.lib").parse_jit_option_fn(jit)
    }
 
-   args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:", long_opts)
-   if #args ~= 2 then
+   args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:j:b", long_opts)
+   if #args < 2 then
       print(require("program.ipfix.probe.README_inc"))
       main.exit(1)
+   elseif #args == 2 then
+      table.insert(args, 'v4')
+      table.insert(args, 'v6')
    end
 
-   local in_link, in_app   = in_apps[input_type](args[1])
-   local out_link, out_app = out_apps[output_type](args[2])
+   local input, output = args[1], args[2]
 
-   local arp_config    = { self_mac = host_mac and ethernet:pton(host_mac),
-                           self_ip = ipv4:pton(host_ip),
-                           next_ip = ipv4:pton(collector_ip) }
-   local ipfix_config    = { active_timeout = active_timeout,
-                             idle_timeout = idle_timeout,
-                             ipfix_version = ipfix_version,
-                             exporter_ip = host_ip,
-                             collector_ip = collector_ip,
-                             collector_port = port }
-   local c = config.new()
-
-   config.app(c, "in", unpack(in_app))
-   config.app(c, "ipfix", ipfix.IPFIX, ipfix_config)
-   config.app(c, "out", unpack(out_app))
-
-   -- use ARP for link-layer concerns unless the output is connected
-   -- to a pcap writer
-   if output_type ~= "pcap" then
-      config.app(c, "arp", arp.ARP, arp_config)
-      config.app(c, "sink", basic.Sink)
-
-      config.link(c, "in." .. in_link.output .. " -> ipfix.input")
-      config.link(c, "out." .. out_link.output .. " -> arp.south")
-
-      -- with UDP, ipfix doesn't need to handle packets from the collector
-      config.link(c, "arp.north -> sink.input")
-
-      config.link(c, "ipfix.output -> arp.north")
-      config.link(c, "arp.south -> out." .. out_link.input)
-   else
-      config.link(c, "in." .. in_link.output .. " -> ipfix.input")
-      config.link(c, "ipfix.output -> out." .. out_link.input)
+   for i = 3, #args do
+      table.insert(templates, args[i])
    end
 
-   local done
-   if not duration then
-      done = function ()
-         return engine.app_table.source.done
+   local probe_config = {
+      active_timeout = active_timeout,
+      idle_timeout = idle_timeout,
+      flush_timeout = flush_timeout,
+      cache_size = cache_size,
+      scan_time = scan_time,
+      observation_domain = observation_domain,
+      template_refresh_interval = template_refresh_interval,
+      ipfix_version = ipfix_version,
+      exporter_ip = host_ip,
+      exporter_mac = host_mac,
+      collector_ip = collector_ip,
+      collector_port = port,
+      mtu = mtu,
+      templates = templates,
+      maps = maps,
+      maps_logfile = maps_logfile,
+      output_type = output_type,
+      output = output,
+      input_type = input_type,
+      input = input
+   }
+
+   local mellanox_qs
+   if input_type == "pci" then
+      local device_info = pci.device_info(input)
+      if device_info.driver == 'apps.mellanox.connectx' then
+         mellanox_qs = {}
       end
    end
 
-   local t1 = now()
-   if cpu then numa.bind_to_cpu(cpu) end
+   for rssq = 0, nqueues - 1 do
 
-   engine.configure(c)
-   engine.busywait = true
-   engine.main({ duration = duration, done = done })
+      local jit_c = lib.deepcopy(jit)
 
-   local t2 = now()
-   local stats = link.stats(engine.app_table.ipfix.input.input)
-   print("IPFIX probe stats:")
-   local comma = lib.comma_value
-   print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
-                       comma(stats.rxbytes),
-                       comma(stats.rxpackets),
-                       comma(math.floor((stats.rxbytes * 8) / (t2 - t1))),
-                       comma(stats.rxpackets / ((t2 - t1) * 1000000))))
+      probe_config.input = input.."/"..rssq
+      if mellanox_qs then
+         table.insert(mellanox_qs, { id = rssq })
+      end
+
+      if nqueues > 1 then
+         -- Create unique identifiers for config options that need to
+         -- be unique per instance
+         probe_config.observation_domain = observation_domain + rssq
+         if output_type == "tap_routed" then
+            probe_config.output = output..probe_config.observation_domain
+         end
+         if jit_c.dump and #jit_c.dump == 2 then
+            jit_c.dump[2] = jit_c.dump[2]..rssq
+         end
+      end
+
+      local worker_expr = string.format(
+         'require("program.ipfix.lib").run(%s, %s, %s, nil, %s)',
+         probe.value_to_string(probe_config), tostring(duration),
+         tostring(busywait), probe.value_to_string(jit_c)
+      )
+      local child_pid = worker.start("ipfix"..rssq, worker_expr)
+      print("Launched IPFIX worker process #"..child_pid)
+   end
+
+   local ctrl_graph = app_graph.new()
+   if mellanox_qs then
+      local conf = {
+         pciaddress = input,
+         queues = mellanox_qs,
+         recvq_size = 8192
+      }
+      local driver = pci.device_info(input).driver
+      app_graph.app(ctrl_graph, "ctrl_"..input,
+                    require(driver).ConnectX, conf)
+   end
+
+   engine.busywait = false
+   engine.Hz = 10
+   engine.configure(ctrl_graph)
+
+   if mellanox_qs then
+      probe.create_ifmib(engine.app_table["ctrl_"..input].stats,
+                         (input:gsub("[:%.]", "_")))
+   end
+
+   engine.main({ duration = duration })
+
+   print("Waiting for workers to finish")
+   local alive
+   repeat
+      alive = false
+      for _, s in pairs(worker.status()) do
+         if s.alive then alive = true end
+      end
+   until not alive
+
 end

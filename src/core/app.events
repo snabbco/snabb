@@ -4,6 +4,9 @@ The app has been started. (Returned from new() callback.)
 1,9|linked:
 The app has been linked. (Returned from link() callback.)
 
+1,9|unlinked:
+The app has been unlinked. (Returned from unlink() callback.)
+
 1,9|reconfigured:
 The app has been reconfigured. (Returned from reconfig() callback.)
 
@@ -23,3 +26,10 @@ Entering app push() callback.
 
 3,3|pushed: inpackets inbytes outpackets outbytes droppackets dropbytes
 Returned from app push() callback.
+
+
+3,9|tick:
+Entering app tick() callback.
+
+3,9|ticked:
+Returned from app tick() callback.

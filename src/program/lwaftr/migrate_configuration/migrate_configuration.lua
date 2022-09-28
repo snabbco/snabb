@@ -6,12 +6,13 @@ local ipv4 = require("lib.protocol.ipv4")
 local rangemap = require("apps.lwaftr.rangemap")
 local ctable = require("lib.ctable")
 local cltable = require('lib.cltable')
+local mem = require('lib.stream.mem')
 local util = require('lib.yang.util')
 local yang = require('lib.yang.yang')
-local stream = require('lib.yang.stream')
 local binding_table = require("apps.lwaftr.binding_table")
 local Parser = require("program.lwaftr.migrate_configuration.conf_parser").Parser
 local data = require('lib.yang.data')
+local schema = require('lib.yang.schema')
 
 local br_address_t = ffi.typeof('uint8_t[16]')
 local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
@@ -264,9 +265,8 @@ local function parse_binding_table(parser)
             softwires = softwires }
 end
 
-function load_binding_table(file)
-   local source = stream.open_input_byte_stream(file)
-   return parse_binding_table(Parser.new(source:as_text_stream()))
+function load_binding_table(filename)
+   return parse_binding_table(Parser.new(filename))
 end
 
 
@@ -274,15 +274,8 @@ local function config_to_string(schema, conf)
    if type(schema) == "string" then
       schema = yang.load_schema_by_name(schema)
    end
-   -- To keep memory usage as low as possible write it out to a temp file.
-   local memfile = util.string_io_file()
-   yang.print_config_for_schema(schema, conf, memfile)
-   conf = memfile:flush()
-
-   -- Do best to remove things manually which take a lot of memory
-   memfile:clear()
-   memfile = nil
-   return conf
+   return mem.call_with_output_string(
+      yang.print_config_for_schema, schema, conf)
 end
 
 
@@ -444,13 +437,38 @@ local function remove_psid_map(conf)
    return conf
 end
 
+local function v3_migration(src, conf_file)
+   local v2_schema = yang.load_schema_by_name("snabb-softwire-v2")
+   local v3_schema = yang.load_schema_by_name("snabb-softwire-v3")
+   local conf = yang.load_config_for_schema(
+      v2_schema, mem.open_input_string(src, conf_file))
+
+   -- Move leaf external-interface/device up as external-device.
+   for device, instance in pairs(conf.softwire_config.instance) do
+      for id, queue in pairs(instance.queue) do
+         if queue.external_interface.device then
+	    if instance.external_device then
+	       io.stderr:write('Multiple external devices detected; '..
+                               'manual verification needed.\n')
+               io.stderr:flush()
+	    end
+	    instance.external_device = queue.external_interface.device
+	    queue.external_interface.device = nil
+	 end
+      end
+   end
+
+   return config_to_string(v3_schema, conf)   
+end
+
 local function multiprocess_migration(src, conf_file)
    local device = "IPv6 PCI Address"
    local ex_device = "IPv4 PCI address"
 
    -- We should build up a hybrid schema from parts of v1 and v2.
    local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
-   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
+   -- Make sure we load a fresh schema, as not to mutate a memoized copy
+   local hybridscm = schema.load_schema(schema.load_schema_source_by_name("snabb-softwire-v2"))
    local v1_external = v1_schema.body["softwire-config"].body["external-interface"]
    local v1_internal = v1_schema.body["softwire-config"].body["internal-interface"]
    local external = hybridscm.body["softwire-config"].body["external-interface"]
@@ -471,7 +489,8 @@ local function multiprocess_migration(src, conf_file)
    -- Extract the grammar, load the config and find the key
    local hybridgmr = data.config_grammar_from_schema(hybridscm)
    local instgmr = hybridgmr.members["softwire-config"].members.instance
-   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
+   local conf = yang.load_config_for_schema(
+      hybridscm, mem.open_input_string(src, conf_file))
    local queue_key = ffi.typeof(instgmr.values.queue.key_ctype)
    local global_external_if = conf.softwire_config.external_interface
    local global_internal_if = conf.softwire_config.internal_interface
@@ -480,9 +499,9 @@ local function multiprocess_migration(src, conf_file)
 
    -- Build up the instance list
    local instance = {
-      [device] = {queue = cltable.new({ key_type = queue_key }),},
+      [device] = {queue={}},
    }
-   local key = ffi.new(queue_key, 0)
+   local key = 0
    local value = {
       external_interface = {
          device = ex_device,
@@ -515,7 +534,7 @@ local function multiprocess_migration(src, conf_file)
    else
       error("One or both of next-hop values must be provided.")
    end
-   cltable.set(instance[device].queue, key, value)
+   instance[device].queue[key] = value
    conf.softwire_config.instance = instance
 
    -- Remove the fields which no longer should exist
@@ -528,7 +547,7 @@ local function multiprocess_migration(src, conf_file)
    conf.softwire_config.external_interface.next_hop = nil
    conf.softwire_config.external_interface.vlan_tag = nil
 
-   return config_to_string('snabb-softwire-v2', conf)
+   return config_to_string(hybridscm, conf)
 end
 
 local function v2_migration(src, conf_file)
@@ -536,7 +555,9 @@ local function v2_migration(src, conf_file)
    -- switch over to v2 of snabb-softwire config.
    local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
    local v1_binding_table = v1_schema.body["softwire-config"].body["binding-table"]
-   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
+   
+   -- Make sure we load a fresh schema, as not to mutate a memoized copy
+   local hybridscm = schema.load_schema(schema.load_schema_source_by_name("snabb-softwire-v2"))
    local binding_table = hybridscm.body["softwire-config"].body["binding-table"]
 
    -- Add the schema from v1 that we need to convert them.
@@ -554,7 +575,11 @@ local function v2_migration(src, conf_file)
    -- Remove the mandatory requirement on softwire.br-address for the migration
    binding_table.body["softwire"].body["br-address"].mandatory = false
 
-   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
+   -- Remove the mandatory requirement on softwire.port-set.psid-length for the migration
+   binding_table.body["softwire"].body["port-set"].body["psid-length"].mandatory = false
+
+   local conf = yang.load_config_for_schema(
+      hybridscm, mem.open_input_string(src, conf_file))
 
    -- Remove the br-address leaf-list and add it onto the softwire.
    conf = remove_address_list(conf)
@@ -584,8 +609,8 @@ end
 
 local function migrate_3_0_1bis(conf_file, src)
    return increment_br(
-      yang.load_config_for_schema_by_name('snabb-softwire-v1', src, conf_file)
-   )
+      yang.load_config_for_schema_by_name(
+         'snabb-softwire-v1', mem.open_input_string(src, conf_file)))
 end
 
 local function migrate_3_2_0(conf_file, src)
@@ -596,13 +621,18 @@ local function migrate_2017_07_01(conf_file, src)
    return multiprocess_migration(src, conf_file)
 end
 
+local function migrate_2022_01_19(conf_file, src)
+   return v3_migration(src, conf_file)
+end
+
 
 local migrations = {
    {version='legacy',    migrator=migrate_legacy},
    {version='3.0.1',     migrator=migrate_3_0_1},
    {version='3.0.1.1',   migrator=migrate_3_0_1bis},
    {version='3.2.0',     migrator=migrate_3_2_0},
-   {version='2017.07.01',migrator=migrate_2017_07_01}
+   {version='2017.07.01',migrator=migrate_2017_07_01},
+   {version='2022.01.19',migrator=migrate_2022_01_19},
 }
 
 
@@ -623,6 +653,7 @@ function run(args)
 
    local conf = io.open(conf_file, "r"):read("*a")
    for _, migration in next,migrations,start do
+      io.stderr:write(("-> %s migration\n"):format(migration.version))
       conf = migration.migrator(conf_file, conf)
       -- Prompt the garbage collection to do a full collect after each migration
       collectgarbage()

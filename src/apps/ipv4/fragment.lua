@@ -64,7 +64,7 @@ end
 local function ipv4_packet_has_valid_length(h, len)
    if len < ffi.sizeof(ether_ipv4_header_t) then return false end
    if ipv4_header_length(h.ipv4) < 20 then return false end
-   return ntohs(h.ipv4.total_length) == len - ether_header_len
+   return ntohs(h.ipv4.total_length) <= len - ether_header_len
 end
 
 Fragmenter = {}
@@ -93,19 +93,14 @@ function Fragmenter:new(conf)
    o.next_fragment_id = deterministic_first_fragment_id or
       math.random(0, 0xffff)
 
-   alarms.add_to_inventory {
-      [{alarm_type_id='outgoing-ipv4-fragments'}] = {
-         resource=tostring(S.getpid()),
-         has_clear=true,
-         description='Outgoing IPv4 fragments over N fragments/s',
-      }
-   }
-   local outgoing_fragments_alarm = alarms.declare_alarm {
-      [{resource=tostring(S.getpid()),alarm_type_id='outgoing-ipv4-fragments'}] = {
-         perceived_severity='warning',
-         alarm_text='More than 10,000 outgoing IPv4 fragments per second',
-      }
-   }
+   alarms.add_to_inventory(
+      {alarm_type_id='outgoing-ipv4-fragments'},
+      {resource=tostring(S.getpid()), has_clear=true,
+       description='Outgoing IPv4 fragments over N fragments/s'})
+   local outgoing_fragments_alarm = alarms.declare_alarm(
+      {resource=tostring(S.getpid()),alarm_type_id='outgoing-ipv4-fragments'},
+      {perceived_severity='warning',
+       alarm_text='More than 10,000 outgoing IPv4 fragments per second'})
    o.outgoing_ipv4_fragments_alarm = CounterAlarm.new(outgoing_fragments_alarm,
       1, 1e4, o, "out-ipv4-frag")
 
@@ -170,8 +165,6 @@ function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
    local max_length = self.mtu + ether_header_len
 
-   self.outgoing_ipv4_fragments_alarm:check()
-
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
@@ -194,6 +187,10 @@ function Fragmenter:push ()
          packet.free(pkt)
       end
    end
+end
+
+function Fragmenter:tick ()
+   self.outgoing_ipv4_fragments_alarm:check()
 end
 
 function selftest()

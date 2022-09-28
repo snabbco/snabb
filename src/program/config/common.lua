@@ -5,9 +5,12 @@ local S = require("syscall")
 local ffi = require("ffi")
 local lib = require("core.lib")
 local shm = require("core.shm")
+local mem = require("lib.stream.mem")
+local file = require("lib.stream.file")
 local rpc = require("lib.yang.rpc")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
+local path_data = require("lib.yang.path_data")
 local path_resolver = require("lib.yang.path_data").resolver
 
 function show_usage(command, status, err_msg)
@@ -36,7 +39,13 @@ end
 
 function data_parser(schema_name, path, is_config)
    local grammar = path_grammar(schema_name, path, is_config)
-   return data.data_parser_from_grammar(grammar)
+   local parser = data.data_parser_from_grammar(grammar)
+   local validator = path_data.consistency_checker_from_grammar(grammar)
+   return function (data)
+      local config = parser(data)
+      validator(config)
+      return config
+   end
 end
 
 function config_parser(schema_name, path)
@@ -56,7 +65,8 @@ end
 function validate_path(schema_name, path, is_config)
    local succ, err = pcall(path_grammar, schema_name, path, is_config)
    if succ == false then
-      error_and_quit(err)
+      local filename, lineno, msg = err:match("(.+):(%d+):(.+)$")
+      error_and_quit(("Invalid path:"..msg) or err)
    end
 end
 
@@ -74,7 +84,7 @@ function parse_command_line(args, opts)
    function handlers.r(arg) ret.revision_date = arg end
    function handlers.c(arg) ret.socket = arg end
    function handlers.f(arg)
-      assert(arg == "yang" or arg == "xpath", "Not valid output format")
+      assert(arg == "yang" or arg == "xpath" or arg == "influxdb", "Not valid output format")
       ret.format = arg
    end
    handlers['print-default'] = function ()
@@ -114,12 +124,13 @@ function parse_command_line(args, opts)
    end
    if opts.with_value then
       local parser = data_parser(ret.schema_name, ret.path, opts.is_config)
+      local stream
       if #args == 0 then
-         ret.value_str = io.stdin:read('*a')
+         stream = file.fdopen(S.stdin, 'rdonly')
       else
-         ret.value_str = table.remove(args, 1)
+         stream = mem.open_input_string(table.remove(args, 1))
       end
-      ret.value = parser(ret.value_str)
+      ret.value = parser(stream)
    end
    if not opts.allow_extra_args and #args ~= 0 then err("too many arguments") end
    return ret, args
@@ -137,7 +148,7 @@ function open_socket_or_die(instance_id)
             instance_id.."'.\n")
       main.exit(1)
    end
-   return socket
+   return file.fdopen(socket, 'rdwr')
 end
 
 function data_serializer(schema_name, path, is_config)
@@ -147,7 +158,7 @@ end
 
 function serialize_data(data, schema_name, path, is_config)
    local printer = data_serializer(schema_name, path, is_config)
-   return printer(data, yang.string_io_file())
+   return mem.call_with_output_string(printer, data)
 end
 
 function serialize_config(config, schema_name, path)
@@ -159,30 +170,22 @@ function serialize_state(config, schema_name, path)
 end
 
 function send_message(socket, msg_str)
-   socket:write(tostring(#msg_str)..'\n'..msg_str)
+   socket:write_chars(tostring(#msg_str))
+   socket:write_chars('\n')
+   socket:write_chars(msg_str)
+   socket:flush()
 end
 
 local function read_length(socket)
-   local len = 0
-   while true do
-      local ch = assert(socket:read(nil, 1))
-      assert(ch ~= '', 'short read')
-      if ch == '\n' then return len end
-      assert(tonumber(ch), 'not a number: '..ch)
-      len = len * 10 + tonumber(ch)
-      assert(len < 1e9, 'length too long: '..len)
-   end
+   local line = socket:read_line()
+   if line == nil then error('unexpected EOF when reading length') end
+   local len = assert(tonumber(line), 'not a number: '..line)
+   assert(len >= 0 and len == math.floor(len), 'bad length: '..len)
+   return len
 end
 
 local function read_msg(socket, len)
-   local buf = ffi.new('uint8_t[?]', len)
-   local pos = 0
-   while pos < len do
-      local count = assert(socket:read(buf+pos, len-pos))
-      if count == 0 then error('short read') end
-      pos = pos + count
-   end
-   return ffi.string(buf, len)
+   return socket:read_chars(len)
 end
 
 function recv_message(socket)
@@ -192,11 +195,12 @@ end
 function call_leader(instance_id, method, args)
    local caller = rpc.prepare_caller('snabb-config-leader-v1')
    local socket = open_socket_or_die(instance_id)
+   -- FIXME: stream call and response.
    local msg, parse_reply = rpc.prepare_call(caller, method, args)
    send_message(socket, msg)
    local reply = recv_message(socket)
    socket:close()
-   return parse_reply(reply)
+   return parse_reply(mem.open_input_string(reply))
 end
 
 function print_and_exit(response, response_prop)

@@ -137,7 +137,7 @@ function SimpleKeyedTunnel:new (conf)
       )
    local header = header_array_ctype(HEADER_SIZE)
    ffi.copy(header, header_template, HEADER_SIZE)
-   local local_cookie = lib.hexundump(conf.local_cookie, 8)
+   local local_cookie = lib.hexundump(conf.local_cookie, 8, false)
    ffi.copy(
          header + COOKIE_OFFSET,
          local_cookie,
@@ -157,7 +157,9 @@ function SimpleKeyedTunnel:new (conf)
    local remote_address = ffi.cast(paddress_ctype, header + DST_IP_OFFSET)
    local local_address = ffi.cast(paddress_ctype, header + SRC_IP_OFFSET)
 
-   local remote_cookie = ffi.cast(pcookie_ctype, lib.hexundump(conf.remote_cookie, 8))
+   local remote_cookie_s = lib.hexundump(conf.remote_cookie, 8, false)
+   local remote_cookie = ffi.new(cookie_ctype)
+   ffi.copy(remote_cookie, remote_cookie_s, #remote_cookie_s)
 
    if conf.local_session then
       local psession = ffi.cast(psession_id_ctype, header + SESSION_ID_OFFSET)

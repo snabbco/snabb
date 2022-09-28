@@ -13,12 +13,11 @@ OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
 PFLUASRC = $(shell cd ../lib/pflua/src && \
 	         find . -regex '[^\#]*\.lua' -printf '%P ')
-CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P ')
+CSRC   = $(shell find . -regex '[^\#]*\.c' -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 PFLUAASM = $(shell cd ../lib/pflua/src && \
 	         find . -regex '[^\#]*\.dasl' -printf '%P ')
-ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
 RMSRC  = $(shell find . -name '*.md' -not -regex './obj.*' -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
@@ -31,7 +30,6 @@ LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
-ARCHOBJ:= $(patsubst %.c,obj/%_c.o,    $(ARCHSRC))
 ASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(ASM))
 PFLUAASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(PFLUAASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
@@ -49,7 +47,7 @@ LUAJIT_A := ../lib/luajit/src/raptorjit.a
 # for each module that has a top-level selftest () function.
 TESTMODS = $(shell find . -regex '[^\#]*\.\(lua\|dasl\)' -printf '%P ' | \
              xargs grep -s -l '^function selftest *[[:punct:]]' | \
-             sed -e 's_\.lua__' -e 's_\.dasl__' -e 's_/_._g')
+             sed -e 's_\.lua__' -e 's_\.dasl__' -e 's_/_._g' -e 's/-/_/g')
 
 # TESTSCRIPTS expands to:
 #   lib/watchdog/selftest.sh ...
@@ -58,7 +56,7 @@ TESTSCRIPTS = $(shell find . -name "selftest.*" -executable | xargs)
 
 PATH := ../lib/luajit/src:$(PATH)
 
-snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(EVTOBJ) $(YANGOBJ) $(LUAJIT_A)
+snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(EVTOBJ) $(YANGOBJ) $(LUAJIT_A)
 	$(E) "GEN       obj/version.lua.gen"
 	$(Q) ../generate-version-lua.sh > obj/version.lua.gen
 	$(E) "LUA       obj/version.lua"
@@ -139,14 +137,6 @@ $(PFLUAOBJ): obj/%_lua.o: ../lib/pflua/src/%.lua Makefile
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
 	$(Q) $(CC) $(DEBUG) -O3 -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
-
-obj/arch/avx2_c.o: arch/avx2.c Makefile
-	$(E) "C(AVX2)   $@"
-	$(Q) $(CC) -O2 -mavx2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
-
-obj/arch/sse2_c.o: arch/sse2.c Makefile
-	$(E) "C(SSE2)   $@"
-	$(Q) $(CC) -O2 -msse2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"

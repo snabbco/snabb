@@ -92,45 +92,6 @@ void* malloc (size_t);
 void free (void*);
 ]]
 
-function string_io_file()
-   local function alloc(n)
-      return ffi.gc(ffi.cast('char*', ffi.C.malloc(n)), ffi.C.free)
-   end
-
-   local file = {}
-   local size = 1024
-   local buf = alloc(size)
-   local written = 0
-   local read = 0
-   function file:write(str)
-      while size - written < #str do
-         if 0 < read then
-            ffi.copy(buf, buf + read, written - read)
-            read, written = 0, written - read
-         else
-            local old_buf, old_written = buf, written
-            size = size * 2
-            buf = alloc(size)
-            ffi.copy(buf, old_buf, written)
-         end
-      end
-      ffi.copy(buf + written, str, #str)
-      written = written + #str
-   end
-   function file:peek()
-      return buf + read, written - read
-   end
-   function file:flush()
-      local ptr, len = buf + read, written - read
-      return ffi.string(ptr, len)
-   end
-   function file:clear(str)
-      size, written, read = 1024, 0, 0
-      buf = alloc(size)
-   end
-   return file
-end
-
 function memoize(f, max_occupancy)
    local cache = {}
    local occupancy = 0
@@ -168,6 +129,8 @@ function timezone ()
    local now = os.time()
    local utctime = os.date("!*t", now)
    local localtime = os.date("*t", now)
+   -- Synchronize daylight-saving flags.
+   utctime.isdst = localtime.isdst
    local timediff = os.difftime(os.time(localtime), os.time(utctime))
    if timediff ~= 0 then
       local sign = timediff > 0 and "+" or "-"
@@ -190,10 +153,18 @@ end
 -- by 'format_date_as_iso8601'.
 function parse_date_as_iso_8601 (date)
    assert(type(date) == 'string')
-   local gmtdate = "(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)Z"
+   local gmtdate = "(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)"
    local year, month, day, hour, min, sec = assert(date:match(gmtdate))
-   local tz_sign, tz_hour, tz_min = date:match("Z([+-]?)(%d%d):(%d%d)")
-   return {year=year, month=month, day=day, hour=hour, min=min, sec=sec, tz_sign=tz_sign, tz_hour=tz_hour, tz_min=tz_min}
+   local ret = {year=year, month=month, day=day, hour=hour, min=min, sec=sec}
+   if date:match("Z$") then
+      return ret
+   else
+      local tz_sign, tz_hour, tz_min = date:match("([+-]?)(%d%d):(%d%d)$")
+      ret.tz_sign = tz_sign
+      ret.tz_hour = tz_hour
+      ret.tz_min = tz_min
+      return ret
+   end
 end
 
 function selftest()

@@ -2,8 +2,10 @@
 module(..., package.seeall)
 
 local lib = require("core.lib")
+local mem = require("lib.stream.mem")
 local parser = require("lib.yang.parser")
 local util = require("lib.yang.util")
+local maxpc = require("lib.maxpc")
 
 local function error_with_loc(loc, msg, ...)
    error(string.format("%s: "..msg, loc, ...))
@@ -307,6 +309,7 @@ local function init_input(node, loc, argument, children)
    node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.body = collect_body_children_at_least_1(loc, children)
 end
+
 local function init_leaf(node, loc, argument, children)
    node.id = require_argument(loc, argument)
    node.when = maybe_child_property(loc, children, 'when', 'value')
@@ -444,7 +447,7 @@ local function init_refine(node, loc, argument, children)
 end
 local function init_revision(node, loc, argument, children)
    -- TODO: parse date
-   node.value = require_argument(loc, argument)
+   node.date = require_argument(loc, argument)
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
 end
@@ -613,7 +616,6 @@ local function inherit_config(schema)
       end
       return node
    end
-
    return visit(schema, true)
 end
 
@@ -637,6 +639,110 @@ function set_default_capabilities(capabilities)
          default_features[mod][feature] = true
       end
    end
+end
+
+-- Parse/interpret YANG 1.1 if-feature expressions
+-- https://tools.ietf.org/html/rfc7950#section-7.20.2
+local if_feature_expr_parser = (function ()
+   local match, capture, combine = maxpc.import()
+   local refs = {}
+   local function ref (s) return function (...) return refs[s](...) end end
+   local function wsp_lf()
+      return combine._or(match.equal(' '), match.equal('\t'),
+                         match.equal('\n'), match.equal('\r'))
+   end
+   local function sep()      return combine.some(wsp_lf()) end
+   local function optsep()   return combine.any(wsp_lf())  end
+   local function keyword(s) return match.string(s)        end
+   local function identifier()
+      -- [a-zA-Z_][a-zA-Z0-9_-.:]+
+      local alpha_ = match.satisfies(function (x)
+            return ("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_")
+               :find(x, 1, true)
+      end)
+      local digit_punct = match.satisfies(function (x)
+            return ("0123456789-."):find(x, 1, true)
+      end)
+      return capture.subseq(
+         match.seq(alpha_, combine.any(combine._or(alpha_, digit_punct)))
+      )
+   end
+   local function identifier_ref()
+      local idref = capture.seq(
+         identifier(),
+         combine.maybe(match.equal(":")), combine.maybe(identifier())
+      )
+      local function ast_idref (mod_or_id, _, id)
+         return {'feature', id or mod_or_id, id and mod_or_id or nil}
+      end
+      return capture.unpack(idref, ast_idref)
+   end
+   local function if_feature_not()
+      local not_feature = capture.seq(
+         keyword'not', sep(), ref'if_feature_factor'
+      )
+      local function ast_not (_, _, fact) return {'not', fact} end
+      return capture.unpack(not_feature, ast_not)
+   end
+   local function if_feature_subexpr()
+      local subexpr = capture.seq(
+         match.equal("("), optsep(), ref'if_feature_expr', optsep(), match.equal(")")
+      )
+      local function ast_subexpr (_, _, expr) return {'subexpr', expr} end
+      return capture.unpack(subexpr, ast_subexpr)
+   end
+   local function if_feature_factor ()
+      return combine._or(
+         if_feature_not(), if_feature_subexpr(), identifier_ref()
+      )
+   end
+   refs.if_feature_factor = if_feature_factor()
+   local function if_feature_and()
+      local and_feature = capture.seq(
+         if_feature_factor(), sep(), keyword'and', sep(), ref'if_feature_term'
+      )
+      local function ast_and (a, _, _, _, b) return {'and', a, b} end
+      return capture.unpack(and_feature, ast_and)
+   end
+   local function if_feature_term()
+      return combine._or(if_feature_and(), if_feature_factor())
+   end
+   refs.if_feature_term = if_feature_term()
+   local function if_feature_or()
+      local or_feature = capture.seq(
+         if_feature_term(), sep(), keyword'or', sep(), ref'if_feature_expr'
+      )
+      local function ast_or (a, _, _, _, b) return {'or', a, b} end
+      return capture.unpack(or_feature, ast_or)
+   end
+   local function if_feature_expr()
+      return combine._or(if_feature_or(), if_feature_term())
+   end
+   refs.if_feature_expr = if_feature_expr()
+   return refs.if_feature_expr
+end)()
+
+local function parse_if_feature_expr(expr)
+   local ast, success, eof = maxpc.parse(expr, if_feature_expr_parser)
+   assert(success and eof, "Error parsing if-feature-expression: "..expr)
+   return ast
+end
+
+local function interpret_if_feature(expr, has_feature_p)
+   local function interpret (ast)
+      local op, a, b = unpack(ast)
+      if op == 'feature' then
+         return has_feature_p(a, b)
+      elseif op == 'or' then
+         if interpret(a) then return true
+         else                 return interpret(b) end
+      elseif op == 'and' then
+         return interpret(a) and interpret(b)
+      elseif op == 'subexpr' then
+         return interpret(a)
+      end
+   end
+   return interpret(parse_if_feature_expr(expr))
 end
 
 -- Inline "grouping" into "uses".
@@ -736,6 +842,28 @@ function resolve(schema, features)
          elseif node.id == 'identityref' then
             node.bases = resolve_bases(node.bases, env)
             node.default_prefix = schema.id
+         elseif node.id == 'enumeration' then
+            local values = {}
+            local max_value = -2147483648
+            for i, enum in ipairs(node.enums) do
+               assert(not node.enums[enum.name],
+                      'duplicate name in enumeration: '..enum.name)
+               node.enums[enum.name] = enum
+               if enum.value then
+                  assert(not values[enum.value],
+                         'duplicate value in enumeration: '..enum.value)
+                  values[enum.value] = true
+                  max_value = math.max(enum.value, max_value)
+               elseif i == 1 then
+                  max_value = 0
+                  enum.value = max_value
+               elseif max_value < 2147483647 then
+                  max_value = max_value + 1
+                  enum.value = max_value
+               else
+                  error('explicit value required in enum: '..enum.name)
+               end
+            end
          end
          node.primitive_type = node.id
       end
@@ -770,6 +898,13 @@ function resolve(schema, features)
             node[prop] = shallow_copy(node[prop])
             for k,v in pairs(node[prop]) do node[prop][k] = visit(v, env) end
          end
+         local last_revision = nil
+         for _,revision in ipairs(node.revisions) do
+            if last_revision == nil or last_revision < revision.date then
+               last_revision = revision.date
+            end
+         end
+         node.last_revision = last_revision
       end
       if node.kind == 'rpc' then
          if node.input then node.input = visit(node.input, env) end
@@ -786,15 +921,22 @@ function resolve(schema, features)
             node.unavailable = true
          end
       end
-      for _,feature in ipairs(pop_prop(node, 'if_features') or {}) do
-         local feature_node = lookup_lazy(env, 'features', feature)
-         if node.kind == 'feature' then
-            -- This is a feature that depends on a feature.  These we
-            -- keep in the environment but if the feature is
-            -- unavailable, we mark it as such.
-            local mod, id = feature_node.module_id, feature_node.id
-            if not (features[mod] or {})[id] then node.unavailable = true end
-         elseif feature_node.unavailable then
+      for _,expr in ipairs(pop_prop(node, 'if_features') or {}) do
+         local function resolve_feature (feature, mod)
+            assert(not mod, "NYI: module qualified features in if-feature expression")
+            local feature_node = lookup_lazy(env, 'features', feature)
+            if node.kind == 'feature' then
+               -- This is a feature that depends on a feature.  These we
+               -- keep in the environment but if the feature is
+               -- unavailable, we mark it as such.
+               local mod, id = feature_node.module_id, feature_node.id
+               if (features[mod] or {})[id] then return true
+               else node.unavailable = true end
+            elseif not feature_node.unavailable then
+               return true
+            end
+         end
+         if not interpret_if_feature(expr, resolve_feature) then
             return nil, env
          end
       end
@@ -922,19 +1064,42 @@ local function primitivize(schema)
 end
 
 function parse_schema(src, filename)
-   return schema_from_ast(parser.parse(src, filename))
+   return schema_from_ast(parser.parse(mem.open_input_string(src, filename)))
 end
 function parse_schema_file(filename)
-   return schema_from_ast(parser.parse_file(filename))
+   return schema_from_ast(parser.parse(assert(file.open(filename))))
+end
+
+local function collect_uniqueness (s)
+   local leaves = {}
+   local function mark (id)
+      if leaves[id] then return false end
+      leaves[id] = true
+      return true
+   end
+   local function visit (node)
+      if not node then return end
+      for k,v in pairs(node) do
+         if type(v) == 'table' then
+            visit(v)
+         else
+            if k == 'kind' and v == 'leaf' then
+               node.is_unique = mark(node.id)
+            end
+         end
+      end
+   end
+   visit(s)
+   return s
 end
 
 function load_schema(src, filename)
    local s, e = resolve(primitivize(parse_schema(src, filename)))
-   return inherit_config(s), e
+   return collect_uniqueness(inherit_config(s)), e
 end
 function load_schema_file(filename)
    local s, e = resolve(primitivize(parse_schema_file(filename)))
-   return inherit_config(s), e
+   return collect_uniqueness(inherit_config(s)), e
 end
 load_schema_file = util.memoize(load_schema_file)
 
@@ -1070,12 +1235,13 @@ function selftest()
    assert(schema.contact == "John Smith fake@person.tld")
    assert(schema.organization == "Fruit Inc.")
    assert(schema.description == "Module to test YANG schema lib")
+   assert(schema.last_revision == "2016-05-28")
 
    -- Check all revisions are accounted for.
    assert(schema.revisions[1].description == "Revision 1")
-   assert(schema.revisions[1].value == "2016-05-27")
+   assert(schema.revisions[1].date == "2016-05-27")
    assert(schema.revisions[2].description == "Revision 2")
-   assert(schema.revisions[2].value == "2016-05-28")
+   assert(schema.revisions[2].date == "2016-05-28")
 
    -- Check that the feature statements are in the exports interface
    -- but not the schema itself.
@@ -1126,7 +1292,7 @@ function selftest()
    -- capabilities, for now, assuming tests are run independently from
    -- programs.
    local caps = get_default_capabilities()
-   local new_caps = { ['ietf-softwire-br'] = {feature={'binding'}} }
+   local new_caps = { ['ietf-softwire-br'] = {feature={'binding-mode'}} }
    for mod_name, mod_caps in pairs(new_caps) do
       if not caps[mod_name] then caps[mod_name] = {feature={}} end
       for _,feature in ipairs(mod_caps.feature) do
@@ -1137,15 +1303,17 @@ function selftest()
 
    load_schema_by_name('ietf-softwire-common')
    load_schema_by_name('ietf-softwire-br')
-   load_schema_by_name('snabb-softwire-v2')
+   load_schema_by_name('snabb-softwire-v3')
 
    local br = load_schema_by_name('ietf-softwire-br')
    local binding = br.body['br-instances'].body['br-type'].body['binding']
    assert(binding)
-   local bt = binding.body['binding'].body['br-instance'].body['binding-table']
+   local bt = binding.body['binding'].body['bind-instance'].body['binding-table']
    assert(bt)
    local ps = bt.body['binding-entry'].body['port-set']
    assert(ps)
+   local alg = br.body['br-instances'].body['br-type'].body['algorithm']
+   assert(not alg)
    -- The binding-entry grouping is defined in ietf-softwire-common and
    -- imported by ietf-softwire-br, but with a refinement that the
    -- default is 0.  Test that the refinement was applied.
@@ -1196,6 +1364,17 @@ function selftest()
 
    -- Test Range with explicit value.
    assert(lib.equal(parse_range_or_length_arg(nil, nil, "42"), {{42, 42}}))
+
+   -- Parsing/interpreting if-feature expressions
+   local function test_features (i, m)
+      local f = { b_99 = { ["c.d"] = true },
+                  [0] = { bar = true } }
+      return f[m or 0][i]
+   end
+   local expr = "baz and foo or bar and (a or b_99:c.d)"
+   assert(interpret_if_feature(expr, test_features))
+   assert(not interpret_if_feature("boo", test_features))
+   assert(not interpret_if_feature("baz or foo", test_features))
 
    print('selftest: ok')
 end
