@@ -11,10 +11,10 @@ snabbflow-config {
         remove-ipv6-extension-headers true;
     }
     ipfix {
-        idle-timeout 2;
-        active-timeout 2;
-        flush-timeout 2;
-        scan-time 1;
+        idle-timeout 30;
+        active-timeout 600;
+        scan-time 10;
+        cache-size 8000000;
         exporter-ip 10.0.0.1;
         collector-pool { name c1; collector { ip 10.0.0.2; port 1234; } }
         maps {
