@@ -40,7 +40,7 @@ deallocated (freed) during processing. This does not necessarily
 correspond directly to ingress or egress packets on a given interface.
 
 
-1,4|commited_counters:
+1,5|commited_counters:
 The engine commits the latest counter values to externally visible shared
 memory.
 
