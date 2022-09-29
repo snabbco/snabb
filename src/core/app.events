@@ -28,8 +28,8 @@ Entering app push() callback.
 Returned from app push() callback.
 
 
-3,9|tick:
+3,5|tick:
 Entering app tick() callback.
 
-3,9|ticked:
+3,5|ticked:
 Returned from app tick() callback.
