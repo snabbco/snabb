@@ -696,8 +696,8 @@ function breathe ()
          app:tick()
          app_events[app].ticked(linkstats(app))
       end
+      events.breath_ticked()
    end
-   events.breath_ticked()
    setvmprofile("engine")
    local freed
    local freed_packets = counter.read(frees) - freed_packets0
