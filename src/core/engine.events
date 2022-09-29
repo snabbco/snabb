@@ -26,7 +26,7 @@ The engine has "pulled" new packets into the event loop for processing.
 The engine has "pushed" packets one step through the processing network.
 
 2,4|breath_ticked:
-The engine has "pushed" packets one step through the processing network.
+The engine has executed "tick" methods.
 
 
 1,5|breath_end: breath npackets bpp
