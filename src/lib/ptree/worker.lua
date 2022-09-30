@@ -120,8 +120,10 @@ function Worker:main ()
          self:handle_actions_from_manager()
          events.engine_started()
          timer.run()
+         events.polled_timers()
       end
       if not engine.busywait then engine.pace_breathing() end
+      engine.randomize_log_rate()
    until stop < engine.now()
    counter.commit()
    if not self.no_report then engine.report(self.report) end
