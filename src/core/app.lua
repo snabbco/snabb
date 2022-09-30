@@ -33,7 +33,7 @@ local named_program_root = shm.root .. "/" .. "by-name"
 program_name = false
 
 -- Auditlog state
-local auditlog_enabled = false
+auditlog_enabled = false
 function enable_auditlog ()
    jit.auditlog(shm.path("audit.log"))
    auditlog_enabled = true
