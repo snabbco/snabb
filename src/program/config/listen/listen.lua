@@ -91,6 +91,9 @@ end
 
 function run(args)
    args = common.parse_command_line(args, { command='listen' })
+   if args.error then
+      common.print_and_exit(args)
+   end
    local caller = rpc.prepare_caller('snabb-config-leader-v1')
    local leader = common.open_socket_or_die(args.instance_id)
    attach_listener(leader, caller, args.schema_name, args.revision_date)

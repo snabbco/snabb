@@ -1,100 +1,14 @@
-Usage: snabb ipfix probe [options] <input> <output> [<template> ...]
+Usage: snabb ipfix probe [options] <config>
        snabb ipfix probe --help
 
 Available options:
-       -m, --host-mac <macaddr> The MAC address of the host running the exporter.
-                                Defaults to a randomly generated MAC.
-       -a, --host-ip  <ipaddr>  The IP address of the host running the exporter.
-                                Defaults to 10.0.0.1.
-       -c, --collector <ipaddr> The IP address of the flow collector.
-                                Defaults to 10.0.0.2.
-       -i, --input-type <type>  One of pcap, raw, tap, or pci. Specifies
-                                how to interpret the <input> argument. Interprets
-                                <input> as a pcap file path, device name, or
-                                PCI address. Defaults to pci.
-       -o, --output-type <type> Takes the same values as -i with the addition of
-                                tap_routed, but for <output>.  For tap_routed, <output>
-                                is the name of the device optionally followed by the
-                                MTU (including the Ethernet header), separated by ':'.
-                                With RSS and output type "tap_routed", each instance of
-                                the exporter uses a unique tap interface by appending the
-                                instance's observation domain to the name.
-       -D, --duration <seconds> Duration to run (in seconds).
-       -p, --port <port>        The port on the collector to send to. Defaults
-                                to port 4739.
-       --rss-queues <nqueues>   If <type> is "pci", create <nqueues> instances of the
-                                exporter, each of which attaches to an RSS queue of the
-                                device.  Defaults to 1. Ignored for all other input types.
-       --mtu <mtu>              The MTU in bytes including the 14-byte Ethernet header
-                                used when determining the size of export packets. If the
-                                output type is tap_routed, the MTU is applied to the
-                                tap interface as well.  Defaults to 1514.
-       --active-timeout <secs>  The timeout period for flows that are still receiving
-                                packets (in seconds).
-       --idle-timeout <secs>    The timeout period for flows with no recent activity
-                                (in seconds).
-       --flush-timeout <secs>   The timeout period after which an export packet is
-                                sent even if it is not of maximum possible size (limited
-                                by the MTU). Defaults to 10 seconds.
-       --scan-time <secs>       The number of seconds it takes for a scan of the flow
-                                cache to find flows eligible for export of each configured
-                                template. Defaults to 10.
-       --cache-size <number>    The initial size of the flow caches of all configured
-                                templates in number of flows.  Defaults to 20000.
-       --observation-domain <domain>
-                                The observation domain to be used for exported IPFIX
-                                flows. Defaults to 256.  With RSS, each instance of the
-                                exporter is configured with a unique observation domain by
-                                adding the number of the RSS queue (in the range 0..<nqueues>)
-                                to <domain>.
-       --template-refresh <seconds>
-                                The interval at which template records are sent in
-                                seconds. Defaults to 600.
-       --pfx4-to-as <file>      Name of the file that contains mappings from IPv4 prefixes
-                                to AS numbers from RIR data (used by extended templates)
-       --pfx6-to-as <file>      Name of the file that contains mappings from IPv6 prefixes
-                                to AS numbers from RIR data (used by extended templates)
-       --vlan-to-ifindex <file> Name of the file that contains mappings from VLAN
-                                tags to interface indices (used by extended templates)
-       --mac-to-as <file>       Name of the file that contains mappings from MAC
-                                addresses to adjacent AS numbers (used by extended templates)
-       --maps-log <file>        Name of the file to which extended templates log
-                                map-related messages.  If not specified, logging is
-                                disabled.
-       --netflow-v9             Use the Netflow V9 protocol to communicate to the
-                                flow collector.
-       --ipfix                  Use IPFIX to communicate with the flow collector.
-                                (mutually exclusive with --netflow-v9, --ipfix is
-                                 the default)
-       --transport <proto>      The transport protocol to use to communicate to
-                                the flow collector. Valid values depend on whether
-                                IPFIX or Netflow V9 is used.
-       --cpu <cpu>              Bind to the given CPU.  See the Snabb
-                                performance guide for more details.
-       -b, --busy-wait          Enable polling for arriving packets.  By default, the system
-                                uses sleep(3) during periods of little or no traffic to
-                                reduce CPU usage.
-       -j CMD, --jit CMD        Control LuaJIT behavior. Available commands:
-                                  -jv=FILE, --jit v=FILE
-                                    Write verbose JIT trace output to FILE.
-                                  -jdump=OPTS[,FILE] --jit dump=OPTS[,FILE]
-                                    Output JIT traces, optionally to a file.
-                                  -jp=OPTS[,FILE] --jit p=OPTS[,FILE]
-                                    Profile execution with low-overhead sampling.
-                                  -jopt=OPT
-                                    Sets JIT option OPT.
-                                  -jtprof
-                                    Profile execution with the traceprof library.
-                                See luajit documentation for more information:
-                                  http://luajit.org/running.html
+       -n, NAME --name NAME     Name of the Snabbflow instance.
+       -b, --busywait           Turn off idle sleep.
+       -r, --real-time          Enable real-time SCHED_FIFO scheduler.
+       -p, --no-profile         Disable VMProfile.
+       -h, --help               Print this help text and exit.
 
-The mandatory arguments <input> and <output> are followed by an
-ordered list of template specifications in the form
-<name>[:<cache-size>], where <name> must be the name of a valid
-template defined in apps.ipfix.template.lua and <cache-size> is the
-optional value of the initial size of the flow cache for the template
-in units of the number of flows.  The templates are processed in the
-given order when incoming packets are processed.  The packet is passed
-to the first matching template only.
-
-The default is "v4 v6".
+The mandatory argument <config> must be a path to the initial
+configuration file.
+Refer to the schema in lib/yang/snabb-snabbflow-v1.yang.
+There is an example configuration in program/ipfix/probe/example.conf.

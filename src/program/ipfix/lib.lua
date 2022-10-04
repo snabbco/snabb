@@ -30,6 +30,10 @@ local function parse_spec (spec, delimiter)
    return t
 end
 
+local function normalize_pci_name (device)
+   return pci.qualified(device):gsub("[:%.]", "_")
+end
+
 function in_apps.pcap (path)
    return { input = "input",
             output = "output" },
@@ -187,9 +191,9 @@ function configure_graph (arg, in_graph)
    end
 
    local ipfix_config = mk_ipfix_config(config)
-   local ipfix_name = "ipfix"..config.instance
-   local out_name = "out"..config.instance
-   local sink_name = "sink"..config.instance
+   local ipfix_name = "ipfix_"..config.instance
+   local out_name = "out_"..config.instance
+   local sink_name = "sink_"..config.instance
 
    local graph = in_graph or app_graph.new()
    if config.input then
@@ -208,7 +212,7 @@ function configure_graph (arg, in_graph)
    -- to a pcap writer or a routed tap interface
    if (config.output_type ~= "pcap" and
        config.output_type ~= "tap_routed") then
-      local arp_name = "arp"..config.instance
+      local arp_name = "arp_"..config.instance
       local arp_config    = { self_mac = config.exporter_mac and
                                  ethernet:pton(config.exporter_mac),
                               self_ip = ipv4:pton(config.exporter_ip),
@@ -237,12 +241,12 @@ function configure_graph (arg, in_graph)
       local pciaddr = unpack(parse_spec(config.input, '/'))
       app_graph.app(graph, "nic_ifmib", iftable.MIB, {
          target_app = "in", stats = 'stats',
-         ifname = (pciaddr:gsub("[:%.]", "_")),
+         ifname = normalize_pci_name(pciaddr),
          log_date = config.log_date
       })
    end
    if config.output_type == "tap_routed" then
-      app_graph.app(graph, "tap_ifmib", iftable.MIB, {
+      app_graph.app(graph, "tap_ifmib_"..config.instance, iftable.MIB, {
          target_app = out_name,
          ifname = config.output,
          ifalias = "IPFIX Observation Domain "..config.observation_domain,
@@ -336,7 +340,7 @@ function run (arg, duration, busywait, cpu, jit)
    clear_jit_options(jit)
 
    local t2 = now()
-   local stats = link.stats(engine.app_table['ipfix'..config.instance].input.input)
+   local stats = link.stats(engine.app_table['ipfix_'..config.instance].input.input)
    print("IPFIX probe stats:")
    local comma = lib.comma_value
    print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
@@ -369,31 +373,32 @@ function run_rss(config, inputs, outputs, duration, busywait, cpu, jit, log_date
    clear_jit_options(jit)
 end
 
-function configure_rss_graph (config, inputs, outputs, log_date)
+function configure_rss_graph (config, inputs, outputs, log_date, rss_group)
    local graph = app_graph.new()
-   app_graph.app(graph, "rss", rss.rss, config)
+
+   local rss_name = "rss"..(rss_group or '')
+   app_graph.app(graph, rss_name, rss.rss, config)
 
    -- An input describes a physical interface
    local tags, in_app_specs = {}, {}
    for n, input in ipairs(inputs) do
-      local suffix = #inputs > 1 and n or ''
-      local input_name = "input"..suffix
+      local pci_name = normalize_pci_name(input.device)
+      local input_name = "input_"..pci_name
       local in_link, in_app = in_apps.pci(input)
       table.insert(in_app_specs,
                    { pciaddr = input.device,
                      name = input_name,
-                     ifname = input.name or
-                        (input.device:gsub("[:%.]", "_")),
+                     ifname = input.name or pci_name,
                      ifalias = input.description })
       app_graph.app(graph, input_name, unpack(in_app))
-      local link_name = "input"..suffix
+      local link_name = pci_name
       if input.tag then
          local tag = input.tag
          assert(not(tags[tag]), "Tag not unique: "..tag)
          link_name = "vlan"..tag
       end
       app_graph.link(graph, input_name.."."..in_link.output
-                        .." -> rss."..link_name)
+                        .." -> "..rss_name.."."..link_name)
    end
 
    -- An output describes either an interlink or a complete ipfix app
@@ -402,17 +407,17 @@ function configure_rss_graph (config, inputs, outputs, log_date)
          -- Keys
          --   link_name  name of the link
          app_graph.app(graph, output.link_name, Transmitter)
-         app_graph.link(graph, "rss."..output.link_name.." -> "
+         app_graph.link(graph, rss_name.."."..output.link_name.." -> "
                            ..output.link_name..".input")
       else
          -- Keys
          --   link_name  name of the link
          --   args       probe configuration
          --   instance   # of embedded instance
-         output.args.instance = output.instance
+         output.args.instance = output.instance or output.args.instance
          local graph = configure_graph(output.args, graph)
-         app_graph.link(graph, "rss."..output.link_name
-                           .." -> ipfix"..output.instance..".input")
+         app_graph.link(graph, rss_name.."."..output.link_name
+                           .." -> ipfix_"..output.args.instance..".input")
       end
    end
 
@@ -439,12 +444,13 @@ function configure_mlx_ctrl_graph (mellanox, log_date)
          queues = spec.queues,
          recvq_size = spec.recvq_size
       }
+      local pci_name = normalize_pci_name(device)
       local driver = pci.device_info(device).driver
-      app_graph.app(ctrl_graph, "ctrl_"..device,
+      app_graph.app(ctrl_graph, "ctrl_"..pci_name,
                     require(driver).ConnectX, conf)
-      app_graph.app(ctrl_graph, "nic_ifmib_"..device, iftable.MIB, {
-         target_app = "ctrl_"..device, stats = 'stats',
-         ifname = spec.ifName or (device:gsub("[:%.]", "_")),
+      app_graph.app(ctrl_graph, "nic_ifmib_"..pci_name, iftable.MIB, {
+         target_app = "ctrl_"..pci_name, stats = 'stats',
+         ifname = spec.ifName or pci_name,
          ifalias = spec.ifAlias,
          log_date = log_date
       })

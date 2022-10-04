@@ -14,7 +14,7 @@ local register = require("lib.hardware.register")
 local receive, empty = link.receive, link.empty
 
 local can_transmit, transmit
-local num_descriptors = 1024
+local num_descriptors = 4096
 
 LoadGen = {}
 
