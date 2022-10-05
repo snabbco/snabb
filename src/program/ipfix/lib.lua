@@ -233,7 +233,8 @@ function configure_graph (arg, in_graph)
    return graph, config
 end
 
-function configure_rss_graph (config, inputs, outputs, log_date, rss_group)
+function configure_rss_graph (config, inputs, outputs, log_date, rss_group, input_type)
+   input_type = input_type or 'pci'
    local graph = app_graph.new()
 
    local rss_name = "rss"..(rss_group or '')
@@ -242,16 +243,23 @@ function configure_rss_graph (config, inputs, outputs, log_date, rss_group)
    -- An input describes a physical interface
    local tags, in_app_specs = {}, {}
    for n, input in ipairs(inputs) do
-      local pci_name = normalize_pci_name(input.device)
-      local input_name = "input_"..pci_name
-      local in_link, in_app = in_apps.pci(input)
-      table.insert(in_app_specs,
-                   { pciaddr = input.device,
-                     name = input_name,
-                     ifname = input.name or pci_name,
-                     ifalias = input.description })
+      local input_name, link_name, in_link, in_app
+      if input_type == 'pci' then
+         local pci_name = normalize_pci_name(input.device)
+         input_name, link_name = "input_"..pci_name, pci_name
+         in_link, in_app = in_apps.pci(input)
+         table.insert(in_app_specs,
+                      { pciaddr = input.device,
+                        name = input_name,
+                        ifname = input.name or pci_name,
+                        ifalias = input.description })
+      elseif input_type == 'pcap' then
+         input_name, link_name = 'pcap', 'pcap'
+         in_link, in_app = in_apps.pcap(input)
+      else
+         error("Unsupported input_type: "..input_type)
+      end
       app_graph.app(graph, input_name, unpack(in_app))
-      local link_name = pci_name
       if input.tag then
          local tag = input.tag
          assert(not(tags[tag]), "Tag not unique: "..tag)
