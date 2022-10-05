@@ -19,18 +19,20 @@ local numa = require("lib.numa")
 local worker = require("core.worker")
 local lib = require("core.lib")
 
-local function make_ipfix_config (template, pci0, cpus)
+local function make_ipfix_config (pci0, opts)
    local rss_groups = 0
    local cpu_conf = ""
-   for cpu in pairs(cpus) do
+   for cpu in pairs(opts.cpu) do
       rss_groups = rss_groups + 1
       cpu_conf = cpu_conf..("cpu %d; "):format(cpu)
    end
    assert(rss_groups > 0, "Need at least one CPU core")
-   local config_template = lib.readfile(template, "*a")
+   local config_template = lib.readfile(opts.template, "*a")
    local tmpfile = os.tmpname()
    local f = assert(io.open(tmpfile, "w+"))
-   f:write(config_template:format(pci0, cpu_conf, rss_groups))
+   f:write(config_template:format(
+      pci0, cpu_conf, opts.rss_groups or rss_groups
+   ))
    assert(f:close())
    return tmpfile
 end
@@ -83,6 +85,7 @@ end
 local long_opts = {
    template           = "t",
    ["exporter-name"]  = "e",
+   ["rss-groups"]     = "r",
    cpu                = "c",
    pcap               = "p",
    duration           = "D",
@@ -112,6 +115,7 @@ local function parameters (args)
       template = "program/ipfix/tests/bench_v4_v6.conf.template",
       exporter_name = "e1",
       cpu = nil,
+      rss_groups = nil,
       pcap = "program/ipfix/tests/sanitized4k_truncated128.pcap",
       duration = 10,
       loadgen_cpu = nil,
@@ -123,6 +127,9 @@ local function parameters (args)
    end
    function handlers.e (arg)
       opts.exporter_name = arg
+   end
+   function handlers.r (arg)
+      opts.rss_groups = assert(tonumber(arg), "rss-groups is not a number!")
    end
    function handlers.c (arg)
       opts.cpu = numa.parse_cpuset(arg)
@@ -143,7 +150,7 @@ local function parameters (args)
       opts.flow_Hz = assert(tonumber(arg), "freq is not a number!")
    end
 
-   local args = lib.dogetopt(args, handlers, "t:e:c:p:D:l:q:f:", long_opts)
+   local args = lib.dogetopt(args, handlers, "t:e:r:c:p:D:l:q:f:", long_opts)
    if #args < 2 or not (opts.cpu and opts.loadgen_cpu) then show_usage(1) end
    local pci0 = table.remove(args, 1)
    local pci1 = table.remove(args, 1)
@@ -152,7 +159,7 @@ end
 
 local pci0, pci1, opts = parameters(main.parameters)
 
-local ipfix_confpath = make_ipfix_config(opts.template, pci0, opts.cpu)
+local ipfix_confpath = make_ipfix_config(pci0, opts)
 
 local probe_pid = worker.start('ipfix_probe',
    ([[require("program.ipfix.probe.probe").run{
