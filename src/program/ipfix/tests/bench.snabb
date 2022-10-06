@@ -12,6 +12,7 @@
       81:00.0 81:00.1
 ]]--
 
+local test = require("program.ipfix.tests.test")
 local ipfix_probe = require("program.ipfix.probe.probe")
 local loadgen_replay = require("program.packetblaster.replay.replay")
 local config_rpc = require("program.config.common")
@@ -37,46 +38,14 @@ local function make_ipfix_config (pci0, opts)
    return tmpfile
 end
 
-local function get_state (pid, path)
-   local opts = { command='get-state', with_path=true, is_config=false }
-   local args = config_rpc.parse_command_line({tostring(pid), path}, opts)
-   if args.error then
-      return args
-   end
-   local response = config_rpc.call_leader(
-      args.instance_id, 'get-state',
-      { schema = args.schema_name, revision = args.revision_date,
-        path = args.path, print_default = args.print_default,
-        format = args.format })
-   return response
-end
-
 local function exporter_is_ready (pid, exporter)
-   local r = get_state(
+   local r = test.get_state(
       pid,
       ("/snabbflow-state/exporter[name=%s]/template-packets-transmitted")
          :format(exporter)
    )
    if not r.error then
       return tonumber(r.state) > 0
-   end
-end
-
-local function print_state (pid, path)
-   local r = get_state(pid, path)
-   if r.error then
-      error(r.error)
-   else
-      print(r.state)
-   end
-end
-
-local function get_counter (pid, path)
-   local r = get_state(pid, path)
-   if r.error then
-      error(r.error)
-   else
-      return tonumber(r.state)
    end
 end
 
@@ -192,8 +161,8 @@ lib.waitfor2(
 
 print()
 print("snabbflow-state:")
-print_state(probe_pid, "/snabbflow-state")
-local packets_received = get_counter(
+test.print_state(probe_pid, "/snabbflow-state")
+local packets_received = test.get_counter(
    probe_pid,
    ("/snabbflow-state/exporter[name=%s]/packets-received")
       :format(opts.exporter_name)

@@ -24,7 +24,7 @@ nfcapd -b 10.0.0.2 -p 4739 -l $flowdir &
 capd=$!
 
 # Run probe test
-./snabb snsh program/ipfix/tests/test.snabb
+./snabb snsh -t program.ipfix.tests.test
 
 kill $capd
 
