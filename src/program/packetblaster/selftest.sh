@@ -58,25 +58,39 @@ fi
  
 # Simple test: Just make sure packetblaster runs for a period of time
 # (doesn't crash on startup).
+echo "packetblaster replay"
 timeout 5 ./snabb packetblaster replay program/snabbnfv/test_fixtures/pcap/64.pcap ${PCIADDR}
 status=$?
 if [ $status != 124 ]; then
     echo "Error: expected timeout (124) but got ${status}"
     exit 1
+else
+  echo "ok"
 fi
 
+echo "packetblaster synth"
 timeout 5 ./snabb packetblaster synth --src 11:11:11:11:11:11 --dst 22:22:22:22:22:22 --sizes 64,128,256 ${PCIADDR}
 status=$?
 if [ $status != 124 ]; then
     echo "Error: expected timeout (124) but got ${status}"
     exit 1
+else
+  echo "ok"
 fi
 
-timeout 5 ./snabb packetblaster lwaftr --pci ${PCIADDR}
-status=$?
-if [ $status != 124 ]; then
-    echo "Error: expected timeout (124) but got ${status}"
-    exit 1
+if [ "$PCIADDR" = "$SNABB_PCI_INTEL0" ]; then
+  echo "packetblaster lwaftr --pci"
+  timeout 5 ./snabb packetblaster lwaftr --pci ${PCIADDR}
+  status=$?
+  if [ $status != 124 ]; then
+      echo "Error: expected timeout (124) but got ${status}"
+      exit 1
+  else
+    echo "ok"
+  fi
+else
+  echo 'Skipping ./snabb packetblaster lwaftr --pci ${PCIADDR}'
+  echo '${PCIADDR} is not ${SNABB_PCI_INTEL0}'
 fi
 
 echo "selftest: ok"

@@ -276,6 +276,7 @@ function FlowSet:new (spec, args)
    end
    add_table_counters('table', o.table)
    add_table_counters('rate_table', o.sp.table)
+   assert(not shm.exists(shm_name.."/packets_in"))
    o.shm = shm.create_frame(shm_name, frame_init)
 
    -- Template-specific counters
@@ -563,38 +564,40 @@ function FlowSet:sync_stats()
    end
 end
 
-IPFIX = {}
-local ipfix_config_params = {
-   idle_timeout = { default = 300 },
-   active_timeout = { default = 120 },
-   flush_timeout = { default = 10 },
-   cache_size = { default = 20000 },
-   max_load_factor = { default = 0.4 },
-   scan_protection = { default = {} },
-   scan_time = { default = 10 },
-   -- RFC 5153 §6.2 recommends a 10-minute template refresh
-   -- configurable from 1 minute to 1 day.
-   template_refresh_interval = { default = 600 },
-   -- Valid values: 9 or 10.
-   ipfix_version = { default = 10 },
-   -- RFC 7011 §10.3.3 specifies that if the PMTU is unknown, a
-   -- maximum of 512 octets should be used for UDP transmission.
-   mtu = { default = 512 },
-   observation_domain = { default = 256 },
-   exporter_ip = { required = true },
-   exporter_eth_src = { default = '00:00:00:00:00:00' },
-   exporter_eth_dst = { default = '00:00:00:00:00:00' },
-   collector_ip = { required = true },
-   collector_port = { required = true },
-   templates = { default = { "v4", "v6" } },
-   maps = { default = {} },
-   maps_log_fh = { default = nil },
-   -- Used to distinguish instances of the app running in the same
-   -- process
-   instance = { default = 1 },
-   add_packet_metadata = { default = true },
-   log_date = { default = true }
+IPFIX = {
+   config = {
+      idle_timeout = { default = 300 },
+      active_timeout = { default = 120 },
+      flush_timeout = { default = 10 },
+      cache_size = { default = 20000 },
+      max_load_factor = { default = 0.4 },
+      scan_protection = { default = {} },
+      scan_time = { default = 10 },
+      -- RFC 5153 §6.2 recommends a 10-minute template refresh
+      -- configurable from 1 minute to 1 day.
+      template_refresh_interval = { default = 600 },
+      -- Valid values: 9 or 10.
+      ipfix_version = { default = 10 },
+      -- RFC 7011 §10.3.3 specifies that if the PMTU is unknown, a
+      -- maximum of 512 octets should be used for UDP transmission.
+      mtu = { default = 512 },
+      observation_domain = { default = 256 },
+      exporter_ip = { required = true },
+      exporter_eth_src = { default = '00:00:00:00:00:00' },
+      exporter_eth_dst = { default = '00:00:00:00:00:00' },
+      collector_ip = { required = true },
+      collector_port = { required = true },
+      templates = { default = { "v4", "v6" } },
+      maps = { default = {} },
+      maps_logfile = { default = nil },
+      -- Used to distinguish instances of the app running in the same
+      -- process
+      instance = { default = 1 },
+      add_packet_metadata = { default = true },
+      log_date = { default = true }
+   }
 }
+local ipfix_config_params = IPFIX.config
 
 local scan_protection_params = {
    enable = { default = false },
@@ -641,78 +644,100 @@ local function setup_transport_header(self, config)
 end
 
 function IPFIX:new(config)
-   config = lib.parse(config, ipfix_config_params)
    local o = { boot_time = engine.now(),
-               template_refresh_interval = config.template_refresh_interval,
                next_template_refresh = -1,
-               version = config.ipfix_version,
-               observation_domain = config.observation_domain,
-               instance = config.instance,
-               add_packet_metadata = config.add_packet_metadata,
-               logger = logger.new({ date = config.log_date,
-                                     module = ("[%5d]"):format(S.getpid())
-                                        .." IPFIX exporter"} ) }
-   o.shm = {
-      -- Total number of packets received
-      received_packets = { counter },
-      -- Packets not matched by any flow set
-      ignored_packets = { counter },
-      -- Number of template packets sent
-      template_packets = { counter },
-      -- Non-wrapping sequence number (see add_ipfix_header() for a
-      -- brief description of the semantics for IPFIX and Netflowv9)
-      sequence_number = { counter, 1 },
-      version = { counter, o.version },
-      observation_domain = { counter, o.observation_domain },
+               stats_timer = lib.throttle(5),
+               templates = {},
+               flow_sets = {},
+               shm = {
+                  -- Total number of packets received
+                  received_packets = { counter },
+                  -- Packets not matched by any flow set
+                  ignored_packets = { counter },
+                  -- Number of template packets sent
+                  template_packets = { counter },
+                  -- Non-wrapping sequence number (see add_ipfix_header() for a
+                  -- brief description of the semantics for IPFIX and Netflowv9)
+                  sequence_number = { counter, 1 },
+                  version = { counter, config.ipfix_version },
+                  observation_domain = { counter, config.observation_domain },
+               }
    }
+   o = setmetatable(o, { __index = IPFIX })
+   o:reconfig(config)
+   return o
+end
 
-   if o.version == 9 then
-      o.header_t = netflow_v9_packet_header_t
-   elseif o.version == 10 then
-      o.header_t = ipfix_packet_header_t
-   else
-      error('unsupported ipfix version: '..o.version)
+function IPFIX:reconfig(config)
+   self.template_refresh_interval = config.template_refresh_interval
+   self.version = config.ipfix_version
+   self.observation_domain = config.observation_domain
+   self.instance = config.instance
+   self.add_packet_metadata = config.add_packet_metadata
+   self.logger = logger.new({ date = config.log_date,
+                                     module = ("[%5d]"):format(S.getpid())
+                                        .." IPFIX exporter"})
+
+   if self.shm.path then -- shm frame initialized?
+      counter.set(self.shm.version, self.version)
+      counter.set(self.shm.observation_domain, self.observation_domain)
    end
-   o.header_ptr_t = ptr_to(o.header_t)
-   o.header_size = ffi.sizeof(o.header_t)
 
-   setup_transport_header(o, config)
+   if self.version == 9 then
+      self.header_t = netflow_v9_packet_header_t
+   elseif self.version == 10 then
+      self.header_t = ipfix_packet_header_t
+   else
+      error('unsupported ipfix version: '..self.version)
+   end
+   self.header_ptr_t = ptr_to(self.header_t)
+   self.header_size = ffi.sizeof(self.header_t)
+
+   setup_transport_header(self, config)
 
    -- FIXME: Assuming we export to IPv4 address.
    local l3_header_len = 20
    local l4_header_len = 8
-   local ipfix_header_len = o.header_size
+   local ipfix_header_len = self.header_size
    local total_header_len = l4_header_len + l3_header_len + ipfix_header_len
    local flow_set_args = { mtu = config.mtu - total_header_len,
                            version = config.ipfix_version,
                            cache_size = config.cache_size,
-			   max_load_factor = config.max_load_factor,
+                           max_load_factor = config.max_load_factor,
                            scan_protection = lib.parse(config.scan_protection,
                                                        scan_protection_params),
                            idle_timeout = config.idle_timeout,
                            active_timeout = config.active_timeout,
                            scan_time = config.scan_time,
                            flush_timeout = config.flush_timeout,
-                           parent = o,
+                           parent = self,
                            maps = config.maps,
-                           maps_log_fh = config.maps_log_fh,
+                           maps_log_fh = config.maps_logfile and
+                                       assert(io.open(config.maps_logfile, "a")) or nil,
                            instance = config.instance,
                            log_date = config.log_date }
 
-   o.flow_sets = {}
-   for _, template in ipairs(config.templates) do
-      table.insert(o.flow_sets, FlowSet:new(template, flow_set_args))
-      o.logger:log("Added template "..o.flow_sets[#o.flow_sets]:id())
+   local flow_set_args_changed = not lib.equal(self.flow_set_args, flow_set_args)
+   self.flow_set_args = flow_set_args
+
+   for i, template in ipairs(self.templates) do
+      if template ~= config.templates[i] or flow_set_args_changed then
+         self.flow_sets[i] = nil
+      end
    end
-
-   o.stats_timer = lib.throttle(5)
-   return setmetatable(o, { __index = self })
-end
-
-function IPFIX:reconfig(config)
-   -- Only support reconfiguration of the transport header for now
-   config = lib.parse(config, ipfix_config_params)
-   setup_transport_header(self, config)
+   for i, template in ipairs(config.templates) do
+      if not self.flow_sets[i] then
+         self.flow_sets[i] = FlowSet:new(template, flow_set_args)
+         if self.templates[i] then
+            self.logger:log("Updated template "..self.flow_sets[i]:id())
+         else
+            self.logger:log("Added template "..self.flow_sets[i]:id())
+         end
+      else
+         self.logger:log("Kept template "..self.flow_sets[i]:id())
+      end
+   end
+   self.templates = config.templates
 end
 
 function IPFIX:send_template_records(out)

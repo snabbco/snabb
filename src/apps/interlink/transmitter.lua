@@ -46,8 +46,8 @@ end
 -- process termination.
 function Transmitter.shutdown (pid)
    for _, queue in ipairs(shm.children("/"..pid.."/interlink/transmitter")) do
-      local backlink = "/"..pid.."/interlink/transmitter/"..queue..".interlink"
-      local shm_name = "/"..pid.."/group/interlink/"..queue..".interlink"
+      local backlink = "/"..pid.."/interlink/transmitter/"..queue
+      local shm_name = "/"..pid.."/group/interlink/"..queue
       -- Call protected in case /<pid>/group is already unlinked.
       local ok, r = pcall(interlink.open, shm_name)
       if ok then interlink.detach_transmitter(r, shm_name) end

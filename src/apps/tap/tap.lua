@@ -28,6 +28,8 @@ Tap._config = {
    mtu_fixup = { default = true },
    mtu_offset = { default = 14 },
    mtu_set = { default = nil },
+   overwrite_dst_mac = { default = false },
+   forwarding = { default = false }
 }
 
 -- Get or set the MTU of a tap device.  Return the current value.
@@ -76,7 +78,8 @@ local function _status (sock, ifr, status)
 end
 
 -- Get the MAC address of a tap device as a int64_t
-local function _macaddr (sock, ifr)
+local function _macaddr (sock, ifr, mac)
+   mac = mac or macaddr:new(0)
    local ok, err = sock:ioctl("SIOCGIFHWADDR", ifr)
    if not ok then
       error("Error getting MAC address for tap device "
@@ -87,7 +90,8 @@ local function _macaddr (sock, ifr)
       error("Tap interface " .. ifr.name
                .. " is not of type ethernet: " .. sa.sa_family)
    else
-      return macaddr:new(ffi.cast("uint64_t*", sa.sa_data)[0]).bits
+      ffi.copy(mac.bytes, sa.sa_data, ffi.sizeof(mac.bytes))
+      return mac
    end
 end
 
@@ -137,12 +141,24 @@ function Tap:new (conf)
                 .. mtu_configured)
    end
 
+   local mac = _macaddr(sock, ifr)
+
+   if conf.forwarding then
+      local tap_sysctl_base = "net/ipv4/conf/"..conf.name
+      assert(S.sysctl(tap_sysctl_base.."/rp_filter", '0'))
+      assert(S.sysctl(tap_sysctl_base.."/accept_local", '1'))
+      assert(S.sysctl(tap_sysctl_base.."/forwarding", '1'))
+   end
+
    return setmetatable({fd = fd,
                         sock = sock,
                         ifr = ifr,
+                        mac = mac,
                         name = conf.name,
-                        status_timer = lib.throttle(0.001),
+                        status_timer = lib.throttle(0.1),
                         pkt = packet.allocate(),
+                        eth = ethernet:new{},
+                        overwrite_dst_mac = conf.overwrite_dst_mac,
                         shm = { rxbytes   = {counter},
                                 rxpackets = {counter},
                                 rxmcast   = {counter},
@@ -155,20 +171,24 @@ function Tap:new (conf)
                                 status    = {counter, _status(sock, ifr)},
                                 mtu       = {counter, conf.mtu},
                                 speed     = {counter, 0},
-                                macaddr   = {counter, _macaddr(sock, ifr)} }},
+                                macaddr   = {counter, mac.bits} }},
       {__index = Tap})
 end
 
 function Tap:status()
    counter.set(self.shm.status, _status(self.sock, self.ifr))
+   counter.set(self.shm.macaddr, _macaddr(self.sock, self.ifr, self.mac).bits)
+end
+
+function Tap:tick ()
+   if self.status_timer() then
+      self:status()
+   end
 end
 
 function Tap:pull ()
    local l = self.output.output
    if l == nil then return end
-   if self.status_timer() then
-      self:status()
-   end
    for i=1,engine.pull_npackets do
       local len, err = S.read(self.fd, self.pkt.data, C.PACKET_PAYLOAD_SIZE)
       -- errno == EAGAIN indicates that the read would have blocked as there is no
@@ -193,12 +213,20 @@ function Tap:pull ()
    end
 end
 
+function Tap:set_dst_mac (p)
+   local eth = self.eth:new_from_mem(p.data, p.length)
+   eth:dst(self.mac.bytes)
+end
+
 function Tap:push ()
    local l = self.input.input
    while not link.empty(l) do
       -- The write might have blocked so don't dequeue the packet from the link
       -- until the write has completed.
       local p = link.front(l)
+      if self.overwrite_dst_mac then
+         self:set_dst_mac(p)
+      end
       local len, err = S.write(self.fd, p.data, p.length)
       -- errno == EAGAIN indicates that the write would of blocked
       if not len and err.errno ~= const.E.AGAIN or len and len ~= p.length then

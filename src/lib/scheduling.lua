@@ -12,7 +12,13 @@ local function fatal (msg)
    main.exit(1)
 end
 
+local default_jit_opt = {
+   sizemcode=256,
+   maxmcode=2048
+}
+
 local scheduling_opts = {
+   jit_opt = {default=default_jit_opt}, -- JIT options.
    cpu = {},                  -- CPU index (integer).
    real_time = {},            -- Boolean.
    ingress_drop_monitor = {}, -- Action string: one of 'flush' or 'warn'.
@@ -23,6 +29,14 @@ local scheduling_opts = {
 }
 
 local sched_apply = {}
+
+function sched_apply.jit_opt(opt)
+   local args = {}
+   for key, value in pairs(opt) do
+      table.insert(args, ("%s=%s"):format(key, value))
+   end
+   require("jit.opt").start(unpack(args))
+end
 
 function sched_apply.cpu (cpu)
    print(string.format('Binding data-plane PID %s to CPU %s.',

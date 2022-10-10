@@ -1,0 +1,22 @@
+Usage: packetblaster ipfix [OPTIONS] <PCAPFILE> <PCI> <CPUSET>
+
+  -D DURATION, --duration DURATION
+                             Run for DURATION seconds.
+                             Default: unlimited
+  -q N, --nqueues N
+                             Number of transmit queues per process.
+                             Default: 1
+  -h, --help
+                             Print usage information.
+
+packetblaster transmits packets to one Connect-X network adapter.
+
+Replays packets from <PCAPFILE> is a loop, incrementing layer 3 addresses
+by one after every loop.
+
+Packets <PCAPFILE> must be of the form Ethernet>Dot1q>IP.
+
+Runs one process for each core given in <CPUSET> (at least one.)
+
+Examples:
+  packetblaster ipfix myfile.cap 0000:01:00.0 1 6 7 8 9
