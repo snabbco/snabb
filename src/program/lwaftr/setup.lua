@@ -210,7 +210,7 @@ end
 function load_kernel_iface (c, conf, v4_nic_name, v6_nic_name)
    local RawSocket = require("apps.socket.raw").RawSocket
    local v6_iface, id, queue = lwutil.parse_instance(conf)
-   local v4_iface = queue.external_interface.dev_info
+   local v4_iface = conf.softwire_config.instance[v6_iface].external_device
    local dev_info = {rx = "rx", tx = "tx"}
 
    lwaftr_app(c, conf, v6_iface)

@@ -28,8 +28,12 @@ local function event_has_flags(event, flags)
    return bit.band(event.mask, S.c.IN[flags]) ~= 0
 end
 
-local function warn(msg, ...)
-   io.stderr:write(string.format(msg.."\n", ...))
+DEBUG = false
+
+local function debug(msg, ...)
+   if DEBUG then
+      io.stderr:write(string.format(msg.."\n", ...))
+   end
 end
 
 local function open_inotify_stream(name, events)
@@ -201,7 +205,7 @@ function recursive_directory_inventory_events(dir, cancel_op)
                        cancel=cancel }
                   rx_op = recompute_rx_op()
                else
-                  warn('unexpected double-add for %s', name)
+                  debug('unexpected double-add for %s', name)
                end
             else
                occupancy = occupancy + 1
@@ -239,7 +243,7 @@ function recursive_directory_inventory_events(dir, cancel_op)
             occupancy = occupancy - 1
             tx:put(event)
          else
-            warn('unexpected event kind on %s: %s', event.name, event.kind)
+            debug('unexpected event kind on %s: %s', event.name, event.kind)
          end
       end
       tx:put({kind='rmdir', name=dir})
