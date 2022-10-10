@@ -5,7 +5,7 @@
 Clone the Snabb repository to get the latest [release](https://github.com/snabbco/snabb/releases/):
 
 ```
-$ git clone https://github.com/eugeneia/snabb.git # XXX: change to upstream once fixes landed
+$ git clone https://github.com/snabbco/snabb.git
 ```
 
 If you don’t have `git` you can also download a Zip archive or Tarball of the latest release and unpack that.
@@ -14,7 +14,6 @@ Next compile Snabb by running
 
 ```
 $ cd snabb # where you cloned or unpacked Snabb
-$ git checkout lwaftr-tutorial # XXX: bug fixes applying to this guide
 $ make
 ... # a bunch of output that you should be able to safely ignore
 BINARY    5.4M snabb # this should be the second-last line of output and indicates success
