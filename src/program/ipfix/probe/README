@@ -7,6 +7,8 @@ Available options:
        -r, --real-time          Enable real-time SCHED_FIFO scheduler.
        -p, --no-profile         Disable VMProfile.
        -h, --help               Print this help text and exit.
+       -T, --test-pcap PCAP     Testing: read packets from PCAP instead
+                                of NIC.
 
 The mandatory argument <config> must be a path to the initial
 configuration file.

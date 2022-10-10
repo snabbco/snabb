@@ -21,9 +21,10 @@ local long_opts = {
    name = "n",
    busywait ="b",
    ["real-time"] = "r",
-   ["no-profile"] = "p"
+   ["no-profile"] = "p",
+   ["test-pcap"] = "T"
 }
-local opt = "hn:brp"
+local opt = "hn:brpT:"
 local opt_handler = {}
 local name
 local busywait, real_time, profile = false, false, true
@@ -32,6 +33,8 @@ function opt_handler.n (arg) name = arg end
 function opt_handler.b () busywait = true end
 function opt_handler.r () real_time = true end
 function opt_handler.p () profile = false end
+local pcap_input
+function opt_handler.T (arg) pcap_input = arg end
 
 function run (args)
    args = lib.dogetopt(args, opt_handler, opt, long_opts)
@@ -49,7 +52,7 @@ local probe_cpuset = cpuset.new()
 local function update_cpuset (cpu_pool)
    local cpu_set = {}
    if cpu_pool then
-      for _, cpu in ipairs(cpu_pool.cpu) do
+      for _, cpu in ipairs(cpu_pool.cpu or {}) do
          if not probe_cpuset:contains(cpu) then
             probe_cpuset:add(cpu)
          end
@@ -202,6 +205,11 @@ function setup_workers (config)
    for rss_group = 1, rss.hardware_scaling.rss_groups do
       local inputs, outputs = {}, {}
       for device, opt in pairs(interfaces) do
+         if pcap_input then
+            table.insert(inputs, pcap_input)
+            break
+         end
+
          ensure_device_unique(device, interfaces)
          local input = lib.deepcopy(opt)
          input.device = device
@@ -341,7 +349,7 @@ function setup_workers (config)
          })
       end
       workers["rss"..rss_group] = probe.configure_rss_graph(
-         rss_config, inputs, outputs, ipfix.log_date, rss_group
+         rss_config, inputs, outputs, ipfix.log_date, rss_group, pcap_input and 'pcap'
       )
    end
 
