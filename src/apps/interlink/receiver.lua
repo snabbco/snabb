@@ -46,8 +46,8 @@ end
 -- process termination.
 function Receiver.shutdown (pid)
    for _, queue in ipairs(shm.children("/"..pid.."/interlink/receiver")) do
-      local backlink = "/"..pid.."/interlink/receiver/"..queue..".interlink"
-      local shm_name = "/"..pid.."/group/interlink/"..queue..".interlink"
+      local backlink = "/"..pid.."/interlink/receiver/"..queue
+      local shm_name = "/"..pid.."/group/interlink/"..queue
       -- Call protected in case /<pid>/group is already unlinked.
       local ok, r = pcall(interlink.open, shm_name)
       if ok then interlink.detach_receiver(r, shm_name) end

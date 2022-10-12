@@ -97,6 +97,9 @@ function parse_command_line(args, opts)
    if #args == 0 then err() end
    ret.instance_id = table.remove(args, 1)
    local descr = call_leader(ret.instance_id, 'describe', {})
+   if descr.error then
+      return descr
+   end
    if not ret.schema_name then
       if opts.require_schema then err("missing --schema arg") end
       ret.schema_name = descr.default_schema
@@ -136,17 +139,15 @@ function parse_command_line(args, opts)
    return ret, args
 end
 
-function open_socket_or_die(instance_id)
+function open_socket(instance_id)
    S.signal('pipe', 'ign')
    local socket = assert(S.socket("unix", "stream"))
    local tail = instance_id..'/config-leader-socket'
    local by_name = S.t.sockaddr_un(shm.root..'/by-name/'..tail)
    local by_pid = S.t.sockaddr_un(shm.root..'/'..tail)
    if not socket:connect(by_name) and not socket:connect(by_pid) then
-      io.stderr:write(
-         "Could not connect to config leader socket on Snabb instance '"..
-            instance_id.."'.\n")
-      main.exit(1)
+      socket:close()
+      return nil
    end
    return file.fdopen(socket, 'rdwr')
 end
@@ -194,7 +195,14 @@ end
 
 function call_leader(instance_id, method, args)
    local caller = rpc.prepare_caller('snabb-config-leader-v1')
-   local socket = open_socket_or_die(instance_id)
+   local socket = open_socket(instance_id)
+   if not socket then
+      return {
+         status = 1,
+         error = ("Could not connect to config leader socket on Snabb instance %q")
+            :format(instance_id)
+      }
+   end
    -- FIXME: stream call and response.
    local msg, parse_reply = rpc.prepare_call(caller, method, args)
    send_message(socket, msg)

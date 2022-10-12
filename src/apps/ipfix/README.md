@@ -93,8 +93,8 @@ packets.
 
 — Key **templates**
 
-*Optional*.  The templates for flows being collected.  See the source
-code for more information.
+*Optional*.  The templates for flows being collected. 
+See `apps/ipfix/README.templates.md` for more information.
 
 ### To-do list
 

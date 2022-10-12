@@ -36,8 +36,6 @@ function new_worker (conf)
    alarms.install_alarm_handler(ptree_alarms:alarm_handler())
    ret.pending_actions = {}
 
-   require("jit.opt").start('sizemcode=256', 'maxmcode=2048')
-
    ret.breathe = engine.breathe
    if conf.measure_latency then
       local latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)

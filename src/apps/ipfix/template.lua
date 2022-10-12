@@ -871,6 +871,51 @@ templates = {
    },
 }
 
+local templates_legend = [[
+- `value=n` means the value stores up to *n* bytes.
+- `tcpControlBitsReduced` are the `tcpControlBits` defined in [RFC 5102](https://datatracker.ietf.org/doc/html/rfc5102#section-5.8.7)
+- The `dns*` keys are private enterprise extensions courtesy by SWITCH
+]]
+
+-- sudo ./snabb snsh -e 'require("apps.ipfix.template").templatesMarkdown()' > apps/ipfix/README.templates.md
+function templatesMarkdown (out)
+   out = out or io.stdout
+   local names = {}
+   for name in pairs(templates) do
+      table.insert(names, name)
+   end
+   table.sort(names)
+   out:write([[<!--- DO NOT EDIT, this file is generated via 
+   sudo ./snabb snsh -e 'require("apps.ipfix.template").templatesMarkdown()' > apps/ipfix/README.templates.md
+   --->
+   
+   ]])
+   out:write("## IPFIX templates (apps.ipfix.template)\n\n")
+   out:write(templates_legend.."\n")
+   out:write("| Name | Id | Type | Filter | Keys | Values | Required Maps\n")
+   out:write("| --- | --- | --- | --- | --- | --- | ---\n")
+   local function listCell (xs)
+      out:write("| ")
+      if not xs then return end
+      for i, x in ipairs(xs) do
+         if i < #xs then
+            out:write(("`%s`, "):format(x))
+         else
+            out:write(("`%s` "):format(x))
+         end
+      end
+   end
+   for _, name in ipairs(names) do
+      local t = templates[name]
+      out:write(("| %s | %d | %s | %s "):format(
+         name, t.id, t.aggregation_type, t.filter))
+      listCell(t.keys)
+      listCell(t.values)
+      listCell(t.require_maps)
+      out:write("\n")
+   end
+end
+
 function selftest()
    print('selftest: apps.ipfix.template')
    local datagram = require("lib.protocol.datagram")

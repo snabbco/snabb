@@ -336,6 +336,72 @@ function basic_match (pci0, pci1)
    print("selftest: done")
 end
 
+function drop (pci0, pci1)
+   print("selftest: connectx_test drop")
+
+   local basic = require("apps.basic.basic_apps")
+   local counter = require("core.counter")
+
+   local c = config.new()
+   config.app(c, "source", basic.Source)
+   local txqueues = {}
+   for i=1,16 do
+      table.insert(txqueues, {id="tx"..i})
+   end
+   config.app(c, "nic0", connectx.ConnectX, {
+      pciaddress=pci0,
+      queues=txqueues
+   })
+   for i, queue in ipairs(txqueues) do
+      config.app(c, "tx"..i, connectx.IO, {
+         pciaddress=pci0, queue="tx"..i, packetblaster=true
+      })
+      config.link(c, "source.output"..i.." -> tx"..i..".input")
+   end
+
+   config.app(c, "sink", basic.Sink)
+   config.app(c, "nic1", connectx.ConnectX, {
+      pciaddress=pci1,
+      queues={{id="rx1"}}
+   })
+   config.app(c, "rx1", connectx.IO, {pciaddress=pci1, queue="rx1"})
+   config.link(c, "rx1.output -> sink.input")
+
+   engine.configure(c)
+
+   print("waiting for linkup...")
+   lib.waitfor(function ()
+      return engine.app_table.nic0.hca:linkup()
+         and engine.app_table.nic1.hca:linkup()
+   end)
+
+   local stats0 = engine.app_table.nic0.stats
+   local stats1 = engine.app_table.nic1.stats
+
+   local function have_stats ()
+      return counter.read(stats0.txpackets) > 0
+         and counter.read(stats1.rxpackets) > 0
+   end
+
+   engine.main({done=have_stats})
+   engine.report_links()
+
+   engine.app_table.nic0:sync_stats()
+   engine.app_table.nic1:sync_stats()
+   print("nic0", "txpackets ", tonumber(counter.read(stats0.txpackets)))
+   print("nic1", "rxpackets ", tonumber(counter.read(stats1.rxpackets)))
+   print("nic1", "rxdrop    ", tonumber(counter.read(stats1.rxdrop)))
+   print("nic1", "rxdrop_rx1", tonumber(counter.read(stats1.rxdrop_rx1)))
+   assert(counter.read(stats1.rxpackets) > 0,
+      "some packets should have been received")
+   assert(counter.read(stats1.rxdrop) > 0,
+      "some packets should be dropped")
+   assert(counter.read(stats1.rxdrop) == counter.read(stats1.rxdrop_rx1),
+      "Per-queue drop counter should match rxdrop")
+
+   print("selftest: done")
+end
+
 function selftest ()
    local pci0 = os.getenv("SNABB_PCI_CONNECTX_0")
    local pci1 = os.getenv("SNABB_PCI_CONNECTX_1")
@@ -347,5 +413,6 @@ function selftest ()
    switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 2, 2, 4)
    switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 1, 2, 8)
    switch(pci0, pci1, 10e6, 1, 60, 1500, 100, 100, 4, 1, 4)
+   drop(pci0, pci1)
 end
 

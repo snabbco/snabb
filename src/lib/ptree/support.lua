@@ -44,15 +44,18 @@ local function add_child_objects(accum, grammar, config)
       return visit(grammar, config)
    end
    function visitor.table(grammar, config)
-      -- Ctables are raw data, and raw data doesn't contain children
-      -- with distinct identity.
-      if grammar.key_ctype and grammar.value_ctype then return end
       local child_grammar = {type="struct", members=grammar.values,
                              ctype=grammar.value_ctype}
-      if grammar.key_ctype and not grammar.native_key then
+      if not grammar.key_ctype or grammar.native_key then
+         for k, v in pairs(config) do visit_child(child_grammar, v) end
+      elseif grammar.key_ctype and grammar.value_ctype then
+      -- Ctables are raw data, and raw data doesn't contain children
+      -- with distinct identity.
+         return
+      elseif grammar.key_ctype then
          for k, v in cltable.pairs(config) do visit_child(child_grammar, v) end
       else
-         for k, v in pairs(config) do visit_child(child_grammar, v) end
+         error("unreachable")
       end
    end
    function visitor.array(grammar, config)

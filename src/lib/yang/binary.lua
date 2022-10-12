@@ -221,14 +221,7 @@ local function data_emitter(production)
       end
    end
    function handlers.table(production)
-      if production.key_ctype and production.value_ctype then
-         return function(data, stream)
-            stream:write_stringref('ctable')
-            stream:write_stringref(production.key_ctype)
-            stream:write_stringref(production.value_ctype)
-            data:save(stream)
-         end
-      elseif production.native_key then
+      if production.native_key then
          local emit_value = visit1({type='struct', members=production.values,
                                     ctype=production.value_ctype})
          -- FIXME: sctable if production.value_ctype?
@@ -258,6 +251,13 @@ local function data_emitter(production)
                stream:write_stringref(k)
                emit_value(v, stream)
             end
+         end
+      elseif production.key_ctype and production.value_ctype then
+         return function(data, stream)
+            stream:write_stringref('ctable')
+            stream:write_stringref(production.key_ctype)
+            stream:write_stringref(production.value_ctype)
+            data:save(stream)
          end
       elseif production.key_ctype then
          local emit_keys = visit1({type='table', key_ctype=production.key_ctype,

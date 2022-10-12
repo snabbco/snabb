@@ -211,7 +211,7 @@ function data_grammar_from_schema(schema, is_config)
    handlers['leaf-list'] = function(node)
       if node.config ~= is_config then return end
       local t = elide_unions(node.type)
-      return {type='array', element_type=t, ctype=value_ctype(t),
+      return {type='array', element_type=t,
               min_elements=node.min_elements, max_elements=node.max_elements}
    end
    function handlers.list(node)
@@ -464,7 +464,7 @@ local function array_parser(keyword, element_type, ctype)
    local array_t = ctype and ffi.typeof('$[?]', elt_t)
    local function finish(out)
       -- FIXME check min-elements
-      if array_t then
+      if out and array_t then
          out = util.ffi_array(array_t(#out, out), elt_t)
       end
       return out
@@ -601,10 +601,10 @@ local function table_parser(keyword, keys, values, native_key, key_ctype,
    local key_t = key_ctype and typeof(key_ctype)
    local value_t = value_ctype and typeof(value_ctype)
    local init
-   if key_t and value_t then
-      function init() return ctable_builder(key_t, value_t) end
-   elseif native_key then
+   if native_key then
       function init() return native_keyed_table_builder(native_key) end
+   elseif key_t and value_t then
+      function init() return ctable_builder(key_t, value_t) end
    elseif key_t then
       function init() return cltable_builder(key_t) end
    else
@@ -616,8 +616,8 @@ local function table_parser(keyword, keys, values, native_key, key_ctype,
    local function parse(P, assoc)
       local struct = parse1(P)
       local key, value = {}, {}
-      if key_t then key = key_t() end
-      if value_t then value = value_t() end
+         if key_t then key = key_t() end
+         if value_t then value = value_t() end
       for k,_ in pairs(keys) do
          local id = normalize_id(k)
          key[id] = struct[id]
@@ -959,16 +959,7 @@ function xpath_printer_from_grammar(production, print_default, root)
    function handlers.table(keyword, production)
       local compose_key = key_composer(production.keys)
       local print_value = body_printer(production.values)
-      if production.key_ctype and production.value_ctype then
-         return function(data, file, path)
-            path = path or ''
-            for entry in data:iterate() do
-               local key = compose_key(entry.key)
-               local path = path..(keyword or '')..key..'/'
-               print_value(entry.value, file, path)
-            end
-         end
-      elseif production.native_key then
+      if production.native_key then
          local id = normalize_id(production.native_key)
          return function(data, file, path)
             path = path or ''
@@ -976,6 +967,15 @@ function xpath_printer_from_grammar(production, print_default, root)
                local key = compose_key({[id]=key})
                local path = path..(keyword or '')..key..'/'
                print_value(value, file, path)
+            end
+         end
+      elseif production.key_ctype and production.value_ctype then
+         return function(data, file, path)
+            path = path or ''
+            for entry in data:iterate() do
+               local key = compose_key(entry.key)
+               local path = path..(keyword or '')..key..'/'
+               print_value(entry.value, file, path)
             end
          end
       elseif production.key_ctype then
@@ -1219,17 +1219,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
       local is_key_unique = is_key_unique(production)
       local compose_key = key_composer(production.keys)
       local print_value = body_printer(production.values)
-      if production.key_ctype and production.value_ctype then
-         return function(data, file, path)
-            path = path or ''
-            for entry in data:iterate() do
-               local key = compose_key(entry.key)
-               local path = path..(keyword or '')..'/'
-               if not is_key_unique then key = path..key end
-               print_value(entry.value, file, path, key)
-            end
-         end
-      elseif production.native_key then
+      if production.native_key then
          local id = normalize_id(production.native_key)
          return function(data, file, path)
             path = path or ''
@@ -1238,6 +1228,16 @@ function influxdb_printer_from_grammar(production, print_default, root)
                local path = path..(keyword or '')..'/'
                if not is_key_unique then key = path..key end
                print_value(value, file, path, key)
+            end
+         end
+      elseif production.key_ctype and production.value_ctype then
+         return function(data, file, path)
+            path = path or ''
+            for entry in data:iterate() do
+               local key = compose_key(entry.key)
+               local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
+               print_value(entry.value, file, path, key)
             end
          end
       elseif production.key_ctype then
@@ -1413,17 +1413,7 @@ function data_printer_from_grammar(production, print_default)
    function handlers.table(keyword, production)
       local print_key = body_printer(production.keys)
       local print_value = body_printer(production.values)
-      if production.key_ctype and production.value_ctype then
-         return function(data, file, indent)
-            for entry in data:iterate() do
-               if keyword then print_keyword(keyword, file, indent) end
-               file:write('{\n')
-               print_key(entry.key, file, indent..'  ')
-               print_value(entry.value, file, indent..'  ')
-               file:write(indent..'}\n')
-            end
-         end
-      elseif production.native_key then
+      if production.native_key then
          local id = normalize_id(production.native_key)
          return function(data, file, indent)
             for key, value in pairs(data) do
@@ -1431,6 +1421,16 @@ function data_printer_from_grammar(production, print_default)
                file:write('{\n')
                print_key({[id]=key}, file, indent..'  ')
                print_value(value, file, indent..'  ')
+               file:write(indent..'}\n')
+            end
+         end
+      elseif production.key_ctype and production.value_ctype then
+         return function(data, file, indent)
+            for entry in data:iterate() do
+               if keyword then print_keyword(keyword, file, indent) end
+               file:write('{\n')
+               print_key(entry.key, file, indent..'  ')
+               print_value(entry.value, file, indent..'  ')
                file:write(indent..'}\n')
             end
          end
@@ -2070,6 +2070,25 @@ function selftest()
       length_test "++++++++++++++++++++++";
    ]])
    assert(success)
+
+   -- Test native numeric keys.
+   local natnumkey_schema = schema.load_schema([[module native-numeric-schema {
+      namespace "urn:ietf:params:xml:ns:yang:native-numeric-schema";
+      prefix "test";
+
+      list numbered {
+         key "id";
+         leaf id { type int32; }
+         leaf bo { type boolean; default true; }
+      }
+   }]])
+   local natnumkey_data = load_config_for_schema(natnumkey_schema,
+      mem.open_input_string [[
+      numbered { id -1; }
+      numbered { id 2; }
+   ]])
+   assert(natnumkey_data.numbered[-1])
+   assert(natnumkey_data.numbered[2])
 
    influxdb_printer_tests()
 
