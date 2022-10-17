@@ -38,7 +38,7 @@ local function map (name, type, readonly, create, ...)
    if create then
       assert(fd:ftruncate(size), "shm: ftruncate failed")
    else
-      assert(fd:fstat().size == size, "shm: unexpected size")
+      assert(fd:fstat().size >= size, "shm: unexpected size")
    end
    local mem, err = S.mmap(nil, size, mapmode, "shared", fd, 0)
    fd:close()
