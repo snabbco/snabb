@@ -69,8 +69,8 @@ local INT = ffi.sizeof("int")
 -- Based on MCRingBuffer, see
 --   http://www.cse.cuhk.edu.hk/%7Epclee/www/pubs/ipdps10.pdf
 
-local interlink_t = ffi.typeof([[
-   struct {
+ffi.cdef([[
+   struct interlink {
       int size;
       char pad0[]]..CACHELINE-1*INT..[[];
       int read, write, state[1];
@@ -80,7 +80,7 @@ local interlink_t = ffi.typeof([[
       int lread, nwrite;
       char pad3[]]..CACHELINE-2*INT..[[];
       struct packet *packets[?];
-   } __attribute__((packed))
+   } __attribute__((packed, aligned(]]..CACHELINE..[[)))
 ]])
 
 -- The life cycle of an interlink is managed using a state machine. This is
@@ -142,7 +142,7 @@ local function attach (name, size, transitions)
    waitfor(
       function ()
          -- Create/open the queue.
-         r = shm.create(name, interlink_t, size)
+         r = shm.create(name, "struct interlink", size)
          -- Initialize queue (only one process can set size).
          if sync.cas(r.state, INIT, FREE) then
             r.size = size
@@ -270,10 +270,10 @@ end
 shm.register('interlink', getfenv())
 
 function open (name, readonly)
-   local r = shm.open(name, interlink_t, 'read-only', 1)
+   local r = shm.open(name, "struct interlink", 'read-only', 1)
    local size = r.size
    shm.unmap(r)
-   return shm.open(name, interlink_t, readonly, size)
+   return shm.open(name, "struct interlink", readonly, size)
 end
 
 local function describe (r)
@@ -293,4 +293,4 @@ local function describe (r)
    return ("%d/%d (%s)"):format(queue_fill(r), size - 1, status(r))
 end
 
-ffi.metatype(interlink_t, {__tostring=describe})
+ffi.metatype("struct interlink", {__tostring=describe})
