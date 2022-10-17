@@ -109,9 +109,11 @@ function initialize ()
 end
 
 -- Call to ensure group freelist is enabled.
-function enable_group_freelist ()
+function enable_group_freelist (nchunks)
    if not group_fl then
-      group_fl = group_freelist.freelist_create("group/packets.freelist")
+      group_fl = group_freelist.freelist_create(
+         "group/packets.freelist", nchunks
+      )
    end
 end
 
