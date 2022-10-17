@@ -121,8 +121,25 @@ function finish (chunk, seq)
    chunk.sequence[0] = seq
 end
 
+local function occupied_chunks (fl)
+   local enqueue, dequeue = fl.enqueue_pos[0], fl.dequeue_pos[0]
+   if dequeue > enqueue then
+      return enqueue + fl.size - dequeue
+   else
+      return enqueue - dequeue
+   end
+end
+
+-- Register struct group_freelist as an abstract SHM object type so that
+-- the group freelist can be recognized by shm.open_frame and described
+-- with tostring().
+shm.register('group_freelist', {open=freelist_open})
+ffi.metatype("struct group_freelist", {__tostring = function (fl)
+   return ("%d/%d"):format(occupied_chunks(fl)*chunksize, fl.size*chunksize)
+end})
+
 function selftest ()
-   local fl = freelist_create("test_freelist")
+   local fl = freelist_create("test.group_freelist")
    assert(not start_remove(fl)) -- empty
 
    local w1, sw1 = start_add(fl)
@@ -168,7 +185,7 @@ function selftest ()
       end
    end
 
-   local flro = freelist_open("test_freelist", 'read-only')
+   local flro = freelist_open("test.group_freelist", 'read-only')
    assert(flro.size == fl.size)
    local objsize = ffi.sizeof("struct group_freelist", fl.size)
    assert(ffi.C.memcmp(fl, flro, objsize) == 0)

@@ -121,7 +121,7 @@ end
 function enable_group_freelist (nchunks)
    if not group_fl then
       group_fl = group_freelist.freelist_create(
-         "group/packets.freelist", nchunks
+         "group/packets.group_freelist", nchunks
       )
    end
 end
@@ -158,12 +158,9 @@ function reclaim_step ()
    end
 end
 
--- Register struct freelist as an abstract SHM object type so that the group
+-- Register struct freelist as an abstract SHM object type so that the
 -- freelist can be recognized by shm.open_frame and described with tostring().
-shm.register(
-   'freelist',
-   {open = function (name) return shm.open(name, "struct freelist") end}
-)
+shm.register('freelist', {open=freelist_open})
 ffi.metatype("struct freelist", {__tostring = function (freelist)
    return ("%d/%d"):format(freelist.nfree, freelist.max)
 end})
@@ -187,7 +184,7 @@ end
 -- process termination.
 function shutdown (pid)
    local in_group, group_fl = pcall(
-      group_freelist.freelist_open, "/"..pid.."/group/packets.freelist"
+      group_freelist.freelist_open, "/"..pid.."/group/packets.group_freelist"
    )
    if in_group then
       local packets_fl = freelist_open("/"..pid.."/engine/packets.freelist")
