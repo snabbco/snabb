@@ -4,22 +4,39 @@ The `ipfix probe` program runs an IPFIX meter and exporter on the
 packets coming in on an interface.  It can be invoked like so:
 
 ```
-./snabb ipfix probe [options] <input> <output>
+./snabb ipfix probe [options] <configuration>
 ```
 
-The *input* argument names an interface on which to read traffic, and
-*output* indicates the interface on which to send exported UDP
-packets.  For example, to take input from the Intel 82599 card at PCI
-address `03:00.0`, send output to `03:00.1`, and bind to the CPU 2, do:
+The configuration is documented in the schema *src/lib/yang/snabb-snabbflow-v1.yang*.
 
-```
-./snabb ipfix probe --cpu 2 03:00.0 03:00.1
-```
+See `./snabb ipfix probe --help` for documentation of the command line options.
 
 Usually you want to run `ipfix probe` using an input interface that
 receives a mirror of your "main" traffic flow.
 
-See `./snabb ipfix probe --help` for more documentation on options to
-pass to `snabb ipfix probe`, including options to set the IPv4
-addresses of the exporter and collector (which default to 10.0.0.1 and
-10.0.0.2, respectively).
+#### Testing
+
+There is a regression test you can run via
+
+```
+./snabb snsh -t program.ipfix.tests.test
+```
+
+You can also run the same test as an integration test with a third party IPFIX collector (`capd`):
+
+```
+program/ipfix/tests/collector-test.sh
+```
+
+#### Benchmark
+
+There is a benchmark script to test `ipfix probe` performance. It can be run like so:
+
+```
+./snabb snsh program/ipfix/tests/bench.snabb \
+    --cpu 6-7 --loadgen-cpu 22-23 \
+    --duration 20 --new-flows-freq 450 \
+    81:00.0 81:00.1
+```
+
+Running the script without arguments will print the available command line options.

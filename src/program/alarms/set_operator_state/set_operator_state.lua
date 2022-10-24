@@ -35,6 +35,9 @@ function run(args)
    local opts = { command='set-alarm-operator-state', with_path=false, is_config=false,
                   usage=show_usage, allow_extra_args=true }
    local args, cdr = common.parse_command_line(args, opts)
+   if args.error then
+      common.print_and_exit(args)
+   end
    local l_args = parse_args(cdr)
    local response = common.call_leader(
       args.instance_id, 'set-alarm-operator-state',

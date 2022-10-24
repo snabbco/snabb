@@ -1,0 +1,174 @@
+#!../../../snabb
+
+-- A benchmark script for 'snabb ipfix probe'
+-- 
+--[[
+   Example usage:
+
+   sudo ./snabb snsh program/ipfix/tests/bench.snabb \
+      --cpu 6-13 --duration 120 \
+      --loadgen-cpu 22-23 --num-txqueues 4 \
+      --new-flows-freq 450 \
+      81:00.0 81:00.1
+]]--
+
+local test = require("program.ipfix.tests.test")
+local ipfix_probe = require("program.ipfix.probe.probe")
+local loadgen_replay = require("program.packetblaster.replay.replay")
+local config_rpc = require("program.config.common")
+local numa = require("lib.numa")
+local worker = require("core.worker")
+local lib = require("core.lib")
+
+local function make_ipfix_config (pci0, opts)
+   local rss_groups = 0
+   local cpu_conf = ""
+   for cpu in pairs(opts.cpu) do
+      rss_groups = rss_groups + 1
+      cpu_conf = cpu_conf..("cpu %d; "):format(cpu)
+   end
+   assert(rss_groups > 0, "Need at least one CPU core")
+   local config_template = lib.readfile(opts.template, "*a")
+   local tmpfile = os.tmpname()
+   local f = assert(io.open(tmpfile, "w+"))
+   f:write(config_template:format(
+      pci0, cpu_conf, opts.rss_groups or rss_groups
+   ))
+   assert(f:close())
+   return tmpfile
+end
+
+local function exporter_is_ready (pid, exporter)
+   local r = test.get_state(
+      pid,
+      ("/snabbflow-state/exporter[name=%s]/template-packets-transmitted")
+         :format(exporter)
+   )
+   if not r.error then
+      return tonumber(r.state) > 0
+   end
+end
+
+-- Script
+
+local long_opts = {
+   template           = "t",
+   ["exporter-name"]  = "e",
+   ["rss-groups"]     = "r",
+   cpu                = "c",
+   pcap               = "p",
+   duration           = "D",
+   ["loadgen-cpu"]    = "l",
+   ["num-txqueues"]   = "q",
+   ["new-flows-freq"] = "f",
+}
+
+local function show_usage (code)
+   print("Usage:")
+   for long, short in pairs(long_opts) do
+      print("", "--"..long, "-"..short, "<arg>")
+   end
+   print("", "<pci0> <pci1>")
+   print [[
+Required options: --cpu and --loadgen-cpu
+Generates new flows at --new-flows-freq.
+I.e., effective new flows per second will be the number of flows in
+--pcap times --new-flows-freq.
+]]
+   main.exit(code)
+end
+
+local function parameters (args)
+   local handlers = {}
+   local opts = {
+      template = "program/ipfix/tests/bench_v4_v6.conf.template",
+      exporter_name = "e1",
+      cpu = nil,
+      rss_groups = nil,
+      pcap = "program/ipfix/tests/sanitized4k_truncated128.pcap",
+      duration = 10,
+      loadgen_cpu = nil,
+      nqueues = 1,
+      flow_Hz = 150
+   }
+   function handlers.t (arg)
+      opts.template = arg
+   end
+   function handlers.e (arg)
+      opts.exporter_name = arg
+   end
+   function handlers.r (arg)
+      opts.rss_groups = assert(tonumber(arg), "rss-groups is not a number!")
+   end
+   function handlers.c (arg)
+      opts.cpu = numa.parse_cpuset(arg)
+   end
+   function handlers.p (arg)
+      opts.pcap = arg
+   end
+   function handlers.D (arg)
+      opts.duration = assert(tonumber(arg), "duration is not a number!")
+   end
+   function handlers.l (arg)
+      opts.loadgen_cpu = arg
+   end
+   function handlers.q (arg)
+      opts.nqueues = assert(tonumber(arg), "nqueues is not a number!")
+   end
+   function handlers.f (arg)
+      opts.flow_Hz = assert(tonumber(arg), "freq is not a number!")
+   end
+
+   local args = lib.dogetopt(args, handlers, "t:e:r:c:p:D:l:q:f:", long_opts)
+   if #args < 2 or not (opts.cpu and opts.loadgen_cpu) then show_usage(1) end
+   local pci0 = table.remove(args, 1)
+   local pci1 = table.remove(args, 1)
+   return pci0, pci1, opts
+end
+
+local pci0, pci1, opts = parameters(main.parameters)
+
+local ipfix_confpath = make_ipfix_config(pci0, opts)
+
+local probe_pid = worker.start('ipfix_probe',
+   ([[require("program.ipfix.probe.probe").run{
+      %q
+   }]]):format(ipfix_confpath))
+
+lib.waitfor2(
+   "probe_ready",
+   function () return exporter_is_ready(probe_pid, opts.exporter_name) end,
+   10,
+   2*1000000 -- 2s interval
+)
+
+local loadgen_pid = worker.start('loadgen',
+   ([[require("program.packetblaster.ipfix.ipfix").run{
+      "-q", %d, "-D", "%d", "-f", %d, %q, %q, %q
+   }]]):format(opts.nqueues,
+               opts.duration,
+               opts.flow_Hz,
+               opts.pcap,
+               pci1,
+               opts.loadgen_cpu))
+
+lib.waitfor2(
+   "loadgen_done",
+   function () return not worker.status()['loadgen'].alive end,
+   opts.duration,
+   2*1000000 -- 2s interval
+)
+
+print()
+print("snabbflow-state:")
+test.print_state(probe_pid, "/snabbflow-state")
+local packets_received = test.get_counter(
+   probe_pid,
+   ("/snabbflow-state/exporter[name=%s]/packets-received")
+      :format(opts.exporter_name)
+)
+print(("%.3f"):format(packets_received/opts.duration/1e6), "Mpps")
+
+worker.stop('ipfix_probe')
+
+os.remove(ipfix_confpath)

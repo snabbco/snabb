@@ -30,6 +30,10 @@ local function parse_spec (spec, delimiter)
    return t
 end
 
+local function normalize_pci_name (device)
+   return pci.qualified(device):gsub("[:%.]", "_")
+end
+
 function in_apps.pcap (path)
    return { input = "input",
             output = "output" },
@@ -86,30 +90,6 @@ function in_apps.pci (input)
           { require(device_info.driver).driver, conf }
 end
 out_apps.pci = in_apps.pci
-
-function value_to_string (value, string)
-   string = string or ''
-   local type = type(value)
-   if type == 'table'  then
-      string = string.."{ "
-      if #value == 0 then
-         for key, value in pairs(value) do
-            string = string..key.." = "
-            string = value_to_string(value, string)..", "
-         end
-      else
-         for _, value in ipairs(value) do
-            string = value_to_string(value, string)..", "
-         end
-      end
-      string = string.." }"
-   elseif type == 'string' then
-      string = string..("%q"):format(value)
-   else
-      string = string..("%s"):format(value)
-   end
-   return string
-end
 
 probe_config = {
    -- Probe-specific
@@ -237,7 +217,7 @@ function configure_graph (arg, in_graph)
       local pciaddr = unpack(parse_spec(config.input, '/'))
       app_graph.app(graph, "nic_ifmib", iftable.MIB, {
          target_app = "in", stats = 'stats',
-         ifname = (pciaddr:gsub("[:%.]", "_")),
+         ifname = normalize_pci_name(pciaddr),
          log_date = config.log_date
       })
    end
@@ -253,147 +233,40 @@ function configure_graph (arg, in_graph)
    return graph, config
 end
 
-function parse_jit_option_fn (jit)
-   return function (arg)
-      if arg:match("^v") then
-         local file = arg:match("^v=(.*)")
-         if file == '' then file = nil end
-         jit.v = file
-      elseif arg:match("^p") then
-         local opts, file = arg:match("^p=([^,]*),?(.*)")
-         if file == '' then file = nil end
-         jit.p = { opts, file }
-      elseif arg:match("^dump") then
-         local opts, file = arg:match("^dump=([^,]*),?(.*)")
-         if file == '' then file = nil end
-         jit.dump = { opts, file }
-      elseif arg:match("^opt") then
-         local opt = arg:match("^opt=(.*)")
-         table.insert(jit.opts, opt)
-      elseif arg:match("^tprof") then
-         jit.traceprof = true
-      end
-   end
-end
-
-local function set_jit_options (jit)
-   if not jit then return end
-   if jit.v then
-      require("jit.v").start(jit.v)
-   end
-   if jit.p and #jit.p > 0 then
-      require("jit.p").start(unpack(jit.p))
-   end
-   if jit.traceprof then
-      require("lib.traceprof.traceprof").start()
-   end
-   if jit.dump and #jit.dump > 0 then
-      require("jit.dump").on(unpack(jit.dump))
-   end
-   if jit.opts and #jit.opts > 0 then
-      require("jit.opt").start(unpack(jit.opts))
-   end
-end
-
-local function clear_jit_options (jit)
-   if not jit then return end
-   if jit.dump then
-      require("jit.dump").off()
-   end
-   if jit.traceprof then
-      require("lib.traceprof.traceprof").stop()
-   end
-   if jit.p then
-      require("jit.p").stop()
-   end
-   if jit.v then
-      require("jit.v").stop()
-   end
-end
-
--- Run an instance of the ipfix probe
-function run (arg, duration, busywait, cpu, jit)
-   local graph, config = configure_graph(arg)
-   engine.configure(graph)
-
-   if cpu then numa.bind_to_cpu(cpu) end
-   set_jit_options(jit)
-
-   local done
-   if not duration and config.input_type == "pcap" then
-      done = function ()
-         return engine.app_table['in'].done
-      end
-   end
-
-   local t1 = now()
-
-   if busywait ~= nil then
-      engine.busywait = busywait
-   end
-   engine.main({ duration = duration, done = done, measure_latency = false })
-
-   clear_jit_options(jit)
-
-   local t2 = now()
-   local stats = link.stats(engine.app_table['ipfix_'..config.instance].input.input)
-   print("IPFIX probe stats:")
-   local comma = lib.comma_value
-   print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
-                       comma(stats.rxbytes),
-                       comma(stats.rxpackets),
-                       comma(math.floor((stats.rxbytes * 8) / (t2 - t1))),
-                       comma(stats.rxpackets / ((t2 - t1) * 1000000))))
-
-end
-
--- Run an instance of the RSS app.  The output links can either be
--- interlinks or regular links with an instance of an ipfix probe
--- attached.
-function run_rss(config, inputs, outputs, duration, busywait, cpu, jit, log_date)
-   if cpu then numa.bind_to_cpu(cpu) end
-   set_jit_options(jit)
-
-   local graph = configure_rss_graph(config, inputs, outputs, log_date)
-
-   engine.configure(graph)
-   require("jit").flush()
-
-   local engine_opts = { no_report = true, measure_latency = false }
-   if duration ~= 0 then engine_opts.duration = duration end
-   if busywait ~= nil then
-      engine.busywait = busywait
-   end
-   engine.main(engine_opts)
-
-   clear_jit_options(jit)
-end
-
-function configure_rss_graph (config, inputs, outputs, log_date)
+function configure_rss_graph (config, inputs, outputs, log_date, rss_group, input_type)
+   input_type = input_type or 'pci'
    local graph = app_graph.new()
-   app_graph.app(graph, "rss", rss.rss, config)
+
+   local rss_name = "rss"..(rss_group or '')
+   app_graph.app(graph, rss_name, rss.rss, config)
 
    -- An input describes a physical interface
    local tags, in_app_specs = {}, {}
    for n, input in ipairs(inputs) do
-      local suffix = #inputs > 1 and n or ''
-      local input_name = "input"..suffix
-      local in_link, in_app = in_apps.pci(input)
-      table.insert(in_app_specs,
-                   { pciaddr = input.device,
-                     name = input_name,
-                     ifname = input.name or
-                        (input.device:gsub("[:%.]", "_")),
-                     ifalias = input.description })
+      local input_name, link_name, in_link, in_app
+      if input_type == 'pci' then
+         local pci_name = normalize_pci_name(input.device)
+         input_name, link_name = "input_"..pci_name, pci_name
+         in_link, in_app = in_apps.pci(input)
+         table.insert(in_app_specs,
+                      { pciaddr = input.device,
+                        name = input_name,
+                        ifname = input.name or pci_name,
+                        ifalias = input.description })
+      elseif input_type == 'pcap' then
+         input_name, link_name = 'pcap', 'pcap'
+         in_link, in_app = in_apps.pcap(input)
+      else
+         error("Unsupported input_type: "..input_type)
+      end
       app_graph.app(graph, input_name, unpack(in_app))
-      local link_name = "input"..suffix
       if input.tag then
          local tag = input.tag
          assert(not(tags[tag]), "Tag not unique: "..tag)
          link_name = "vlan"..tag
       end
       app_graph.link(graph, input_name.."."..in_link.output
-                        .." -> rss."..link_name)
+                        .." -> "..rss_name.."."..link_name)
    end
 
    -- An output describes either an interlink or a complete ipfix app
@@ -402,7 +275,7 @@ function configure_rss_graph (config, inputs, outputs, log_date)
          -- Keys
          --   link_name  name of the link
          app_graph.app(graph, output.link_name, Transmitter)
-         app_graph.link(graph, "rss."..output.link_name.." -> "
+         app_graph.link(graph, rss_name.."."..output.link_name.." -> "
                            ..output.link_name..".input")
       else
          -- Keys
@@ -411,7 +284,7 @@ function configure_rss_graph (config, inputs, outputs, log_date)
          --   instance   # of embedded instance
          output.args.instance = output.instance or output.args.instance
          local graph = configure_graph(output.args, graph)
-         app_graph.link(graph, "rss."..output.link_name
+         app_graph.link(graph, rss_name.."."..output.link_name
                            .." -> ipfix_"..output.args.instance..".input")
       end
    end
@@ -439,12 +312,13 @@ function configure_mlx_ctrl_graph (mellanox, log_date)
          queues = spec.queues,
          recvq_size = spec.recvq_size
       }
+      local pci_name = normalize_pci_name(device)
       local driver = pci.device_info(device).driver
-      app_graph.app(ctrl_graph, "ctrl_"..device,
+      app_graph.app(ctrl_graph, "ctrl_"..pci_name,
                     require(driver).ConnectX, conf)
-      app_graph.app(ctrl_graph, "nic_ifmib_"..device, iftable.MIB, {
-         target_app = "ctrl_"..device, stats = 'stats',
-         ifname = spec.ifName or (device:gsub("[:%.]", "_")),
+      app_graph.app(ctrl_graph, "nic_ifmib_"..pci_name, iftable.MIB, {
+         target_app = "ctrl_"..pci_name, stats = 'stats',
+         ifname = spec.ifName or pci_name,
          ifalias = spec.ifAlias,
          log_date = log_date
       })

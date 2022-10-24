@@ -78,18 +78,22 @@ psid_map_value_t = ffi.typeof[[
 
 BTLookupQueue = {}
 
+local BTLookupQueue_size = 128
+assert(BTLookupQueue_size >= engine.pull_npackets)
+
 -- BTLookupQueue needs a binding table to get softwires and PSID lookup.
 function BTLookupQueue.new(binding_table)
    local ret = {
       binding_table = assert(binding_table),
    }
-   ret.streamer = binding_table.softwires:make_lookup_streamer(32)
-   ret.packet_queue = ffi.new("struct packet * [32]")
+   ret.streamer = binding_table.softwires:make_lookup_streamer(BTLookupQueue_size)
+   ret.packet_queue = ffi.new("struct packet * [?]", BTLookupQueue_size)
    ret.length = 0
    return setmetatable(ret, {__index=BTLookupQueue})
 end
 
 function BTLookupQueue:enqueue_lookup(pkt, ipv4, port)
+   assert(self.length < BTLookupQueue_size, "BTLookupQueue overflow")
    local n = self.length
    local streamer = self.streamer
    streamer.entries[n].key.ipv4 = ipv4
@@ -97,7 +101,6 @@ function BTLookupQueue:enqueue_lookup(pkt, ipv4, port)
    self.packet_queue[n] = pkt
    n = n + 1
    self.length = n
-   return n == 32
 end
 
 function BTLookupQueue:process_queue()

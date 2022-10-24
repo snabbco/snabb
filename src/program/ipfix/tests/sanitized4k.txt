@@ -1,0 +1,16 @@
+max@spare-NFG1:~/snabb$ sudo src/snabb snsh pcap-analyze.snabb sanitized4k.pcap
+apps report:
+analyze
+        dot1q   [33024] 4096    100.00%
+        |       ipv6    [34525] 160     3.91%
+        |       |       udp     [17]    26      16.25%
+        |       |       icmp6   [58]    1       0.63%
+        |       |       tcp     [6]     133     83.13%
+        |       ipv4    [2048]  3936    96.09%
+        |       |       icmp    [1]     38      0.97%
+        |       |       udp     [17]    763     19.39%
+        |       |       gre     [47]    62      1.58%
+        |       |       |       ipv4    [2048]  62      100.00%
+        |       |       |       |       tcp     [6]     62      100.00%
+        |       |       esp     [50]    9       0.23%
+        |       |       tcp     [6]     3064    77.85%

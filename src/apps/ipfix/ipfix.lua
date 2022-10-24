@@ -865,20 +865,23 @@ function selftest()
    local consts = require("apps.lwaftr.constants")
    local ethertype_ipv4 = consts.ethertype_ipv4
    local ethertype_ipv6 = consts.ethertype_ipv6
-   local ipfix = IPFIX:new({ exporter_ip = "192.168.1.2",
-                             collector_ip = "192.168.1.1",
-                             collector_port = 4739,
-                             flush_timeout = 0,
-                             scan_time = 1,
-                             templates = {
-                              'v4_extended', 'v6_extended'
-                             },
-                             maps = {
-                               mac_to_as = "apps/ipfix/test/mac_to_as",
-                               vlan_to_ifindex = "apps/ipfix/test/vlan_to_ifindex",
-                               pfx4_to_as = "apps/ipfix/test/pfx4_to_as.csv",
-                               pfx6_to_as = "apps/ipfix/test/pfx6_to_as.csv"
-                             }})
+   local conf = {
+      exporter_ip = "192.168.1.2",
+      collector_ip = "192.168.1.1",
+      collector_port = 4739,
+      flush_timeout = 0,
+      scan_time = 1,
+      templates = {
+         'v4_extended', 'v6_extended'
+      },
+      maps = {
+         mac_to_as = "apps/ipfix/test/mac_to_as",
+         vlan_to_ifindex = "apps/ipfix/test/vlan_to_ifindex",
+         pfx4_to_as = "apps/ipfix/test/pfx4_to_as.csv",
+         pfx6_to_as = "apps/ipfix/test/pfx6_to_as.csv"
+      }
+   }
+   local ipfix = IPFIX:new(lib.parse(conf, IPFIX.config))
    ipfix.shm = shm.create_frame("apps/ipfix", ipfix.shm)
 
    -- Mock input and output.

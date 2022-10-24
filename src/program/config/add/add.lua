@@ -7,6 +7,9 @@ function run(args)
    local opts = { command='add', with_path=true, with_value=true,
                   is_config=true }
    args = common.parse_command_line(args, opts)
+   if args.error then
+      common.print_and_exit(args)
+   end
    local response = common.call_leader(
       args.instance_id, 'add-config',
       { schema = args.schema_name, revision = args.revision_date,

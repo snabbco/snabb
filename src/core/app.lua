@@ -367,7 +367,7 @@ function apply_config_actions (actions)
          error(("bad return value from app '%s' start() method: %s"):format(
                   name, tostring(app)))
       end
-      local zone = app.zone or getfenv(class.new)._NAME or name
+      local zone = app.zone or rawget(getfenv(class.new), '_NAME') or name
       app.appname = name
       app.output = {}
       app.input = {}
