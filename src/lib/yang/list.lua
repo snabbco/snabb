@@ -326,6 +326,10 @@ List.type_map = {
    lvalue = {ctype='uint32_t', kind='lvalue'}
 }
 
+function supported_type (t)
+   return List.type_map[t] and true
+end
+
 ffi.cdef[[
    typedef uint8_t ipv6_addr_t[16];
 ]]
