@@ -246,17 +246,19 @@ local function data_emitter(production)
       local emit_list_members =
          handlers.struct(spec_production(production.list.members))
       local emit_member = visitn(production.values)
-      local normalize_id = data.normalize_id
+      for k, emit in pairs(emit_member) do
+         emit_member[data.normalize_id(k)] = emit
+      end
       return function(data, stream)
          stream:write_stringref('list')
          local l = list.object(data)
          emit_list_keys(l.keys, stream)
          emit_list_members(l.members, stream)
-         for name, lv in ipairs(l.lvalues) do
-            stream:write_stringref(name)
-            for k,v in pairs(lv) do
-               assert(k < SPARSE_ARRAY_END)
-               stream:write_scalar(uint32_t, k)
+         for k, values in pairs(l.lvalues) do
+            stream:write_stringref(k)
+            for i,v in pairs(values) do
+               assert(i < SPARSE_ARRAY_END)
+               stream:write_scalar(uint32_t, i)
                emit_member[k](v, stream)
             end
             stream:write_scalar(uint32_t, SPARSE_ARRAY_END)
@@ -433,7 +435,7 @@ local function read_compiled_data(stream, strtab)
       local lvalues = {}
       for _, spec in pairs(members) do
          if spec.type == 'lvalue' then
-            local name = stream:read_string()
+            local name = read_string()
             lvalues[name] = {}
             while true do
                local i = stream:read_scalar(nil, uint32_t)
@@ -570,6 +572,9 @@ function selftest()
             key addr;
             leaf addr { type inet:ipv4-address; mandatory true; }
             leaf port { type uint8 { range 0..11; } mandatory true; }
+            container metadata {
+               leaf info { type string; }
+            }
          }
          leaf severity {
             type severity;
@@ -607,8 +612,8 @@ function selftest()
       addrs 5.4.3.2;
       routes {
         route { addr 1.2.3.4; port 1; }
-        route { addr 2.3.4.5; port 10; }
-        route { addr 3.4.5.6; port 2; }
+        route { addr 2.3.4.5; port 10; metadata { info "bar"; } }
+        route { addr 3.4.5.6; port 2; metadata { info "foo"; } }
         severity minor;
       }
       next-hop {
