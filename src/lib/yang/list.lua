@@ -370,7 +370,7 @@ List.string_t = List:cached_type [[
 
 List.optional_ts = [[
    struct {
-      %s value;
+      struct { %s %s; } value;
       bool present;
    } __attribute__((packed))
 ]]
@@ -433,7 +433,7 @@ function List:build_type (fields)
          "Invalid field spec for "..name)
       local ct = self:type_info(spec.type).ctype
       if spec.optional then
-         ct = self.optional_ts:format(ct)
+         ct = self.optional_ts:format(ct, name)
       end
       t = t..("%s %s; "):format(ct, name)
    end
@@ -573,29 +573,29 @@ end
 
 function List:pack_optional (dst, name, type_info, value)
    if value ~= nil then
-      self:pack_mandatory(dst[name], 'value', type_info, value)
+      self:pack_mandatory(dst[name].value, name, type_info, value)
       dst[name].present = true
    else
-      dst[name].value = 0
+      dst[name].value[name] = 0
       dst[name].present = false
    end
 end
 
 function List:unpack_optional (dst, name, type_info, value)
    if value.present then
-      self:unpack_mandatory(dst, name, type_info, value.value)
+      self:unpack_mandatory(dst, name, type_info, value.value[name])
    end
 end
 
 function List:free_optional (name, type_info, value)
    if value.present then
-      self:free_mandatory(name, type_info, value.value)
+      self:free_mandatory(name, type_info, value.value[name])
    end
 end
 
-function List:equal_optional (packed, unpacked, type_info)
+function List:equal_optional (name, packed, unpacked, type_info)
    if packed.present then
-      return self:equal_mandatory(packed.value, unpacked, type_info)
+      return self:equal_mandatory(packed.value[name], unpacked, type_info)
    else
       return unpacked == nil
    end
@@ -628,10 +628,10 @@ function List:free_field (name, spec, value)
    end
 end
 
-function List:equal_field (packed, unpacked, spec)
+function List:equal_field (name, packed, unpacked, spec)
    local type_info = self:type_info(spec.type)
    if spec.optional then
-      return self:equal_optional(packed, unpacked, type_info)
+      return self:equal_optional(name, packed, unpacked, type_info)
    else
       return self:equal_mandatory(packed, unpacked, type_info)
    end
@@ -763,7 +763,7 @@ end
 function List:entry_keys_equal (e, o)
    local keys = self:leaf(o).keys
    for name, spec in pairs(self.keys) do
-      if not self:equal_field(keys[name], e[name], spec) then
+      if not self:equal_field(name, keys[name], e[name], spec) then
          return false
       end
    end
