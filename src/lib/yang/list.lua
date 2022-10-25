@@ -397,6 +397,11 @@ function List:new (keys, members)
    self.root = self:alloc_node() -- heap obj=0 reserved for root node
    self.length = 0
    self.lvalues = {}
+   for name, member in pairs(members) do
+      if member.type == 'lvalue' then
+         self.lvalues[name] = {}
+      end
+   end
    return self
 end
 
@@ -512,8 +517,8 @@ function List:pack_mandatory (dst, name, type_info, value)
    elseif type_info.kind == 'bytes' then
       ffi.copy(dst[name], value, ffi.sizeof(type_info.ctype))
    elseif type_info.kind == 'lvalue' then
-      local idx = #self.lvalues + 1
-      self.lvalues[idx] = assert(value)
+      local idx = #self.lvalues[name] + 1
+      self.lvalues[name][idx] = assert(value)
       dst[name] = idx
    else
       error("NYI: kind "..type_info.kind)
@@ -530,13 +535,13 @@ function List:unpack_mandatory (dst, name, type_info, value)
    elseif type_info.kind == 'bytes' then
       dst[name] = value
    elseif type_info.kind == 'lvalue' then
-      dst[name] = assert(self.lvalues[value])
+      dst[name] = assert(self.lvalues[name][value])
    else
       error("NYI: kind "..type_info.kind)
    end
 end
 
-function List:free_mandatory (value, type_info)
+function List:free_mandatory (name, type_info, value)
    if type_info.kind == 'scalar' then
       -- nop
    elseif type_info.kind == 'string' then
@@ -544,7 +549,7 @@ function List:free_mandatory (value, type_info)
    elseif type_info.kind == 'empty' then
       -- nop
    elseif type_info.kind == 'lvalue' then
-      self.lvalues[value] = nil
+      self.lvalues[name][value] = nil
    elseif type_info.kind == 'bytes' then
       -- nop
    else
@@ -582,9 +587,9 @@ function List:unpack_optional (dst, name, type_info, value)
    end
 end
 
-function List:free_optional (value, type_info)
+function List:free_optional (name, type_info, value)
    if value.present then
-      self:free_mandatory(value.value, type_info)
+      self:free_mandatory(name, type_info, value.value)
    end
 end
 
@@ -614,12 +619,12 @@ function List:unpack_field (dst, name, spec, value)
    end
 end
 
-function List:free_field (value, spec)
+function List:free_field (name, spec, value)
    local type_info = self:type_info(spec.type)
    if spec.optional then
-      self:free_optional(value, type_info)
+      self:free_optional(name, type_info, value)
    else
-      self:free_mandatory(value, type_info)
+      self:free_mandatory(name, type_info, value)
    end
 end
 
@@ -646,7 +651,7 @@ end
 
 function List:free_fields (s, fields)
    for name, spec in pairs(fields) do
-      self:free_field(s[name], spec)
+      self:free_field(name, spec, s[name])
    end
 end
 
@@ -979,7 +984,6 @@ function List:save (stream)
       self.first or -1, self.last or -1, self.length
    ))
    self.heap:save(stream)
-   return self.lvalues
 end
 
 function List:load (stream, keys, members, lvalues)
@@ -1122,8 +1126,8 @@ function selftest_list ()
    assert(l:find_entry{id="foo1"}.value.bar == true)
    l:add_or_update_entry {id="foo1", value={bar=false}}
    l:remove_entry {id="foo"}
-   assert(l.lvalues[1] == nil)
-   assert(l.lvalues[2].bar == false)
+   assert(l.lvalues.value[1] == nil)
+   assert(l.lvalues.value[2].bar == false)
 
    -- Test load/save
    local keys = {id={type='string'}}
@@ -1133,9 +1137,9 @@ function selftest_list ()
    l:add_entry {id="foo1", value={bar=true}}
    local memstream = require("lib.stream.mem")
    local tmp = memstream.tmpfile()
-   local lvalues = l:save(tmp)
+   l:save(tmp)
    tmp:seek('set', 0)
-   local l = List:load(tmp, keys, members, lvalues)
+   local l = List:load(tmp, keys, members, l.lvalues)
    assert(#l:find_entry{id="foo"}.value == 0)
    assert(l:find_entry{id="foo1"}.value.bar == true)
 end
@@ -1199,21 +1203,24 @@ local function mt_for_single_key (key)
    return list_mt_cache[key]
 end
 
-function new (keys, members)
+local function list_meta (keys, members)
    local numkeys = 0
    local key1
    for key in pairs(keys) do
       key1 = key1 or key
       numkeys = numkeys + 1
    end
-   local mt
    if numkeys == 1 then
-      mt = mt_for_single_key(key1)
+      return mt_for_single_key(key1)
    elseif numkeys > 1 then
-      mt = ListMeta
+      return ListMeta
    else
       error("List needs at least one key")
    end
+end
+
+function new (keys, members)
+   local mt = list_meta(keys, members)
    return setmetatable({list=List:new(keys, members)}, mt)
 end
 
@@ -1225,6 +1232,11 @@ function object (list)
          return o
       end
    end
+end
+
+function load (stream, keys, members, lvalues)
+   local mt = list_meta(keys, members)
+   return setmetatable({list=List:load(stream, keys, members, lvalues)}, mt)
 end
 
 function from_table(t, keys, members)
