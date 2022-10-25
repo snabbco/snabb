@@ -11,11 +11,10 @@ local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
 local data = require('lib.yang.data')
-local ctable = require('lib.ctable')
-local cltable = require('lib.cltable')
+local list = require("lib.yang.list")
 
 local MAGIC = "yangconf"
-local VERSION = 0x0000f000
+local VERSION = 0x0000f200
 
 local header_t = ffi.typeof([[
 struct {
@@ -220,72 +219,49 @@ local function data_emitter(production)
          end
       end
    end
-   function handlers.table(production)
-      if production.native_key then
-         local emit_value = visit1({type='struct', members=production.values,
-                                    ctype=production.value_ctype})
-         -- FIXME: sctable if production.value_ctype?
-         return function(data, stream)
-            -- A string-keyed table is the same as a tagged struct.
-            stream:write_stringref('lstruct')
-            local number_keyed_members = {}
-            for k, v in pairs(data) do
-               if type(k) == 'number' then
-                  assert(ffi.cast("uint32_t", k) == k)
-                  number_keyed_members[k] = v
-               end
-            end
-            stream:write_scalar(uint32_t, table_size(number_keyed_members))
-            for k,v in pairs(number_keyed_members) do
+   function handlers.list(production)
+      local fieldspec_production = {
+         type = 'struct',
+         members = {
+            type = {
+               type = 'scalar',
+               argument_type = { primitive_type = 'string' }
+            },
+            optional = {
+               type = 'scalar',
+               argument_type = { primitive_type = 'boolean' },
+               ctype = value.types.boolean.ctype
+            }
+         }
+      }
+      local function spec_production (spec)
+         local p = {type='struct', members={}}
+         for name in pairs(spec) do
+            p.members[name] = fieldspec_production
+         end
+         return p
+      end
+      local emit_list_keys =
+         handlers.struct(spec_production(production.list.keys))
+      local emit_list_members =
+         handlers.struct(spec_production(production.list.members))
+      local emit_member = visitn(production.values)
+      local normalize_id = data.normalize_id
+      return function(data, stream)
+         stream:write_stringref('list')
+         local l = list.object(data)
+         emit_list_keys(l.keys, stream)
+         emit_list_members(l.members, stream)
+         for name, lv in ipairs(l.lvalues) do
+            stream:write_stringref(name)
+            for k,v in pairs(lv) do
+               assert(k < SPARSE_ARRAY_END)
                stream:write_scalar(uint32_t, k)
-               emit_value(v, stream)
-            end
-            local string_keyed_members = {}
-            for k, v in pairs(data) do
-               if type(k) == 'string' then
-                  string_keyed_members[k] = v
-               end
-            end
-            stream:write_scalar(uint32_t, table_size(string_keyed_members))
-            for k,v in pairs(string_keyed_members) do
-               stream:write_stringref(k)
-               emit_value(v, stream)
-            end
-         end
-      elseif production.key_ctype and production.value_ctype then
-         return function(data, stream)
-            stream:write_stringref('ctable')
-            stream:write_stringref(production.key_ctype)
-            stream:write_stringref(production.value_ctype)
-            data:save(stream)
-         end
-      elseif production.key_ctype then
-         local emit_keys = visit1({type='table', key_ctype=production.key_ctype,
-                                   value_ctype='uint32_t'})
-         local emit_value = visit1({type='struct', members=production.values})
-         return function(data, stream)
-            stream:write_stringref('cltable')
-            emit_keys(data.keys, stream)
-            for i, value in pairs(data.values) do
-               stream:write_scalar(uint32_t, i)
-               emit_value(value, stream)
+               emit_member[k](v, stream)
             end
             stream:write_scalar(uint32_t, SPARSE_ARRAY_END)
          end
-      else
-         local emit_key = visit1({type='struct', members=production.keys,
-                                  ctype=production.key_ctype})
-         local emit_value = visit1({type='struct', members=production.values,
-                                    ctype=production.value_ctype})
-         -- FIXME: lctable if production.value_ctype?
-         return function(data, stream)
-            stream:write_stringref('lltable')
-            stream:write_scalar(uint32_t, table_size(data))
-            for k,v in pairs(data) do
-               emit_key(k, stream)
-               emit_value(v, stream)
-            end
-         end
+         l:save(stream)
       end
    end
    local native_types = lib.set('enumeration', 'identityref', 'string')
@@ -451,29 +427,22 @@ local function read_compiled_data(stream, strtab)
       for i=1,stream:read_scalar(nil, uint32_t) do table.insert(ret, read1()) end
       return ret
    end
-   function readers.ctable()
-      local key_ctype = read_string()
-      local value_ctype = read_string()
-      local key_t, value_t = data.typeof(key_ctype), data.typeof(value_ctype)
-      return ctable.load(stream, {key_type=key_t, value_type=value_t})
-   end
-   function readers.cltable()
+   function readers.list()
       local keys = read1()
-      local values = {}
-      while true do
-         local i = stream:read_scalar(nil, uint32_t)
-         if i == SPARSE_ARRAY_END then break end
-         values[i] = read1()
+      local members = read1()
+      local lvalues = {}
+      for _, spec in pairs(members) do
+         if spec.type == 'lvalue' then
+            local name = stream:read_string()
+            lvalues[name] = {}
+            while true do
+               local i = stream:read_scalar(nil, uint32_t)
+               if i == SPARSE_ARRAY_END then break end
+               lvalues[name][i] = read1()
+            end
+         end
       end
-      return cltable.build(keys, values)
-   end
-   function readers.lltable()
-      local ret = {}
-      for i=1,stream:read_scalar(nil, uint32_t) do
-         local k = read1()
-         ret[k] = read1()
-      end
-      return ret
+      return list.load(stream, keys, members, lvalues)
    end
    function readers.stringref()
       return read_string()
@@ -662,13 +631,9 @@ function selftest()
       assert(data.addrs[1]==util.ipv4_pton('4.3.2.1'))
       assert(data.addrs[2]==util.ipv4_pton('5.4.3.2'))
       local routing_table = data.routes.route
-      local key = ffi.new('struct { uint32_t addr; }')
-      key.addr = util.ipv4_pton('1.2.3.4')
-      assert(routing_table:lookup_ptr(key).value.port == 1)
-      key.addr = util.ipv4_pton('2.3.4.5')
-      assert(routing_table:lookup_ptr(key).value.port == 10)
-      key.addr = util.ipv4_pton('3.4.5.6')
-      assert(routing_table:lookup_ptr(key).value.port == 2)
+      assert(routing_table[util.ipv4_pton('1.2.3.4')].port == 1)
+      assert(routing_table[util.ipv4_pton('2.3.4.5')].port == 10)
+      assert(routing_table[util.ipv4_pton('3.4.5.6')].port == 2)
       assert(
          data.next_hop.ipv4 == util.ipv4_pton('5.6.7.8'),
          "Choice type test failed (round: "..i..")"
