@@ -250,11 +250,15 @@ function data_grammar_from_schema(schema, is_config)
          end
       end
       if is_empty(values) and node.config ~= is_config then return end
-      return {type='list', keys=keys, values=values,
-              list = {keys=(node.key and list_spec(keys, list_key)) or
-                              {__ikey={type='uint64'}},
-                      members=list_spec(values, list_member),
-                      has_keys=(node.key and true)},
+      local list = {}
+      if node.key then
+         list.keys = list_spec(keys, list_key)
+      else
+         list.keys = {__ikey={type='uint64'}}
+      end
+      list.members = list_spec(values, list_member)
+      list.has_key = node.key and true
+      return {type='list', keys=keys, values=values, list=list,
               unique = node.unique,
               min_elements=node.min_elements, max_elements=node.max_elements}
    end
@@ -569,7 +573,7 @@ function list_parser(keyword, keys, values, spec)
       local l = list.object(res)
       local assoc = {}
       function assoc:add(entry)
-         if not spec.has_keys then
+         if not spec.has_key then
             entry.__ikey = #res+1
          end
          l:add_entry(entry)
