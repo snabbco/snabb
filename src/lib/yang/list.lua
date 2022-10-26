@@ -1129,6 +1129,19 @@ function selftest_list ()
    assert(l.lvalues.value[1] == nil)
    assert(l.lvalues.value[2].bar == false)
 
+   -- Test optional lvalue
+   local l = List:new(
+      {id={type='string'}},
+      {o={type='lvalue', optional=true}}
+   )
+   l:add_entry {id="foo"}
+   l:add_entry {id="foo1", o={bar=true}}
+   assert(l:find_entry{id="foo"}.o == nil)
+   assert(l:find_entry{id="foo1"}.o.bar == true)
+   l:add_or_update_entry {id="foo1", o={bar=false}}
+   l:remove_entry {id="foo"}
+   assert(l.lvalues.o[1].bar == false)
+
    -- Test load/save
    local keys = {id={type='string'}}
    local members = {value={type='lvalue'}}
