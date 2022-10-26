@@ -54,28 +54,56 @@ function tointeger(str, what, min, max)
    return res
 end
 
+local array_mt = {}
+
 function ffi_array(ptr, elt_t, count)
-   local mt = {}
-   local size = count or ffi.sizeof(ptr)/ffi.sizeof(elt_t)
-   function mt:__len() return size end
-   function mt:__index(idx)
-      assert(1 <= idx and idx <= size)
-      return ptr[idx-1]
+   local t = ffi.typeof(elt_t)
+   local initial_size = count or ffi.sizeof(ptr)/ffi.sizeof(t)
+   local self = {
+      t = t,
+      ptr = ptr,
+      size = initial_size,
+      fill = initial_size
+   }
+   return setmetatable(self, array_mt)
+end
+
+function array_mt:__len()
+   return self.fill
+end
+function array_mt:__index(idx)
+   assert(1 <= idx and idx <= self.fill)
+   return self.ptr[idx-1]
+end
+function array_mt:__newindex(idx, val)
+   if val then
+      if idx > self.size then
+         -- grow
+         local old = self.ptr
+         self.size = self.size * 2
+         self.ptr = ffi.new(ffi.typeof("$[?]", self.t), self.size)
+         ffi.copy(self.ptr, old, ffi.sizeof(old))
+      end
+      assert(1 <= idx and idx <= self.fill+1)
+      self.fill = math.max(idx, self.fill)
+      self.ptr[idx-1] = val
+   else
+      assert(1 <= idx and idx <= self.fill)
+      ffi.copy(self.ptr+idx-1, self.ptr+idx,
+         (self.fill-idx)*ffi.sizeof(self.t))
+      self.fill = self.fill-1
    end
-   function mt:__newindex(idx, val)
-      assert(1 <= idx and idx <= size)
-      ptr[idx-1] = val
-   end
-   function mt:__ipairs()
-      local idx = -1
-      return function()
-         idx = idx + 1
-         if idx >= size then return end
-         return idx+1, ptr[idx]
+end
+function array_mt:__pairs()
+   local idx = 0
+   return function()
+      idx = idx + 1
+      if idx <= self.fill then
+         return idx, self.ptr[idx-1]
       end
    end
-   return ffi.metatype(ffi.typeof('struct { $* ptr; }', elt_t), mt)(ptr)
 end
+array_mt.__ipairs = array_mt.__pairs
 
 -- The yang modules represent IPv4 addresses as host-endian uint32
 -- values in Lua.  See https://github.com/snabbco/snabb/issues/1063.
@@ -184,5 +212,18 @@ function selftest()
    assert(tointeger('-0x8000000000000000') == -0x8000000000000000LL)
    assert(ipv4_pton('255.0.0.1') == 255 * 2^24 + 1)
    assert(ipv4_ntop(ipv4_pton('255.0.0.1')) == '255.0.0.1')
+   -- ffi_array
+   local a = ffi_array(ffi.new("double[3]"), "double")
+   assert(#a == 3)
+   for i in ipairs(a) do
+      a[i] = i
+   end
+   assert(a[3] == 3)
+   a[4] = 4
+   assert(a[4] == 4)
+   assert(#a == 4)
+   a[2] = nil
+   assert(#a == 3)
+   assert(a[3] == 4)
    print('selftest: ok')
 end

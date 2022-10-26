@@ -9,7 +9,7 @@ local value = require("lib.yang.value")
 local schema = require("lib.yang.schema")
 local parse_path = require("lib.yang.path").parse_path
 local util = require("lib.yang.util")
-local cltable = require("lib.cltable")
+local list = require("lib.yang.list")
 local normalize_id = data.normalize_id
 
 local function table_keys(t)
@@ -20,132 +20,121 @@ end
 
 function prepare_array_lookup(query)
    if not lib.equal(table_keys(query), {"position()"}) then
-      error("Arrays can only be indexed by position.")
+      error("Invalid query: leaf-list can only be indexed by position.")
    end
    local idx = tonumber(query["position()"])
    if idx < 1 or idx ~= math.floor(idx) then
-      error("Arrays can only be indexed by positive integers.")
+      error("Invalid query: leaf-list can only be indexed by positive integers.")
    end
    return idx
 end
 
-function prepare_table_lookup(keys, ctype, query)
-   local static_key = ctype and data.typeof(ctype)() or {}
-   for k,_ in pairs(query) do
-      if not keys[k] then error("'"..k.."' is not a table key") end
+function prepare_list_lookup(grammar, query)
+   if not grammar.list.has_key then
+      error("Invalid query: list has no key.")
    end
-   for k,grammar in pairs(keys) do
+   local key = {}
+   for k,_ in pairs(query) do
+      if not grammar.keys[k] then
+         error("Invalid path:'"..k.."' is not a list key.")
+      end
+   end
+   for k,grammar in pairs(grammar.keys) do
       local v = query[k] or grammar.default
       if v == nil then
-         error("Table query missing required key '"..k.."'")
+         error("Invalid query: missing required key '"..k.."'")
       end
       local key_primitive_type = grammar.argument_type.primitive_type
       local parser = value.types[key_primitive_type].parse
-      static_key[normalize_id(k)] = parser(v, 'path query value')
+      key[normalize_id(k)] = parser(v, 'path query value')
    end
-   return static_key
+   return key
 end
 
--- Returns a resolver for a particular schema and *lua* path.
-function resolver(grammar, path_string)
-   local function ctable_getter(key, getter)
-      return function(data)
-         local data = getter(data):lookup_ptr(key)
-         if data == nil then error("Not found") end
-         return data.value
-      end
-   end
-   local function table_getter(key, getter)
-      return function(data)
-         local data = getter(data)[key]
-         if data == nil then error("Not found") end
-         return data
-      end
-   end
-   local function slow_table_getter(key, getter)
-      return function(data)
-         for k,v in pairs(getter(data)) do
-            if lib.equal(k, key) then return v end
-         end
-         error("Not found")
-      end
-   end
-   local function compute_table_getter(grammar, key, getter)
-      if grammar.native_key then
-         return table_getter(key[normalize_id(grammar.native_key)], getter)
-      elseif grammar.key_ctype and grammar.value_ctype then
-         return ctable_getter(key, getter)
-      elseif grammar.key_ctype then
-         return table_getter(key, getter)
-      else
-         return slow_table_getter(key, getter)
-      end
-   end
-   local function handle_table_query(grammar, query, getter)
-      local key = prepare_table_lookup(grammar.keys, grammar.key_ctype, query)
-      local child_grammar = {type="struct", members=grammar.values,
-                             ctype=grammar.value_ctype}
-      local child_getter = compute_table_getter(grammar, key, getter)
-      return child_getter, child_grammar
-   end
-   local function handle_array_query(grammar, query, getter)
-      local idx = prepare_array_lookup(query)
-      -- Pretend that array elements are scalars.
-      local child_grammar = {type="scalar", argument_type=grammar.element_type,
-                             ctype=grammar.ctype}
-      local function child_getter(data)
-         local array = getter(data)
-         if idx > #array then error("Index out of bounds") end
-         return array[idx]
-      end
-      return child_getter, child_grammar
-   end
-   local function handle_query(grammar, query, getter)
-      if lib.equal(table_keys(query), {}) then return getter, grammar end
-      if grammar.type == 'array' then
-         return handle_array_query(grammar, query, getter)
-      elseif grammar.type == 'table' then
-         return handle_table_query(grammar, query, getter)
-      else
-         error("Path query parameters only supported for structs and tables.")
-      end
-   end
-   local function compute_getter(grammar, name, query, getter)
-      local child_grammar
-      child_grammar = grammar.members[name]
-      if not child_grammar then
-         for member_name, member in pairs(grammar.members) do
-            if child_grammar then break end
-            if member.type == 'choice' then
-               for case_name, case in pairs(member.choices) do
-                  if child_grammar then break end
-                  if case[name] then child_grammar = case[name] end
-               end
+local function compute_struct_getter(grammar, name, getter)
+   local child_grammar = grammar.members[name]
+   if not child_grammar then
+      for member_name, member in pairs(grammar.members) do
+         if child_grammar then break end
+         if member.type == 'choice' then
+            for case_name, case in pairs(member.choices) do
+               if child_grammar then break end
+               if case[name] then child_grammar = case[name] end
             end
          end
       end
-      if not child_grammar then
-         error("Struct has no field named '"..name.."'.")
-      end
-      local id = normalize_id(name)
-      local function child_getter(data)
-         local struct = getter(data)
-         local child = struct[id]
-         if child == nil then
-            error("Struct instance has no field named '"..name.."'.")
-         end
-         return child
-      end
-      return handle_query(child_grammar, query, child_getter)
    end
-   local getter, grammar = function(data) return data end, grammar
-   for _, elt in ipairs(parse_path(path_string)) do
-      -- All non-leaves of the path tree must be structs.
-      if grammar.type ~= 'struct' then error("Invalid path.") end
+   if not child_grammar then
+      error("Struct has no field named '"..name.."'.")
+   end
+   local id = normalize_id(name)
+   local function child_getter(data)
+      local struct = getter(data)
+      local child = struct[id]
+      if child == nil then
+         error("Struct instance has no field named '"..name.."'.")
+      end
+      return child
+   end
+   return child_grammar, child_getter
+end
+
+local function compute_array_getter(grammar, query, getter)
+   local idx = prepare_array_lookup(query)
+   -- Pretend that array elements are scalars.
+   local child_grammar = {type="scalar", argument_type=grammar.element_type,
+                          ctype=grammar.ctype}
+   local function child_getter(data)
+      local array = getter(data)
+      if idx > #array then error("Index out of bounds") end
+      return array[idx]
+   end
+   return child_grammar, child_getter
+end
+
+local function compute_list_getter(grammar, query, getter)
+   local key = prepare_list_lookup(grammar, query)
+   -- Pretend that list entries are structs.
+   local child_grammar = {type="struct", members=grammar.values,
+                          ctype=grammar.value_ctype}
+   local function child_getter(data)
+      local l = list.object(getter(data))
+      local data = l:find_entry(key)
+      if data == nil then error("Not found") end
+      return data
+   end
+   return child_grammar, child_getter
+end
+
+local function compute_getter(grammar, name, query, getter)
+   if grammar.type == 'struct' then
+      grammar, getter = compute_struct_getter(grammar, name, getter)
+   else
+      error("Invalid path: '"..name.."' is not a container.")
+   end
+   if #table_keys(query) > 0 then
+      if grammar.type == 'array' then
+         return compute_array_getter(grammar, query, getter)
+      elseif grammar.type == 'list' then
+         return compute_list_getter(grammar, query, getter)
+      else
+         error("Invalid path: '"..name.."' can not be queried.")
+      end
+   end
+end
+
+-- Returns a resolver for a particular schema and *lua* path.
+function resolver(grammar, path)
+   if type(path) == 'string' then
+      path = parse_path(path)
+   end
+   local getter = function(data) return data end
+   for _, elt in ipairs(path) do
       getter, grammar = compute_getter(grammar, elt.name, elt.query, getter)
    end
    return getter, grammar
 end
+
 resolver = util.memoize(resolver)
 
 local function printer_for_grammar(grammar, path, format, print_default)
@@ -195,19 +184,6 @@ function parser_for_schema_by_name(schema_name, path)
 end
 parser_for_schema_by_name = util.memoize(parser_for_schema_by_name)
 
-local function parsed_path_to_string (path)
-   local ret = {}
-   for _,v in ipairs(path) do
-      local query = {}
-      for k,v in pairs(v.query or {}) do
-         table.insert(query, '['..k..'='..v..']')
-      end
-      query = table.concat(query, '')
-      table.insert(ret, v.name..query)
-   end
-   return '/'..table.concat(ret, '/')
-end
-
 local function setter_for_grammar(grammar, path)
    if path == "/" then
       return function(config, subconfig) return subconfig end
@@ -215,11 +191,12 @@ local function setter_for_grammar(grammar, path)
    local head = parse_path(path)
    local tail = table.remove(head)
    local tail_name, query = tail.name, tail.query
-   head = parsed_path_to_string(head)
    if lib.equal(query, {}) then
       -- No query; the simple case.
       local getter, grammar = resolver(grammar, head)
-      assert(grammar.type == 'struct')
+      if grammar.type ~= 'struct' then
+         error("Invalid path: missing query for '"..tail_name.."'.")
+      end
       local tail_id = data.normalize_id(tail_name)
       return function(config, subconfig)
          getter(config)[tail_id] = subconfig
@@ -229,51 +206,24 @@ local function setter_for_grammar(grammar, path)
 
    -- Otherwise the path ends in a query; it must denote an array or
    -- table item.
-   local getter, grammar = resolver(grammar, head..'/'..tail_name)
+   table.insert(head, {name=tail_name, query={}})
+   local getter, grammar = resolver(grammar, head)
    if grammar.type == 'array' then
       local idx = prepare_array_lookup(query)
       return function(config, subconfig)
          local array = getter(config)
-         assert(idx <= #array)
          array[idx] = subconfig
          return config
       end
-   elseif grammar.type == 'table' then
-      local key = prepare_table_lookup(grammar.keys, grammar.key_ctype, query)
-      if grammar.native_key then
-         key = key[data.normalize_id(grammar.native_key)]
-         return function(config, subconfig)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = subconfig
-            return config
-         end
-      elseif grammar.key_ctype and grammar.value_ctype then
-         return function(config, subconfig)
-            getter(config):update(key, subconfig)
-            return config
-         end
-      elseif grammar.key_ctype then
-         return function(config, subconfig)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = subconfig
-            return config
-         end
-      else
-         return function(config, subconfig)
-            local tab = getter(config)
-            for k,v in pairs(tab) do
-               if lib.equal(k, key) then
-                  tab[k] = subconfig
-                  return config
-               end
-            end
-            error("Not found")
-         end
+   elseif grammar.type == 'list' then
+      local key = prepare_list_lookup(grammar, query)
+      return function (config, subconfig)
+         local l = list.object(getter(config))
+         l:add_or_update_entry(key, subconfig)
+         return config
       end
    else
-      error('Query parameters only allowed on arrays and tables')
+      error("Invalid path: '"..tail_name.."' can not be queried.")
    end
 end
 
@@ -291,83 +241,30 @@ local function adder_for_grammar(grammar, path)
    local top_grammar = grammar
    local getter, grammar = resolver(grammar, path)
    if grammar.type == 'array' then
-      if grammar.ctype then
-         -- It's an FFI array; have to create a fresh one, sadly.
-         local setter = setter_for_grammar(top_grammar, path)
-         local elt_t = data.typeof(grammar.ctype)
-         local array_t = ffi.typeof('$[?]', elt_t)
-         return function(config, subconfig)
-            local cur = getter(config)
-            local new = array_t(#cur + #subconfig)
-            local i = 1
-            for _,elt in ipairs(cur) do new[i-1] = elt; i = i + 1 end
-            for _,elt in ipairs(subconfig) do new[i-1] = elt; i = i + 1 end
-            return setter(config, util.ffi_array(new, elt_t))
-         end
-      end
-      -- Otherwise we can add entries in place.
       return function(config, subconfig)
          local cur = getter(config)
-         for _,elt in ipairs(subconfig) do table.insert(cur, elt) end
+         for _,elt in ipairs(subconfig) do
+            cur[#cur+1] = elt
+         end
          return config
       end
-   elseif grammar.type == 'table' then
+   elseif grammar.type == 'list' then
       -- Invariant: either all entries in the new subconfig are added,
       -- or none are.
-      if grammar.native_key
-      or (grammar.key_ctype and not grammar.value_ctype) then
-         -- cltable or string-keyed table.
-         local pairs = grammar.key_ctype and cltable.pairs or pairs
-         return function(config, subconfig)
-            local tab = getter(config)
-            for k,_ in pairs(subconfig) do
-               if tab[k] ~= nil then error('already-existing entry') end
+      return function(config, subconfig)
+         local l = list.object(getter(config))
+         for i, entry in ipairs(subconfig) do
+            if l:find_entry(entry) then
+               error("Can not add already-existing list entry #"..i..".")
             end
-            for k,v in pairs(subconfig) do tab[k] = v end
-            return config
          end
-      elseif grammar.key_ctype and grammar.value_ctype then
-         -- ctable.
-         return function(config, subconfig)
-            local ctab = getter(config)
-            for entry in subconfig:iterate() do
-               if ctab:lookup_ptr(entry.key) ~= nil then
-                  error('already-existing entry')
-               end
-            end
-            for entry in subconfig:iterate() do
-               ctab:add(entry.key, entry.value)
-            end
-            return config
+         for _, entry in ipairs(subconfig) do
+            l:add_entry(entry)
          end
-      elseif grammar.native_key or grammar.key_ctype then
-         -- cltable or native-keyed table.
-         local pairs = grammar.native_key and pairs or cltable.pairs
-         return function(config, subconfig)
-            local tab = getter(config)
-            for k,_ in pairs(subconfig) do
-               if tab[k] ~= nil then error('already-existing entry') end
-            end
-            for k,v in pairs(subconfig) do tab[k] = v end
-            return config
-         end
-      else
-         -- Sad quadratic loop.
-         return function(config, subconfig)
-            local tab = getter(config)
-            for key,val in pairs(tab) do
-               for k,_ in pairs(subconfig) do
-                  if lib.equal(key, k) then
-                     error('already-existing entry', key)
-                  end
-               end
-            end
-            for k,v in pairs(subconfig) do tab[k] = v end
-            return config
-         end
+         return config
       end
    else
-      error('Add only allowed on arrays and tables')
+      error("Invalid path: '"..tail_name.."' is not a list or a leaf-list.")
    end
 end
 
@@ -386,70 +283,29 @@ local function remover_for_grammar(grammar, path)
    local head = parse_path(path)
    local tail = table.remove(head)
    local tail_name, query = tail.name, tail.query
-   head = parsed_path_to_string(head)
-   local head_and_tail_name = head..'/'..tail_name
-   local getter, grammar = resolver(grammar, head_and_tail_name)
+   table.insert(head, {name=tail_name, query={}})
+   local getter, grammar = resolver(grammar, head)
    if grammar.type == 'array' then
-      if grammar.ctype then
-         -- It's an FFI array; have to create a fresh one, sadly.
-         local idx = prepare_array_lookup(query)
-         local setter = setter_for_grammar(top_grammar, head_and_tail_name)
-         local elt_t = data.typeof(grammar.ctype)
-         local array_t = ffi.typeof('$[?]', elt_t)
-         return function(config)
-            local cur = getter(config)
-            assert(idx <= #cur)
-            local new = array_t(#cur - 1)
-            for i,elt in ipairs(cur) do
-               if i < idx then new[i-1] = elt end
-               if i > idx then new[i-2] = elt end
-            end
-            return setter(config, util.ffi_array(new, elt_t))
-         end
-      end
-      -- Otherwise we can remove the entry in place.
+      local idx = prepare_array_lookup(query)
       return function(config)
          local cur = getter(config)
-         assert(i <= #cur)
-         table.remove(cur, i)
+         if idx > #cur then
+            error("Leaf-list '"..tail_name"' has no element #"..idx..".")
+         end
+         cur[idx] = nil
          return config
       end
-   elseif grammar.type == 'table' then
-      local key = prepare_table_lookup(grammar.keys, grammar.key_ctype, query)
-      if grammar.native_key then
-         key = key[data.normalize_id(grammar.native_key)]
-         return function(config)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = nil
-            return config
+   elseif grammar.type == 'list' then
+      local key = prepare_list_lookup(grammar, query)
+      return function(config)
+         local l = list.object(getter(config))
+         if not l:remove_entry(key) then
+            error("List '"..tail_name"' has no entry matching the query.")
          end
-      elseif grammar.key_ctype and grammar.value_ctype then
-         return function(config)
-            getter(config):remove(key)
-            return config
-         end
-      elseif grammar.key_ctype then
-         return function(config)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = nil
-            return config
-         end
-      else
-         return function(config)
-            local tab = getter(config)
-            for k,v in pairs(tab) do
-               if lib.equal(k, key) then
-                  tab[k] = nil
-                  return config
-               end
-            end
-            error("Not found")
-         end
+         return config
       end
    else
-      error('Remove only allowed on arrays and tables')
+      error("Invalid path: '"..tail_name.."' is not a list or a leaf-list.")
    end
 end
 
@@ -495,7 +351,7 @@ function leafref_checker_from_grammar(grammar)
             else
                -- Pass.
             end
-         elseif node.type == 'table' then
+         elseif node.type == 'list' then
             for k,v in pairs(node.keys) do visit(path..'/'..k, v) end
             for k,v in pairs(node.values) do visit(path..'/'..k, v) end
          elseif node.type == 'choice' then
@@ -543,25 +399,6 @@ function leafref_checker_from_grammar(grammar)
    end
 end
 
-local function pairs_from_grammar(grammar)
-   if grammar.native_key then
-      return pairs
-   elseif grammar.key_ctype and grammar.value_ctype then
-      return function (ctable)
-         local ctable_next, ctable_max, ctable_entry = ctable:iterate()
-         return function()
-            ctable_entry = ctable_next(ctable_max, ctable_entry)
-            if not ctable_entry then return end
-            return ctable_entry.key, ctable_entry.value
-         end
-      end
-   elseif grammar.key_ctype then
-      return cltable.pairs
-   else
-      return pairs
-   end
-end
-
 local function expanded_pairs(values)
    -- Return an iterator for each non-choice pair in values and each pair of
    -- all choice bodies recursively.
@@ -582,55 +419,92 @@ local function expanded_pairs(values)
 end
 
 function uniqueness_checker_from_grammar(grammar)
-   -- Generate checker for table
-   local function unique_assertion(leaves, grammar)
-      local unique_leaves = {}
-      for leaf in leaves:split(" +") do
-         table.insert(unique_leaves, normalize_id(leaf))
+   local function collision_checker(unique)
+      local leaves = {}
+      for leaf in unique:split(" +") do
+         table.insert(leaves, normalize_id(leaf))
       end
-      local pairs = pairs_from_grammar(grammar)
-      return function (tab)
-         -- Sad quadratic loop, again
-         for k1, v1 in pairs(tab) do
-            for k2, v2 in pairs(tab) do
-               if k1 == k2 then break end
-               local collision = true
-               for _, leaf in ipairs(unique_leaves) do
-                  if not lib.equal(v1[leaf], v2[leaf]) then
-                     collision = false
-                     break
+      return function (x, y)
+         local collision = true
+         for _, leaf in ipairs(leaves) do
+            if not lib.equal(x[leaf], y[leaf]) then
+               collision = false
+               break
+            end
+         end
+         return collision
+      end
+   end
+   local function uniqueness_checker (collsion)
+      return function (list)
+         -- Sad quadratic loop
+         for i, x in ipairs(list) do
+            for j, y in ipairs(list) does
+               if i == j then break end
+               if collision(x, y) then
+                  return false
+               end
+            end
+         end
+         return true
+      end
+   end
+   local function struct_getter (name)
+      local id = normalize_id(name)
+      return function(data)
+         return data[id]
+      end
+   end
+   local function visitor(grammar, getter)
+      if grammar.type == 'struct' then
+         local member_visitors = {}
+         for name, member in expanded_pairs(grammar.members) do
+            local visit_member = visitor(member, struct_getter(name))
+            if visit_member then
+               table.insert(member_visitors, visit_member)
+            end
+         end
+         return function (data)
+            local struct = getter(data)
+            if not struct then return end
+            -- visit members
+            for _, visit in ipairs(member_visitors) do
+               visit(struct)
+            end
+         end
+      elseif grammar.type == 'list' then
+         local value_visitors = {}
+         for name, value in expanded_pairs(grammar.values) do
+            local visit_value = visitor(value, struct_getter(name))
+            if visit_value then
+               table.insert(value_visitors, visit_value)
+            end
+         end
+         local checkers = {}
+         for _, unique in ipairs(grammar.unique) do
+            checkers[unique] = uniqueness_checker(collision_checker(unique))
+         end
+         return function (data)
+            local list = getter(data)
+            if not list then return end
+            -- visit values (skip if list has no list or container members)
+            if #value_visitors > 0 then
+               for _, entry in ipairs(list) do
+                  for _, visit in ipairs(value_visitors) do
+                     visit(entry)
                   end
                end
-               assert(not collision, "Not unique: "..leaves)
+            end
+            -- check uniqueness
+            for unique, checker in ipairs(checkers) do
+               if not checker(list) then
+                  error("Not unique: "..unique)
+               end
             end
          end
       end
    end
-   -- Visit tables with unique constraints in grammar and apply checker
-   local function visit_unique_and_check(grammar, data)
-      if not data then return
-      elseif grammar.type == 'table' then
-         local pairs = pairs_from_grammar(grammar)
-         -- visit values
-         for name, value in expanded_pairs(grammar.values) do
-            for k, datum in pairs(data) do
-               visit_unique_and_check(value, datum[normalize_id(name)])
-            end
-         end
-         -- check unique rescrictions
-         for _, leaves in ipairs(grammar.unique) do
-            unique_assertion(leaves, grammar)(data)
-         end
-      elseif grammar.type == 'struct' then
-         -- visit members
-         for name, member in expanded_pairs(grammar.members) do
-            visit_unique_and_check(member, data[normalize_id(name)])
-         end
-      end
-   end
-   return function (data)
-      visit_unique_and_check(grammar, data)
-   end
+   return visitor(grammar, function (data) return data end)
 end
 
 function minmax_elements_checker_from_grammar(grammar)
@@ -640,12 +514,8 @@ function minmax_elements_checker_from_grammar(grammar)
       if not (grammar.min_elements or grammar.max_elements) then
          return function () end
       end
-      local pairs = pairs_from_grammar(grammar)
-      return function (tab)
-         local n = 0
-         for k1, v1 in pairs(tab) do
-            n = n + 1
-         end
+      return function (data)
+         local n = #data
          if grammar.min_elements then
             assert(n >= grammar.min_elements,
                    name..": requires at least "..
@@ -664,11 +534,10 @@ function minmax_elements_checker_from_grammar(grammar)
       elseif grammar.type == 'array' then
          -- check min/max elements restrictions
          minmax_assertion(grammar, name)(data)
-      elseif grammar.type == 'table' then
+      elseif grammar.type == 'list' then
          -- visit values
-         local pairs = pairs_from_grammar(grammar)
          for name, value in expanded_pairs(grammar.values) do
-            for k, datum in pairs(data) do
+            for _, datum in ipairs(data) do
                visit_minmax_and_check(value, datum[normalize_id(name)], name)
             end
          end
