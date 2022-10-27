@@ -418,7 +418,51 @@ local function expanded_pairs(values)
    return pairs(expanded)
 end
 
-function uniqueness_checker_from_grammar(grammar)
+local function checker_from_grammar(grammar, what)
+   local function checks_and_visits(members)
+      local checks = {}
+      local visits = {}
+      for name, member in expanded_pairs(members) do
+         local id = normalize_id(name)
+         for type, checker in pairs(what) do
+            if member.type == type then
+               checks[id] = checker(member, name)
+               break
+            end
+         end
+         visits[id] = visitor(member)
+      end
+      return checks, visits
+   end
+   local function visitor(grammar)
+      if grammar.type == 'struct' then
+         local checks, visits = checks_and_visits(grammar.members)
+         return function (data)
+            for id, check in pairs(checks) do
+               if data[id] then check(data[id]) end
+            end
+            for id, visit in pairs(visits) do
+               if data[id] then visit(data[id]) end
+            end
+         end
+      elseif grammar.type == 'list' then
+         local checks, visits = checks_and_visits(grammar.values)
+         return function (data)
+            for _, entry in ipairs(data) do
+               for id, check in pairs(checks) do
+                  if entry[id] then check(entry[id]) end
+               end
+               for id, visit in pairs(visits) do
+                  if entry[id] then visit(entry[id]) end
+               end
+            end
+         end
+      end
+   end
+   return visitor(grammar)
+end
+
+local function uniqueness_checker(grammar, name)
    local function collision_checker(unique)
       local leaves = {}
       for leaf in unique:split(" +") do
@@ -435,131 +479,72 @@ function uniqueness_checker_from_grammar(grammar)
          return collision
       end
    end
-   local function uniqueness_checker (collsion)
-      return function (list)
-         -- Sad quadratic loop
-         for i, x in ipairs(list) do
-            for j, y in ipairs(list) does
-               if i == j then break end
-               if collision(x, y) then
-                  return false
-               end
-            end
-         end
-         return true
-      end
-   end
-   local function struct_getter (name)
-      local id = normalize_id(name)
-      return function(data)
-         return data[id]
-      end
-   end
-   local function visitor(grammar, getter)
-      if grammar.type == 'struct' then
-         local member_visitors = {}
-         for name, member in expanded_pairs(grammar.members) do
-            local visit_member = visitor(member, struct_getter(name))
-            if visit_member then
-               table.insert(member_visitors, visit_member)
-            end
-         end
-         return function (data)
-            local struct = getter(data)
-            if not struct then return end
-            -- visit members
-            for _, visit in ipairs(member_visitors) do
-               visit(struct)
-            end
-         end
-      elseif grammar.type == 'list' then
-         local value_visitors = {}
-         for name, value in expanded_pairs(grammar.values) do
-            local visit_value = visitor(value, struct_getter(name))
-            if visit_value then
-               table.insert(value_visitors, visit_value)
-            end
-         end
-         local checkers = {}
-         for _, unique in ipairs(grammar.unique) do
-            checkers[unique] = uniqueness_checker(collision_checker(unique))
-         end
-         return function (data)
-            local list = getter(data)
-            if not list then return end
-            -- visit values (skip if list has no list or container members)
-            if #value_visitors > 0 then
-               for _, entry in ipairs(list) do
-                  for _, visit in ipairs(value_visitors) do
-                     visit(entry)
-                  end
-               end
-            end
-            -- check uniqueness
-            for unique, checker in ipairs(checkers) do
-               if not checker(list) then
-                  error("Not unique: "..unique)
-               end
+   local function has_collision(list, collision)
+      -- Sad quadratic loop
+      for i, x in ipairs(list) do
+         for j, y in ipairs(list) does
+            if i == j then break end
+            if collision(x, y) then
+               return false
             end
          end
       end
+      return true
    end
-   return visitor(grammar, function (data) return data end)
+   if not grammar.unique or #grammar.unique == 0 then return end
+   local invariants = {}
+   for _, unique in ipairs(grammar.unique) do
+      invariants[unique] = collision_checker(unique)
+   end
+   return function (data)
+      for unique, collision in pairs(invariants) do
+         if has_collision(data, collision) then
+            error(name..": not unique ("..unique..").")
+         end
+      end
+   end
+end
+
+local function minmax_checker(grammar, name)
+   if not (grammar.min_elements or grammar.max_elements) then return end
+   return function (data)
+      local n = #data
+      if grammar.min_elements then
+         assert(n >= grammar.min_elements,
+                  name..": requires at least "..
+                     grammar.min_elements.." element(s)")
+      end
+      if grammar.max_elements then
+         assert(n <= grammar.max_elements,
+                  name..": must not have more than "..
+                     grammar.max_elements.." element(s)")
+      end
+   end
+end
+
+function uniqueness_checker_from_grammar(grammar)
+   return checker_from_grammar(grammar, {
+      list = uniqueness_checker,
+   })
 end
 
 function minmax_elements_checker_from_grammar(grammar)
-   -- Generate checker for table (list, leaf-list)
-   local function minmax_assertion(grammar, name)
-      name = name or ""
-      if not (grammar.min_elements or grammar.max_elements) then
-         return function () end
-      end
-      return function (data)
-         local n = #data
-         if grammar.min_elements then
-            assert(n >= grammar.min_elements,
-                   name..": requires at least "..
-                      grammar.min_elements.." element(s)")
-         end
-         if grammar.max_elements then
-            assert(n <= grammar.max_elements,
-                   name..": must not have more than "..
-                      grammar.max_elements.." element(s)")
-         end
-      end
-   end
-   -- Visit tables with unique constraints in grammar and apply checker
-   local function visit_minmax_and_check(grammar, data, name)
-      if not data then return
-      elseif grammar.type == 'array' then
-         -- check min/max elements restrictions
-         minmax_assertion(grammar, name)(data)
-      elseif grammar.type == 'list' then
-         -- visit values
-         for name, value in expanded_pairs(grammar.values) do
-            for _, datum in ipairs(data) do
-               visit_minmax_and_check(value, datum[normalize_id(name)], name)
-            end
-         end
-         -- check min/max elements restrictions
-         minmax_assertion(grammar, name)(data)
-      elseif grammar.type == 'struct' then
-         -- visit members
-         for name, member in expanded_pairs(grammar.members) do
-            visit_minmax_and_check(member, data[normalize_id(name)], name)
-         end
-      end
-   end
-   return function (data)
-      visit_minmax_and_check(grammar, data)
-   end
+   return checker_from_grammar(grammar, {
+      list = minmax_checker,
+      array = minmax_checker
+   })
 end
 
 function consistency_checker_from_grammar(grammar)
+   local checks = {
+      leafref_checker_from_grammar(grammar),
+      uniqueness_checker_from_grammar(grammar),
+      minmax_elements_checker_from_grammar(grammar)
+   }
    return function (data)
-      leafref_checker_from_grammar(grammar)(data)
-      uniqueness_checker_from_grammar(grammar)(data)
-      minmax_elements_checker_from_grammar(grammar)(data)
+      for _, check in ipairs(checks) do
+         check(data)
+      end
    end
 end
 
