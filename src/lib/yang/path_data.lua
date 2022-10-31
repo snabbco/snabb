@@ -3,134 +3,80 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
-local lib = require("core.lib")
 local data = require("lib.yang.data")
 local value = require("lib.yang.value")
 local schema = require("lib.yang.schema")
-local parse_path = require("lib.yang.path").parse_path
+local path = require("lib.yang.path")
+local parse_path = path.parse_path
 local util = require("lib.yang.util")
 local list = require("lib.yang.list")
 local normalize_id = data.normalize_id
 
-local function table_keys(t)
-   local ret = {}
-   for k, v in pairs(t) do table.insert(ret, k) end
-   return ret
-end
-
-function prepare_array_lookup(query)
-   if not lib.equal(table_keys(query), {"position()"}) then
-      error("Invalid query: leaf-list can only be indexed by position.")
-   end
-   local idx = tonumber(query["position()"])
-   if idx < 1 or idx ~= math.floor(idx) then
-      error("Invalid query: leaf-list can only be indexed by positive integers.")
-   end
-   return idx
-end
-
-function prepare_list_lookup(grammar, query)
-   if not grammar.list.has_key then
-      error("Invalid query: list has no key.")
-   end
-   local key = {}
-   for k,_ in pairs(query) do
-      if not grammar.keys[k] then
-         error("Invalid path:'"..k.."' is not a list key.")
-      end
-   end
-   for k,grammar in pairs(grammar.keys) do
-      local v = query[k] or grammar.default
-      if v == nil then
-         error("Invalid query: missing required key '"..k.."'")
-      end
-      local key_primitive_type = grammar.argument_type.primitive_type
-      local parser = value.types[key_primitive_type].parse
-      key[normalize_id(k)] = parser(v, 'path query value')
-   end
-   return key
-end
-
-local function compute_struct_getter(grammar, name, getter)
-   local child_grammar = grammar.members[name]
-   if not child_grammar then
-      for member_name, member in pairs(grammar.members) do
-         if child_grammar then break end
-         if member.type == 'choice' then
-            for case_name, case in pairs(member.choices) do
-               if child_grammar then break end
-               if case[name] then child_grammar = case[name] end
-            end
-         end
-      end
-   end
-   if not child_grammar then
-      error("Struct has no field named '"..name.."'.")
-   end
+local function compute_struct_getter(name, getter)
    local id = normalize_id(name)
-   local function child_getter(data)
+   return function (data)
       local struct = getter(data)
-      local child = struct[id]
-      if child == nil then
-         error("Struct instance has no field named '"..name.."'.")
+      if struct[id] ~= nil then
+         return struct[id]
+      else
+         error("Container has no member '"..name.."'.")
       end
-      return child
    end
-   return child_grammar, child_getter
 end
 
-local function compute_array_getter(grammar, query, getter)
-   local idx = prepare_array_lookup(query)
-   -- Pretend that array elements are scalars.
-   local child_grammar = {type="scalar", argument_type=grammar.element_type,
-                          ctype=grammar.ctype}
-   local function child_getter(data)
+local function compute_array_getter(idx, getter)
+   return function (data)
       local array = getter(data)
-      if idx > #array then error("Index out of bounds") end
+      if idx > #array then
+         error("Index "..idx.." is out of bounds.")
+      end
       return array[idx]
    end
-   return child_grammar, child_getter
 end
 
-local function compute_list_getter(grammar, query, getter)
-   local key = prepare_list_lookup(grammar, query)
-   -- Pretend that list entries are structs.
-   local child_grammar = {type="struct", members=grammar.values,
-                          ctype=grammar.value_ctype}
-   local function child_getter(data)
+local function compute_list_getter(key, getter)
+   return function (data)
       local l = list.object(getter(data))
-      local data = l:find_entry(key)
-      if data == nil then error("Not found") end
-      return data
+      local entry = l:find_entry(key)
+      if entry ~= nil then
+         return data
+      else
+         error("List has no such entry.")
+      end
    end
-   return child_grammar, child_getter
 end
 
-local function compute_getter(grammar, name, query, getter)
+local function compute_getter(grammar, part, getter)
    if grammar.type == 'struct' then
-      grammar, getter = compute_struct_getter(grammar, name, getter)
+      getter = compute_struct_getter(part.name, getter)
+      grammar = part.grammar
    else
       error("Invalid path: '"..name.."' is not a container.")
    end
-   if #table_keys(query) > 0 then
+   if part.key then
       if grammar.type == 'array' then
-         return compute_array_getter(grammar, query, getter)
+         getter = compute_array_getter(part.key, getter)
+         -- Pretend that array elements are scalars.
+         grammar = {type="scalar", argument_type=grammar.element_type,
+                    ctype=grammar.ctype}
       elseif grammar.type == 'list' then
-         return compute_list_getter(grammar, query, getter)
+         getter = compute_list_getter(part.key, getter)
+         -- Pretend that list entries are structs.
+         grammar = {type="struct", members=grammar.values,
+                    ctype=grammar.value_ctype}
       else
          error("Invalid path: '"..name.."' can not be queried.")
       end
    end
+   return getter, grammar
 end
 
 -- Returns a resolver for a particular schema and *lua* path.
 function resolver(grammar, path)
-   if type(path) == 'string' then
-      path = parse_path(path)
-   end
+   path = parse_path(path, grammar)
    local getter = function(data) return data end
-   for _, elt in ipairs(path) do
-      getter, grammar = compute_getter(grammar, elt.name, elt.query, getter)
+   for _, part in ipairs(path) do
+      getter, grammar = compute_getter(grammar, part, getter)
    end
    return getter, grammar
 end
@@ -188,10 +134,10 @@ local function setter_for_grammar(grammar, path)
    if path == "/" then
       return function(config, subconfig) return subconfig end
    end
-   local head = parse_path(path)
+   local head = parse_path(path, grammar)
    local tail = table.remove(head)
-   local tail_name, query = tail.name, tail.query
-   if lib.equal(query, {}) then
+   local tail_name, key = tail.name, tail.key
+   if not key then
       -- No query; the simple case.
       local getter, grammar = resolver(grammar, head)
       if grammar.type ~= 'struct' then
@@ -209,14 +155,13 @@ local function setter_for_grammar(grammar, path)
    table.insert(head, {name=tail_name, query={}})
    local getter, grammar = resolver(grammar, head)
    if grammar.type == 'array' then
-      local idx = prepare_array_lookup(query)
+      local idx = key
       return function(config, subconfig)
          local array = getter(config)
          array[idx] = subconfig
          return config
       end
    elseif grammar.type == 'list' then
-      local key = prepare_list_lookup(grammar, query)
       return function (config, subconfig)
          local l = list.object(getter(config))
          l:add_or_update_entry(key, subconfig)
@@ -238,7 +183,6 @@ end
 setter_for_schema_by_name = util.memoize(setter_for_schema_by_name)
 
 local function adder_for_grammar(grammar, path)
-   local top_grammar = grammar
    local getter, grammar = resolver(grammar, path)
    if grammar.type == 'array' then
       return function(config, subconfig)
@@ -279,14 +223,13 @@ end
 adder_for_schema_by_name = util.memoize(adder_for_schema_by_name)
 
 local function remover_for_grammar(grammar, path)
-   local top_grammar = grammar
-   local head = parse_path(path)
+   local head = parse_path(path, grammar)
    local tail = table.remove(head)
-   local tail_name, query = tail.name, tail.query
+   local tail_name, key = tail.name, tail.key
    table.insert(head, {name=tail_name, query={}})
    local getter, grammar = resolver(grammar, head)
    if grammar.type == 'array' then
-      local idx = prepare_array_lookup(query)
+      local idx = key
       return function(config)
          local cur = getter(config)
          if idx > #cur then
@@ -296,7 +239,6 @@ local function remover_for_grammar(grammar, path)
          return config
       end
    elseif grammar.type == 'list' then
-      local key = prepare_list_lookup(grammar, query)
       return function(config)
          local l = list.object(getter(config))
          if not l:remove_entry(key) then
@@ -318,6 +260,13 @@ function remover_for_schema_by_name (schema_name, path)
    return remover_for_schema(schema.load_schema_by_name(schema_name), path)
 end
 remover_for_schema_by_name = util.memoize(remover_for_schema_by_name)
+
+function visitor_from_grammar(grammar, what, visit)
+   local visitor
+   
+
+
+end
 
 function leafref_checker_from_grammar(grammar)
    -- Converts a relative path to an absolute path.
@@ -482,7 +431,7 @@ local function uniqueness_checker(grammar, name)
    local function has_collision(list, collision)
       -- Sad quadratic loop
       for i, x in ipairs(list) do
-         for j, y in ipairs(list) does
+         for j, y in ipairs(list) do
             if i == j then break end
             if collision(x, y) then
                return false
