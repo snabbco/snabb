@@ -312,10 +312,12 @@ List.type_map = {
    decimal64 = {ctype='double', kind='scalar'},
    enumeration = {ctype='int32_t', kind='scalar'},
    empty = {ctype='bool', kind='empty'}, -- no representation (always true)
+   identityref = {ctype='uint32_t', kind='string'}, -- same as string 
    int8 = {ctype='int8_t', kind='scalar'},
    int16 = {ctype='int16_t', kind='scalar'},
    int32 = {ctype='int32_t', kind='scalar'},
    int64 = {ctype='int64_t', kind='scalar'},
+   leafref = {ctype='uint32_t', kind='string'}, -- same as string 
    string = {ctype='uint32_t', kind='string'}, -- pointer into heap
    uint8 = {ctype='uint8_t', kind='scalar'},
    uint16 = {ctype='uint16_t', kind='scalar'},
