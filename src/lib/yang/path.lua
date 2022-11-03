@@ -52,22 +52,29 @@ end
 
 -- Finds the grammar node for a fragment in a given grammar.
 local function extract_grammar_node(grammar, name)
-   local handlers = {}
-   function handlers.struct (grammar)
-      return grammar.members[name]
-   end
-   function handlers.list (grammar)
-      return grammar.keys[name] or grammar.values[name]
-   end
-   function handlers.choice (grammar)
-      for _, case in pairs(grammar.choices) do
-         if case[name] then
-            return case[name]
-         end
-         if case.type == 'choice' then
-            local node = handler.choice(case)
+   local function expand_choices (members)
+      for _, member in pairs(members) do
+         if member.type == 'choice' then
+            local node = extract_grammar_node(member, name)
             if node then return node end
          end
+      end
+   end
+   local handlers = {}
+   function handlers.struct (node)
+      if node.members[name] then return node.members[name] end
+      return expand_choices(node.members)
+   end
+   function handlers.list (node)
+      if node.keys[name] then return node.keys[name] end
+      if node.values[name] then return node.values[name] end
+      return expand_choices(node.values)
+   end
+   function handlers.choice (node)
+      for _, case in pairs(node.choices) do
+         if case[name] then return case[name] end
+         local node = expand_choices(case)
+         if node then return node end
       end
    end
    function handlers.scalar ()
@@ -77,7 +84,7 @@ local function extract_grammar_node(grammar, name)
       error("Invalid path: trying to access '"..name.."' in leaf-list.")
    end
    local node = assert(handlers[grammar.type], grammar.type)(grammar)
-   return node or error("Invalid path: '"..name"' is not in schema.")
+   return node or error("Invalid path: '"..name.."' is not in schema.")
 end
 
 -- Converts an XPath path to a lua array consisting of path components.
@@ -186,7 +193,7 @@ function normalize_path(path, grammar)
    return ((path.relative and '') or '/')..table.concat(ret, '/')
 end
 
-function parse_relative_path (path, node_path, grammar)
+function parse_relative_path(path, node_path, grammar)
    path = parse_path(path)
    if not path.relative then
       return parse_path(path, grammar)
@@ -202,7 +209,7 @@ function parse_relative_path (path, node_path, grammar)
          assert(i==1, "Invalid path: '"..part.name"' has to be first component.")
       elseif part.name == '..' then
          assert(#apath >= 1, "Invalid path: attempt to traverse up root (/..).")
-         table.remove(apart, #apart)
+         table.remove(apath, #apath)
       else
          table.insert(apath, part)
       end
