@@ -8,6 +8,8 @@ local value = require("lib.yang.value")
 local schema = require("lib.yang.schema")
 local path = require("lib.yang.path")
 local parse_path = path.parse_path
+local parse_relative_path = path.parse_relative_path
+local normalize_path = path.normalize_path
 local util = require("lib.yang.util")
 local list = require("lib.yang.list")
 local normalize_id = data.normalize_id
@@ -39,7 +41,7 @@ local function compute_list_getter(key, getter)
       local l = list.object(getter(data))
       local entry = l:find_entry(key)
       if entry ~= nil then
-         return data
+         return entry
       else
          error("List has no such entry.")
       end
@@ -261,93 +263,6 @@ function remover_for_schema_by_name (schema_name, path)
 end
 remover_for_schema_by_name = util.memoize(remover_for_schema_by_name)
 
-function visitor_from_grammar(grammar, what, visit)
-   local visitor
-   
-
-
-end
-
-function leafref_checker_from_grammar(grammar)
-   -- Converts a relative path to an absolute path.
-   -- TODO: Consider moving it to /lib/yang/path.lua.
-   local function to_absolute_path (path, node_path)
-      path = path:gsub("current%(%)", node_path)
-      if path:sub(1, 1) == '/' then return path end
-      if path:sub(1, 2) == './' then
-         path = path:sub(3)
-         return node_path..'/'..path
-      end
-      while path:sub(1, 3) == '../' do
-         path = path:sub(4)
-         node_path = lib.dirname(node_path)
-      end
-      return node_path..'/'..path
-   end
-   local function leafref (node)
-      return node.argument_type and node.argument_type.leafref
-   end
-   -- Leafref nodes iterator. Returns node as value and full data path as key.
-   local function visit_leafref_paths (root)
-      local function visit (path, node)
-         if node.type == 'struct' then
-            for k,v in pairs(node.members) do visit(path..'/'..k, v) end
-         elseif node.type == 'array' then
-            -- Pass.
-         elseif node.type == 'scalar' then
-            if leafref(node) then
-               coroutine.yield(path, node)
-            else
-               -- Pass.
-            end
-         elseif node.type == 'list' then
-            for k,v in pairs(node.keys) do visit(path..'/'..k, v) end
-            for k,v in pairs(node.values) do visit(path..'/'..k, v) end
-         elseif node.type == 'choice' then
-            for _,choice in pairs(node.choices) do
-               for k,v in pairs(choice) do visit(path..'/'..k, v) end
-            end
-         else
-            error('unexpected kind', node.kind)
-         end
-      end
-      return coroutine.wrap(function() visit('', root) end), true
-   end
-   -- Fetch value of path in data tree.
-   local function resolve (data, path)
-      local ret = data
-      for k in path:gmatch("[^/]+") do ret = ret[k] end
-      return ret
-   end
-   -- If not present, should be true.
-   local function require_instance (node)
-      if node.argument_type.require_instances == nil then return true end
-      return node.argument_type.require_instances
-   end
-   local leafrefs = {}
-   for path, node in visit_leafref_paths(grammar) do
-      if require_instance(node) then
-         local leafref = to_absolute_path(leafref(node), path)
-         local success, getter = pcall(resolver, grammar, lib.dirname(leafref))
-         if success then
-            table.insert(leafrefs, {path=path, leafref=leafref, getter=getter})
-         end
-      end
-   end
-   if #leafrefs == 0 then return function(data) end end
-   return function (data)
-      for _,v in ipairs(leafrefs) do
-         local path, leafref, getter = v.path, v.leafref, v.getter
-         local results = assert(getter(data),
-                                'Wrong XPath expression: '..leafref)
-         local val = resolve(data, path)
-         assert(type(results) == 'table' and results[val],
-               ("Broken leafref integrity in '%s' when referencing '%s'"):format(
-                path, leafref))
-      end
-   end
-end
-
 local function expanded_pairs(values)
    -- Return an iterator for each non-choice pair in values and each pair of
    -- all choice bodies recursively.
@@ -367,51 +282,123 @@ local function expanded_pairs(values)
    return pairs(expanded)
 end
 
-local function checker_from_grammar(grammar, what)
-   local function checks_and_visits(members)
-      local checks = {}
-      local visits = {}
-      for name, member in expanded_pairs(members) do
-         local id = normalize_id(name)
-         for type, checker in pairs(what) do
-            if member.type == type then
-               checks[id] = checker(member, name)
-               break
-            end
-         end
-         visits[id] = visitor(member)
-      end
-      return checks, visits
+function checker_from_grammar(grammar, checker)
+   local function path_add(path, name)
+      local p = {}
+      for i, part in ipairs(path) do p[i] = part end
+      p[#p+1] = {name=name, query={}}
+      return p
    end
-   local function visitor(grammar)
-      if grammar.type == 'struct' then
-         local checks, visits = checks_and_visits(grammar.members)
-         return function (data)
-            for id, check in pairs(checks) do
-               if data[id] then check(data[id]) end
-            end
-            for id, visit in pairs(visits) do
-               if data[id] then visit(data[id]) end
-            end
+   local function visitor(node, path)
+      local check = checker(node, path, grammar)
+      if node.type == 'scalar' then
+         return check
+      elseif node.type == 'struct' then
+         local visits = {}
+         for name, member in expanded_pairs(node.members) do
+            local id = normalize_id(name)
+            visits[id] = visitor(member, path_add(path, name))
          end
-      elseif grammar.type == 'list' then
-         local checks, visits = checks_and_visits(grammar.values)
-         return function (data)
-            for _, entry in ipairs(data) do
-               for id, check in pairs(checks) do
-                  if entry[id] then check(entry[id]) end
-               end
+         for _ in pairs(visits) do
+            return function (data, root)
+               root = root or data
+               if check then check(data, root) end
                for id, visit in pairs(visits) do
-                  if entry[id] then visit(entry[id]) end
+                  if data[id] then visit(data[id], root) end
                end
             end
          end
+      elseif node.type == 'array' then
+         -- Pretend that array elements are scalars.
+         local pseudo_node = {type="scalar", argument_type=node.element_type,
+                              ctype=node.ctype}
+         local check_elt = checker(pseudo_node, path, grammar)
+         if check_elt then
+            return function (data, root)
+               root = root or data
+               if check then check(data, root) end
+               for idx, elt in ipairs(data) do
+                  check_elt(elt, root)
+               end
+            end
+         end
+      elseif node.type == 'list' then
+         local checks_and_visits = {}
+         for name, member in pairs(node.keys) do
+            local id = normalize_id(name)
+            checks_and_visits[id] =
+               checker(member, path_add(path, name), grammar)
+         end
+         for name, member in expanded_pairs(node.values) do
+            local id = normalize_id(name)
+            checks_and_visits[id] =
+               visitor(member, path_add(path, name))
+         end
+         for _ in pairs(checks_and_visits) do
+            return function (data, root)
+               root = root or data
+               if check then check(data, root) end
+               for _, entry in ipairs(data) do
+                  for id, visit in pairs(visits) do
+                     if entry[id] then visit(entry[id], root) end
+                  end
+               end
+            end
+         end
+      else
+         error("BUG: unhandled node type: "..node.type)
       end
    end
-   return visitor(grammar)
+   return visitor(grammar, {})
 end
 
-local function uniqueness_checker(grammar, name)
+local function consistency_error(path, msg, ...)
+   error(("Consistency error in '%s': %s")
+      :format(normalize_path(path), msg:format(...)))
+end
+
+local function leafref_checker(node, path, grammar)
+   if node.type ~= 'scalar' then return end
+   if not (node.argument_type and node.argument_type.leafref) then return end
+   local leafref = node.argument_type.leafref
+   local ok, leafref_path = pcall(parse_relative_path, leafref, path)
+   if not ok then
+      consistency_error(path,
+         "invalid leafref path: '%s' (%s). ",
+         leafref, leafref_path)
+   end
+   local tail = table.remove(leafref_path)
+   local list_part = leafref_path[#leafref_path]
+   if not (list_part and list_part.grammar.type == 'list') then
+      consistency_error(path, "not a list leafref: '%s'. ", leafref)
+   end
+   local key = {}
+
+   if not list_part.grammar.keys[tail.name] then
+      consistency_error(path,
+         "'%s' is not a valid key for list referenced by leafref '%s'.",
+         tail.name, leafref)
+   end
+   local resolve = resolver(grammar, leafref_path)
+   if node.argument_type.require_instances ~= false then
+      return function (data, root)
+         local ok, res = pcall(resolve, root)
+         if not ok then
+            consistency_error(path,
+               "failed to resolve leafref: '%s' (%s).",
+               leafref, res)
+         end
+         local ok, res = pcall(function () return res[data] end)
+         if not ok then
+            consistency_error(path,
+               "missing instance for leafref %s: %s (%s).",
+               leafref, data, res)
+         end
+      end
+   end
+end
+
+local function uniqueness_checker(node, path)
    local function collision_checker(unique)
       local leaves = {}
       for leaf in unique:split(" +") do
@@ -440,58 +427,45 @@ local function uniqueness_checker(grammar, name)
       end
       return true
    end
-   if not grammar.unique or #grammar.unique == 0 then return end
+   if node.type ~= 'list' then return end
+   if not node.unique or #node.unique == 0 then return end
    local invariants = {}
-   for _, unique in ipairs(grammar.unique) do
+   for _, unique in ipairs(node.unique) do
       invariants[unique] = collision_checker(unique)
    end
    return function (data)
       for unique, collision in pairs(invariants) do
          if has_collision(data, collision) then
-            error(name..": not unique ("..unique..").")
+            consistency_error(path, "not unique (%s)", unique)
          end
       end
    end
 end
 
-local function minmax_checker(grammar, name)
-   if not (grammar.min_elements or grammar.max_elements) then return end
+local function minmax_checker(node, path)
+   if not (node.type == 'array' or node.type == 'list') then return end
+   if not (node.min_elements or node.max_elements) then return end
    return function (data)
       local n = #data
-      if grammar.min_elements then
-         assert(n >= grammar.min_elements,
-                  name..": requires at least "..
-                     grammar.min_elements.." element(s)")
+      if node.min_elements and n < node.min_elements then
+         consistency_error(path,
+            "requires at least %d element(s).", node.min_elements)
       end
-      if grammar.max_elements then
-         assert(n <= grammar.max_elements,
-                  name..": must not have more than "..
-                     grammar.max_elements.." element(s)")
+      if node.max_elements and n > node.max_elements then
+         consistency_error(path,
+            "must not have more than %d element(s).", node.max_elements)
       end
    end
 end
 
-function uniqueness_checker_from_grammar(grammar)
-   return checker_from_grammar(grammar, {
-      list = uniqueness_checker,
-   })
-end
-
-function minmax_elements_checker_from_grammar(grammar)
-   return checker_from_grammar(grammar, {
-      list = minmax_checker,
-      array = minmax_checker
-   })
-end
-
 function consistency_checker_from_grammar(grammar)
    local checks = {
-      leafref_checker_from_grammar(grammar),
-      uniqueness_checker_from_grammar(grammar),
-      minmax_elements_checker_from_grammar(grammar)
+      checker_from_grammar(grammar, leafref_checker),
+      checker_from_grammar(grammar, uniqueness_checker),
+      checker_from_grammar(grammar, minmax_checker)
    }
    return function (data)
-      for _, check in ipairs(checks) do
+      for _, check in pairs(checks) do
          check(data)
       end
    end
