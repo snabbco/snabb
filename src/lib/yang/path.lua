@@ -10,6 +10,7 @@ module(..., package.seeall)
 local valuelib = require("lib.yang.value")
 local datalib = require("lib.yang.data")
 local normalize_id = datalib.normalize_id
+local lib = require("core.lib")
 
 
 local function syntax_error(str, pos)
@@ -172,6 +173,44 @@ function parse_path(path, grammar)
             part.key = parse_query(grammar, part.query)
             break
          end
+      end
+   end
+   return path
+end
+
+local function unparse_query(grammar, key)
+   if grammar.type == 'array' then
+      return {['position()']=tonumber(key)}
+   elseif grammar.type == 'list' then
+      if not grammar.list.has_key then
+         error("Invalid key: list has no key.")
+      end
+      local query = {}
+      for k,grammar in pairs(grammar.keys) do
+         local key_primitive_type = grammar.argument_type.primitive_type
+         local tostring = valuelib.types[key_primitive_type].tostring
+         local id = normalize_id(k)
+         if key[id] then
+            query[k] = tostring(key[id])
+         elseif grammar.default then
+            query[k] = grammar.default
+         else
+            error("Invalid key: missing required key '"..k.."'")
+         end
+      end
+      return query
+   else
+      error("Invalid key: can only query list or leaf-list.")
+   end
+end
+
+function unparse_path(path, grammar)
+   path = lib.deepcopy(path)
+   for _, part in ipairs(path) do
+      grammar = extract_grammar_node(grammar, part.name)
+      part.grammar = grammar
+      if part.key then
+         part.query = unparse_query(grammar, part.key)
       end
    end
    return path
