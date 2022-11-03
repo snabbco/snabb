@@ -8,11 +8,13 @@ local value = require("lib.yang.value")
 local schema = require("lib.yang.schema")
 local path = require("lib.yang.path")
 local parse_path = path.parse_path
+local unparse_path = path.unparse_path
 local parse_relative_path = path.parse_relative_path
 local normalize_path = path.normalize_path
 local util = require("lib.yang.util")
 local list = require("lib.yang.list")
 local normalize_id = data.normalize_id
+local lib = require("core.lib")
 
 local function compute_struct_getter(name, getter)
    local id = normalize_id(name)
@@ -21,7 +23,7 @@ local function compute_struct_getter(name, getter)
       if struct[id] ~= nil then
          return struct[id]
       else
-         error("Container has no member '"..name.."'.")
+         error("Container has no member '"..name.."'")
       end
    end
 end
@@ -30,7 +32,7 @@ local function compute_array_getter(idx, getter)
    return function (data)
       local array = getter(data)
       if idx > #array then
-         error("Index "..idx.." is out of bounds.")
+         error("Index "..idx.." is out of bounds")
       end
       return array[idx]
    end
@@ -43,7 +45,7 @@ local function compute_list_getter(key, getter)
       if entry ~= nil then
          return entry
       else
-         error("List has no such entry.")
+         error("List has no such entry")
       end
    end
 end
@@ -53,7 +55,7 @@ local function compute_getter(grammar, part, getter)
       getter = compute_struct_getter(part.name, getter)
       grammar = part.grammar
    else
-      error("Invalid path: '"..name.."' is not a container.")
+      error("Invalid path: '"..name.."' is not a container")
    end
    if part.key then
       if grammar.type == 'array' then
@@ -67,7 +69,7 @@ local function compute_getter(grammar, part, getter)
          grammar = {type="struct", members=grammar.values,
                     ctype=grammar.value_ctype}
       else
-         error("Invalid path: '"..name.."' can not be queried.")
+         error("Invalid path: '"..name.."' can not be queried")
       end
    end
    return getter, grammar
@@ -143,7 +145,7 @@ local function setter_for_grammar(grammar, path)
       -- No query; the simple case.
       local getter, grammar = resolver(grammar, head)
       if grammar.type ~= 'struct' then
-         error("Invalid path: missing query for '"..tail_name.."'.")
+         error("Invalid path: missing query for '"..tail_name.."'")
       end
       local tail_id = data.normalize_id(tail_name)
       return function(config, subconfig)
@@ -170,7 +172,7 @@ local function setter_for_grammar(grammar, path)
          return config
       end
    else
-      error("Invalid path: '"..tail_name.."' can not be queried.")
+      error("Invalid path: '"..tail_name.."' can not be queried")
    end
 end
 
@@ -201,7 +203,7 @@ local function adder_for_grammar(grammar, path)
          local l = list.object(getter(config))
          for i, entry in ipairs(subconfig) do
             if l:find_entry(entry) then
-               error("Can not add already-existing list entry #"..i..".")
+               error("Can not add already-existing list entry #"..i)
             end
          end
          for _, entry in ipairs(subconfig) do
@@ -210,7 +212,7 @@ local function adder_for_grammar(grammar, path)
          return config
       end
    else
-      error("Invalid path: '"..tail_name.."' is not a list or a leaf-list.")
+      error("Invalid path: '"..tail_name.."' is not a list or a leaf-list")
    end
 end
 
@@ -235,7 +237,7 @@ local function remover_for_grammar(grammar, path)
       return function(config)
          local cur = getter(config)
          if idx > #cur then
-            error("Leaf-list '"..tail_name"' has no element #"..idx..".")
+            error("Leaf-list '"..tail_name"' has no element #"..idx)
          end
          cur[idx] = nil
          return config
@@ -244,12 +246,12 @@ local function remover_for_grammar(grammar, path)
       return function(config)
          local l = list.object(getter(config))
          if not l:remove_entry(key) then
-            error("List '"..tail_name"' has no entry matching the query.")
+            error("List '"..tail_name"' has no entry matching the query")
          end
          return config
       end
    else
-      error("Invalid path: '"..tail_name.."' is not a list or a leaf-list.")
+      error("Invalid path: '"..tail_name.."' is not a list or a leaf-list")
    end
 end
 
@@ -285,6 +287,7 @@ end
 function checker_from_grammar(grammar, checker)
    local function path_add(path, name)
       local p = {}
+      function p.unparse() return unparse_path(p, grammar) end
       for i, part in ipairs(path) do p[i] = part end
       p[#p+1] = {name=name, query={}}
       return p
@@ -308,6 +311,7 @@ function checker_from_grammar(grammar, checker)
                end
             end
          end
+         return check
       elseif node.type == 'array' then
          -- Pretend that array elements are scalars.
          local pseudo_node = {type="scalar", argument_type=node.element_type,
@@ -318,10 +322,13 @@ function checker_from_grammar(grammar, checker)
                root = root or data
                if check then check(data, root) end
                for idx, elt in ipairs(data) do
+                  path[#path].key = idx
                   check_elt(elt, root)
                end
+               path[#path].key = nil
             end
          end
+         return check
       elseif node.type == 'list' then
          local checks_and_visits = {}
          for name, member in pairs(node.keys) do
@@ -339,12 +346,15 @@ function checker_from_grammar(grammar, checker)
                root = root or data
                if check then check(data, root) end
                for _, entry in ipairs(data) do
+                  path[#path].key = entry
                   for id, visit in pairs(visits) do
                      if entry[id] then visit(entry[id], root) end
                   end
                end
+               path[#path].key = nil
             end
          end
+         return check
       else
          error("BUG: unhandled node type: "..node.type)
       end
@@ -353,6 +363,7 @@ function checker_from_grammar(grammar, checker)
 end
 
 local function consistency_error(path, msg, ...)
+   if path.unparse then path = path.unparse() end
    error(("Consistency error in '%s': %s")
       :format(normalize_path(path), msg:format(...)))
 end
@@ -360,39 +371,42 @@ end
 local function leafref_checker(node, path, grammar)
    if node.type ~= 'scalar' then return end
    if not (node.argument_type and node.argument_type.leafref) then return end
-   local leafref = node.argument_type.leafref
-   local ok, leafref_path = pcall(parse_relative_path, leafref, path)
+   local ok, leafref = pcall(parse_path, node.argument_type.leafref)
    if not ok then
       consistency_error(path,
-         "invalid leafref path: '%s' (%s). ",
-         leafref, leafref_path)
+         "invalid leafref '%s' (%s)",
+         node.argument_type.leafref, leafref)
    end
-   local tail = table.remove(leafref_path)
-   local list_part = leafref_path[#leafref_path]
-   if not (list_part and list_part.grammar.type == 'list') then
-      consistency_error(path, "not a list leafref: '%s'. ", leafref)
+   for _, part in ipairs(leafref) do
+      -- NYI: queries in leafrefs are currently ignored.
+      part.query = {}
    end
-   local key = {}
-
-   if not list_part.grammar.keys[tail.name] then
+   local ok, err = pcall(parse_relative_path, leafref, path, grammar)
+   if not ok then
       consistency_error(path,
-         "'%s' is not a valid key for list referenced by leafref '%s'.",
-         tail.name, leafref)
+         "invalid leafref '%s' (%s)",
+         node.argument_type.leafref, err)
    end
-   local resolve = resolver(grammar, leafref_path)
-   if node.argument_type.require_instances ~= false then
+   if node.require_instances ~= false then
+      -- We only support one simple case:
+      -- leafrefs that are keys into lists with a single string key.
+      local leaf = table.remove(leafref)
+      local list = leafref[#leafref]
+      if not (list and list.grammar.type == 'list') then return end
+      if not list.grammar.list.has_key then return end
+      for k in pairs(list.grammar.keys) do
+         if k ~= leaf.name then return end
+      end
       return function (data, root)
-         local ok, res = pcall(resolve, root)
+         local ok, err = pcall(function ()
+            list.query = {[leaf.name]=assert(data, "missing leafref value")}
+            local p = parse_relative_path(leafref, unparse_path(path, grammar))
+            return resolver(grammar, p)(root)
+         end)
          if not ok then
             consistency_error(path,
-               "failed to resolve leafref: '%s' (%s).",
-               leafref, res)
-         end
-         local ok, res = pcall(function () return res[data] end)
-         if not ok then
-            consistency_error(path,
-               "missing instance for leafref %s: %s (%s).",
-               leafref, data, res)
+               "broken leafref integrity for '%s' (%s)",
+               data, err)
          end
       end
    end
@@ -421,11 +435,10 @@ local function uniqueness_checker(node, path)
          for j, y in ipairs(list) do
             if i == j then break end
             if collision(x, y) then
-               return false
+               return true
             end
          end
       end
-      return true
    end
    if node.type ~= 'list' then return end
    if not node.unique or #node.unique == 0 then return end
@@ -449,11 +462,11 @@ local function minmax_checker(node, path)
       local n = #data
       if node.min_elements and n < node.min_elements then
          consistency_error(path,
-            "requires at least %d element(s).", node.min_elements)
+            "requires at least %d element(s)", node.min_elements)
       end
       if node.max_elements and n > node.max_elements then
          consistency_error(path,
-            "must not have more than %d element(s).", node.max_elements)
+            "must not have more than %d element(s)", node.max_elements)
       end
    end
 end
@@ -627,13 +640,29 @@ function selftest()
    local checker = consistency_checker_from_schema(my_schema, true)
    checker(loaded_data)
 
+   local invalid_data = data.load_config_for_schema(my_schema, mem.open_input_string([[
+   test {
+      interface {
+         name "eth1";
+         admin-status true;
+         address {
+            ip 192.168.0.1;
+         }
+      }
+      mgmt "eth0";
+   }
+   ]]))
+   local ok, err = pcall(checker, invalid_data)
+   assert(not ok)
+   print(err)
+
    local checker = consistency_checker_from_schema_by_name('ietf-alarms', false)
    assert(checker)
 
    local scm = schema.load_schema_by_name('snabb-softwire-v3')
    local grammar = data.config_grammar_from_schema(scm)
    setter_for_grammar(grammar, "/softwire-config/instance[device=test]/"..
-                               "queue[id=0]/external-interface/ip 208.118.235.148")
+                               "queue[id=0]/external-interface/ip")
    remover_for_grammar(grammar, "/softwire-config/instance[device=test]/")
 
    -- Test unique restrictions:
@@ -667,6 +696,7 @@ function selftest()
                                      }
    ]]))
    assert(not success)
+   print(result)
 
    -- Test unique validation (should succeed)
    checker(data.load_config_for_schema(unique_schema,
