@@ -347,7 +347,7 @@ function checker_from_grammar(grammar, checker)
                if check then check(data, root) end
                for _, entry in ipairs(data) do
                   path[#path].key = entry
-                  for id, visit in pairs(visits) do
+                  for id, visit in pairs(checks_and_visits) do
                      if entry[id] then visit(entry[id], root) end
                   end
                end
@@ -389,7 +389,7 @@ local function leafref_checker(node, path, grammar)
    end
    if node.require_instances ~= false then
       -- We only support one simple case:
-      -- leafrefs that are keys into lists with a single string key.
+      -- leafrefs that are keys into lists with a single key.
       local leaf = table.remove(leafref)
       local list = leafref[#leafref]
       if not (list and list.grammar.type == 'list') then return end
@@ -406,7 +406,7 @@ local function leafref_checker(node, path, grammar)
          if not ok then
             consistency_error(path,
                "broken leafref integrity for '%s' (%s)",
-               data, err)
+               normalize_path(leafref), err)
          end
       end
    end
@@ -895,6 +895,57 @@ function selftest()
                                             testleaf "bar";
                                           }
    ]]))
+
+   -- Test restrictions embedded in list entries:
+   local nested_schema = schema.load_schema([[module nested-schema {
+      namespace "urn:ietf:params:xml:ns:yang:nested-schema";
+      prefix "test";
+
+      list entry {
+         key name;
+         leaf name { type string; }
+         leaf-list ll { type string; min-elements 1; }
+      }
+
+      list ref {
+         key name;
+         leaf name { type string; }
+         leaf entry {
+            type leafref {
+               path "../../entry/name";
+            }
+         }
+      }
+   }]])
+   local checker = consistency_checker_from_schema(nested_schema, true)
+   
+   -- Test validation (should succeed)
+   checker(data.load_config_for_schema(nested_schema,
+                                       mem.open_input_string [[
+      entry { name foo; ll "a"; }
+      ref { name bar; entry foo; }
+   ]]))
+
+   -- Test minmax inconsistency in list entry (should fail)
+   local ok, err = pcall(checker,
+      data.load_config_for_schema(nested_schema,
+                                  mem.open_input_string [[
+      entry { name foo; }
+      ref { name bar; entry foo; }
+   ]]))
+   assert(not ok)
+   print(err)
+
+   -- Test leafref inconsistency in list entry (should fail)
+   local ok, err = pcall(checker,
+      data.load_config_for_schema(nested_schema,
+                                  mem.open_input_string [[
+      entry { name foo; ll "a"; }
+      ref { name bar; entry foo1; }
+   ]]))
+   assert(not ok)
+   print(err)
+
 
    print("selftest: ok")
 end
