@@ -6,7 +6,6 @@ local S = require("syscall")
 local bit = require("bit")
 local ffi = require("ffi")
 local lib = require("core.lib")
-local cltable = require("lib.cltable")
 local binary = require("lib.yang.binary")
 
 local band = bit.band
