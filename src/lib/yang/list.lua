@@ -3,6 +3,7 @@
 module(..., package.seeall)
 
 local murmur = require("lib.hash.murmur")
+local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 local band, bor, bnot, lshift, rshift =
@@ -325,6 +326,7 @@ List.type_map = {
    uint64 = {ctype='uint64_t', kind='scalar'},
    ['ipv4-address'] = {ctype='uint32_t', kind='scalar'},
    ['ipv6-address'] = {ctype='ipv6_addr_t', kind='bytes'},
+   struct = {kind='struct'}, -- arbitrary ctype struct
    lvalue = {ctype='uint32_t', kind='lvalue'}
 }
 
@@ -433,7 +435,11 @@ function List:build_type (fields)
       local spec = fields[name]
       assert(type(spec) == 'table' and type(spec.type) == 'string',
          "Invalid field spec for "..name)
-      local ct = self:type_info(spec.type).ctype
+      local type_info = self:type_info(spec.type)
+      local ct = type_info.ctype
+      if type_info.kind == 'struct' then
+         ct = spec.ts
+      end
       if spec.optional then
          ct = self.optional_ts:format(ct, name)
       end
@@ -518,6 +524,8 @@ function List:pack_mandatory (dst, name, type_info, value)
       dst[name] = true
    elseif type_info.kind == 'bytes' then
       ffi.copy(dst[name], value, ffi.sizeof(type_info.ctype))
+   elseif type_info.kind == 'struct' then
+      dst[name] = value
    elseif type_info.kind == 'lvalue' then
       local idx = #self.lvalues[name] + 1
       self.lvalues[name][idx] = assert(value)
@@ -536,6 +544,8 @@ function List:unpack_mandatory (dst, name, type_info, value)
       dst[name] = true
    elseif type_info.kind == 'bytes' then
       dst[name] = value
+   elseif type_info.kind == 'struct' then
+      dst[name] = value
    elseif type_info.kind == 'lvalue' then
       dst[name] = assert(self.lvalues[name][value])
    else
@@ -550,10 +560,12 @@ function List:free_mandatory (name, type_info, value)
       self:free_str(value)
    elseif type_info.kind == 'empty' then
       -- nop
-   elseif type_info.kind == 'lvalue' then
-      self.lvalues[name][value] = nil
    elseif type_info.kind == 'bytes' then
       -- nop
+   elseif type_info.kind == 'struct' then
+      -- nop
+   elseif type_info.kind == 'lvalue' then
+      self.lvalues[name][value] = nil
    else
       error("NYI: kind "..type_info.kind)
    end
@@ -578,7 +590,6 @@ function List:pack_optional (dst, name, type_info, value)
       self:pack_mandatory(dst[name].value, name, type_info, value)
       dst[name].present = true
    else
-      dst[name].value[name] = 0
       dst[name].present = false
    end
 end
@@ -592,14 +603,6 @@ end
 function List:free_optional (name, type_info, value)
    if value.present then
       self:free_mandatory(name, type_info, value.value[name])
-   end
-end
-
-function List:equal_optional (name, packed, unpacked, type_info)
-   if packed.present then
-      return self:equal_mandatory(packed.value[name], unpacked, type_info)
-   else
-      return unpacked == nil
    end
 end
 
@@ -632,11 +635,7 @@ end
 
 function List:equal_field (name, packed, unpacked, spec)
    local type_info = self:type_info(spec.type)
-   if spec.optional then
-      return self:equal_optional(name, packed, unpacked, type_info)
-   else
-      return self:equal_mandatory(packed, unpacked, type_info)
-   end
+   return self:equal_mandatory(packed, unpacked, type_info)
 end
 
 function List:pack_fields (s, t, fields)
@@ -1143,6 +1142,40 @@ function selftest_list ()
    l:add_or_update_entry {id="foo1", o={bar=false}}
    l:remove_entry {id="foo"}
    assert(l.lvalues.o[1].bar == false)
+
+   -- Test struct
+   local l = List:new(
+      {id={type='string'}},
+      {value={type='struct', ts="struct { uint16_t x, y; }"}}
+   )
+   l:add_entry {id="foo", value={x=1, y=2}}
+   l:add_entry {id="foo1", value={x=2, y=3}}
+   assert(l:find_entry{id="foo"}.value.x == 1)
+   assert(l:find_entry{id="foo"}.value.y == 2)
+   assert(l:find_entry{id="foo1"}.value.x == 2)
+   assert(l:find_entry{id="foo1"}.value.y == 3)
+   l:add_or_update_entry {id="foo1", value={x=3,y=4}}
+   assert(l:find_entry{id="foo1"}.value.x == 3)
+   assert(l:find_entry{id="foo1"}.value.y == 4)
+   l:add_or_update_entry {id="foo1", value=l:find_entry{id="foo"}.value}
+   assert(l:find_entry{id="foo1"}.value.x == 1)
+   assert(l:find_entry{id="foo1"}.value.y == 2)
+
+   -- Test optional struct
+   local l = List:new(
+      {id={type='string'}},
+      {value={type='struct', ts="struct { uint16_t x, y; }", optional=true}}
+   )
+   l:add_entry {id="foo"}
+   l:add_entry {id="foo1", value={x=2, y=3}}
+   assert(l:find_entry{id="foo"}.value == nil)
+   assert(l:find_entry{id="foo1"}.value.x == 2)
+   assert(l:find_entry{id="foo1"}.value.y == 3)
+   l:add_or_update_entry {id="foo", value={x=1,y=2}}
+   assert(l:find_entry{id="foo"}.value.x == 1)
+   assert(l:find_entry{id="foo"}.value.y == 2)
+   l:add_or_update_entry {id="foo1", value=nil}
+   assert(l:find_entry{id="foo1"}.value == nil)
 
    -- Test load/save
    local keys = {id={type='string'}}

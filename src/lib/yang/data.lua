@@ -175,6 +175,11 @@ function data_grammar_from_schema(schema, is_config)
                members[name] = member
             end
          end
+      elseif node.type == 'struct' and node.ctype then
+         members[name] = {
+            type = 'struct', ts = node.ctype,
+            optional = not node.mandatory
+         }
       else
          members[name] = {
             type = 'lvalue',
