@@ -168,7 +168,10 @@ function initialize ()
 end
 
 function handler (reason)
-   print(debug.traceback(reason))
+   io.stderr:write(reason)
+   io.stderr:write("\n")
+   io.stderr:write((STP.stacktrace()))
+   io.stderr:write("\n")
    if debug_on_error then debug.debug() end
    os.exit(1)
 end
