@@ -145,7 +145,7 @@ function BindingTable.new(psid_map, softwires)
    local ret = {
       psid_map = assert(psid_map),
       softwires = assert(softwires),
-      lookup = softwires.entry_type()
+      entry = softwires.entry_type()
    }
    return setmetatable(ret, {__index=BindingTable})
 end
@@ -165,7 +165,7 @@ end
 
 
 function BindingTable:lookup(ipv4, port)
-   local lookup_key = self.lookup.key
+   local lookup_key = self.entry.key
    local psid = self:lookup_psid(ipv4, port)
    lookup_key.ipv4 = ipv4
    lookup_key.psid = psid
