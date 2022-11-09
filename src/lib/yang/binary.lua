@@ -11,6 +11,7 @@ local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
 local data = require('lib.yang.data')
+local cdata = require('lib.yang.ctype')
 local list = require("lib.yang.list")
 
 local MAGIC = "yangconf"
@@ -84,7 +85,7 @@ end
 local value_emitters = {}
 local function value_emitter(ctype)
    if value_emitters[ctype] then return value_emitters[ctype] end
-   local type = data.typeof(ctype)
+   local type = cdata.typeof(ctype)
    local align = ffi.alignof(type)
    local size = ffi.sizeof(type)
    local buf = ffi.typeof('$[1]', type)()
@@ -152,7 +153,7 @@ local function data_emitter(production)
       end
       table.sort(member_keys, order_predicate)
       if production.ctype then
-         local data_t = data.typeof(production.ctype)
+         local data_t = cdata.typeof(production.ctype)
          return function(data, stream)
             stream:write_stringref('cstruct')
             stream:write_stringref(production.ctype)
@@ -202,7 +203,7 @@ local function data_emitter(production)
    end
    function handlers.array(production)
       if production.ctype then
-         local data_t = data.typeof(production.ctype)
+         local data_t = cdata.typeof(production.ctype)
          return function(data, stream)
             stream:write_stringref('carray')
             stream:write_stringref(production.ctype)
@@ -226,6 +227,11 @@ local function data_emitter(production)
             type = {
                type = 'scalar',
                argument_type = { primitive_type = 'string' }
+            },
+            ts = {
+               type = 'scalar',
+               argument_type = { primitive_type = 'string' },
+               mandatory = false
             },
             optional = {
                type = 'scalar',
@@ -420,7 +426,7 @@ local function read_compiled_data(stream, strtab)
       return ret
    end
    function readers.carray()
-      local ctype = data.typeof(read_string())
+      local ctype = cdata.typeof(read_string())
       local count = stream:read_scalar(nil, uint32_t)
       return util.ffi_array(stream:read_array(nil, ctype, count), ctype, count)
    end
@@ -450,11 +456,11 @@ local function read_compiled_data(stream, strtab)
       return read_string()
    end
    function readers.cstruct()
-      local ctype = data.typeof(read_string())
+      local ctype = cdata.typeof(read_string())
       return stream:read_struct(nil, ctype)
    end
    function readers.cscalar()
-      local ctype = data.typeof(read_string())
+      local ctype = cdata.typeof(read_string())
       return stream:read_scalar(nil, ctype)
    end
    function readers.flag()
