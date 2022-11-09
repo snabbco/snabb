@@ -2,6 +2,7 @@
 -- COPYING.
 module(..., package.seeall)
 
+local typeof = require("lib.yang.ctype").typeof
 local murmur = require("lib.hash.murmur")
 local lib = require("core.lib")
 local ffi = require("ffi")
@@ -342,18 +343,10 @@ function List:type_info (type)
    return assert(self.type_map[type], "Unsupported type: "..type)
 end
 
-List.type_cache = {}
-
-function List:cached_type (t)
-   if not self.type_cache[t] then
-      self.type_cache[t] = ffi.typeof(t)
-   end
-   return self.type_cache[t]
-end
-
-List.node_t = List:cached_type [[
+List.node_t = ffi.typeof [[
    struct {
-      uint16_t occupied, leaf;
+      uint16_t occupied;
+      uint16_t leaf;
       uint32_t parent;
       uint32_t children[16];
    }
@@ -361,11 +354,12 @@ List.node_t = List:cached_type [[
 
 List.list_ts = [[
    struct {
-      uint32_t prev, next;
+      uint32_t prev;
+      uint32_t next;
    }
 ]]
 
-List.string_t = List:cached_type [[
+List.string_t = ffi.typeof [[
    struct {
       uint16_t len;
       uint8_t str[1];
@@ -376,7 +370,15 @@ List.optional_ts = [[
    struct {
       struct { %s %s; } value;
       bool present;
-   } __attribute__((packed))
+   }
+]]
+
+List.leaf_ts = [[
+   struct {
+      %s list;
+      %s keys;
+      %s members;
+   }
 ]]
 
 function List:_new (keys, members)
@@ -388,8 +390,8 @@ function List:_new (keys, members)
    local members_ts = self:build_type(members)
    self.keys = keys
    self.members = members
-   self.keys_t = self:cached_type(keys_ts)
-   self.leaf_t = self:cached_type(self:build_leaf_type(keys_ts, members_ts))
+   self.keys_t = typeof(keys_ts)
+   self.leaf_t = typeof(self:build_leaf_type(keys_ts, members_ts))
    self.hashin = self.keys_t()
    return self
 end
@@ -445,13 +447,12 @@ function List:build_type (fields)
       end
       t = t..("%s %s; "):format(ct, name)
    end
-   t = t.."} __attribute__((packed))"
+   t = t.."}"
    return t
 end
 
 function List:build_leaf_type (keys_ts, members_ts)
-   return ("struct { %s list; %s keys; %s members; } __attribute__((packed))")
-      :format(self.list_ts, keys_ts, members_ts)
+   return self.leaf_ts:format(self.list_ts, keys_ts, members_ts)
 end
 
 function List:heap_cast (t, o)
@@ -1144,9 +1145,10 @@ function selftest_list ()
    assert(l.lvalues.o[1].bar == false)
 
    -- Test struct
+   local ts = "struct { uint16_t x; uint16_t y; }"
    local l = List:new(
       {id={type='string'}},
-      {value={type='struct', ts="struct { uint16_t x, y; }"}}
+      {value={type='struct', ts=ts}}
    )
    l:add_entry {id="foo", value={x=1, y=2}}
    l:add_entry {id="foo1", value={x=2, y=3}}
@@ -1164,7 +1166,7 @@ function selftest_list ()
    -- Test optional struct
    local l = List:new(
       {id={type='string'}},
-      {value={type='struct', ts="struct { uint16_t x, y; }", optional=true}}
+      {value={type='struct', ts=ts, optional=true}}
    )
    l:add_entry {id="foo"}
    l:add_entry {id="foo1", value={x=2, y=3}}
