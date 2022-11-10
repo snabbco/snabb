@@ -173,7 +173,7 @@ local function ietf_binding_table_from_native(bt)
    local ret = list.new(list_spec.keys, list_spec.members)
    local warn_lossy = false
    for i, softwire in ipairs(bt.softwire) do
-      if ret[softwire] then
+      if ret[softwire.b4_ipv6] then
          -- If two entries in the native softwire table have the same key in
          -- the ietf-softwire-br schema, we omit the duplicate entry and print
          -- a load warning to inform the user of this issue.
@@ -189,7 +189,7 @@ local function ietf_binding_table_from_native(bt)
             },
             br_ipv6_addr = softwire.br_address,
          }
-         ret[entry] = entry
+         ret[softwire.b4_ipv6] = entry
       end
    end
    if warn_lossy then
