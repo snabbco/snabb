@@ -53,7 +53,7 @@ function state_reader_from_grammar(production, maybe_keyword)
       end
       return ret
    end
-   function visitor.table(keyword, production)
+   function visitor.list(keyword, production)
       -- TODO: Right now we basically map leaves to counters; we have
       -- no structured way to know what keys we might use.  To make
       -- tables here we'd need more of a design!
