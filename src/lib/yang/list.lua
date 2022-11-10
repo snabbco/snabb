@@ -399,7 +399,7 @@ end
 function List:new (keys, members)
    local self = self:_new(keys, members)
    self.heap = Heap:new()
-   self.first, self.last = nil, nil -- empty
+   self.first, self.last = 0, 0 -- empty
    self.root = self:alloc_node() -- heap obj=0 reserved for root node
    self.length = 0
    self.lvalues = {}
@@ -893,7 +893,7 @@ end
 
 function List:append_leaf (o, prev)
    prev = prev or self.last
-   if not prev then
+   if prev == 0 then -- empty (0 is reserved for root node)
       self.first, self.last = o, o
    else
       local leaf = self:leaf(o)
@@ -963,6 +963,7 @@ end
 function List:ipairs ()
    local n = 1
    local o = self.first
+   assert(type(o) == 'number')
    return function ()
       if o == 0 then
          return
@@ -982,9 +983,8 @@ List.header_t = ffi.typeof[[
 ]]
 
 function List:save (stream)
-   stream:write_struct(self.header_t, self.header_t(
-      self.first or -1, self.last or -1, self.length
-   ))
+   local header = self.header_t(self.first, self.last, self.length)
+   stream:write_struct(self.header_t, header)
    self.heap:save(stream)
 end
 
@@ -992,8 +992,8 @@ function List:load (stream, keys, members, lvalues)
    local self = self:_new(keys, members)
    local h = stream:read_struct(nil, self.header_t)
    self.heap = Heap:load(stream)
-   self.first = (h.first >= 0 and h.first) or nil
-   self.last = (h.last >= 0 and h.last) or nil
+   self.first = h.first
+   self.last = h.last
    self.root = 0 -- heap obj=0 reserved for root node
    self.length = h.length
    self.lvalues = lvalues
@@ -1033,6 +1033,11 @@ function selftest_list ()
       else
          error("unexpected index: "..i)
       end
+   end
+
+   -- Test empty interator
+   for _ in List:new({id={type='uint64'}}, {}):ipairs() do
+      error("list is empty")
    end
    
    -- Test update
