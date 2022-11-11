@@ -162,15 +162,16 @@ function data_grammar_from_schema(schema, is_config)
          end
       end
       if is_empty(values) and node.config ~= is_config then return end
-      local list = {}
+      local l = {}
       if node.key then
-         list.keys = list_spec(keys, list_key)
+         l.keys = list_spec(keys, list_key)
       else
-         list.keys = {__ikey={type='uint64'}}
+         l.keys = {__ikey={type='uint64'}}
       end
-      list.members = list_spec(values, list_member)
-      list.has_key = node.key and true
-      return {type='list', keys=keys, values=values, list=list,
+      l.members = list_spec(values, list_member)
+      l.has_key = node.key and true
+      function l.new() return list.new(l.keys, l.members) end
+      return {type='list', keys=keys, values=values, list=l,
               unique = node.unique,
               min_elements=node.min_elements, max_elements=node.max_elements}
    end
@@ -481,7 +482,7 @@ function list_parser(keyword, keys, values, spec)
    for k,v in pairs(values) do members[k] = v end
    local parser = struct_parser(keyword, members)
    local function init()
-      local res = list.new(spec.keys, spec.members)
+      local res = spec.new()
       local l = list.object(res)
       local assoc = {}
       function assoc:add(entry)
@@ -840,6 +841,7 @@ function xpath_printer_from_grammar(production, print_default, root)
       local compose_key = key_composer(production.keys)
       local print_value = body_printer(production.values)
       return function(data, file, path)
+         assert(list.object(data))
          path = path or ''
          for _, entry in ipairs(data) do
             local key = compose_key(entry)
@@ -1070,6 +1072,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
       local compose_key = key_composer(production.keys)
       local print_value = body_printer(production.values)
       return function(data, file, path)
+         assert(list.object(data))
          path = path or ''
          for _, entry in ipairs(data) do
             local key = compose_key(entry)
@@ -1231,6 +1234,7 @@ function data_printer_from_grammar(production, print_default)
       local print_key = body_printer(production.keys)
       local print_value = body_printer(production.values)
       return function(data, file, indent)
+         assert(list.object(data))
          for _, entry in ipairs(data) do
             if keyword then print_keyword(keyword, file, indent) end
             file:write('{\n')

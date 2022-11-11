@@ -257,7 +257,7 @@ local function data_emitter(production)
       end
       return function(data, stream)
          stream:write_stringref('list')
-         local l = list.object(data)
+         local l = assert(list.object(data))
          emit_list_keys(l.keys, stream)
          emit_list_members(l.members, stream)
          for k, values in pairs(l.lvalues) do
