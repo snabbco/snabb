@@ -87,6 +87,23 @@ end
 
 resolver = util.memoize(resolver)
 
+local function grammar_for_schema(schema, path, is_config)
+   local grammar = data.data_grammar_from_schema(schema, is_config ~= false)
+   local path = parse_path(path or '/', grammar)
+   if #path > 0 then
+      return path[#path].grammar
+   else
+      return grammar
+   end
+end
+
+function grammar_for_schema_by_name(schema_name, path, is_config)
+   local schema = schema.load_schema_by_name(schema_name)
+   return grammar_for_schema(schema, path, is_config)
+end
+
+grammar_for_schema_by_name = util.memoize(grammar_for_schema_by_name)
+
 local function printer_for_grammar(grammar, path, format, print_default)
    local getter, subgrammar = resolver(grammar, path)
    local printer
