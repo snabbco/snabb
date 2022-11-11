@@ -51,11 +51,11 @@ local function compute_list_getter(key, getter)
 end
 
 local function compute_getter(grammar, part, getter)
-   if grammar.type == 'struct' then
+   if grammar.type == 'struct' or grammar.type == 'sequence' then
       getter = compute_struct_getter(part.name, getter)
       grammar = part.grammar
    else
-      error("Invalid path: '"..name.."' is not a container")
+      error("Invalid path: '"..part.name.."' is not a container")
    end
    if part.key then
       if grammar.type == 'array' then

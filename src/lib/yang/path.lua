@@ -84,6 +84,10 @@ local function extract_grammar_node(grammar, name)
    function handlers.array ()
       error("Invalid path: trying to access '"..name.."' in leaf-list.")
    end
+   -- rpc
+   function handlers.sequence (node)
+      if node.members[name] then return node.members[name] end
+   end
    local node = assert(handlers[grammar.type], grammar.type)(grammar)
    return node or error("Invalid path: '"..name.."' is not in schema.")
 end
