@@ -228,10 +228,9 @@ local function data_emitter(production)
                type = 'scalar',
                argument_type = { primitive_type = 'string' }
             },
-            ts = {
+            ctype = {
                type = 'scalar',
-               argument_type = { primitive_type = 'string' },
-               mandatory = false
+               argument_type = { primitive_type = 'string' }
             },
             optional = {
                type = 'scalar',

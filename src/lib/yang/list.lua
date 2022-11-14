@@ -282,65 +282,44 @@ local List = {
    node_children = 16
 }
 
--- YANG built-in types:
---        +---------------------+-------------------------------------+
---        | Name                | Description                         |
---        +---------------------+-------------------------------------+
---        | binary              | Any binary data                     |
---        | bits                | A set of bits or flags              |
---        | boolean             | "true" or "false"                   |
---        | decimal64           | 64-bit signed decimal number        |
---        | empty               | A leaf that does not have any value |
---        | enumeration         | One of an enumerated set of strings |
---        | identityref         | A reference to an abstract identity |
---        | instance-identifier | A reference to a data tree node     |
---        | int8                | 8-bit signed integer                |
---        | int16               | 16-bit signed integer               |
---        | int32               | 32-bit signed integer               |
---        | int64               | 64-bit signed integer               |
---        | leafref             | A reference to a leaf instance      |
---        | string              | A character string                  |
---        | uint8               | 8-bit unsigned integer              |
---        | uint16              | 16-bit unsigned integer             |
---        | uint32              | 32-bit unsigned integer             |
---        | uint64              | 64-bit unsigned integer             |
---        | union               | Choice of member types              |
---        +---------------------+-------------------------------------+
-
 List.type_map = {
    binary = {ctype='uint32_t', kind='string'}, -- same as string
-   bits = {ctype='uint64_t', kind='scalar'}, -- no more than 64 flags
-   boolean = {ctype='bool', kind='scalar'},
-   decimal64 = {ctype='double', kind='scalar'},
-   enumeration = {ctype='int32_t', kind='scalar'},
    empty = {ctype='bool', kind='empty'}, -- no representation (always true)
+   enumeration = {ctype='uint32_t', kind='string'}, -- same as string 
    identityref = {ctype='uint32_t', kind='string'}, -- same as string 
-   int8 = {ctype='int8_t', kind='scalar'},
-   int16 = {ctype='int16_t', kind='scalar'},
-   int32 = {ctype='int32_t', kind='scalar'},
-   int64 = {ctype='int64_t', kind='scalar'},
    leafref = {ctype='uint32_t', kind='string'}, -- same as string 
    string = {ctype='uint32_t', kind='string'}, -- pointer into heap
-   uint8 = {ctype='uint8_t', kind='scalar'},
-   uint16 = {ctype='uint16_t', kind='scalar'},
-   uint32 = {ctype='uint32_t', kind='scalar'},
-   uint64 = {ctype='uint64_t', kind='scalar'},
-   ['ipv4-address'] = {ctype='uint32_t', kind='scalar'},
-   ['ipv6-address'] = {ctype='ipv6_addr_t', kind='bytes'},
-   struct = {kind='struct'}, -- arbitrary ctype struct
    lvalue = {ctype='uint32_t', kind='lvalue'}
 }
 
-function supported_type (t)
-   return List.type_map[t] and true
-end
-
-ffi.cdef[[
-   typedef uint8_t ipv6_addr_t[16];
-]]
-
 function List:type_info (type)
    return assert(self.type_map[type], "Unsupported type: "..type)
+end
+
+function List:type_kind (spec)
+   if spec.ctype then return 'ctype'
+   else return self:type_info(spec.type).kind end
+end
+
+function List:type_ctype (spec)
+   return spec.ctype or self:type_info(spec.type).ctype
+end
+
+function validate_keys (keys)
+   validate_members(keys)
+   for name, key in pairs(keys) do
+      assert(not key.optional, "Keys can not be optional")
+   end
+end
+
+function validate_members (members)
+   for name, member in pairs(members) do
+      assert(type(member) == 'table' and
+             (type(member.type) == 'string' or
+              type(member.ctype) == 'string'),
+         "Invalid field spec for "..name)
+      assert(List:type_kind(member))
+   end
 end
 
 List.node_t = ffi.typeof [[
@@ -368,9 +347,9 @@ List.string_t = ffi.typeof [[
 
 List.optional_ts = [[
    struct {
-      struct { %s %s; } value;
+      struct { %s } value;
       bool present;
-   }
+   } %s;
 ]]
 
 List.leaf_ts = [[
@@ -383,9 +362,8 @@ List.leaf_ts = [[
 
 function List:_new (keys, members)
    local self = setmetatable({}, {__index=List})
-   for name, spec in pairs(keys) do
-      assert(not spec.optional, "Keys can not be optional: "..name)
-   end
+   validate_keys(keys)
+   validate_members(members)
    local keys_ts = self:build_type(keys)
    local members_ts = self:build_type(members)
    self.keys = keys
@@ -435,17 +413,18 @@ function List:build_type (fields)
    local t = "struct { "
    for _, name in ipairs(self:field_order(fields)) do
       local spec = fields[name]
-      assert(type(spec) == 'table' and type(spec.type) == 'string',
-         "Invalid field spec for "..name)
-      local type_info = self:type_info(spec.type)
-      local ct = type_info.ctype
-      if type_info.kind == 'struct' then
-         ct = spec.ts
+      local ct = self:type_ctype(spec)
+      local et, array = ct:match("(.+)(%[%d+%])")
+      local f
+      if array then
+         f = ("%s %s%s;"):format(et, name, array)
+      else
+         f = ("%s %s;"):format(ct, name)
       end
       if spec.optional then
-         ct = self.optional_ts:format(ct, name)
+         f = self.optional_ts:format(f, name)
       end
-      t = t..("%s %s; "):format(ct, name)
+      t = t..f
    end
    t = t.."}"
    return t
@@ -515,128 +494,97 @@ function List:str_equal_string (o, s)
    return C.memcmp(str.str, s, str.len) == 0
 end
 
-function List:pack_mandatory (dst, name, type_info, value)
+function List:pack_mandatory (dst, name, kind, value)
    assert(value ~= nil, "Missing value: "..name)
-   if type_info.kind == 'scalar' then
-      dst[name] = value
-   elseif type_info.kind == 'string' then
+   if kind == 'string' then
       dst[name] = self:alloc_str(value)
-   elseif type_info.kind == 'empty' then
+   elseif kind == 'empty' then
       dst[name] = true
-   elseif type_info.kind == 'bytes' then
-      ffi.copy(dst[name], value, ffi.sizeof(type_info.ctype))
-   elseif type_info.kind == 'struct' then
+   elseif kind == 'ctype' then
       dst[name] = value
-   elseif type_info.kind == 'lvalue' then
+   elseif kind == 'lvalue' then
       local idx = #self.lvalues[name] + 1
       self.lvalues[name][idx] = assert(value)
       dst[name] = idx
    else
-      error("NYI: kind "..type_info.kind)
+      error("NYI: kind "..kind)
    end
 end
 
-function List:unpack_mandatory (dst, name, type_info, value)
-   if type_info.kind == 'scalar' then
-      dst[name] = value
-   elseif type_info.kind == 'string' then
+function List:unpack_mandatory (dst, name, kind, value)
+   if kind == 'string' then
       dst[name] = self:tostring(value)
-   elseif type_info.kind == 'empty' then
+   elseif kind == 'empty' then
       dst[name] = true
-   elseif type_info.kind == 'bytes' then
+   elseif kind == 'ctype' then
       dst[name] = value
-   elseif type_info.kind == 'struct' then
-      dst[name] = value
-   elseif type_info.kind == 'lvalue' then
+   elseif kind == 'lvalue' then
       dst[name] = assert(self.lvalues[name][value])
    else
-      error("NYI: kind "..type_info.kind)
+      error("NYI: kind "..kind)
    end
 end
 
-function List:free_mandatory (name, type_info, value)
-   if type_info.kind == 'scalar' then
-      -- nop
-   elseif type_info.kind == 'string' then
+function List:free_mandatory (name, kind, value)
+   if kind == 'string' then
       self:free_str(value)
-   elseif type_info.kind == 'empty' then
+   elseif kind == 'empty' then
       -- nop
-   elseif type_info.kind == 'bytes' then
+   elseif kind == 'ctype' then
       -- nop
-   elseif type_info.kind == 'struct' then
-      -- nop
-   elseif type_info.kind == 'lvalue' then
+   elseif kind == 'lvalue' then
       self.lvalues[name][value] = nil
    else
-      error("NYI: kind "..type_info.kind)
+      error("NYI: kind "..kind)
    end
 end
 
-function List:equal_mandatory (packed, unpacked, type_info)
-   if type_info.kind == 'scalar' then
-      return packed == unpacked
-   elseif type_info.kind == 'string' then
-      return self:str_equal_string(packed, unpacked)
-   elseif type_info.kind == 'empty' then
-      return true
-   elseif type_info.kind == 'bytes' then
-      return C.memcmp(packed, unpacked, ffi.sizeof(type_info.ctype)) == 0
-   else
-      error("NYI: kind "..type_info.kind)
-   end
-end
-
-function List:pack_optional (dst, name, type_info, value)
+function List:pack_optional (dst, name, kind, value)
    if value ~= nil then
-      self:pack_mandatory(dst[name].value, name, type_info, value)
+      self:pack_mandatory(dst[name].value, name, kind, value)
       dst[name].present = true
    else
       dst[name].present = false
    end
 end
 
-function List:unpack_optional (dst, name, type_info, value)
+function List:unpack_optional (dst, name, kind, value)
    if value.present then
-      self:unpack_mandatory(dst, name, type_info, value.value[name])
+      self:unpack_mandatory(dst, name, kind, value.value[name])
    end
 end
 
-function List:free_optional (name, type_info, value)
+function List:free_optional (name, kind, value)
    if value.present then
-      self:free_mandatory(name, type_info, value.value[name])
+      self:free_mandatory(name, kind, value.value[name])
    end
 end
 
 function List:pack_field (dst, name, spec, value)
-   local type_info = self:type_info(spec.type)
+   local kind = self:type_kind(spec)
    if spec.optional then
-      self:pack_optional(dst, name, type_info, value)
+      self:pack_optional(dst, name, kind, value)
    else
-      self:pack_mandatory(dst, name, type_info, value)
+      self:pack_mandatory(dst, name, kind, value)
    end
 end
 
 function List:unpack_field (dst, name, spec, value)
-   local type_info = self:type_info(spec.type)
+   local kind = self:type_kind(spec)
    if spec.optional then
-      self:unpack_optional(dst, name, type_info, value)
+      self:unpack_optional(dst, name, kind, value)
    else
-      self:unpack_mandatory(dst, name, type_info, value)
+      self:unpack_mandatory(dst, name, kind, value)
    end
 end
 
 function List:free_field (name, spec, value)
-   local type_info = self:type_info(spec.type)
+   local kind = self:type_kind(spec)
    if spec.optional then
-      self:free_optional(name, type_info, value)
+      self:free_optional(name, kind, value)
    else
-      self:free_mandatory(name, type_info, value)
+      self:free_mandatory(name, kind, value)
    end
-end
-
-function List:equal_field (name, packed, unpacked, spec)
-   local type_info = self:type_info(spec.type)
-   return self:equal_mandatory(packed, unpacked, type_info)
 end
 
 function List:pack_fields (s, t, fields)
@@ -664,17 +612,15 @@ end
 
 function List:entry_hash (e, seed)
    for name, spec in pairs(self.keys) do
-      local type_info = self:type_info(spec.type)
-      if type_info.kind == 'scalar' then
+      local kind = self:type_kind(spec)
+      if kind == 'ctype' then
          self:pack_field(self.hashin, name, spec, e[name])
-      elseif type_info.kind == 'string' then
+      elseif kind == 'string' then
          self.hashin[name] = hash32(e[name], #e[name], seed)
-      elseif type_info.kind == 'empty' then
-         self:pack_field(self.hashin, name, spec, e[name])
-      elseif type_info.kind == 'bytes' then
+      elseif kind == 'empty' then
          self:pack_field(self.hashin, name, spec, e[name])
       else
-         error("NYI: kind "..type_info.kind)
+         error("NYI: kind "..kind)
       end
    end
    return hash32(self.hashin, ffi.sizeof(self.keys_t), seed)
@@ -683,18 +629,16 @@ end
 -- Same as entry hash but for keys_t
 function List:leaf_hash (keys, seed)
    for name, spec in pairs(self.keys) do
-      local type_info = self:type_info(spec.type)
-      if type_info.kind == 'scalar' then
+      local kind = self:type_kind(spec)
+      if kind == 'ctype' then
          self:pack_field(self.hashin, name, spec, keys[name])
-      elseif type_info.kind == 'string' then
+      elseif kind == 'string' then
          local str = self:str(keys[name])
          self.hashin[name] = hash32(str.str, str.len, seed)
-      elseif type_info.kind == 'empty' then
-         self:pack_field(self.hashin, name, spec, keys[name])
-      elseif type_info.kind == 'bytes' then
+      elseif kind == 'empty' then
          self:pack_field(self.hashin, name, spec, keys[name])
       else
-         error("NYI: kind "..type_info.kind)
+         error("NYI: kind "..kind)
       end
    end
    return hash32(self.hashin, ffi.sizeof(self.keys_t), seed)
@@ -764,12 +708,19 @@ end
 
 function List:entry_keys_equal (e, o)
    local keys = self:leaf(o).keys
+   local cmp = self.hashin
+   ffi.fill(cmp, ffi.sizeof(cmp))
    for name, spec in pairs(self.keys) do
-      if not self:equal_field(name, keys[name], e[name], spec) then
-         return false
+      local kind = self:type_kind(spec)
+      if kind == 'string' then
+         if self:str_equal_string(keys[name], e[name]) then
+            cmp[name] = keys[name]
+         end
+      else
+         self:pack_mandatory(cmp, name, kind, e[name])
       end
    end
-   return true
+   return C.memcmp(keys, cmp, ffi.sizeof(keys)) == 0
 end
 
 -- NB: finds any node matching the keys hash!
@@ -1002,8 +953,8 @@ end
 
 function selftest_list ()
    local l = List:new(
-      {id={type='uint32'}, name={type='string'}},
-      {value={type='decimal64'}, description={type='string'}}
+      {id={ctype='uint32_t'}, name={type='string'}},
+      {value={ctype='double'}, description={type='string'}}
    )
    -- print("leaf_t", ffi.sizeof(l.leaf_t))
    -- print("node_t", ffi.sizeof(l.node_t))
@@ -1036,7 +987,7 @@ function selftest_list ()
    end
 
    -- Test empty interator
-   for _ in List:new({id={type='uint64'}}, {}):ipairs() do
+   for _ in List:new({id={ctype='uint64_t'}}, {}):ipairs() do
       error("list is empty")
    end
    
@@ -1058,7 +1009,7 @@ function selftest_list ()
    assert(e_updated.description == "one")
    
    -- Test collisions
-   local lc = List:new({id={type='uint64'}}, {})
+   local lc = List:new({id={ctype='uint64_t'}}, {})
    -- print("leaf_t", ffi.sizeof(lc.leaf_t))
    -- print("node_t", ffi.sizeof(lc.node_t))
    lc:add_entry {id=0ULL}
@@ -1081,7 +1032,7 @@ function selftest_list ()
    -- Test optional
    local l = List:new(
       {id={type='string'}},
-      {value={type='decimal64', optional=true},
+      {value={ctype='double', optional=true},
        description={type='string', optional=true}}
    )
    l:add_entry{
@@ -1153,7 +1104,7 @@ function selftest_list ()
    local ts = "struct { uint16_t x; uint16_t y; }"
    local l = List:new(
       {id={type='string'}},
-      {value={type='struct', ts=ts}}
+      {value={ctype=ts}}
    )
    l:add_entry {id="foo", value={x=1, y=2}}
    l:add_entry {id="foo1", value={x=2, y=3}}
@@ -1171,7 +1122,7 @@ function selftest_list ()
    -- Test optional struct
    local l = List:new(
       {id={type='string'}},
-      {value={type='struct', ts=ts, optional=true}}
+      {value={ctype=ts, optional=true}}
    )
    l:add_entry {id="foo"}
    l:add_entry {id="foo1", value={x=2, y=3}}
@@ -1294,22 +1245,10 @@ function load (stream, keys, members, lvalues)
    return setmetatable({list=List:load(stream, keys, members, lvalues)}, mt)
 end
 
-function from_table(t, keys, members)
-   local l = new(keys, members)
-   for key1 in pairs(keys) do
-      assert(getmetatable(l) == mt_for_single_key(key1),
-         "from_table only supports single-keyed lists")
-   end
-   for k, e in pairs(t) do
-      l[k] = e
-   end
-   return l
-end
-
 local function selftest_listmeta ()
    local l1 = new(
-      {id={type='uint32'}, name={type='string'}},
-      {value={type='decimal64'}, description={type='string'}}
+      {id={ctype='uint32_t'}, name={type='string'}},
+      {value={ctype='double'}, description={type='string'}}
    )
    l1[{id=0, name='foo'}] = {value=1.5, description="yepyep"}
    l1[{id=1, name='bar'}] = {value=3.14, description="PI"}
@@ -1344,7 +1283,7 @@ local function selftest_listmeta ()
    l.foo = nil
    assert(l.foo == nil)
    assert(#l == 0)
-   local l = new({id={type='decimal64'}}, {value={type='string'}})
+   local l = new({id={ctype='double'}}, {value={type='string'}})
    l[3] = {value="bar"}
    assert(l[3])
    assert(#l == 1)
@@ -1364,24 +1303,14 @@ local function selftest_listmeta ()
    assert(object(l) == rawget(l, 'list'))
    assert(object({}) == nil)
    assert(object(42) == nil)
-   -- Test from_table()
-   local t = {{value=1}, {value=2}, {value=3}}
-   local l = from_table(t, {id={type='uint32'}}, {value={type='decimal64'}})
-   assert(l[2])
-   assert(l[2].value == 2)
-   local t = {foo={value=1}, bar={value=2}}
-   local l = from_table(t, {id={type='string'}}, {value={type='decimal64'}})
-   assert(l.foo)
-   assert(l.foo.value == 1)
-   assert(#l == 2)
 end
 
 function selftest_ip ()
    local yang_util = require("lib.yang.util")
    local ipv6 = require("lib.protocol.ipv6")
    local l = new(
-      {ip={type='ipv4-address'}, port={type='uint16'}},
-      {b4_address={type='ipv6-address'}}
+      {ip={ctype='uint32_t'}, port={ctype='uint16_t'}},
+      {b4_address={ctype='uint8_t[16]'}}
    )
    math.randomseed(0)
    for i=1, 1e5 do

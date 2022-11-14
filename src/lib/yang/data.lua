@@ -8,7 +8,7 @@ local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
 local list = require("lib.yang.list")
-local typeof = require("lib.yang.ctype").typeof
+      typeof = require("lib.yang.ctype").typeof
 local ffi = require("ffi")
 local lib = require('core.lib')
 local regexp = require("lib.xsd_regexp")
@@ -49,50 +49,6 @@ function data_grammar_from_schema(schema, is_config)
    local function value_ctype(type)
       -- Note that not all primitive types have ctypes.
       return assert(value.types[assert(type.primitive_type)]).ctype
-   end
-   local function list_spec(nodes, spec_builder)
-      local spec = {}
-      for name, node in pairs(nodes) do
-         spec_builder(spec, normalize_id(name), node)
-      end
-      return spec
-   end
-   local function list_key(keys, name, node)
-      assert(node.type =='scalar')
-      assert(list.supported_type(node.argument_type.primitive_type),
-            "Unsupported list key type: "..node.argument_type.primitive_type)
-      keys[name] = {
-         type = node.argument_type.primitive_type,
-         optional = not node.mandatory
-      }
-   end
-   local function list_member(members, name, node)
-      if node.type == 'scalar' then
-         assert(list.supported_type(node.argument_type.primitive_type),
-            "Unsupported list member type: "..node.argument_type.primitive_type)
-         members[name] = {
-            type = node.argument_type.primitive_type,
-            optional = not node.mandatory
-         }
-      elseif node.type == 'choice' then
-         for _, choices in pairs(node.choices) do
-            local choice_members = list_spec(choices, list_member)
-            for name, member in pairs(choice_members) do
-               assert(not members[name])
-               members[name] = member
-            end
-         end
-      elseif node.type == 'struct' and node.ctype then
-         members[name] = {
-            type = 'struct', ts = node.ctype,
-            optional = not node.mandatory
-         }
-      else
-         members[name] = {
-            type = 'lvalue',
-            optional = not node.mandatory
-         }
-      end
    end
    local handlers = {}
    local function visit(node)
@@ -162,13 +118,64 @@ function data_grammar_from_schema(schema, is_config)
          end
       end
       if is_empty(values) and node.config ~= is_config then return end
+      local function list_spec(nodes, builder, validate)
+         local spec = {}
+         for name, node in pairs(nodes) do
+            builder(spec, normalize_id(name), node)
+         end
+         if validate then validate(spec) end
+         return spec
+      end
+      local function list_key(keys, name, node)
+         assert(node.type =='scalar')
+         if node.ctype then
+            keys[name] = {ctype=node.ctype}
+         elseif value_ctype(node.argument_type) then
+            keys[name] = {ctype=value_ctype(node.argument_type)}
+         else
+            keys[name] = {type=node.argument_type.primitive_type}
+         end
+      end
+      local function list_member(members, name, node)
+         if node.ctype then
+            members[name] = {
+               ctype = node.ctype,
+               optional = not node.mandatory
+            }
+         elseif node.type == 'scalar' then
+            if value_ctype(node.argument_type) then
+               members[name] = {
+                  ctype = value_ctype(node.argument_type),
+                  optional = not node.mandatory
+               }
+            else
+               members[name] = {
+                  type = node.argument_type.primitive_type,
+                  optional = not node.mandatory
+               }
+            end
+         elseif node.type == 'choice' then
+            for _, choices in pairs(node.choices) do
+               local choice_members = list_spec(choices, list_member)
+               for name, member in pairs(choice_members) do
+                  assert(not members[name])
+                  members[name] = member
+               end
+            end
+         else
+            members[name] = {
+               type = 'lvalue',
+               optional = not node.mandatory
+            }
+         end
+      end
       local l = {}
       if node.key then
-         l.keys = list_spec(keys, list_key)
+         l.keys = list_spec(keys, list_key, list.validate_keys)
       else
-         l.keys = {__ikey={type='uint64'}}
+         l.keys = {__ikey={ctype='uint64_t'}}
       end
-      l.members = list_spec(values, list_member)
+      l.members = list_spec(values, list_member, list.validate_members)
       l.has_key = node.key and true
       function l.new() return list.new(l.keys, l.members) end
       return {type='list', keys=keys, values=values, list=l,
