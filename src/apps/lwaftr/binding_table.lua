@@ -151,15 +151,16 @@ function BindingTable.new(psid_map, softwires)
 end
 
 function BindingTable:add_softwire_entry(entry_blob)
-   local entry_t = self.softwires.entry_type
-   assert(ffi.sizeof(entry_t) == ffi.sizeof(entry_blob))
-   ffi.copy(entry, entry_blob, ffi.sizeof(entry_blob))
+   local entry = self.entry
+   assert(ffi.sizeof(entry) == ffi.sizeof(entry_blob))
+   ffi.copy(entry, entry_blob, ffi.sizeof(entry))
    self.softwires:add(entry.key, entry.value)
 end
 
 function BindingTable:remove_softwire_entry(entry_key_blob)
-   assert(ffi.sizeof(softwire_key_t) == ffi.sizeof(entry_key_blob))
-   ffi.copy(entry.key, entry_key_blob, ffi.sizeof(entry_key_blob))
+   local entry = self.entry
+   assert(ffi.sizeof(entry.key) == ffi.sizeof(entry_key_blob))
+   ffi.copy(entry.key, entry_key_blob, ffi.sizeof(entry.key))
    self.softwires:remove(entry.key)
 end
 
@@ -271,7 +272,7 @@ function load (conf)
    local softwires = ctable.new{
       key_type = softwire_key_t,
       value_type = softwire_value_t,
-      initial_size = #conf.softwire*2
+      initial_size = math.max(1024, #conf.softwire*2)
    }
 
    local key, value = softwire_key_t(), softwire_value_t()
