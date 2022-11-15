@@ -1524,7 +1524,7 @@ function selftest()
                enum plastic;
             }
          }
-         list contents { uses fruit; key name; }
+         list contents { uses fruit; key name; ordered-by user; }
       }
       leaf addr {
          description "internet of fruit";
@@ -1575,6 +1575,22 @@ function selftest()
       assert(data.addr == util.ipv4_pton('1.2.3.4'))
       assert(data.choices.one.blue == "hey")
       assert(data.choices.two.red == "bye")
+
+      -- Check list order
+      local score, total = 0, 0
+      for i, content in ipairs(contents) do
+         assert(score < content.score, "ipairs out of order: "..i)
+         score = content.score
+         total = total + 1
+      end
+      assert(total == #contents)
+      local score, total = 0, 0
+      for i, content in pairs(contents) do
+         assert(score < content.score, "pairs out of order: "..i)
+         score = content.score
+         total = total + 1
+      end
+      assert(total == #contents)
 
       local stream = mem.tmpfile()
       print_config_for_schema(test_schema, data, stream)
