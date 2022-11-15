@@ -852,16 +852,30 @@ function List:append_leaf (o, prev)
       leaf.list.prev = prev
       leaf.list.next = pleaf.list.next
       pleaf.list.next = o
+      if leaf.list.next == 0 then
+         -- print("new last")
+         self.last = o
+      end
    end
    self.length = self.length + 1
 end
 
 function List:unlink_leaf (o)
    local leaf = self:leaf(o)
-   local prev = self:leaf(leaf.list.prev)
-   local next = self:leaf(leaf.list.next)
-   prev.list.next = leaf.list.next
-   next.list.prev = leaf.list.prev
+   if self.first == o then
+      self.first = leaf.list.next
+   end
+   if self.last == o then
+      self.last = leaf.list.prev
+   end
+   if leaf.list.prev ~= 0 then
+      local prev = self:leaf(leaf.list.prev)
+      prev.list.next = leaf.list.next   
+   end
+   if leaf.list.next ~= 0 then
+      local next = self:leaf(leaf.list.next)
+      next.list.prev = leaf.list.prev
+   end
    self.length = self.length - 1
 end
 
@@ -1134,6 +1148,29 @@ function selftest_list ()
    assert(l:find_entry{id="foo"}.value.y == 2)
    l:add_or_update_entry {id="foo1", value=nil}
    assert(l:find_entry{id="foo1"}.value == nil)
+
+   -- Test list ordering
+   local l = List:new({n={ctype='uint64_t'}},{})
+   l:add_entry({n=1})
+   l:add_entry({n=2})
+   l:add_entry({n=3})
+   l:add_entry({n=4})
+   l:add_entry({n=5})
+   local n, count = 0, 0
+   for i, e in l:ipairs() do
+      assert(e.n > n, "out of order: "..i)
+      n = e.n
+      count = count + 1
+   end
+   assert(count == l.length)
+
+   -- Test empty iterator
+   local l = List:new({n={ctype='uint64_t'}},{})
+   l:add_entry({n=1})
+   l:remove_entry({n=1})
+   for i, e in l:ipairs() do
+      assert(false)
+   end
 
    -- Test load/save
    local keys = {id={type='string'}}
