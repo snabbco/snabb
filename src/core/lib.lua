@@ -20,6 +20,8 @@ function equal (x, y)
    elseif x == y then
       return true
    elseif type(x) == 'table' then
+      if getmetatable(x) then return false end
+      if getmetatable(y) then return false end
       for k, v in pairs(x) do
          if not equal(v, y[k]) then return false end
       end
