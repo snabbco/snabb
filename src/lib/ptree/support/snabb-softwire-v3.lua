@@ -95,7 +95,7 @@ end
 local function remove_softwire_entry_actions(app_graph, path)
    assert(app_graph.apps['lwaftr'])
    path = path_mod.parse_path(path, get_softwire_grammar())
-   local key = binding_table.softwires_key_t(path[#path].key)
+   local key = binding_table.softwire_key_t(path[#path].key)
    local args = {'lwaftr', 'remove_softwire_entry', key}
    -- If it's the last softwire for the corresponding psid entry, remove it.
    -- TODO: check if last psid entry and then remove.
@@ -196,12 +196,13 @@ local function native_binding_table_from_ietf(ietf)
    local _, softwire_grammar =
       snabb_softwire_getter('/softwire-config/binding-table/softwire')
    local softwire = softwire_grammar.list.new()
+   local l = list.object(softwire)
    for _, entry in ipairs(ietf) do
-      softwire:add_entry{
-         ipv4=entry.binding_ipv4_addr,
+      l:add_entry{
+         ipv4=assert(entry.binding_ipv4_addr),
          psid=entry.port_set.psid,
          br_address=entry.br_ipv6_addr,
-         b4_ipv6=k.binding_ipv6info,
+         b4_ipv6=entry.binding_ipv6info,
          port_set={
             psid_length=entry.port_set.psid_len,
             reserved_ports_bit_count=entry.port_set.psid_offset
