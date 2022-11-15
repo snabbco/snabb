@@ -157,39 +157,55 @@ local function setter_for_grammar(grammar, path)
    end
    local head = parse_path(path, grammar)
    local tail = table.remove(head)
-   local tail_name, key = tail.name, tail.key
-   if not key then
+   local tail_name, tail_key = tail.name, tail.key
+   local target = head[#head]
+   local target_name, target_key = target.name, target.key
+   if tail_key then
+      -- The path ends in a query; it must denote an array or
+      -- list item.
+      table.insert(head, {name=tail_name, query={}})
+      local getter, grammar = resolver(grammar, head)
+      if grammar.type == 'array' then
+         local idx = tail_key
+         return function(config, subconfig)
+            local array = getter(config)
+            array[idx] = subconfig
+            return config
+         end
+      elseif grammar.type == 'list' then
+         return function (config, subconfig)
+            local l = list.object(getter(config))
+            l:add_or_update_entry(tail_key, subconfig)
+            return config
+         end
+      else
+         error("Invalid path: '"..tail_name.."' can not be queried")
+      end
+   elseif target_key then
+      -- The path updates an entry in a collection; it must denote
+      -- a list item.
+      head[#head] = {name=target_name, query={}}
+      local getter, grammar = resolver(grammar, head)
+      local tail_id = data.normalize_id(tail_name)
+      assert(grammar.type == 'list')
+      return function (config, subconfig)
+         local l = list.object(getter(config))
+         local entry = l:find_entry(target_key)
+         entry[tail_id] = subconfig
+         l:add_or_update_entry(entry)
+         return config
+      end
+   else
       -- No query; the simple case.
       local getter, grammar = resolver(grammar, head)
       if grammar.type ~= 'struct' then
-         error("Invalid path: missing query for '"..tail_name.."'")
+         error("Invalid path: missing query for '"..tail.name.."'")
       end
       local tail_id = data.normalize_id(tail_name)
       return function(config, subconfig)
          getter(config)[tail_id] = subconfig
          return config
       end
-   end
-
-   -- Otherwise the path ends in a query; it must denote an array or
-   -- table item.
-   table.insert(head, {name=tail_name, query={}})
-   local getter, grammar = resolver(grammar, head)
-   if grammar.type == 'array' then
-      local idx = key
-      return function(config, subconfig)
-         local array = getter(config)
-         array[idx] = subconfig
-         return config
-      end
-   elseif grammar.type == 'list' then
-      return function (config, subconfig)
-         local l = list.object(getter(config))
-         l:add_or_update_entry(key, subconfig)
-         return config
-      end
-   else
-      error("Invalid path: '"..tail_name.."' can not be queried")
    end
 end
 
@@ -246,6 +262,7 @@ adder_for_schema_by_name = util.memoize(adder_for_schema_by_name)
 local function remover_for_grammar(grammar, path)
    local head = parse_path(path, grammar)
    local tail = table.remove(head)
+   if not tail.key then error("Invalid path: missing query") end
    local tail_name, key = tail.name, tail.key
    table.insert(head, {name=tail_name, query={}})
    local getter, grammar = resolver(grammar, head)
