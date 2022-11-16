@@ -57,14 +57,14 @@ function state_reader_from_grammar(production, maybe_keyword)
       -- TODO: Right now we basically map leaves to counters; we have
       -- no structured way to know what keys we might use.  To make
       -- tables here we'd need more of a design!
-      io.stderr:write(
-         'WARNING: Reading state into tables not yet implemented\n')
+      -- io.stderr:write(
+      --    'WARNING: Reading state into lists is not yet implemented\n')
       return function(counters) return nil end
    end
    function visitor.array(keyword, production)
       -- For similar reasons as tables, no idea what to do here!
-      io.stderr:write(
-         'WARNING: Reading state into arrays not yet implemented\n')
+      -- io.stderr:write(
+      --    'WARNING: Reading state into arrays not yet implemented\n')
       return function(counters) return nil end
    end
    function visitor.struct(keyword, production)
