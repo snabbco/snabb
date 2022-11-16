@@ -206,7 +206,8 @@ local function native_binding_table_from_ietf(ietf)
          port_set={
             psid_length=entry.port_set.psid_len,
             reserved_ports_bit_count=entry.port_set.psid_offset
-         }
+         },
+         padding = 0
       }
    end
    return {softwire=softwire}
