@@ -139,19 +139,18 @@ function data_grammar_from_schema(schema, is_config)
       local function list_member(members, name, node)
          if node.ctype then
             members[name] = {
-               ctype = node.ctype,
-               optional = not node.mandatory
+               ctype = node.ctype
             }
          elseif node.type == 'scalar' then
             if value_ctype(node.argument_type) then
                members[name] = {
                   ctype = value_ctype(node.argument_type),
-                  optional = not node.mandatory
+                  optional = not (node.default or node.mandatory)
                }
             else
                members[name] = {
                   type = node.argument_type.primitive_type,
-                  optional = not node.mandatory
+                  optional = not (node.default or node.mandatory)
                }
             end
          elseif node.type == 'choice' then
@@ -507,15 +506,9 @@ function list_parser(keyword, keys, values, spec)
    local function parse(P, assoc)
       local struct = parse1(P)
       local entry = {}
-      for k,_ in pairs(keys) do
+      for k,_ in pairs(struct) do
          local id = normalize_id(k)
          entry[id] = struct[id]
-      end
-      for k, v in pairs(struct) do
-         local id = normalize_id(k)
-         if keys[k] == nil then
-            entry[id] = struct[id]
-         end
       end
       assoc:add(entry)
       return assoc
