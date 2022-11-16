@@ -397,9 +397,9 @@ function List:field_order (fields)
    local function order_fields (x, y)
       -- 1. mandatory fields (< name)
       -- 2. optional fields (< name)
-      if not fields[x].optional and fields[y.optional] then
+      if (not fields[x].optional) and fields[y].optional then
          return true
-      elseif fields[x].optional and not fields[y.optional] then
+      elseif fields[x].optional and (not fields[y].optional) then
          return false
       else
          return x < y
@@ -424,7 +424,7 @@ function List:build_type (fields)
       if spec.optional then
          f = self.optional_ts:format(f, name)
       end
-      t = t..f
+      t = t..f.." "
    end
    t = t.."}"
    return t
@@ -1132,6 +1132,9 @@ function selftest_list ()
    l:add_or_update_entry {id="foo1", value=l:find_entry{id="foo"}.value}
    assert(l:find_entry{id="foo1"}.value.x == 1)
    assert(l:find_entry{id="foo1"}.value.y == 2)
+   l:add_entry {id="foo2", value=typeof(ts)({x=7, y=8})}
+   assert(l:find_entry{id="foo2"}.value.x == 7)
+   assert(l:find_entry{id="foo2"}.value.y == 8)
 
    -- Test optional struct
    local l = List:new(
