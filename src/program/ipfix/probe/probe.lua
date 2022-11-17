@@ -128,10 +128,10 @@ function setup_workers (config)
    local collector_pools = {}
    for name, p in pairs(ipfix.collector_pool) do
       local collectors = {}
-      for entry in p.collector:iterate() do
+      for _, entry in ipairs(p.collector) do
          table.insert(collectors, {
-            ip = yang_util.ipv4_ntop(entry.key.ip),
-            port = entry.key.port
+            ip = yang_util.ipv4_ntop(entry.ip),
+            port = entry.port
          })
       end
       collector_pools[name] = collectors
