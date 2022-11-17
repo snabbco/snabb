@@ -88,11 +88,11 @@ function CPUSet:list ()
    return list
 end
 
-function CPUSet:acquire_for_pci_addresses(addrs)
-   return self:acquire(numa.choose_numa_node_for_pci_addresses(addrs))
+function CPUSet:acquire_for_pci_addresses(addrs, worker)
+   return self:acquire(numa.choose_numa_node_for_pci_addresses(addrs), worker)
 end
 
-function CPUSet:acquire(on_node)
+function CPUSet:acquire(on_node, worker)
    for node, cpus in pairs(self.by_node) do
       if on_node == nil or on_node == node then
          for cpu, avail in pairs(cpus) do
@@ -117,11 +117,11 @@ function CPUSet:acquire(on_node)
    end
    for node, cpus in pairs(self.by_node) do
       print(("Warning: All assignable CPUs in use; "..
-             "leaving data-plane PID %d without assigned CPU."):format(S.getpid()))
+             "leaving data-plane worker '%s' without assigned CPU."):format(worker))
       return
    end
    print(("Warning: No assignable CPUs declared; "..
-         "leaving data-plane PID %d without assigned CPU."):format(S.getpid()))
+         "leaving data-plane worker '%s' without assigned CPU."):format(worker))
 end
 
 function CPUSet:release(cpu)

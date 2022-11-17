@@ -185,6 +185,7 @@ end
 
 function Manager:start ()
    if self.name then engine.claim_name(self.name) end
+   self:info(("Manager has started (PID %d)"):format(S.getpid()))
    self.cpuset:bind_to_numa_node()
    require('lib.fibers.file').install_poll_io_handler()
    self.sched = fiber.current_scheduler
@@ -368,7 +369,7 @@ function Manager:acquire_cpu_for_worker(id, app_graph)
          end
       end
    end
-   return self.cpuset:acquire_for_pci_addresses(pci_addresses)
+   return self.cpuset:acquire_for_pci_addresses(pci_addresses, id)
 end
 
 function Manager:compute_scheduling_for_worker(id, app_graph)
