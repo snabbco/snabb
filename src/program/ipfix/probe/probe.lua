@@ -152,19 +152,6 @@ function setup_workers (config)
          "Exporter for the default traffic class can not be the exporter for a defined class.")
    end
 
-   local class_order = {}
-   for exporter in pairs(flow_director.class) do
-      table.insert(class_order, exporter)
-   end
-   table.sort(class_order, function (x, y)
-      return flow_director.class[x].order < flow_director.class[y].order
-   end)
-
-   local function class_name (exporter, class)
-      -- Including order in name to avoid name collision with 'default' class
-      return ("%s_%d"):format(exporter, class.order)
-   end
-
    local rss_links = {}
    local function rss_link_name (class)
       if not rss_links[class] then
@@ -275,7 +262,7 @@ function setup_workers (config)
             local rss_link
             local class = flow_director.class[name]
             if class then
-               rss_link = rss_link_name(class_name(name, class))
+               rss_link = rss_link_name('class_'..name)
             elseif name == flow_director.default_class.exporter then
                rss_link = rss_link_name('default')
             else
@@ -336,14 +323,13 @@ function setup_workers (config)
          classes = {},
          remove_extension_headers = flow_director.remove_ipv6_extension_headers
       }
-      for _, exporter in ipairs(class_order) do
-         local class = flow_director.class[exporter]
-         if not ipfix.exporter[exporter] then
-            error(("Exporter '%s' referenced in traffic class %d is not defined.")
-               :format(exporter, class.order))
+      for i, class in ipairs(flow_director.class) do
+         if not ipfix.exporter[class.exporter] then
+            error(("Exporter '%s' referenced in traffic class #%d is not defined.")
+               :format(class.exporter, i))
          end
          table.insert(rss_config.classes, {
-            name = class_name(exporter, class),
+            name = 'class_'..class.exporter,
             filter = class.filter,
             continue = class.continue
          })

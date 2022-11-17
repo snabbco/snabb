@@ -168,7 +168,6 @@ module snabb-snabbflow-v1 {
 
       list class {
         key exporter;
-        unique order;
         description
           "Traffic classes match packets making up the sets of flows
           processed by indivdual exporters.
@@ -182,19 +181,13 @@ module snabb-snabbflow-v1 {
           matches multiple classes, it is duplicated for each class and
           thereby flows can be processed by multiple exporters.";
 
-        ordered-by user; // XXX not yet implemented, hence the 'order' leaf
+        ordered-by user;
 
         leaf exporter {
           type string-name;
           description
             "An exporter defined in /snabbflow-config/ipfix/exporter.
             Packets matched by the class are processed by this exporter.";
-        }
-
-        leaf order {
-          type uint32 { range 1..max; }
-          description
-            "Match order of this class.";
         }
         
         leaf filter {
