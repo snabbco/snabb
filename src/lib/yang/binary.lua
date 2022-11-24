@@ -15,7 +15,7 @@ local cdata = require('lib.yang.ctype')
 local list = require("lib.yang.list")
 
 local MAGIC = "yangconf"
-local VERSION = 0x0000f200
+local VERSION = 0x0000f300
 
 local header_t = ffi.typeof([[
 struct {
