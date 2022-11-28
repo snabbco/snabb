@@ -272,7 +272,7 @@ function load (conf)
    local softwires = ctable.new{
       key_type = softwire_key_t,
       value_type = softwire_value_t,
-      initial_size = math.max(1024, #conf.softwire*2)
+      max_occupancy_rate = 0.4
    }
 
    local key, value = softwire_key_t(), softwire_value_t()
