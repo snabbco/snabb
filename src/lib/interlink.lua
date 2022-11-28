@@ -96,11 +96,12 @@ ffi.cdef([[
 -- Interlinks can be in one of six states:
 
 local INIT = 0 -- Implicit initial state due to 0 value.
-local FREE = 1 -- Queue is in free state, ready to attach.
-local RXUP = 2 -- Receiver has attached.
-local TXUP = 3 -- Transmitter has attached.
-local DXUP = 4 -- Both ends have attached.
-local DOWN = 5 -- Both ends have detached; must be re-allocated.
+local CONF = 1 -- Queue size is being configured.
+local FREE = 2 -- Queue is in free state, ready to attach.
+local RXUP = 3 -- Receiver has attached.
+local TXUP = 4 -- Transmitter has attached.
+local DXUP = 5 -- Both ends have attached.
+local DOWN = 6 -- Both ends have detached; must be re-allocated.
 
 -- If at any point both ends have detached from an interlink it stays in the
 -- DOWN state until it is deallocated.
@@ -110,7 +111,8 @@ local DOWN = 5 -- Both ends have detached; must be re-allocated.
 -- Who      Change          Why
 -- ------   -------------   ---------------------------------------------------
 -- (any)    none -> INIT    A process creates the queue (initial state).
--- (any)    INIT -> FREE    A process has initialized the queue.
+-- (any)    INIT -> CONF    A process has started configuring the queue.
+-- (any)    CONF -> FREE    A process has initialized and configured the queue.
 -- recv.    FREE -> RXUP    Receiver attaches to free queue.
 -- recv.    TXUP -> DXUP    Receiver attaches to queue with ready transmitter.
 -- recv.    DXUP -> TXUP    Receiver detaches from queue.
@@ -126,6 +128,8 @@ local DOWN = 5 -- Both ends have detached; must be re-allocated.
 -- ------   ----------- --------------------------------------------------------
 -- recv.    INIT->RXUP  Can not attach to uninitialized queue.
 -- trans.   INIT->TXUP  Can not attach to uninitialized queue.
+-- recv.    CONF->RXUP  Can not attach to unconfigured queue.
+-- trans.   CONF->TXUP  Can not attach to unconfigured queue.
 -- (any)    FREE->DEAD  Cannot shutdown before having attached.
 -- (any)       *->FREE  Cannot transition to FREE except by reallocating.
 -- recv.    TXUP->DEAD  Receiver cannot mutate queue after it has detached.
@@ -143,9 +147,11 @@ local function attach (name, size, transitions)
       function ()
          -- Create/open the queue.
          r = shm.create(name, "struct interlink", size)
-         -- Initialize queue (only one process can set size).
-         if sync.cas(r.state, INIT, FREE) then
+         -- Initialize queue and configure its size
+         -- (only one process can set size).
+         if sync.cas(r.state, INIT, CONF) then
             r.size = size
+            assert(sync.cas(r.state, CONF, FREE))
          end
          -- Return if we succeed to attach.
          if transitions(r) then return true end
@@ -283,7 +289,9 @@ local function describe (r)
    end
    local function status (r)
       return ({
-         [FREE] = "initializing",
+         [INIT] = "being initialized",
+         [CONF] = "being configuring",
+         [FREE] = "free to attach",
          [RXUP] = "waiting for transmitter",
          [TXUP] = "waiting for receiver",
          [DXUP] = "in active use",
