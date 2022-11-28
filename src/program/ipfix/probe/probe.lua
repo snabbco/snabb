@@ -128,10 +128,10 @@ function setup_workers (config)
    local collector_pools = {}
    for name, p in pairs(ipfix.collector_pool) do
       local collectors = {}
-      for entry in p.collector:iterate() do
+      for _, entry in ipairs(p.collector) do
          table.insert(collectors, {
-            ip = yang_util.ipv4_ntop(entry.key.ip),
-            port = entry.key.port
+            ip = yang_util.ipv4_ntop(entry.ip),
+            port = entry.port
          })
       end
       collector_pools[name] = collectors
@@ -150,19 +150,6 @@ function setup_workers (config)
    if flow_director.default_class.exporter then
       assert(not flow_director.class[flow_director.default_class.exporter],
          "Exporter for the default traffic class can not be the exporter for a defined class.")
-   end
-
-   local class_order = {}
-   for exporter in pairs(flow_director.class) do
-      table.insert(class_order, exporter)
-   end
-   table.sort(class_order, function (x, y)
-      return flow_director.class[x].order < flow_director.class[y].order
-   end)
-
-   local function class_name (exporter, class)
-      -- Including order in name to avoid name collision with 'default' class
-      return ("%s_%d"):format(exporter, class.order)
    end
 
    local rss_links = {}
@@ -275,7 +262,7 @@ function setup_workers (config)
             local rss_link
             local class = flow_director.class[name]
             if class then
-               rss_link = rss_link_name(class_name(name, class))
+               rss_link = rss_link_name('class_'..name)
             elseif name == flow_director.default_class.exporter then
                rss_link = rss_link_name('default')
             else
@@ -336,14 +323,13 @@ function setup_workers (config)
          classes = {},
          remove_extension_headers = flow_director.remove_ipv6_extension_headers
       }
-      for _, exporter in ipairs(class_order) do
-         local class = flow_director.class[exporter]
-         if not ipfix.exporter[exporter] then
-            error(("Exporter '%s' referenced in traffic class %d is not defined.")
-               :format(exporter, class.order))
+      for i, class in ipairs(flow_director.class) do
+         if not ipfix.exporter[class.exporter] then
+            error(("Exporter '%s' referenced in traffic class #%d is not defined.")
+               :format(class.exporter, i))
          end
          table.insert(rss_config.classes, {
-            name = class_name(exporter, class),
+            name = 'class_'..class.exporter,
             filter = class.filter,
             continue = class.continue
          })

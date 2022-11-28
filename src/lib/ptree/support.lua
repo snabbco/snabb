@@ -8,7 +8,6 @@ local path_mod = require("lib.yang.path")
 local path_data = require("lib.yang.path_data")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
-local cltable = require("lib.cltable")
 
 function compute_parent_paths(path)
    local function sorted_keys(t)
@@ -43,19 +42,16 @@ local function add_child_objects(accum, grammar, config)
       table.insert(accum, config)
       return visit(grammar, config)
    end
-   function visitor.table(grammar, config)
+   function visitor.list(grammar, config)
+      if grammar.value_ctype then
+         -- List entries are raw data and do not contain children with
+         -- distinct identities.
+         return
+      end
       local child_grammar = {type="struct", members=grammar.values,
                              ctype=grammar.value_ctype}
-      if not grammar.key_ctype or grammar.native_key then
-         for k, v in pairs(config) do visit_child(child_grammar, v) end
-      elseif grammar.key_ctype and grammar.value_ctype then
-      -- Ctables are raw data, and raw data doesn't contain children
-      -- with distinct identity.
-         return
-      elseif grammar.key_ctype then
-         for k, v in cltable.pairs(config) do visit_child(child_grammar, v) end
-      else
-         error("unreachable")
+      for _, entry in ipairs(config) do
+         visit_child(child_grammar, entry)
       end
    end
    function visitor.array(grammar, config)
@@ -88,7 +84,7 @@ local function compute_objects_maybe_updated_in_place (schema, config,
       if subgrammar.type == 'scalar' then return objs end
       table.insert(objs, getter(config))
       -- Members of raw data can't be updated in place either.
-      if subgrammar.type == 'table' then
+      if subgrammar.type == 'list' then
          if subgrammar.key_ctype and subgrammar.value_ctype then return objs end
       elseif subgrammar.type == 'struct' then
          if subgrammar.ctype then return objs end

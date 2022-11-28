@@ -42,6 +42,10 @@ add_known_module("bit32", "bit32 module")
 -- luajit
 add_known_module("bit", "bit module")
 add_known_module("jit", "jit module")
+-- lua5.3
+if _VERSION >= "Lua 5.3" then
+	add_known_module("utf8", "utf8 module")
+end
 
 
 local m_user_known_tables = {}
@@ -72,7 +76,7 @@ for _, name in ipairs{
 	"tostring",
 	"type",
 	"xpcall",
-	
+
 	-- Lua 5.1
 	"gcinfo",
 	"getfenv",
@@ -98,7 +102,7 @@ local function safe_tostring (value)
 end
 
 -- Private:
--- Parses a line, looking for possible function definitions (in a very naïve way) 
+-- Parses a line, looking for possible function definitions (in a very naï¿½ve way)
 -- Returns '(anonymous)' if no function name was found in the line
 local function ParseLine(line)
 	assert(type(line) == "string")
@@ -139,7 +143,7 @@ local function GuessFunctionName(info)
 			return "?"
 		end
 		local line
-		for i = 1, info.linedefined do
+		for _ = 1, info.linedefined do
 			line = file:read("*l")
 		end
 		if not line then
@@ -224,7 +228,7 @@ function Dumper:DumpLocals (level)
 	if self.dumping_same_thread then
 		level = level + 1
 	end
-	
+
 	local name, value = self.getlocal(level, i)
 	if not name then
 		return
@@ -266,7 +270,7 @@ function Dumper:DumpLocals (level)
 			else
 				local source = info.short_src
 				if source:sub(2,7) == "string" then
-					source = source:sub(9)	-- uno más, por el espacio que viene (string "Baragent.Main", por ejemplo)
+					source = source:sub(9)	-- uno mï¿½s, por el espacio que viene (string "Baragent.Main", por ejemplo)
 				end
 				--for k,v in pairs(info) do print(k,v) end
 				fun_name = fun_name or GuessFunctionName(info)
@@ -305,7 +309,7 @@ function _M.stacktrace(thread, message, level)
 	local dumper = Dumper.new(thread)
 
 	local original_error
-	
+
 	if type(message) == "table" then
 		dumper:add("an error object {\r\n")
 		local first = true
@@ -326,14 +330,14 @@ function _M.stacktrace(thread, message, level)
 		dumper:add(message)
 		original_error = message
 	end
-	
+
 	dumper:add("\r\n")
 	dumper:add[[
 Stack Traceback
 ===============
 ]]
 	--print(error_message)
-	
+
 	local level_to_show = level
 	if dumper.dumping_same_thread then level = level + 1 end
 
@@ -381,12 +385,12 @@ Stack Traceback
 		else
 			dumper:add_f("(%d) unknown frame %s\r\n", level_to_show, info.what)
 		end
-		
+
 		level = level + 1
 		level_to_show = level_to_show + 1
 		info = dumper.getinfo(level, "nSlf")
 	end
-	
+
 	return dumper:concat_lines(), original_error
 end
 

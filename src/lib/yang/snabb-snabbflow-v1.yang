@@ -106,7 +106,10 @@ module snabb-snabbflow-v1 {
             "Sofware RSS configuration for the selected exporter.";
 
           leaf name {
-            type string-name;
+            type leafref {
+              path "/snabbflow-config/ipfix/exporter/name";
+              require-instance true;
+            }
             description
               "The 'name' of an exporter defined in
               /snabbflow-config/ipfix/exporter.";
@@ -168,7 +171,6 @@ module snabb-snabbflow-v1 {
 
       list class {
         key exporter;
-        unique order;
         description
           "Traffic classes match packets making up the sets of flows
           processed by indivdual exporters.
@@ -182,19 +184,16 @@ module snabb-snabbflow-v1 {
           matches multiple classes, it is duplicated for each class and
           thereby flows can be processed by multiple exporters.";
 
-        ordered-by user; // XXX not yet implemented, hence the 'order' leaf
+        ordered-by user;
 
         leaf exporter {
-          type string-name;
+          type leafref {
+            path "/snabbflow-config/ipfix/exporter/name";
+            require-instance true;
+          }
           description
             "An exporter defined in /snabbflow-config/ipfix/exporter.
             Packets matched by the class are processed by this exporter.";
-        }
-
-        leaf order {
-          type uint32 { range 1..max; }
-          description
-            "Match order of this class.";
         }
         
         leaf filter {
@@ -222,7 +221,10 @@ module snabb-snabbflow-v1 {
           any other traffic class.";
 
         leaf exporter {
-          type string-name;
+          type leafref {
+            path "/snabbflow-config/ipfix/exporter/name";
+            require-instance true;
+          }
           description
             "An exporter defined in /snabbflow-config/ipfix/exporter.
             Flows matched by the default class are processed by this
@@ -397,7 +399,7 @@ module snabb-snabbflow-v1 {
           type string-name;
           description
             "Identifier used to refer to the collector pool in
-            /snabbflow-config/ipic/exporter.";
+            /snabbflow-config/ipfix/exporter/collector-pool.";
         }
 
         list collector {
@@ -443,7 +445,7 @@ module snabb-snabbflow-v1 {
           type string-name;
           description
             "The name used to refer to this exporter in
-            /snabbflow-config/rss/software-scaling.";
+            /snabbflow-config/rss/software-scaling/exporter/name.";
         }
 
         leaf-list template {
@@ -454,7 +456,11 @@ module snabb-snabbflow-v1 {
         }
 
         leaf collector-pool {
-          type string;
+          type leafref {
+            path "/snabbflow-config/ipfix/collector-pool/name";
+            require-instance true;
+          }
+          mandatory true;
           description
             "A collector pool defined in /snabbflow-config/ipfix/collector-pool.";
         }
@@ -507,7 +513,9 @@ module snabb-snabbflow-v1 {
         "Exporter statistics.";
 
       leaf name {
-        type string-name;
+        type leafref {
+          path "/snabbflow-config/ipfix/exporter/name";
+        }
         description
           "An exporter defined in /snabbflow-config/ipfix/exporter.";
       }
@@ -562,7 +570,9 @@ module snabb-snabbflow-v1 {
           /snabbflow-config/rss/software-scaling.";
 
         leaf name {
-          type string-name;
+          type leafref {
+            path "/snabbflow-config/ipfix/exporter/name";
+          }
           description
             "An exporter defined in /snabbflow-config/ipfix/exporter.";
         }
@@ -596,7 +606,7 @@ module snabb-snabbflow-v1 {
 
     grouping interface-state {
       leaf device {
-        type string;
+        type pci-address;
         description
           "PCI address of the network device.";
       }
