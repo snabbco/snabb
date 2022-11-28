@@ -52,24 +52,28 @@ end
 
 -- Freelist containing empty packets ready for use.
 
-local max_packets = 1e6
+local default_max_packets = 1e6
 
 ffi.cdef([[
 struct freelist {
     int nfree;
     int max;
-    struct packet *list[]]..max_packets..[[];
+    struct packet *list[?];
 };
 ]])
 
-local function freelist_create(name)
-   local fl = shm.create(name, "struct freelist")
+local function freelist_create(name, max_packets)
+   max_packets = max_packets or default_max_packets
+   local fl = shm.create(name, "struct freelist", max_packets)
    fl.max = max_packets
    return fl
 end
 
 local function freelist_open(name, readonly)
-   return shm.open(name, "struct freelist", readonly)
+   local fl = shm.open(name, "struct freelist", 'read-only', 1)
+   local max = fl.max
+   shm.unmap(fl)
+   return shm.open(name, "struct freelist", readonly, max)
 end
 
 local function freelist_full(freelist)
@@ -104,14 +108,21 @@ local packets_allocated = 0
 local packets_fl, group_fl
 
 -- Call to ensure packet freelist is enabled.
-function initialize ()
-   packets_fl = freelist_create("engine/packets.freelist")
+function initialize (max_packets)
+   if packets_fl then
+      assert(packets_fl.nfree == 0, "freelist is already in use")
+      shm.unmap(packets_fl)
+      shm.unlink("engine/packets.freelist")
+   end
+   packets_fl = freelist_create("engine/packets.freelist", max_packets)
 end
 
 -- Call to ensure group freelist is enabled.
-function enable_group_freelist ()
+function enable_group_freelist (nchunks)
    if not group_fl then
-      group_fl = group_freelist.freelist_create("group/packets.freelist")
+      group_fl = group_freelist.freelist_create(
+         "group/packets.group_freelist", nchunks
+      )
    end
 end
 
@@ -147,12 +158,9 @@ function reclaim_step ()
    end
 end
 
--- Register struct freelist as an abstract SHM object type so that the group
+-- Register struct freelist as an abstract SHM object type so that the
 -- freelist can be recognized by shm.open_frame and described with tostring().
-shm.register(
-   'freelist',
-   {open = function (name) return shm.open(name, "struct freelist") end}
-)
+shm.register('freelist', {open=freelist_open})
 ffi.metatype("struct freelist", {__tostring = function (freelist)
    return ("%d/%d"):format(freelist.nfree, freelist.max)
 end})
@@ -176,7 +184,7 @@ end
 -- process termination.
 function shutdown (pid)
    local in_group, group_fl = pcall(
-      group_freelist.freelist_open, "/"..pid.."/group/packets.freelist"
+      group_freelist.freelist_open, "/"..pid.."/group/packets.group_freelist"
    )
    if in_group then
       local packets_fl = freelist_open("/"..pid.."/engine/packets.freelist")
@@ -308,7 +316,7 @@ end
 
 function preallocate_step()
    assert(packets_allocated + packet_allocation_step
-            <= max_packets - group_fl_chunksize,
+            <= packets_fl.max - group_fl_chunksize,
           "packet allocation overflow")
 
    for i=1, packet_allocation_step do
@@ -319,6 +327,12 @@ function preallocate_step()
 end
 
 function selftest ()
+   initialize(10000)
+   assert(packets_fl.max == 10000)
+   allocate()
+   local ok, err = pcall(initialize)
+   assert(not ok and err:match("freelist is already in use"))
+
    assert(is_aligned(0, 1))
    assert(is_aligned(1, 1))
    assert(is_aligned(2, 1))
