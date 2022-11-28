@@ -25,6 +25,7 @@ module snabb-snabbflow-v1 {
 
     list interface {
       key device;
+      unique "name vlan-tag";
 
       description
         "Interaces serving as IPFIX Observation Points.";
@@ -349,7 +350,7 @@ module snabb-snabbflow-v1 {
       }
 
       leaf mtu {
-        type uint32;
+        type uint32 { range 512..9000; }
         default 1500;
         description
           "MTU for exported UDP packets.";

@@ -98,7 +98,7 @@ function selftest ()
       assert(diff <= tolerance, "Flows mismatch!")
    end
 
-   expect(ip4_flows, 30000, 0.1)
+   expect(ip4_flows, 30000, 0.2)
    expect(ip6_flows, 1400, 0.1)
    expect(http4_flows, 200, 0.2)
    expect(dns4_flows, 1300, 0.2)

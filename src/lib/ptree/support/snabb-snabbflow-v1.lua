@@ -95,16 +95,13 @@ end
 function collect_rss_states (pid, rss_links)
    local states = {}
    local id
-   for _, app in ipairs(shm.children("/"..pid.."/apps")) do
-      local rss_group = tonumber(app:match("^rss(%d+)$"))
+   for _, link in ipairs(shm.children("/"..pid.."/links")) do
+      local rss_group = tonumber(link:match("^rss(%d+)%."))
       if rss_group then
          id = tonumber(rss_group)
-         break
       end
-   end
-   for _, link in ipairs(shm.children("/"..pid.."/links")) do
       for rss_link, _ in pairs(rss_links) do
-         if (link:match("^"..rss_link) and link:match("^rss%d+.")) -- embedded link
+         if (link:match("^"..rss_link) and link:match("^rss%d+%.")) -- embedded link
          or (link:match("-> *"..rss_link:gsub("%.output$", ".input").."$")) -- interlink
          then
             local stats = shm.open_frame("/"..pid.."/links/"..link)

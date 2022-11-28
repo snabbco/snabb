@@ -10,6 +10,7 @@ local pci = require("lib.hardware.pci")
 local lib = require("core.lib")
 local app_graph = require("core.config")
 
+local ipfix = require("apps.ipfix.ipfix")
 local probe = require("program.ipfix.lib")
 
 local probe_schema = 'snabb-snabbflow-v1'
@@ -97,17 +98,13 @@ function start (name, confpath)
    }
 end
 
-local ipfix_default_config = lib.deepcopy(probe.probe_config)
+local ipfix_default_config = lib.deepcopy(ipfix.IPFIX.config)
 for _, key in ipairs({
       "collector_ip",
       "collector_port",
       "observation_domain",
       "exporter_mac",
       "templates",
-      "output_type",
-      "output",
-      "input_type",
-      "input",
       "instance"
 }) do
    ipfix_default_config[key] = nil
@@ -192,15 +189,12 @@ function setup_workers (config)
    for rss_group = 1, rss.hardware_scaling.rss_groups do
       local inputs, outputs = {}, {}
       for device, opt in pairs(interfaces) do
-         if pcap_input then
-            table.insert(inputs, pcap_input)
-            break
-         end
 
          ensure_device_unique(device, interfaces)
          local input = lib.deepcopy(opt)
          input.device = device
          input.rxq = rss_group - 1
+         input.log_date = ipfix.log_date
          table.insert(inputs, input)
 
          -- The mellanox driver requires a master process that sets up
@@ -210,10 +204,11 @@ function setup_workers (config)
          if device_info.driver == 'apps.mellanox.connectx' then
             local spec = mellanox[device]
             if not spec then
-               spec = { ifName = input.name,
-                        ifAlias = input.description,
+               spec = { name = input.name,
+                        alias = input.description,
                         queues = {},
-                        recvq_size = input.receive_queue_size }
+                        recvq_size = input.receive_queue_size,
+                        log_date = ipfix.log_date }
                mellanox[device] = spec
             end
             table.insert(spec.queues, { id = input.rxq })
@@ -234,7 +229,6 @@ function setup_workers (config)
          config.collector_pool = exporter.collector_pool
          config.templates = exporter.template
 
-         config.output_type = "tap_routed"
          config.add_packet_metadata = false
 
          config.maps = {}
@@ -280,11 +274,13 @@ function setup_workers (config)
             iconfig.log_date = ipfix.log_date
             local od = next_observation_domain()
             iconfig.observation_domain = od
-            iconfig.output = "ipfixexport"..od
             if ipfix.maps.log_directory then
                iconfig.maps_logfile =
                   ipfix.maps.log_directory.."/"..od..".log"
             end
+
+            -- Subtract Ethernet and VLAN overhead from MTU
+            iconfig.mtu = iconfig.mtu - 14
 
             -- Scale the scan protection parameters by the number of
             -- ipfix instances in this RSS class
@@ -303,11 +299,10 @@ function setup_workers (config)
                }
             else
                output = { type = "interlink", link_name = rss_link }
-               iconfig.input_type = "interlink"
-               iconfig.input = rss_link
-               
-
-               workers[rss_link] = probe.configure_graph(iconfig)
+               workers[rss_link] =
+                  probe.configure_interlink_ipfix_tap_instance(
+                     rss_link, iconfig
+                  )
                -- Dedicated exporter processes are restartable
                worker_opts[rss_link] = {
                   restart_intensity = software_scaling.restart.intensity,
@@ -334,15 +329,41 @@ function setup_workers (config)
             continue = class.continue
          })
       end
-      workers["rss"..rss_group] = probe.configure_rss_graph(
-         rss_config, inputs, outputs, ipfix.log_date, rss_group, pcap_input and 'pcap'
-      )
+      if #outputs == 1 and outputs[1].type ~= 'interlink' then
+         -- We have a single output within a single process
+         -- (no flow director classes, and a single embedded exporer instance.)
+         -- This is the simple case: omit creating a software RSS app.
+         -- NB: IPFIX app has to extract metadata as software RSS app is not present.
+         local config = outputs[1].args
+         config.add_packet_metadata = true
+         if pcap_input then
+            workers["rss"..rss_group] = probe.configure_pcap_ipfix_tap_instance(
+               config, pcap_input, rss_group
+            )
+         else
+            workers["rss"..rss_group] = probe.configure_pci_ipfix_tap_instance(
+               config, inputs, rss_group
+            )
+         end
+      else
+         -- Otherwise we have the general case: configure a software RSS app to
+         -- distribute inputs over flow director classes and exporter instances.
+         if pcap_input then
+            workers["rss"..rss_group] = probe.configure_pcap_rss_tap_instances(
+               rss_config, pcap_input, outputs, rss_group
+            )
+         else
+            workers["rss"..rss_group] = probe.configure_pci_rss_tap_instances(
+               rss_config, inputs, outputs, rss_group
+            )
+         end
+      end
    end
 
    -- Create a trivial app graph that only contains the control apps
    -- for the Mellanox driver, which sets up the queues and
    -- maintains interface counters.
-   local ctrl_graph, need_ctrl = probe.configure_mlx_ctrl_graph(mellanox, ipfix.log_date)
+   local ctrl_graph, need_ctrl = probe.configure_mlx_controller(mellanox)
 
    if need_ctrl then
       workers["mlx_ctrl"] = ctrl_graph
