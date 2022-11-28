@@ -216,8 +216,15 @@ function selftest ()
    assert(not exists(name))
 
    -- Checking parameterized types
+   print("checking parameterized types..")
    local name = "shm/selftest/parameterized"
-   local p1 = create(name, "struct { int x; int xs[?]; }")
+   local p1 = create(name, "struct { int x; int xs[?]; }", 10)
+   local p2 = open(name, "struct { int x; int xs[?]; }", 'read-only', 10)
+   p1.xs[9] = 42
+   assert(p2.xs[9] == 42)
+   unmap(p2)
+   unmap(p1)
+   assert(unlink(name))
 
    -- Test that we can open and cleanup many objects
    print("checking many objects..")
