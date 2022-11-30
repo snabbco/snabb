@@ -71,7 +71,7 @@ local INT = ffi.sizeof("uint32_t")
 
 ffi.cdef([[
    struct interlink {
-      uint32_t read, write, state[1], size;
+      uint32_t read, write, size, state[1];
       char pad1[]]..CACHELINE-4*INT..[[];
       uint32_t lwrite, nread, rmask;
       char pad2[]]..CACHELINE-3*INT..[[];
