@@ -40,8 +40,7 @@ struct group_freelist {
    uint32_t dequeue_pos[1], dequeue_mask;
    uint8_t pad_dequeue_pos[]]..CACHELINE-2*INT..[[];
 
-   uint32_t state[1], size;
-   uint8_t pad_state[]]..CACHELINE-2*INT..[[];
+   uint32_t size, state[1];
 
    struct group_freelist_chunk chunk[?];
 } __attribute__((packed, aligned(]]..CACHELINE..[[)))]])
