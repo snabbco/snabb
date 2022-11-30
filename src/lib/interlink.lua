@@ -64,19 +64,19 @@ local waitfor = require("core.lib").waitfor
 local sync = require("core.sync")
 
 local CACHELINE = 64 -- XXX - make dynamic
-local INT = ffi.sizeof("int")
+local INT = ffi.sizeof("uint32_t")
 
 -- Based on MCRingBuffer, see
 --   http://www.cse.cuhk.edu.hk/%7Epclee/www/pubs/ipdps10.pdf
 
 ffi.cdef([[
    struct interlink {
-      int read, write, state[1], size;
+      uint32_t read, write, state[1], size;
       char pad1[]]..CACHELINE-4*INT..[[];
-      int lwrite, nread;
-      char pad2[]]..CACHELINE-2*INT..[[];
-      int lread, nwrite;
-      char pad3[]]..CACHELINE-2*INT..[[];
+      uint32_t lwrite, nread, rmask;
+      char pad2[]]..CACHELINE-3*INT..[[];
+      uint32_t lread, nwrite, wmask;
+      char pad3[]]..CACHELINE-3*INT..[[];
       struct packet *packets[?];
    } __attribute__((packed, aligned(]]..CACHELINE..[[)))
 ]])
@@ -149,6 +149,8 @@ local function attach (name, size, transitions)
          -- (only one process can set size).
          if sync.cas(r.state, INIT, CONF) then
             r.size = size
+            local mask = size - 1
+            r.rmask, r.wmask = mask, mask
             assert(sync.cas(r.state, CONF, FREE))
          end
          -- Return if we succeed to attach.
@@ -222,12 +224,12 @@ end
 
 -- Queue operations follow below.
 
-local function NEXT (size, i)
-   return band(i + 1, size - 1)
+local function NEXT (mask, i)
+   return band(i + 1, mask)
 end
 
 function full (r)
-   local after_nwrite = NEXT(r.size, r.nwrite)
+   local after_nwrite = NEXT(r.wmask, r.nwrite)
    if after_nwrite == r.lread then
       if after_nwrite == r.read then
          return true
@@ -238,7 +240,7 @@ end
 
 function insert (r, p)
    r.packets[r.nwrite] = p
-   r.nwrite = NEXT(r.size, r.nwrite)
+   r.nwrite = NEXT(r.wmask, r.nwrite)
 end
 
 function push (r)
@@ -257,7 +259,7 @@ end
 
 function extract (r)
    local p = r.packets[r.nread]
-   r.nread = NEXT(r.size, r.nread)
+   r.nread = NEXT(r.rmask, r.nread)
    return p
 end
 
