@@ -34,11 +34,11 @@ struct group_freelist_chunk {
 
 ffi.cdef([[
 struct group_freelist {
-   uint32_t enqueue_pos[1];
-   uint8_t pad_enqueue_pos[]]..CACHELINE-1*INT..[[];
+   uint32_t enqueue_pos[1], enqueue_mask;
+   uint8_t pad_enqueue_pos[]]..CACHELINE-2*INT..[[];
 
-   uint32_t dequeue_pos[1];
-   uint8_t pad_dequeue_pos[]]..CACHELINE-1*INT..[[];
+   uint32_t dequeue_pos[1], dequeue_mask;
+   uint8_t pad_dequeue_pos[]]..CACHELINE-2*INT..[[];
 
    uint32_t state[1], size;
    uint8_t pad_state[]]..CACHELINE-2*INT..[[];
@@ -56,10 +56,12 @@ function freelist_create (name, size)
    local fl = shm.create(name, "struct group_freelist", size)
    if sync.cas(fl.state, CREATE, INIT) then
       fl.size = size
+      local mask = size - 1
+      fl.enqueue_mask, fl.dequeue_mask = mask, mask
       for i = 0, fl.size-1 do
          fl.chunk[i].sequence[0] = i
       end
-      fl.state[0] = READY
+      assert(sync.cas(fl.state, INIT, READY))
       return fl
    else
       shm.unmap(fl)
@@ -75,14 +77,11 @@ function freelist_open (name, readonly)
    return shm.open(name, "struct group_freelist", readonly, size)
 end
 
-local function mask (fl, i)
-   return band(i, fl.size-1)
-end
-
 function start_add (fl)
    local pos = fl.enqueue_pos[0]
+   local mask = fl.enqueue_mask
    while true do
-      local chunk = fl.chunk[mask(fl, pos)]
+      local chunk = fl.chunk[band(pos, mask)]
       local seq = chunk.sequence[0]
       local dif = seq - pos
       if dif == 0 then
@@ -100,13 +99,14 @@ end
 
 function start_remove (fl)
    local pos = fl.dequeue_pos[0]
+   local mask = fl.dequeue_mask
    while true do
-      local chunk = fl.chunk[mask(fl, pos)]
+      local chunk = fl.chunk[band(pos, mask)]
       local seq = chunk.sequence[0]
       local dif = seq - (pos+1)
       if dif == 0 then
          if sync.cas(fl.dequeue_pos, pos, pos+1) then
-            return chunk, pos+fl.size
+            return chunk, pos+mask+1
          end
       elseif dif < 0 then
          return
