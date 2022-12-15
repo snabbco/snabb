@@ -326,7 +326,7 @@ local function data_generator_from_grammar(production, generate_invalid)
       for k,v in pairs(t) do ret[k]=v end
       return ret
    end
-   function handlers.table(keyword, production)
+   function handlers.list(keyword, production)
       local keys = {}
       for k,v in pairs(production.keys) do
          keys[k] = shallow_copy(v)
@@ -398,7 +398,7 @@ local function path_generator_from_grammar(production, generate_invalid)
          return head..'[position()='..math.random(1,100)..']'
       end
    end
-   function handlers.table(keyword, production)
+   function handlers.list(keyword, production)
       local keys, values, gen_key, gen_tail = {}, {}, {}, {}
       for k,v in pairs(production.keys) do
          table.insert(keys, k)
@@ -534,7 +534,7 @@ function selftest()
       local val = value_from_type({ primitive_type="binary",
                                     range={ value={} }})
       local cmd = string.format("echo \"%s\" | base64 -d > /dev/null", val)
-      assert(os.execute(cmd) == 0, string.format("test value: %s", val))
+      assert(os.execute(cmd), string.format("test value: %s", val))
    end
    print('selftest: ok')
 end

@@ -619,9 +619,22 @@ local function inherit_config(schema)
    return visit(schema, true)
 end
 
+local config_leader_rpc_output_grammar
+local function get_describe_capability_grammar()
+   local data, path_data = require("lib.yang.data"), require("lib.yang.path_data")
+   if not config_leader_rpc_output_grammar then
+      local schema = load_schema_by_name('snabb-config-leader-v1')
+      config_leader_rpc_output_grammar = data.rpc_output_grammar_from_schema(schema)
+   end
+   local _, capability_grammar = path_data.resolver(
+      config_leader_rpc_output_grammar, '/describe/capability'
+   )
+   return capability_grammar
+end
+
 local default_features = {}
 function get_default_capabilities()
-   local ret = {}
+   local ret = get_describe_capability_grammar().list.new()
    for mod,features in pairs(default_features) do
       local feature_names = {}
       for feature,_ in pairs(features) do
