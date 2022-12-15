@@ -5,42 +5,18 @@
 -- of representing a path. The path provided is a subset of XPath supporting
 -- named keys such as [addr=1.2.3.4] and also basic positional querying
 -- for arrays e.g [position()=1] for the first element.
---
--- The structure of the path is dependent on the type the node is. The
--- conversions are as follows:
---
--- Scalar fields:
---    A lua string of the member name
--- Struct fields:
---    A lua string of the member name
--- Array fields:
---    This is a table which has a "name" property specifying member
---    name and a "key" field which is a 1 based integer to specify the
---    position in the array.
--- Table fields:
---    This is a table which has a "name" property specifying member
---    name and has a "keys" (not key) property which is either:
---       - A string representing the key if the table is string keyed.
---       - A lua table with corrisponding leaf names as the key and the
---         value as the value.
 module(..., package.seeall)
 
-local equal = require("core.lib").equal
+local valuelib = require("lib.yang.value")
 local datalib = require("lib.yang.data")
 local normalize_id = datalib.normalize_id
+local lib = require("core.lib")
 
-local function table_keys(t)
-   local ret = {}
-   for k, v in pairs(t) do table.insert(ret, k) end
-   return ret
-end
 
-local syntax_error = function (str, pos)
-   local header = "Syntax error in "
-   io.stderr:write(header..str.."\n")
-   io.stderr:write(string.rep(" ", #header + pos-1))
-   io.stderr:write("^\n")
-   os.exit(1)
+local function syntax_error(str, pos)
+   error("Syntax error in:\n"
+      ..str.."\n"
+      ..string.rep(" ", pos-1).."^\n")
 end
 
 local function extract_parts (fragment)
@@ -77,61 +53,47 @@ end
 
 -- Finds the grammar node for a fragment in a given grammar.
 local function extract_grammar_node(grammar, name)
-   local handlers = {}
-   function handlers.struct () return grammar.members[name] end
-   function handlers.table ()
-      if grammar.keys[name] == nil then
-         return grammar.values[name]
-      else
-         return grammar.keys[name]
+   local function expand_choices (members)
+      for _, member in pairs(members) do
+         if member.type == 'choice' then
+            local node = extract_grammar_node(member, name)
+            if node then return node end
+         end
       end
    end
-   function handlers.choice ()
-      for case_name, case in pairs(grammar.choices) do
-         if case[name] ~= nil then return case[name] end
+   local handlers = {}
+   function handlers.struct (node)
+      if node.members[name] then return node.members[name] end
+      return expand_choices(node.members)
+   end
+   function handlers.list (node)
+      if node.keys[name] then return node.keys[name] end
+      if node.values[name] then return node.values[name] end
+      return expand_choices(node.values)
+   end
+   function handlers.choice (node)
+      for _, case in pairs(node.choices) do
+         if case[name] then return case[name] end
+         local node = expand_choices(case)
+         if node then return node end
       end
    end
-   return assert(assert(handlers[grammar.type], grammar.type)(), name)
+   function handlers.scalar ()
+      error("Invalid path: trying to access '"..name.."' in scalar.")
+   end
+   function handlers.array ()
+      error("Invalid path: trying to access '"..name.."' in leaf-list.")
+   end
+   -- rpc
+   function handlers.sequence (node)
+      if node.members[name] then return node.members[name] end
+   end
+   local node = assert(handlers[grammar.type], grammar.type)(grammar)
+   return node or error("Invalid path: '"..name.."' is not in schema.")
 end
 
--- Converts an XPath path to a lua array consisting of path componants.
--- A path component can then be resolved on a yang data tree:
-function convert_path(grammar, path)
-   local path = normalize_path(path)
-   local handlers = {}
-   function handlers.scalar(grammar, fragment)
-      return {name=fragment.name, grammar=grammar}
-   end
-   function handlers.struct(grammar, fragment)
-      return {name=fragment.name, grammar=grammar}
-   end
-   function handlers.table(grammar, fragment)
-      return {name=fragment.name, keys=fragment.query, grammar=grammar}
-   end
-   function handlers.array(grammar, fragment)
-      local position = fragment.query["position()"]
-      return {name=fragment.name, key=tonumber(position), grammar=grammar}
-   end
-   local function handle(grammar, fragment)
-      return assert(handlers[grammar.type], grammar.type)(grammar, fragment)
-   end
-
-   if path == "/" then return {} end
-
-   local ret = {}
-   local node = grammar
-   if path:sub(1, 1) == "/" then path = path:sub(2) end -- remove leading /
-   if path:sub(-1) == "/" then path = path:sub(1, -2) end -- remove trailing /
-   for element in path:split("/") do
-      local parts = extract_parts(element)
-      node = extract_grammar_node(node, parts.name)
-      local luapath = handle(node, parts)
-      table.insert(ret, luapath)
-   end
-   return ret
-end
-
-function parse_path (path)
+-- Converts an XPath path to a lua array consisting of path components.
+local function parse_path1 (path)
    local depth = 0
    local t, token = {}, ''
    local function insert_token ()
@@ -157,27 +119,150 @@ function parse_path (path)
    end
    insert_token()
 
-   local ret = {}
+   local ret = {relative = not path:match("^/")}
    for _, element in ipairs(t) do
       if element ~= '' then table.insert(ret, extract_parts(element)) end
    end
    return ret
 end
 
-function normalize_path(path)
+local function parse_query(grammar, query)
+   if grammar.type == 'array' then
+      local idx
+      for key, value in pairs(query) do
+         if key == 'position()' then
+            idx = tonumber(value)
+         else
+            error("Invalid query: leaf-list can only be indexed by position.")
+         end
+      end
+      if (not idx) or idx < 1 or idx ~= math.floor(idx) then
+         error("Invalid query: leaf-list can only be indexed by positive integers.")
+      end
+      return idx
+   elseif grammar.type == 'list' then
+      if not grammar.list.has_key then
+         error("Invalid query: list has no key.")
+      end
+      local key = {}
+      for k,_ in pairs(query) do
+         if not grammar.keys[k] then
+            error("Invalid query:'"..k.."' is not a list key.")
+         end
+      end
+      for k,grammar in pairs(grammar.keys) do
+         local v = query[k] or grammar.default
+         if v == nil then
+            error("Invalid query: missing required key '"..k.."'")
+         end
+         local key_primitive_type = grammar.argument_type.primitive_type
+         local parser = valuelib.types[key_primitive_type].parse
+         key[normalize_id(k)] = parser(v, 'path query value')
+      end
+      return key
+   else
+      error("Invalid query: can only query list or leaf-list.")
+   end
+end
+
+function parse_path(path, grammar)
+   if type(path) == 'string' then
+      path = parse_path1(path)
+   end
+   if grammar then
+      for _, part in ipairs(path) do
+         grammar = extract_grammar_node(grammar, part.name)
+         part.grammar = grammar
+         for _ in pairs(part.query) do
+            part.key = parse_query(grammar, part.query)
+            break
+         end
+      end
+   end
+   return path
+end
+
+local function unparse_query(grammar, key)
+   if grammar.type == 'array' then
+      return {['position()']=tonumber(key)}
+   elseif grammar.type == 'list' then
+      if not grammar.list.has_key then
+         error("Invalid key: list has no key.")
+      end
+      local query = {}
+      for k,grammar in pairs(grammar.keys) do
+         local key_primitive_type = grammar.argument_type.primitive_type
+         local tostring = valuelib.types[key_primitive_type].tostring
+         local id = normalize_id(k)
+         if key[id] then
+            query[k] = tostring(key[id])
+         elseif grammar.default then
+            query[k] = grammar.default
+         else
+            error("Invalid key: missing required key '"..k.."'")
+         end
+      end
+      return query
+   else
+      error("Invalid key: can only query list or leaf-list.")
+   end
+end
+
+function unparse_path(path, grammar)
+   path = lib.deepcopy(path)
+   for _, part in ipairs(path) do
+      grammar = extract_grammar_node(grammar, part.name)
+      part.grammar = grammar
+      if part.key then
+         part.query = unparse_query(grammar, part.key)
+      end
+   end
+   return path
+end
+
+function normalize_path(path, grammar)
+   path = parse_path(path, grammar)
    local ret = {}
-   for _,part in ipairs(parse_path(path)) do
+   for _,part in ipairs(path) do
       local str = part.name
-      local keys = table_keys(part.query)
+      local keys = {}
+      for key in pairs(part.query) do
+         table.insert(keys, key)
+      end
       table.sort(keys)
       for _,k in ipairs(keys) do str = str..'['..k..'='..part.query[k]..']' end
       table.insert(ret, str)
    end
-   return '/'..table.concat(ret, '/')
+   return ((path.relative and '') or '/')..table.concat(ret, '/')
+end
+
+function parse_relative_path(path, node_path, grammar)
+   path = parse_path(path)
+   if not path.relative then
+      return parse_path(path, grammar)
+   end
+   node_path = parse_path(node_path, grammar)
+   assert(not node_path.relative, "node_path has to be absolute.")
+   local apath = {relative=false}
+   for _, part in ipairs(node_path) do
+      table.insert(apath, part)
+   end
+   for i, part in ipairs(path) do
+      if part.name == '.' or part.name == 'current()' then
+         assert(i==1, "Invalid path: '"..part.name"' has to be first component.")
+      elseif part.name == '..' then
+         assert(#apath >= 1, "Invalid path: attempt to traverse up root (/..).")
+         table.remove(apath, #apath)
+      else
+         table.insert(apath, part)
+      end
+   end
+   return parse_path(apath, grammar)
 end
 
 function selftest()
    print("selftest: lib.yang.path")
+   local util = require("lib.yang.util")
    local schemalib = require("lib.yang.schema")
    local schema_src = [[module snabb-simple-router {
       namespace snabb:simple-router;
@@ -200,30 +285,34 @@ function selftest()
    local grammar = datalib.config_grammar_from_schema(scm)
 
    -- Test path to lua path.
-   local path = convert_path(grammar,"/routes/route[addr=1.2.3.4]/port")
+   local path = parse_path("/routes/route[addr=1.2.3.4]/port", grammar)
 
    assert(path[1].name == "routes")
    assert(path[2].name == "route")
-   assert(path[2].keys)
-   assert(path[2].keys["addr"] == "1.2.3.4")
+   assert(path[2].query.addr == "1.2.3.4")
+   assert(path[2].key.addr == util.ipv4_pton("1.2.3.4"))
    assert(path[3].name == "port")
 
-   local path = convert_path(grammar, "/blocked-ips[position()=4]/")
+   local path = parse_path("/blocked-ips[position()=4]/", grammar)
    assert(path[1].name == "blocked-ips")
+   assert(path[1].query['position()'] == "4")
    assert(path[1].key == 4)
 
-   assert(normalize_path('') == '/')
+   assert(normalize_path('') == '')
    assert(normalize_path('//') == '/')
    assert(normalize_path('/') == '/')
    assert(normalize_path('//foo//bar//') == '/foo/bar')
    assert(normalize_path('//foo[b=1][c=2]//bar//') == '/foo[b=1][c=2]/bar')
    assert(normalize_path('//foo[c=1][b=2]//bar//') == '/foo[b=2][c=1]/bar')
 
-   assert(extract_parts('//foo[b=1]'))
-
-   parse_path('/alarms/alarm-list/alarm'..
-              '[resource=alarms/alarm-list/alarm/related-alarm/resource]'..
-              '[alarm-type-id=/alarms/alarm-list/alarm/related-alarm/alarm-type-id]')
+   local path = 
+      parse_path('/alarms/alarm-list/alarm'..
+                 '[resource=alarms/alarm-list/alarm/related-alarm/resource]'..
+                 '[alarm-type-id=/alarms/alarm-list/alarm/related-alarm/alarm-type-id]')
+   assert(#path == 3)
+   assert(path[3].name == 'alarm')
+   assert(path[3].query.resource == "alarms/alarm-list/alarm/related-alarm/resource")
+   assert(path[3].query['alarm-type-id'] == "/alarms/alarm-list/alarm/related-alarm/alarm-type-id")
 
    print("selftest: ok")
 end

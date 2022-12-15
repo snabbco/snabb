@@ -168,8 +168,16 @@ function initialize ()
 end
 
 function handler (reason)
-   print(reason)
-   print(STP.stacktrace())
+   local ok, bt = pcall(STP.stacktrace)
+   if ok and bt then
+      io.stderr:write(reason)
+      io.stderr:write("\n")
+      io.stderr:write(bt)
+      io.stderr:write("\n")
+   else
+      io.stderr:write(debug.traceback(reason))
+      io.stderr:write("\n")
+   end
    if debug_on_error then debug.debug() end
    os.exit(1)
 end

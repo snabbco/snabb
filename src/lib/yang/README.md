@@ -315,28 +315,23 @@ type, but on the Lua side is given the normal 1-based indexing and
 support for the `#len` length operator via a wrapper.  A non-fixed
 `leaf-list` is just a Lua array (a table with indexes starting from 1).
 
-Instances of `list` nodes can have one of several representations.
-(Recall that in YANG, `list` is not a list in the sense that we normally
-think of it in programming languages, but rather is a kind of hash map.)
+Instances of `list` nodes are compiled to `lib.yang.list` objects. These behave mostly like regular Lua tables but are really hash tries underneath and support multi-key lookup and are ordered. A list with a single key *foo* behaves just like a Lua table:
 
-If there is only one key leaf, and that leaf has a string type, then a
-configuration list is represented as a normal Lua table whose keys are
-the key strings, and whose values are Lua structures holding the leaf
-values, as in containers.  (In fact, it could be that the value of a
-string-key struct is represented as a C struct, as in raw containers.)
+```lua
+list[x] -- entry with foo==x
+list[x] = y -- add or update entry with foo==x
+```
 
-If all key and value types are fixed, then a `list` configuration
-compiles to an efficient [`ctable`](../README.ctable.md).
+A List with two keys *foo* and *bar* can be used like so:
 
-If all keys are fixed but values are not, then a `list` configuration
-compiles to a [`cltable`](../README.cltable.md).
+```lua
+list[{foo=x, bar=y}] -- entry with key {foo=x, bar=y}
+list[{foo=x, bar=y}] = z -- add or update entry
+```
 
-Otherwise, a `list` configuration compiles to a Lua table whose keys are
-Lua tables containing the keys.  This sounds good on the surface but
-really it's a pain, because you can't simply look up a value in the
-table like `foo[{key1=42,key2=50}]`, because lookup in such a table is
-by identity and not be value.  Oh well.  You can still do `for k,v in
-pairs(foo)`, which is often good enough in this case.
+In both cases the lists can be iterated in order with `ipairs` and `pairs`.
+For single-key lists `pairs` works as expected.
+For multi-key lists `pairs` is identical to `ipairs` (keys are included in the entry table.)
 
 Note that there are a number of value types that are not implemented,
 including some important ones like `union`.

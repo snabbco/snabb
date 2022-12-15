@@ -1,6 +1,7 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
+local path_data = require("lib.yang.path_data")
 local support = require("lib.ptree.support")
 local shm = require("core.shm")
 local counter = require("core.counter")
@@ -94,16 +95,13 @@ end
 function collect_rss_states (pid, rss_links)
    local states = {}
    local id
-   for _, app in ipairs(shm.children("/"..pid.."/apps")) do
-      local rss_group = tonumber(app:match("^rss(%d+)$"))
+   for _, link in ipairs(shm.children("/"..pid.."/links")) do
+      local rss_group = tonumber(link:match("^rss(%d+)%."))
       if rss_group then
          id = tonumber(rss_group)
-         break
       end
-   end
-   for _, link in ipairs(shm.children("/"..pid.."/links")) do
       for rss_link, _ in pairs(rss_links) do
-         if (link:match("^"..rss_link) and link:match("^rss%d+.")) -- embedded link
+         if (link:match("^"..rss_link) and link:match("^rss%d+%.")) -- embedded link
          or (link:match("-> *"..rss_link:gsub("%.output$", ".input").."$")) -- interlink
          then
             local stats = shm.open_frame("/"..pid.."/links/"..link)
@@ -130,6 +128,12 @@ end
 
 local function compute_pid_reader ()
    return function (pid) return pid end
+end
+
+local function get_state_grammar (path)
+   return path_data.grammar_for_schema_by_name(
+      'snabb-snabbflow-v1', '/snabbflow-state/'..path, false
+   )
 end
 
 local function process_states (pids)
@@ -215,6 +219,49 @@ local function process_states (pids)
          local instances = rss_group.exporter[exporter].instance
          instances[ipfix_state.id] = ipfix_state
       end
+   end
+   -- Convert tables to lists as defined in schema
+   local interfaces = state.interface
+   state.interface = get_state_grammar('interface').list.new()
+   for device, interface in pairs(interfaces) do
+      state.interface[device] = interface
+   end
+   local exporters = state.exporter
+   state.exporter = get_state_grammar('exporter').list.new()
+   for name, exporter in pairs(exporters) do
+      local templates = exporter.template
+      exporter.template = get_state_grammar('exporter/template').list.new()
+      for id, template in pairs(templates) do
+         exporter.template[id] = template
+      end
+      state.exporter[name] = exporter
+   end
+   local rss_groups = state.rss_group
+   state.rss_group = get_state_grammar('rss-group').list.new()
+   for id, rss_group in pairs(rss_groups) do
+      local queues = rss_group.queue
+      rss_group.queue = get_state_grammar('rss-group/queue').list.new()
+      for device, queue in pairs(queues) do
+         rss_group.queue[device] = queue
+      end
+      local exporters = rss_group.exporter
+      rss_group.exporter = get_state_grammar('rss-group/exporter').list.new()
+      for name, exporter in pairs(exporters) do
+         local instances = exporter.instance
+         exporter.instance =
+            get_state_grammar('rss-group/exporter/instance').list.new()
+         for id, instance in pairs(instances) do
+            local templates = instance.template
+            instance.template =
+               get_state_grammar('rss-group/exporter/instance/template').list.new()
+            for id, template in pairs(templates) do
+               instance.template[id] = template
+            end
+            exporter.instance[id] = instance
+         end
+         rss_group.exporter[name] = exporter
+      end
+      state.rss_group[id] = rss_group
    end
    return {snabbflow_state=state}
 end

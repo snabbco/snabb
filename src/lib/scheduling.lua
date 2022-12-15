@@ -21,6 +21,7 @@ local scheduling_opts = {
    jit_opt = {default=default_jit_opt}, -- JIT options.
    cpu = {},                  -- CPU index (integer).
    real_time = {},            -- Boolean.
+   max_packets = {},          -- Positive integer.
    ingress_drop_monitor = {}, -- Action string: one of 'flush' or 'warn'.
    profile = {default=true},  -- Boolean.
    busywait = {default=true}, -- Boolean.
@@ -52,6 +53,10 @@ function sched_apply.real_time (real_time)
    if real_time and not S.sched_setscheduler(0, "fifo", 1) then
       fatal('Failed to enable real-time scheduling.  Try running as root.')
    end
+end
+
+function sched_apply.max_packets (max_packets)
+   packet.initialize(max_packets)
 end
 
 function sched_apply.busywait (busywait)

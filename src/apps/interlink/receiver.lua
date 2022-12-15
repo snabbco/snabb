@@ -5,11 +5,22 @@ module(...,package.seeall)
 local shm = require("core.shm")
 local interlink = require("lib.interlink")
 
-local Receiver = {name="apps.interlink.Receiver"}
+local Receiver = {
+   name = "apps.interlink.Receiver",
+   config = {
+      queue = {},
+      size = {default=1024}
+   }
+}
 
-function Receiver:new (queue)
+function Receiver:new (conf)
+   local self = {
+      attached = false,
+      queue = conf.queue,
+      size = conf.size
+   }
    packet.enable_group_freelist()
-   return setmetatable({attached=false, queue=queue}, {__index=Receiver})
+   return setmetatable(self, {__index=Receiver})
 end
 
 function Receiver:link ()
@@ -17,7 +28,7 @@ function Receiver:link ()
    if not self.attached then
       self.shm_name = "group/interlink/"..queue..".interlink"
       self.backlink = "interlink/receiver/"..queue..".interlink"
-      self.interlink = interlink.attach_receiver(self.shm_name)
+      self.interlink = interlink.attach_receiver(self.shm_name, self.size)
       shm.alias(self.backlink, self.shm_name)
       self.attached = true
    end
