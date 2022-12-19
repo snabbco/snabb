@@ -40,6 +40,7 @@ function enable_auditlog ()
 end
 
 -- Timeline event log
+local timeline_enabled = true
 local timeline_log, events -- initialized on demand
 function timeline ()
    if timeline_log == nil then
@@ -51,6 +52,11 @@ function timeline ()
 end
 
 function randomize_log_rate ()
+   -- Bail if timeline logging is disabled.
+   -- Effectively this disables all events with rate < 9.
+   if not timeline_enabled then
+      return
+   end
    -- Randomize the log rate. Enable each rate in 5x more breaths
    -- than the rate below by randomly picking from log5() distribution.
    -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
