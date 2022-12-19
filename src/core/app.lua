@@ -374,8 +374,7 @@ function apply_config_actions (actions)
       configuration.links[linkspec] = nil
    end
    function ops.new_link (linkspec)
-      local link = link.new(linkspec)
-      link_table[linkspec] = link
+      link_table[linkspec] = link.new(linkspec)
       configuration.links[linkspec] = true
    end
    function ops.link_output (appname, linkname, linkspec)
@@ -588,6 +587,9 @@ function main (options)
       enable_latency_histogram()
       breathe = latency:wrap_thunk(breathe, now)
    end
+
+   -- Setup vmprofile
+   setvmprofile("engine")
 
    -- Enable tick
    enable_tick()
@@ -808,7 +810,6 @@ function report_apps ()
          app:report()
       end
    end
-   setvmprofile("engine")
 end
 
 function selftest ()

@@ -290,7 +290,10 @@ end
 function account_free (p)
    counter.add(engine.frees)
    counter.add(engine.freebytes, p.length)
-   counter.add(engine.freebits, physical_bits(p))
+   -- Calculate bits of physical capacity required for packet on 10GbE
+   -- Account for minimum data size and overhead of CRC and inter-packet gap
+   -- https://en.wikipedia.org/wiki/Ethernet_frame
+   counter.add(engine.freebits, (12 + 8 + math.max(p.length, 60) + 4) * 8)
 end
 
 local free_internal, account_free =
@@ -302,13 +305,6 @@ function free (p)
    if group_fl and need_rebalance() then
       rebalance_step()
    end
-end
-
-function physical_bits (p)
-   -- Calculate bits of physical capacity required for packet on 10GbE
-   -- Account for minimum data size and overhead of CRC and inter-packet gap
-   -- https://en.wikipedia.org/wiki/Ethernet_frame
-   return (12 + 8 + math.max(p.length, 60) + 4) * 8
 end
 
 -- Set packet data length.
