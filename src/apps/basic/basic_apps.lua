@@ -150,7 +150,7 @@ end
 function Truncate:push ()
    for _ = 1, link.nreadable(self.input.input) do
       local p = receive(self.input.input)
-      ffi.fill(p.data, math.min(0, self.n - p.length))
+      ffi.fill(p.data, math.max(0, self.n - p.length))
       p.length = self.n
       transmit(self.output.output,p)
    end

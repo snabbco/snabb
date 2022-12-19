@@ -4,7 +4,7 @@ CSRC   = $(wildcard src/c/*.c)
 COBJ   = $(CSRC:.c=.o)
 PREFIX = /usr/local
 
-LUAJIT_CFLAGS := -include $(CURDIR)/gcc-preinclude.h
+LUAJIT_CFLAGS := -include $(CURDIR)/gcc-preinclude.h -DLUAJIT_ENABLE_LUA52COMPAT
 
 all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 #       LuaJIT

@@ -35,6 +35,9 @@ function run(args)
    local opts = { command='compress-alarms', with_path=false, is_config=false,
                   usage=show_usage }
    args = common.parse_command_line(args, opts)
+   if args.error then
+      common.print_and_exit(args)
+   end
    local response = common.call_leader(
       args.instance_id, 'compress-alarms',
       { schema = args.schema_name, revision = args.revision,

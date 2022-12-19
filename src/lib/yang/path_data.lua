@@ -3,150 +3,106 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
-local lib = require("core.lib")
 local data = require("lib.yang.data")
 local value = require("lib.yang.value")
 local schema = require("lib.yang.schema")
-local parse_path = require("lib.yang.path").parse_path
+local path = require("lib.yang.path")
+local parse_path = path.parse_path
+local unparse_path = path.unparse_path
+local parse_relative_path = path.parse_relative_path
+local normalize_path = path.normalize_path
 local util = require("lib.yang.util")
-local cltable = require("lib.cltable")
+local list = require("lib.yang.list")
 local normalize_id = data.normalize_id
+local lib = require("core.lib")
 
-local function table_keys(t)
-   local ret = {}
-   for k, v in pairs(t) do table.insert(ret, k) end
-   return ret
-end
-
-function prepare_array_lookup(query)
-   if not lib.equal(table_keys(query), {"position()"}) then
-      error("Arrays can only be indexed by position.")
-   end
-   local idx = tonumber(query["position()"])
-   if idx < 1 or idx ~= math.floor(idx) then
-      error("Arrays can only be indexed by positive integers.")
-   end
-   return idx
-end
-
-function prepare_table_lookup(keys, ctype, query)
-   local static_key = ctype and data.typeof(ctype)() or {}
-   for k,_ in pairs(query) do
-      if not keys[k] then error("'"..k.."' is not a table key") end
-   end
-   for k,grammar in pairs(keys) do
-      local v = query[k] or grammar.default
-      if v == nil then
-         error("Table query missing required key '"..k.."'")
-      end
-      local key_primitive_type = grammar.argument_type.primitive_type
-      local parser = value.types[key_primitive_type].parse
-      static_key[normalize_id(k)] = parser(v, 'path query value')
-   end
-   return static_key
-end
-
--- Returns a resolver for a particular schema and *lua* path.
-function resolver(grammar, path_string)
-   local function ctable_getter(key, getter)
-      return function(data)
-         local data = getter(data):lookup_ptr(key)
-         if data == nil then error("Not found") end
-         return data.value
-      end
-   end
-   local function table_getter(key, getter)
-      return function(data)
-         local data = getter(data)[key]
-         if data == nil then error("Not found") end
-         return data
-      end
-   end
-   local function slow_table_getter(key, getter)
-      return function(data)
-         for k,v in pairs(getter(data)) do
-            if lib.equal(k, key) then return v end
-         end
-         error("Not found")
-      end
-   end
-   local function compute_table_getter(grammar, key, getter)
-      if grammar.native_key then
-         return table_getter(key[normalize_id(grammar.native_key)], getter)
-      elseif grammar.key_ctype and grammar.value_ctype then
-         return ctable_getter(key, getter)
-      elseif grammar.key_ctype then
-         return table_getter(key, getter)
+local function compute_struct_getter(name, getter)
+   local id = normalize_id(name)
+   return function (data)
+      local struct = getter(data)
+      if struct[id] ~= nil then
+         return struct[id]
       else
-         return slow_table_getter(key, getter)
+         error("Container has no member '"..name.."'")
       end
    end
-   local function handle_table_query(grammar, query, getter)
-      local key = prepare_table_lookup(grammar.keys, grammar.key_ctype, query)
-      local child_grammar = {type="struct", members=grammar.values,
-                             ctype=grammar.value_ctype}
-      local child_getter = compute_table_getter(grammar, key, getter)
-      return child_getter, child_grammar
-   end
-   local function handle_array_query(grammar, query, getter)
-      local idx = prepare_array_lookup(query)
-      -- Pretend that array elements are scalars.
-      local child_grammar = {type="scalar", argument_type=grammar.element_type,
-                             ctype=grammar.ctype}
-      local function child_getter(data)
-         local array = getter(data)
-         if idx > #array then error("Index out of bounds") end
-         return array[idx]
+end
+
+local function compute_array_getter(idx, getter)
+   return function (data)
+      local array = getter(data)
+      if idx > #array then
+         error("Index "..idx.." is out of bounds")
       end
-      return child_getter, child_grammar
+      return array[idx]
    end
-   local function handle_query(grammar, query, getter)
-      if lib.equal(table_keys(query), {}) then return getter, grammar end
+end
+
+local function compute_list_getter(key, getter)
+   return function (data)
+      local l = list.object(getter(data))
+      local entry = l:find_entry(key)
+      if entry ~= nil then
+         return entry
+      else
+         error("List has no such entry")
+      end
+   end
+end
+
+local function compute_getter(grammar, part, getter)
+   if grammar.type == 'struct' or grammar.type == 'sequence' then
+      getter = compute_struct_getter(part.name, getter)
+      grammar = part.grammar
+   else
+      error("Invalid path: '"..part.name.."' is not a container")
+   end
+   if part.key then
       if grammar.type == 'array' then
-         return handle_array_query(grammar, query, getter)
-      elseif grammar.type == 'table' then
-         return handle_table_query(grammar, query, getter)
+         getter = compute_array_getter(part.key, getter)
+         -- Pretend that array elements are scalars.
+         grammar = {type="scalar", argument_type=grammar.element_type,
+                    ctype=grammar.ctype}
+      elseif grammar.type == 'list' then
+         getter = compute_list_getter(part.key, getter)
+         -- Pretend that list entries are structs.
+         grammar = {type="struct", members=grammar.values,
+                    ctype=grammar.value_ctype}
       else
-         error("Path query parameters only supported for structs and tables.")
+         error("Invalid path: '"..name.."' can not be queried")
       end
-   end
-   local function compute_getter(grammar, name, query, getter)
-      local child_grammar
-      child_grammar = grammar.members[name]
-      if not child_grammar then
-         for member_name, member in pairs(grammar.members) do
-            if child_grammar then break end
-            if member.type == 'choice' then
-               for case_name, case in pairs(member.choices) do
-                  if child_grammar then break end
-                  if case[name] then child_grammar = case[name] end
-               end
-            end
-         end
-      end
-      if not child_grammar then
-         error("Struct has no field named '"..name.."'.")
-      end
-      local id = normalize_id(name)
-      local function child_getter(data)
-         local struct = getter(data)
-         local child = struct[id]
-         if child == nil then
-            error("Struct instance has no field named '"..name.."'.")
-         end
-         return child
-      end
-      return handle_query(child_grammar, query, child_getter)
-   end
-   local getter, grammar = function(data) return data end, grammar
-   for _, elt in ipairs(parse_path(path_string)) do
-      -- All non-leaves of the path tree must be structs.
-      if grammar.type ~= 'struct' then error("Invalid path.") end
-      getter, grammar = compute_getter(grammar, elt.name, elt.query, getter)
    end
    return getter, grammar
 end
+
+-- Returns a resolver for a particular schema and *lua* path.
+function resolver(grammar, path)
+   path = parse_path(path, grammar)
+   local getter = function(data) return data end
+   for _, part in ipairs(path) do
+      getter, grammar = compute_getter(grammar, part, getter)
+   end
+   return getter, grammar
+end
+
 resolver = util.memoize(resolver)
+
+local function grammar_for_schema(schema, path, is_config)
+   local grammar = data.data_grammar_from_schema(schema, is_config ~= false)
+   local path = parse_path(path or '/', grammar)
+   if #path > 0 then
+      return path[#path].grammar
+   else
+      return grammar
+   end
+end
+
+function grammar_for_schema_by_name(schema_name, path, is_config)
+   local schema = schema.load_schema_by_name(schema_name)
+   return grammar_for_schema(schema, path, is_config)
+end
+
+grammar_for_schema_by_name = util.memoize(grammar_for_schema_by_name)
 
 local function printer_for_grammar(grammar, path, format, print_default)
    local getter, subgrammar = resolver(grammar, path)
@@ -195,85 +151,61 @@ function parser_for_schema_by_name(schema_name, path)
 end
 parser_for_schema_by_name = util.memoize(parser_for_schema_by_name)
 
-local function parsed_path_to_string (path)
-   local ret = {}
-   for _,v in ipairs(path) do
-      local query = {}
-      for k,v in pairs(v.query or {}) do
-         table.insert(query, '['..k..'='..v..']')
-      end
-      query = table.concat(query, '')
-      table.insert(ret, v.name..query)
-   end
-   return '/'..table.concat(ret, '/')
-end
-
 local function setter_for_grammar(grammar, path)
    if path == "/" then
       return function(config, subconfig) return subconfig end
    end
-   local head = parse_path(path)
+   local head = parse_path(path, grammar)
    local tail = table.remove(head)
-   local tail_name, query = tail.name, tail.query
-   head = parsed_path_to_string(head)
-   if lib.equal(query, {}) then
+   local tail_name, tail_key = tail.name, tail.key
+   local target = head[#head]
+   local target_name, target_key = target.name, target.key
+   if tail_key then
+      -- The path ends in a query; it must denote an array or
+      -- list item.
+      table.insert(head, {name=tail_name, query={}})
+      local getter, grammar = resolver(grammar, head)
+      if grammar.type == 'array' then
+         local idx = tail_key
+         return function(config, subconfig)
+            local array = getter(config)
+            array[idx] = subconfig
+            return config
+         end
+      elseif grammar.type == 'list' then
+         return function (config, subconfig)
+            local l = list.object(getter(config))
+            l:add_or_update_entry(tail_key, subconfig)
+            return config
+         end
+      else
+         error("Invalid path: '"..tail_name.."' can not be queried")
+      end
+   elseif target_key then
+      -- The path updates an entry in a collection; it must denote
+      -- a list item.
+      head[#head] = {name=target_name, query={}}
+      local getter, grammar = resolver(grammar, head)
+      local tail_id = data.normalize_id(tail_name)
+      assert(grammar.type == 'list')
+      return function (config, subconfig)
+         local l = list.object(getter(config))
+         local entry = l:find_entry(target_key)
+         entry[tail_id] = subconfig
+         l:add_or_update_entry(entry)
+         return config
+      end
+   else
       -- No query; the simple case.
       local getter, grammar = resolver(grammar, head)
-      assert(grammar.type == 'struct')
+      if grammar.type ~= 'struct' then
+         error("Invalid path: missing query for '"..tail.name.."'")
+      end
       local tail_id = data.normalize_id(tail_name)
       return function(config, subconfig)
          getter(config)[tail_id] = subconfig
          return config
       end
-   end
-
-   -- Otherwise the path ends in a query; it must denote an array or
-   -- table item.
-   local getter, grammar = resolver(grammar, head..'/'..tail_name)
-   if grammar.type == 'array' then
-      local idx = prepare_array_lookup(query)
-      return function(config, subconfig)
-         local array = getter(config)
-         assert(idx <= #array)
-         array[idx] = subconfig
-         return config
-      end
-   elseif grammar.type == 'table' then
-      local key = prepare_table_lookup(grammar.keys, grammar.key_ctype, query)
-      if grammar.native_key then
-         key = key[data.normalize_id(grammar.native_key)]
-         return function(config, subconfig)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = subconfig
-            return config
-         end
-      elseif grammar.key_ctype and grammar.value_ctype then
-         return function(config, subconfig)
-            getter(config):update(key, subconfig)
-            return config
-         end
-      elseif grammar.key_ctype then
-         return function(config, subconfig)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = subconfig
-            return config
-         end
-      else
-         return function(config, subconfig)
-            local tab = getter(config)
-            for k,v in pairs(tab) do
-               if lib.equal(k, key) then
-                  tab[k] = subconfig
-                  return config
-               end
-            end
-            error("Not found")
-         end
-      end
-   else
-      error('Query parameters only allowed on arrays and tables')
    end
 end
 
@@ -288,86 +220,32 @@ end
 setter_for_schema_by_name = util.memoize(setter_for_schema_by_name)
 
 local function adder_for_grammar(grammar, path)
-   local top_grammar = grammar
    local getter, grammar = resolver(grammar, path)
    if grammar.type == 'array' then
-      if grammar.ctype then
-         -- It's an FFI array; have to create a fresh one, sadly.
-         local setter = setter_for_grammar(top_grammar, path)
-         local elt_t = data.typeof(grammar.ctype)
-         local array_t = ffi.typeof('$[?]', elt_t)
-         return function(config, subconfig)
-            local cur = getter(config)
-            local new = array_t(#cur + #subconfig)
-            local i = 1
-            for _,elt in ipairs(cur) do new[i-1] = elt; i = i + 1 end
-            for _,elt in ipairs(subconfig) do new[i-1] = elt; i = i + 1 end
-            return setter(config, util.ffi_array(new, elt_t))
-         end
-      end
-      -- Otherwise we can add entries in place.
       return function(config, subconfig)
          local cur = getter(config)
-         for _,elt in ipairs(subconfig) do table.insert(cur, elt) end
+         for _,elt in ipairs(subconfig) do
+            cur[#cur+1] = elt
+         end
          return config
       end
-   elseif grammar.type == 'table' then
+   elseif grammar.type == 'list' then
       -- Invariant: either all entries in the new subconfig are added,
       -- or none are.
-      if grammar.native_key
-      or (grammar.key_ctype and not grammar.value_ctype) then
-         -- cltable or string-keyed table.
-         local pairs = grammar.key_ctype and cltable.pairs or pairs
-         return function(config, subconfig)
-            local tab = getter(config)
-            for k,_ in pairs(subconfig) do
-               if tab[k] ~= nil then error('already-existing entry') end
+      return function(config, subconfig)
+         local l = list.object(getter(config))
+         for i, entry in ipairs(subconfig) do
+            if l:find_entry(entry) then
+               error("Can not add already-existing list entry #"..i)
             end
-            for k,v in pairs(subconfig) do tab[k] = v end
-            return config
          end
-      elseif grammar.key_ctype and grammar.value_ctype then
-         -- ctable.
-         return function(config, subconfig)
-            local ctab = getter(config)
-            for entry in subconfig:iterate() do
-               if ctab:lookup_ptr(entry.key) ~= nil then
-                  error('already-existing entry')
-               end
-            end
-            for entry in subconfig:iterate() do
-               ctab:add(entry.key, entry.value)
-            end
-            return config
+         for _, entry in ipairs(subconfig) do
+            l:add_entry(entry)
          end
-      elseif grammar.native_key or grammar.key_ctype then
-         -- cltable or native-keyed table.
-         local pairs = grammar.native_key and pairs or cltable.pairs
-         return function(config, subconfig)
-            local tab = getter(config)
-            for k,_ in pairs(subconfig) do
-               if tab[k] ~= nil then error('already-existing entry') end
-            end
-            for k,v in pairs(subconfig) do tab[k] = v end
-            return config
-         end
-      else
-         -- Sad quadratic loop.
-         return function(config, subconfig)
-            local tab = getter(config)
-            for key,val in pairs(tab) do
-               for k,_ in pairs(subconfig) do
-                  if lib.equal(key, k) then
-                     error('already-existing entry', key)
-                  end
-               end
-            end
-            for k,v in pairs(subconfig) do tab[k] = v end
-            return config
-         end
+         return config
       end
    else
-      error('Add only allowed on arrays and tables')
+      error("Invalid path: '"..tail_name.."' is not a list or a leaf-list")
    end
 end
 
@@ -382,74 +260,32 @@ end
 adder_for_schema_by_name = util.memoize(adder_for_schema_by_name)
 
 local function remover_for_grammar(grammar, path)
-   local top_grammar = grammar
-   local head = parse_path(path)
+   local head = parse_path(path, grammar)
    local tail = table.remove(head)
-   local tail_name, query = tail.name, tail.query
-   head = parsed_path_to_string(head)
-   local head_and_tail_name = head..'/'..tail_name
-   local getter, grammar = resolver(grammar, head_and_tail_name)
+   if not tail.key then error("Invalid path: missing query") end
+   local tail_name, key = tail.name, tail.key
+   table.insert(head, {name=tail_name, query={}})
+   local getter, grammar = resolver(grammar, head)
    if grammar.type == 'array' then
-      if grammar.ctype then
-         -- It's an FFI array; have to create a fresh one, sadly.
-         local idx = prepare_array_lookup(query)
-         local setter = setter_for_grammar(top_grammar, head_and_tail_name)
-         local elt_t = data.typeof(grammar.ctype)
-         local array_t = ffi.typeof('$[?]', elt_t)
-         return function(config)
-            local cur = getter(config)
-            assert(idx <= #cur)
-            local new = array_t(#cur - 1)
-            for i,elt in ipairs(cur) do
-               if i < idx then new[i-1] = elt end
-               if i > idx then new[i-2] = elt end
-            end
-            return setter(config, util.ffi_array(new, elt_t))
-         end
-      end
-      -- Otherwise we can remove the entry in place.
+      local idx = key
       return function(config)
          local cur = getter(config)
-         assert(i <= #cur)
-         table.remove(cur, i)
+         if idx > #cur then
+            error("Leaf-list '"..tail_name"' has no element #"..idx)
+         end
+         cur[idx] = nil
          return config
       end
-   elseif grammar.type == 'table' then
-      local key = prepare_table_lookup(grammar.keys, grammar.key_ctype, query)
-      if grammar.native_key then
-         key = key[data.normalize_id(grammar.native_key)]
-         return function(config)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = nil
-            return config
+   elseif grammar.type == 'list' then
+      return function(config)
+         local l = list.object(getter(config))
+         if not l:remove_entry(key) then
+            error("List '"..tail_name"' has no entry matching the query")
          end
-      elseif grammar.key_ctype and grammar.value_ctype then
-         return function(config)
-            getter(config):remove(key)
-            return config
-         end
-      elseif grammar.key_ctype then
-         return function(config)
-            local tab = getter(config)
-            assert(tab[key] ~= nil)
-            tab[key] = nil
-            return config
-         end
-      else
-         return function(config)
-            local tab = getter(config)
-            for k,v in pairs(tab) do
-               if lib.equal(k, key) then
-                  tab[k] = nil
-                  return config
-               end
-            end
-            error("Not found")
-         end
+         return config
       end
    else
-      error('Remove only allowed on arrays and tables')
+      error("Invalid path: '"..tail_name.."' is not a list or a leaf-list")
    end
 end
 
@@ -462,105 +298,6 @@ function remover_for_schema_by_name (schema_name, path)
    return remover_for_schema(schema.load_schema_by_name(schema_name), path)
 end
 remover_for_schema_by_name = util.memoize(remover_for_schema_by_name)
-
-function leafref_checker_from_grammar(grammar)
-   -- Converts a relative path to an absolute path.
-   -- TODO: Consider moving it to /lib/yang/path.lua.
-   local function to_absolute_path (path, node_path)
-      path = path:gsub("current%(%)", node_path)
-      if path:sub(1, 1) == '/' then return path end
-      if path:sub(1, 2) == './' then
-         path = path:sub(3)
-         return node_path..'/'..path
-      end
-      while path:sub(1, 3) == '../' do
-         path = path:sub(4)
-         node_path = lib.dirname(node_path)
-      end
-      return node_path..'/'..path
-   end
-   local function leafref (node)
-      return node.argument_type and node.argument_type.leafref
-   end
-   -- Leafref nodes iterator. Returns node as value and full data path as key.
-   local function visit_leafref_paths (root)
-      local function visit (path, node)
-         if node.type == 'struct' then
-            for k,v in pairs(node.members) do visit(path..'/'..k, v) end
-         elseif node.type == 'array' then
-            -- Pass.
-         elseif node.type == 'scalar' then
-            if leafref(node) then
-               coroutine.yield(path, node)
-            else
-               -- Pass.
-            end
-         elseif node.type == 'table' then
-            for k,v in pairs(node.keys) do visit(path..'/'..k, v) end
-            for k,v in pairs(node.values) do visit(path..'/'..k, v) end
-         elseif node.type == 'choice' then
-            for _,choice in pairs(node.choices) do
-               for k,v in pairs(choice) do visit(path..'/'..k, v) end
-            end
-         else
-            error('unexpected kind', node.kind)
-         end
-      end
-      return coroutine.wrap(function() visit('', root) end), true
-   end
-   -- Fetch value of path in data tree.
-   local function resolve (data, path)
-      local ret = data
-      for k in path:gmatch("[^/]+") do ret = ret[k] end
-      return ret
-   end
-   -- If not present, should be true.
-   local function require_instance (node)
-      if node.argument_type.require_instances == nil then return true end
-      return node.argument_type.require_instances
-   end
-   local leafrefs = {}
-   for path, node in visit_leafref_paths(grammar) do
-      if require_instance(node) then
-         local leafref = to_absolute_path(leafref(node), path)
-         local success, getter = pcall(resolver, grammar, lib.dirname(leafref))
-         if success then
-            table.insert(leafrefs, {path=path, leafref=leafref, getter=getter})
-         end
-      end
-   end
-   if #leafrefs == 0 then return function(data) end end
-   return function (data)
-      for _,v in ipairs(leafrefs) do
-         local path, leafref, getter = v.path, v.leafref, v.getter
-         local results = assert(getter(data),
-                                'Wrong XPath expression: '..leafref)
-         local val = resolve(data, path)
-         assert(type(results) == 'table' and results[val],
-               ("Broken leafref integrity in '%s' when referencing '%s'"):format(
-                path, leafref))
-      end
-   end
-end
-
-local function pairs_from_grammar(grammar)
-   if grammar.native_key then
-      return pairs
-   elseif grammar.key_ctype and grammar.value_ctype then
-      return function (ctable)
-         local ctable_next, ctable_max, ctable_entry = ctable:iterate()
-         return function()
-            ctable_entry = ctable_next(ctable_max, ctable_entry)
-            if not ctable_entry then return end
-            return ctable_entry.key, ctable_entry.value
-         end
-      end
-   elseif grammar.key_ctype then
-      return cltable.pairs
-   else
-      return pairs
-   end
-end
 
 local function expanded_pairs(values)
    -- Return an iterator for each non-choice pair in values and each pair of
@@ -581,116 +318,203 @@ local function expanded_pairs(values)
    return pairs(expanded)
 end
 
-function uniqueness_checker_from_grammar(grammar)
-   -- Generate checker for table
-   local function unique_assertion(leaves, grammar)
-      local unique_leaves = {}
-      for leaf in leaves:split(" +") do
-         table.insert(unique_leaves, normalize_id(leaf))
-      end
-      local pairs = pairs_from_grammar(grammar)
-      return function (tab)
-         -- Sad quadratic loop, again
-         for k1, v1 in pairs(tab) do
-            for k2, v2 in pairs(tab) do
-               if k1 == k2 then break end
-               local collision = true
-               for _, leaf in ipairs(unique_leaves) do
-                  if not lib.equal(v1[leaf], v2[leaf]) then
-                     collision = false
-                     break
+function checker_from_grammar(grammar, checker)
+   local function path_add(path, name)
+      local p = {}
+      function p.unparse() return unparse_path(p, grammar) end
+      for i, part in ipairs(path) do p[i] = part end
+      p[#p+1] = {name=name, query={}}
+      return p
+   end
+   local function visitor(node, path)
+      local check = checker(node, path, grammar)
+      if node.type == 'scalar' then
+         return check
+      elseif node.type == 'struct' then
+         local visits = {}
+         for name, member in expanded_pairs(node.members) do
+            local id = normalize_id(name)
+            visits[id] = visitor(member, path_add(path, name))
+         end
+         for _ in pairs(visits) do
+            return function (data, root)
+               root = root or data
+               if check then check(data, root) end
+               for id, visit in pairs(visits) do
+                  if data[id] then visit(data[id], root) end
+               end
+            end
+         end
+         return check
+      elseif node.type == 'array' then
+         -- Pretend that array elements are scalars.
+         local pseudo_node = {type="scalar", argument_type=node.element_type,
+                              ctype=node.ctype}
+         local check_elt = checker(pseudo_node, path, grammar)
+         if check_elt then
+            return function (data, root)
+               root = root or data
+               if check then check(data, root) end
+               for idx, elt in ipairs(data) do
+                  path[#path].key = idx
+                  check_elt(elt, root)
+               end
+               path[#path].key = nil
+            end
+         end
+         return check
+      elseif node.type == 'list' then
+         local checks_and_visits = {}
+         for name, member in pairs(node.keys) do
+            local id = normalize_id(name)
+            checks_and_visits[id] =
+               checker(member, path_add(path, name), grammar)
+         end
+         for name, member in expanded_pairs(node.values) do
+            local id = normalize_id(name)
+            checks_and_visits[id] =
+               visitor(member, path_add(path, name))
+         end
+         for _ in pairs(checks_and_visits) do
+            return function (data, root)
+               root = root or data
+               if check then check(data, root) end
+               for _, entry in ipairs(data) do
+                  path[#path].key = entry
+                  for id, visit in pairs(checks_and_visits) do
+                     if entry[id] then visit(entry[id], root) end
                   end
                end
-               assert(not collision, "Not unique: "..leaves)
+               path[#path].key = nil
             end
          end
+         return check
+      else
+         error("BUG: unhandled node type: "..node.type)
       end
    end
-   -- Visit tables with unique constraints in grammar and apply checker
-   local function visit_unique_and_check(grammar, data)
-      if not data then return
-      elseif grammar.type == 'table' then
-         local pairs = pairs_from_grammar(grammar)
-         -- visit values
-         for name, value in expanded_pairs(grammar.values) do
-            for k, datum in pairs(data) do
-               visit_unique_and_check(value, datum[normalize_id(name)])
-            end
-         end
-         -- check unique rescrictions
-         for _, leaves in ipairs(grammar.unique) do
-            unique_assertion(leaves, grammar)(data)
-         end
-      elseif grammar.type == 'struct' then
-         -- visit members
-         for name, member in expanded_pairs(grammar.members) do
-            visit_unique_and_check(member, data[normalize_id(name)])
+   return visitor(grammar, {})
+end
+
+local function consistency_error(path, msg, ...)
+   if path.unparse then path = path.unparse() end
+   error(("Consistency error in '%s': %s")
+      :format(normalize_path(path), msg:format(...)))
+end
+
+local function leafref_checker(node, path, grammar)
+   if node.type ~= 'scalar' then return end
+   if not (node.argument_type and node.argument_type.leafref) then return end
+   local ok, leafref = pcall(parse_path, node.argument_type.leafref)
+   if not ok then
+      consistency_error(path,
+         "invalid leafref '%s' (%s)",
+         node.argument_type.leafref, leafref)
+   end
+   for _, part in ipairs(leafref) do
+      -- NYI: queries in leafrefs are currently ignored.
+      part.query = {}
+   end
+   local ok, err = pcall(parse_relative_path, leafref, path, grammar)
+   if not ok then
+      consistency_error(path,
+         "invalid leafref '%s' (%s)",
+         node.argument_type.leafref, err)
+   end
+   if node.require_instances ~= false then
+      -- We only support one simple case:
+      -- leafrefs that are keys into lists with a single key.
+      local leaf = table.remove(leafref)
+      local list = leafref[#leafref]
+      if not (list and list.grammar.type == 'list') then return end
+      if not list.grammar.list.has_key then return end
+      for k in pairs(list.grammar.keys) do
+         if k ~= leaf.name then return end
+      end
+      return function (data, root)
+         local ok, err = pcall(function ()
+            list.query = {[leaf.name]=assert(data, "missing leafref value")}
+            local p = parse_relative_path(leafref, unparse_path(path, grammar))
+            return resolver(grammar, p)(root)
+         end)
+         if not ok then
+            consistency_error(path,
+               "broken leafref integrity for '%s' (%s)",
+               normalize_path(leafref), err)
          end
       end
-   end
-   return function (data)
-      visit_unique_and_check(grammar, data)
    end
 end
 
-function minmax_elements_checker_from_grammar(grammar)
-   -- Generate checker for table (list, leaf-list)
-   local function minmax_assertion(grammar, name)
-      name = name or ""
-      if not (grammar.min_elements or grammar.max_elements) then
-         return function () end
+local function uniqueness_checker(node, path)
+   local function collision_checker(unique)
+      local leaves = {}
+      for leaf in unique:split(" +") do
+         table.insert(leaves, normalize_id(leaf))
       end
-      local pairs = pairs_from_grammar(grammar)
-      return function (tab)
-         local n = 0
-         for k1, v1 in pairs(tab) do
-            n = n + 1
-         end
-         if grammar.min_elements then
-            assert(n >= grammar.min_elements,
-                   name..": requires at least "..
-                      grammar.min_elements.." element(s)")
-         end
-         if grammar.max_elements then
-            assert(n <= grammar.max_elements,
-                   name..": must not have more than "..
-                      grammar.max_elements.." element(s)")
-         end
-      end
-   end
-   -- Visit tables with unique constraints in grammar and apply checker
-   local function visit_minmax_and_check(grammar, data, name)
-      if not data then return
-      elseif grammar.type == 'array' then
-         -- check min/max elements restrictions
-         minmax_assertion(grammar, name)(data)
-      elseif grammar.type == 'table' then
-         -- visit values
-         local pairs = pairs_from_grammar(grammar)
-         for name, value in expanded_pairs(grammar.values) do
-            for k, datum in pairs(data) do
-               visit_minmax_and_check(value, datum[normalize_id(name)], name)
+      return function (x, y)
+         local collision = true
+         for _, leaf in ipairs(leaves) do
+            if not lib.equal(x[leaf], y[leaf]) then
+               collision = false
+               break
             end
          end
-         -- check min/max elements restrictions
-         minmax_assertion(grammar, name)(data)
-      elseif grammar.type == 'struct' then
-         -- visit members
-         for name, member in expanded_pairs(grammar.members) do
-            visit_minmax_and_check(member, data[normalize_id(name)], name)
+         return collision
+      end
+   end
+   local function has_collision(list, collision)
+      -- Sad quadratic loop
+      for i, x in ipairs(list) do
+         for j, y in ipairs(list) do
+            if i == j then break end
+            if collision(x, y) then
+               return true
+            end
          end
       end
    end
+   if node.type ~= 'list' then return end
+   if not node.unique or #node.unique == 0 then return end
+   local invariants = {}
+   for _, unique in ipairs(node.unique) do
+      invariants[unique] = collision_checker(unique)
+   end
    return function (data)
-      visit_minmax_and_check(grammar, data)
+      for unique, collision in pairs(invariants) do
+         if has_collision(data, collision) then
+            consistency_error(path, "not unique (%s)", unique)
+         end
+      end
+   end
+end
+
+local function minmax_checker(node, path)
+   if not (node.type == 'array' or node.type == 'list') then return end
+   if not (node.min_elements or node.max_elements) then return end
+   return function (data)
+      local n = #data
+      if node.min_elements and n < node.min_elements then
+         consistency_error(path,
+            "requires at least %d element(s)", node.min_elements)
+      end
+      if node.max_elements and n > node.max_elements then
+         consistency_error(path,
+            "must not have more than %d element(s)", node.max_elements)
+      end
    end
 end
 
 function consistency_checker_from_grammar(grammar)
+   local checks = {
+      checker_from_grammar(grammar, leafref_checker),
+      checker_from_grammar(grammar, uniqueness_checker),
+      checker_from_grammar(grammar, minmax_checker)
+   }
    return function (data)
-      leafref_checker_from_grammar(grammar)(data)
-      uniqueness_checker_from_grammar(grammar)(data)
-      minmax_elements_checker_from_grammar(grammar)(data)
+      for _, check in pairs(checks) do
+         check(data)
+      end
    end
 end
 
@@ -850,13 +674,29 @@ function selftest()
    local checker = consistency_checker_from_schema(my_schema, true)
    checker(loaded_data)
 
+   local invalid_data = data.load_config_for_schema(my_schema, mem.open_input_string([[
+   test {
+      interface {
+         name "eth1";
+         admin-status true;
+         address {
+            ip 192.168.0.1;
+         }
+      }
+      mgmt "eth0";
+   }
+   ]]))
+   local ok, err = pcall(checker, invalid_data)
+   assert(not ok)
+   print(err)
+
    local checker = consistency_checker_from_schema_by_name('ietf-alarms', false)
    assert(checker)
 
    local scm = schema.load_schema_by_name('snabb-softwire-v3')
    local grammar = data.config_grammar_from_schema(scm)
    setter_for_grammar(grammar, "/softwire-config/instance[device=test]/"..
-                               "queue[id=0]/external-interface/ip 208.118.235.148")
+                               "queue[id=0]/external-interface/ip")
    remover_for_grammar(grammar, "/softwire-config/instance[device=test]/")
 
    -- Test unique restrictions:
@@ -890,6 +730,7 @@ function selftest()
                                      }
    ]]))
    assert(not success)
+   print(result)
 
    -- Test unique validation (should succeed)
    checker(data.load_config_for_schema(unique_schema,
@@ -1088,6 +929,57 @@ function selftest()
                                             testleaf "bar";
                                           }
    ]]))
+
+   -- Test restrictions embedded in list entries:
+   local nested_schema = schema.load_schema([[module nested-schema {
+      namespace "urn:ietf:params:xml:ns:yang:nested-schema";
+      prefix "test";
+
+      list entry {
+         key name;
+         leaf name { type string; }
+         leaf-list ll { type string; min-elements 1; }
+      }
+
+      list ref {
+         key name;
+         leaf name { type string; }
+         leaf entry {
+            type leafref {
+               path "../../entry/name";
+            }
+         }
+      }
+   }]])
+   local checker = consistency_checker_from_schema(nested_schema, true)
+   
+   -- Test validation (should succeed)
+   checker(data.load_config_for_schema(nested_schema,
+                                       mem.open_input_string [[
+      entry { name foo; ll "a"; }
+      ref { name bar; entry foo; }
+   ]]))
+
+   -- Test minmax inconsistency in list entry (should fail)
+   local ok, err = pcall(checker,
+      data.load_config_for_schema(nested_schema,
+                                  mem.open_input_string [[
+      entry { name foo; }
+      ref { name bar; entry foo; }
+   ]]))
+   assert(not ok)
+   print(err)
+
+   -- Test leafref inconsistency in list entry (should fail)
+   local ok, err = pcall(checker,
+      data.load_config_for_schema(nested_schema,
+                                  mem.open_input_string [[
+      entry { name foo; ll "a"; }
+      ref { name bar; entry foo1; }
+   ]]))
+   assert(not ok)
+   print(err)
+
 
    print("selftest: ok")
 end

@@ -15,8 +15,13 @@ local cast = ffi.cast
 
 -- Returns true if x and y are structurally similar (isomorphic).
 function equal (x, y)
-   if type(x) ~= type(y) then return false end
-   if type(x) == 'table' then
+   if type(x) ~= type(y) then
+      return false
+   elseif x == y then
+      return true
+   elseif type(x) == 'table' then
+      if getmetatable(x) then return false end
+      if getmetatable(y) then return false end
       for k, v in pairs(x) do
          if not equal(v, y[k]) then return false end
       end
@@ -31,7 +36,7 @@ function equal (x, y)
       if ffi.sizeof(y) ~= size then return false end
       return C.memcmp(x, y, size) == 0
    else
-      return x == y
+      return false
    end
 end
 

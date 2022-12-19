@@ -218,6 +218,7 @@ ConnectX.config = {
    fc_tx_enable = { default  = false },
    queues       = { required = true },
    macvlan      = { default  = false },
+   sync_stats_interval = {default = 1}
 }
 local queue_config = {
    id   = { required = true },
@@ -315,7 +316,7 @@ function ConnectX:new (conf)
    -- Lists of receive queues by macvlan (used if usemac=true)
    local macvlan_rqlist = {}
 
-   for _, queue in ipairs(conf.queues) do
+   for _, queue in ipairs(queues) do
       -- Create a shared memory object for controlling the queue pair
       local shmpath = "group/pci/"..pciaddress.."/"..queue.id
       local cxq = shm.create(shmpath, cxq_t)
@@ -610,7 +611,7 @@ function ConnectX:new (conf)
       -- Post command
       req.start_fn(req.hca, req.args)
    end
-   self.sync_timer = lib.throttle(1)
+   self.sync_timer = lib.throttle(conf.sync_stats_interval)
 
    function free_cxq (cxq)
       -- Force CXQ state -> DEAD
@@ -644,6 +645,7 @@ function ConnectX:new (conf)
          free_cxq(cxq)
          shm.unlink(shmpath)
       end
+      shm.delete_frame(self.stats)
    end
 
    function self:pull ()
@@ -651,6 +653,31 @@ function ConnectX:new (conf)
          self:sync_stats()
          eq:poll()
       end
+   end
+
+   local last_stats = {
+      rxpackets = 0,
+      rxbytes = 0,
+      txpackets = 0,
+      txbytes = 0
+   }
+   function self:report ()
+      self:sync_stats()
+      local stats = self.stats
+      local txpackets = counter.read(stats.txpackets) - last_stats.txpackets
+      local txbytes = counter.read(stats.txbytes) - last_stats.txbytes
+      local rxpackets = counter.read(stats.rxpackets) - last_stats.rxpackets
+      local rxbytes = counter.read(stats.rxbytes) - last_stats.rxbytes
+      last_stats.txpackets = counter.read(stats.txpackets)
+      last_stats.txbytes = counter.read(stats.txbytes)
+      last_stats.rxpackets = counter.read(stats.rxpackets)
+      last_stats.rxbytes = counter.read(stats.rxbytes)
+      print(pciaddress,
+         "TX packets", lib.comma_value(tonumber(txpackets)),
+         "TX bytes", lib.comma_value(tonumber(txbytes)))
+      print(pciaddress,
+         "RX packets", lib.comma_value(tonumber(rxpackets)),
+         "RX bytes", lib.comma_value(tonumber(rxbytes)))
    end
 
    function self:sync_stats ()
@@ -1459,7 +1486,12 @@ function IO:new (conf)
 
    -- Detach from the NIC.
    function self:stop ()
-      close()
+      if cxq then
+         if not sync.cas(cxq.state, IDLE, FREE) then
+            assert(cxq.state[0] == DEAD, "illegal state detected")
+         end
+         close()
+      end
    end
 
    -- Configure self as packetblaster?

@@ -69,6 +69,13 @@ local ipv4_ntop = require("lib.yang.util").ipv4_ntop
 
 local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
 
+softwire_key_t = ffi.typeof[[
+   struct { uint32_t ipv4; uint16_t psid; }
+]]
+softwire_value_t = ffi.typeof[[
+   struct { uint8_t b4_ipv6[16], br_address[16]; }
+]]
+
 psid_map_key_t = ffi.typeof[[
    struct { uint32_t addr; }
 ]]
@@ -78,18 +85,22 @@ psid_map_value_t = ffi.typeof[[
 
 BTLookupQueue = {}
 
+local BTLookupQueue_size = 128
+assert(BTLookupQueue_size >= engine.pull_npackets)
+
 -- BTLookupQueue needs a binding table to get softwires and PSID lookup.
 function BTLookupQueue.new(binding_table)
    local ret = {
       binding_table = assert(binding_table),
    }
-   ret.streamer = binding_table.softwires:make_lookup_streamer(32)
-   ret.packet_queue = ffi.new("struct packet * [32]")
+   ret.streamer = binding_table.softwires:make_lookup_streamer(BTLookupQueue_size)
+   ret.packet_queue = ffi.new("struct packet * [?]", BTLookupQueue_size)
    ret.length = 0
    return setmetatable(ret, {__index=BTLookupQueue})
 end
 
 function BTLookupQueue:enqueue_lookup(pkt, ipv4, port)
+   assert(self.length < BTLookupQueue_size, "BTLookupQueue overflow")
    local n = self.length
    local streamer = self.streamer
    streamer.entries[n].key.ipv4 = ipv4
@@ -97,7 +108,6 @@ function BTLookupQueue:enqueue_lookup(pkt, ipv4, port)
    self.packet_queue[n] = pkt
    n = n + 1
    self.length = n
-   return n == 32
 end
 
 function BTLookupQueue:process_queue()
@@ -131,32 +141,32 @@ function BTLookupQueue:reset_queue()
 end
 
 local BindingTable = {}
-local lookup_key
 function BindingTable.new(psid_map, softwires)
    local ret = {
       psid_map = assert(psid_map),
       softwires = assert(softwires),
+      entry = softwires.entry_type()
    }
-   lookup_key = ret.softwires.entry_type().key
    return setmetatable(ret, {__index=BindingTable})
 end
 
 function BindingTable:add_softwire_entry(entry_blob)
-   local entry = self.softwires.entry_type()
+   local entry = self.entry
    assert(ffi.sizeof(entry) == ffi.sizeof(entry_blob))
-   ffi.copy(entry, entry_blob, ffi.sizeof(entry_blob))
+   ffi.copy(entry, entry_blob, ffi.sizeof(entry))
    self.softwires:add(entry.key, entry.value)
 end
 
 function BindingTable:remove_softwire_entry(entry_key_blob)
-   local entry = self.softwires.entry_type()
+   local entry = self.entry
    assert(ffi.sizeof(entry.key) == ffi.sizeof(entry_key_blob))
-   ffi.copy(entry.key, entry_key_blob, ffi.sizeof(entry_key_blob))
+   ffi.copy(entry.key, entry_key_blob, ffi.sizeof(entry.key))
    self.softwires:remove(entry.key)
 end
 
 
 function BindingTable:lookup(ipv4, port)
+   local lookup_key = self.entry.key
    local psid = self:lookup_psid(ipv4, port)
    lookup_key.ipv4 = ipv4
    lookup_key.psid = psid
@@ -223,7 +233,7 @@ function BindingTable:iterate_softwires()
 end
 
 function pack_psid_map_entry (softwire)
-   local port_set = assert(softwire.value.port_set)
+   local port_set = assert(softwire.port_set)
 
    local psid_length = port_set.psid_length
    local shift = 16 - psid_length - (port_set.reserved_ports_bit_count or 0)
@@ -232,7 +242,7 @@ function pack_psid_map_entry (softwire)
             ("psid_length %s + shift %s should not exceed 16"):
                format(psid_length, shift))
 
-   local key = softwire.key.ipv4
+   local key = softwire.ipv4
    local value = {psid_length = psid_length, shift = shift}
 
    return key, value
@@ -259,18 +269,33 @@ function load (conf)
       self.keys[key] = value
    end
 
-   for entry in conf.softwire:iterate() do
+   local softwires = ctable.new{
+      key_type = softwire_key_t,
+      value_type = softwire_value_t,
+      max_occupancy_rate = 0.4
+   }
+
+   local key, value = softwire_key_t(), softwire_value_t()
+   for _, entry in ipairs(conf.softwire) do
+      -- Add entry to binding table
+      key.ipv4 = entry.ipv4
+      key.psid = entry.psid
+      value.b4_ipv6 = entry.b4_ipv6
+      value.br_address = entry.br_address
+      softwires:add(key, value)
+
       -- Check that the map either hasn't been added or that
       -- it's the same value as one which has.
       local psid_key, psid_value = pack_psid_map_entry(entry)
       if not inter_psid_map:exists(psid_key, psid_value) then
          inter_psid_map:add(psid_key, psid_value)
-         psid_builder:add(entry.key.ipv4, psid_value)
+         psid_builder:add(entry.ipv4, psid_value)
       end
    end
 
    local psid_map = psid_builder:build(psid_map_value_t(), true)
-   return BindingTable.new(psid_map, conf.softwire)
+
+   return BindingTable.new(psid_map, softwires)
 end
 
 function selftest()

@@ -12,9 +12,16 @@ local function fatal (msg)
    main.exit(1)
 end
 
+local default_jit_opt = {
+   sizemcode=256,
+   maxmcode=2048
+}
+
 local scheduling_opts = {
+   jit_opt = {default=default_jit_opt}, -- JIT options.
    cpu = {},                  -- CPU index (integer).
    real_time = {},            -- Boolean.
+   max_packets = {},          -- Positive integer.
    ingress_drop_monitor = {}, -- Action string: one of 'flush' or 'warn'.
    profile = {default=true},  -- Boolean.
    busywait = {default=true}, -- Boolean.
@@ -23,6 +30,14 @@ local scheduling_opts = {
 }
 
 local sched_apply = {}
+
+function sched_apply.jit_opt(opt)
+   local args = {}
+   for key, value in pairs(opt) do
+      table.insert(args, ("%s=%s"):format(key, value))
+   end
+   require("jit.opt").start(unpack(args))
+end
 
 function sched_apply.cpu (cpu)
    print(string.format('Binding data-plane PID %s to CPU %s.',
@@ -38,6 +53,10 @@ function sched_apply.real_time (real_time)
    if real_time and not S.sched_setscheduler(0, "fifo", 1) then
       fatal('Failed to enable real-time scheduling.  Try running as root.')
    end
+end
+
+function sched_apply.max_packets (max_packets)
+   packet.initialize(max_packets)
 end
 
 function sched_apply.busywait (busywait)

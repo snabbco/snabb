@@ -1,0 +1,762 @@
+module snabb-snabbflow-v1 {
+  yang-version 1.1;
+  namespace snabb:snabbflow-v1;
+  prefix snabbflow;
+
+  import ietf-inet-types { prefix inet; }
+  import ietf-yang-types { prefix yang; }
+
+  organization "Snabb";
+  contact "Max Rottenkolber <max@mr.gy>";
+  description
+   "Configuration for the Snabbflow IPFIX exporter.";
+
+  revision 2022-04-27 {
+    description
+      "Initial draft.";
+  }
+
+
+  // Snabbflow configuration
+
+  container snabbflow-config {
+    description
+     "Configuration for the Snabbflow IPFIX exporter.";
+
+    list interface {
+      key device;
+      unique "name vlan-tag";
+
+      description
+        "Interaces serving as IPFIX Observation Points.";
+
+      leaf device {
+        type pci-address;
+        description
+          "PCI address of the network device.";
+      }
+      leaf name {
+        type string;
+        description
+          "String used for ifName in ifTable MIB (SNMP).";
+      }
+      leaf description {
+        type string;
+        description
+          "String used for ifAlias in ifTable MIB (SNMP).";
+      }
+      leaf vlan-tag {
+        type uint16 { range 0..4095; }
+        description
+          "802.1Q Ethernet VLAN tag for this interface.";
+      }
+      leaf receive-queue-size {
+        type uint32 { range 512|1024|2048|4096|8192|16384|32768; }
+        default 2048;
+        description
+          "Receive queue size.";
+      }
+    }
+
+    container rss {
+      description
+        "Receive-side scaling (RSS) configuration.
+        The IPFIX workload can be scaled across multiple worker processes via
+
+        1. hardware-scaling: the device driver used to ingest traffic
+           on an interface distributes packets across one or more RSS groups.
+
+        2. software-scaling: traffic may further be distributed to any number
+           of dedicated exporter instance workers via software RSS.";
+
+      container cpu-pool {
+        description
+          "Snabbflow worker processes are bound to CPU cores
+          from the cpu-pool.";
+
+        leaf-list cpu {
+          type uint32;
+          description
+            "CPU cores used by Snabbflow.";
+        }
+      }
+
+      container hardware-scaling {
+        description
+          "Snabbflow supports hardware assisted RSS to scale the workload
+          across one ore more RSS groups. Each RSS group is handled by a
+          dedicated worker process.";
+        
+        leaf rss-groups {
+          type uint32 { range 1..64; }
+          default 1;
+          description
+            "Number of hardware-assisted RSS groups used for scaling.";
+        }
+      }
+
+      container software-scaling {
+        description
+          "In addition to hardware assisted RSS Snabbflow supports
+          software RSS. For each IPFIX exporter, traffic is scaled across
+          one or more exporter instances in each RSS group.";
+
+        list exporter {
+          key name;
+          description
+            "Sofware RSS configuration for the selected exporter.";
+
+          leaf name {
+            type leafref {
+              path "/snabbflow-config/ipfix/exporter/name";
+              require-instance true;
+            }
+            description
+              "The 'name' of an exporter defined in
+              /snabbflow-config/ipfix/exporter.";
+          }
+
+          leaf embed {
+            type boolean;
+            default true;
+            description
+              "By default a single instance of each exporter is embedded
+              in each RSS group worker process.
+              
+              If set to false, then for each RSS group the exporter is
+              executed in one or more instances, each in its own dedicated
+              worker process (using a dedicated CPU core).";
+          }
+          
+          leaf instances {
+            type uint32 { range 1..max; }
+            default 1;
+            description
+              "When 'embed' is false, number of exporter instances per
+              RSS group. Has no effect when 'embed' is set to true.";
+          }
+
+          container restart {
+            description
+              "Restart policy for exporter instance workers.
+              Exporter workers will be restarted if they crash unless they
+              would exceed the configured restart policy.
+              The restart policy is expressed as follows: a process may be
+              restarted up to 'intensity' times within 'period' seconds.
+              Setting 'intensity' to 0 effectively disables restarts.";
+
+            leaf intensity {
+              type decimal64 { range 0..max; }
+              default 5;
+              description
+                "The number of restarts permitted within a given time period.
+                Setting the intensity to 0 effectively disables restarts.";
+            }
+
+            leaf period {
+              type decimal64 { range 0..max; }
+              default 30;
+              description
+                "The duration of the time period in seconds.";
+            }
+          }
+        }
+      }
+    }
+
+    container flow-director {
+      description
+        "Snabbflow supports distinct sets of flows being processed by
+        any number of exporters. Flows are matched into traffic classes
+        which are in turn processed by exporters.";
+
+      list class {
+        key exporter;
+        description
+          "Traffic classes match packets making up the sets of flows
+          processed by indivdual exporters.
+          
+          Each class specifies a single exporter which processes the
+          matched flows, and exporters can only process a single
+          traffic class each.
+          
+          Classes are ordered and matched in sequence. Packets may match
+          multiple classes via use of the 'continue' option. When a packet
+          matches multiple classes, it is duplicated for each class and
+          thereby flows can be processed by multiple exporters.";
+
+        ordered-by user;
+
+        leaf exporter {
+          type leafref {
+            path "/snabbflow-config/ipfix/exporter/name";
+            require-instance true;
+          }
+          description
+            "An exporter defined in /snabbflow-config/ipfix/exporter.
+            Packets matched by the class are processed by this exporter.";
+        }
+        
+        leaf filter {
+          mandatory true;
+          type string;
+          description
+            "pcap-filter(7) expression that specifies
+            packets matching this class.";
+        }
+
+        leaf continue {
+          type boolean;
+          default false;
+          description
+            "If set to true, a packet matching this class can also match
+            further consecutive classes (in match order).
+            By default the matching of a packet to a class terminates
+            the matching process.";
+        }
+      }
+
+      container default-class {
+        description
+          "The default class matches all flows not matched by
+          any other traffic class.";
+
+        leaf exporter {
+          type leafref {
+            path "/snabbflow-config/ipfix/exporter/name";
+            require-instance true;
+          }
+          description
+            "An exporter defined in /snabbflow-config/ipfix/exporter.
+            Flows matched by the default class are processed by this
+            exporter. If none is given, then flows matched by the
+            default class are dropped and not processed by any exporter.";
+        }
+      }
+
+      leaf remove-ipv6-extension-headers {
+        type boolean;
+        default true;
+        description
+          "IPv6 extention headers are stripped from packets unless this
+          is set to false.";
+      }
+    }
+
+    container ipfix {
+      description
+        "IPFIX configuration. See also: apps.ipfix";
+
+      leaf idle-timeout {
+        type decimal64;
+        default 300;
+        description
+          "Number of seconds after which a flow should be considered
+          idle and available for expiry.";
+      }
+
+      leaf active-timeout {
+        type decimal64;
+        default 120;
+        description
+          "Period at which an active, non-idle flow should produce
+          export records.";
+      }
+
+      leaf flush-timeout {
+        type decimal64;
+        default 10;
+        description
+          "Maximum number of seconds after which queued data records
+          are exported.  If set to a positive value, data records are queued
+          until a flow export packet of maximum size according to the configured
+          'mtu' can be generated or 'flush-timeout' seconds have passed
+          since the last export packet was generated, whichever occurs first.
+          If set to zero, data records are exported immediately after each scan
+          of the flow cache.";
+      }
+
+      leaf cache-size {
+        type uint32;
+        default 20000;
+        description
+          "Initial size of flow tables, in terms of number of flows.";
+      }
+
+      leaf max-load-factor {
+        type decimal64;
+        default 0.4;
+        description
+          "Controls provisioning size of hash table backing the cache.
+          Refer to “max_occupancy_rate” in lib/README.ctable.md.";
+      }
+
+      container scan-protection {
+        description
+          "Per /24 prefix, the rate of new flows consisting of only
+          a single packet is measured. This is intended to detect
+          address and port range scans.
+          The options below can be used to limit the rate at which
+          these flows are exported by suppressing them.";
+        leaf enable {
+          type boolean;
+          default false;
+          description
+            "If set to true, scan protection will be enabled.";
+        }
+        leaf threshold-rate {
+          type decimal64;
+          default 10000;
+          description
+            "Rate of new single-packet flows per second within a /24 prefix
+            beyond which exports will be suppressed.";
+        }
+        leaf export-rate {
+          type decimal64;
+          default 500;
+          description
+            "Shared rate limit for exports of all suppressed flows
+            (exports per second).";
+        }
+      }
+
+      leaf scan-time {
+        type decimal64;
+        default 10;
+        description
+          "The flow cache for every configured template is scanned
+          continously to check for entries eligible for export based on the
+          'idle-timeout' and 'active-timeout' leaves.  Scan-time
+          determines the interval in seconds that a scan of the entire flow
+          cache will take.  The implementation uses a token bucket mechanism by
+          which access to the tables is distributed evenly over the time
+          interval.";
+      }
+
+      leaf template-refresh-interval {
+        type decimal64;
+        default 600;
+        description
+          "Period at which to send template records over UDP.";
+      }
+
+      leaf version {
+        type uint32;
+        default 10;
+        description
+          "Version of IPFIX to export.
+          9 indicates legacy NetFlow v9;
+          10 indicates RFC 7011 IPFIX.";
+      }
+
+      leaf mtu {
+        type uint32 { range 512..9000; }
+        default 1500;
+        description
+          "MTU for exported UDP packets.";
+      }
+
+      leaf exporter-ip {
+        mandatory true;
+        type inet:ipv4-address;
+        description
+          "The IPv4 address from which to send exported UDP packets.";
+      }
+
+      container maps {
+        description
+          "Maps to translate various protocol fields to additional flow metadata.";
+        // XXX: YANGify? Document formats.
+        // XXX: make optional, default to empty maps.
+        container pfx4-to-as { leaf file { mandatory true; type string; } }
+        container pfx6-to-as { leaf file { mandatory true; type string; } }
+        container vlan-to-ifindex { leaf file { mandatory true; type string; } }
+        container mac-to-as { leaf file { mandatory true; type string; } }
+        leaf log-directory {
+          type string;
+          description
+            "Path in which to create log files for map failures.
+            If given, failed lookups in maps will be logged to
+            <log-directory>/<observation-domain>.log";
+        }
+      }
+
+      leaf log-date {
+        type boolean;
+        default true;
+        description
+          "Indicates whether each log message should be prepended by
+          the current date and time.";
+      }
+
+      list collector-pool {
+        key name;
+
+        description
+          "Named pools of collector endpoints. Exporter instances
+          distribute exported flows across the collectors in a pool.";
+
+        leaf name { 
+          type string-name;
+          description
+            "Identifier used to refer to the collector pool in
+            /snabbflow-config/ipfix/exporter/collector-pool.";
+        }
+
+        list collector {
+          key "ip port";
+
+          description
+            "The set of collector endpoints within the pool.";
+
+          leaf ip { 
+            mandatory true;
+            type inet:ipv4-address;
+            description
+              "Address of the collector.";
+          }
+          leaf port {
+            mandatory true;
+            type uint16;
+            description
+              "Port of the collector.";
+          }
+        }
+      }
+
+      leaf observation-domain-base {
+        type uint32;
+        default 256;
+        description
+          "Each exporter instance is assigned an Observation Domain.
+          This leaf defines the first identifer used. Further instances
+          will be assigned consecutive identifiers by incrementing the
+          last assigned identifier by one.";
+      }
+
+      list exporter {
+        key name;
+        description
+          "Set of configured exporters. Each exporter receives packets
+          matching a single class defined in /snabbflow-config/rss/flow-director,
+          aggregates flows according to a set of templates, and
+          exports them to a specified /snabbflow-config/ipfix/collector-pool.";
+
+        leaf name {
+          type string-name;
+          description
+            "The name used to refer to this exporter in
+            /snabbflow-config/rss/software-scaling/exporter/name.";
+        }
+
+        leaf-list template {
+          type string;
+          description
+            "The set of templates used to aggregate flows.
+            The available templates are described in apps/ipfix/README.templates.md.";
+        }
+
+        leaf collector-pool {
+          type leafref {
+            path "/snabbflow-config/ipfix/collector-pool/name";
+            require-instance true;
+          }
+          mandatory true;
+          description
+            "A collector pool defined in /snabbflow-config/ipfix/collector-pool.";
+        }
+      }
+    }
+  }
+
+
+  // Types 
+  
+  typedef string-name {
+    type string { pattern '[\w_]+'; }
+    description
+      "A string name used to refer to various Snabbflow components.";
+  }
+
+  typedef numeric-id {
+    type uint32 { range 1..max; }
+    description
+      "A numeric identifier.";
+  }
+
+  typedef pci-address {
+    type string {
+      pattern '([0-9a-fA-F]{4}:)?[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9a-fA-F]';
+    }
+    description
+      "The bus address of a PCI device.";
+  }
+
+
+  // Snabbflow state
+
+  container snabbflow-state {
+    config false;
+    description
+     "Inspectable state for the Snabbflow IPFIX exporter.";
+
+    list interface {
+      key device;
+      description
+        "Network device statistics";
+
+      uses interface-state;
+    }
+
+    list exporter {
+      key name;
+      description
+        "Exporter statistics.";
+
+      leaf name {
+        type leafref {
+          path "/snabbflow-config/ipfix/exporter/name";
+        }
+        description
+          "An exporter defined in /snabbflow-config/ipfix/exporter.";
+      }
+
+      uses exporter-state;
+
+      list template {
+        key id;
+        description
+          "Template statistics.";
+
+        uses template-state;
+      }
+    }
+
+    list rss-group {
+      key id;
+      description
+        "Statistics for the RSS group workers defined in
+        /snabbflow-config/rss/hardware-scaling.";
+
+      leaf id {
+        type numeric-id;
+        description
+          "RSS group identifier.";
+      }
+
+      uses worker-state;
+
+      list queue {
+        key device;
+        description
+          "Statistics for the receive queues used by this RSS group.";
+
+        leaf device {
+          type pci-address;
+          description
+            "PCI address of the network device.";
+        }
+
+        leaf packets-dropped {
+          type yang:zero-based-counter64;
+          description
+            "Count of incoming packets that were dropped.";
+        }
+      }
+
+      list exporter {
+        key name;
+        description
+          "Exporter statistics for this RSS group as per
+          /snabbflow-config/rss/software-scaling.";
+
+        leaf name {
+          type leafref {
+            path "/snabbflow-config/ipfix/exporter/name";
+          }
+          description
+            "An exporter defined in /snabbflow-config/ipfix/exporter.";
+        }
+
+        list instance {
+          key id;
+          description
+            "Statistics for exporter instance workers for this RSS group.";
+
+          leaf id {
+            type numeric-id;
+            description
+              "Exporter instance identifier (within this RSS group).";
+          }
+
+          uses worker-state;
+          uses exporter-state;
+          uses exporter-instance-state;
+
+          list template {
+            key id;
+            description
+              "Statistics for template instances.";
+
+            uses template-state;
+            uses template-instance-state;
+          }
+        }
+      }
+    }
+
+    grouping interface-state {
+      leaf device {
+        type pci-address;
+        description
+          "PCI address of the network device.";
+      }
+
+      leaf packets-received {
+        type yang:zero-based-counter64;
+        description
+          "Count of packets received.";
+      }
+
+      leaf packets-dropped {
+        type yang:zero-based-counter64;
+        description
+          "Count of incoming packets that were dropped.";
+      }
+    }
+
+    grouping exporter-state {
+      leaf packets-received {
+        type yang:zero-based-counter64;
+        description
+          "Count of packets received.";
+      }
+
+      leaf packets-dropped  {
+        type yang:zero-based-counter64;
+        description
+          "Count of incoming packets that were dropped.";
+      }
+
+      leaf packets-ignored  {
+        type yang:zero-based-counter64;
+        description
+          "Count of incoming packets that were ignored.";
+      }
+
+      leaf template-packets-transmitted {
+        type yang:zero-based-counter64;
+        description
+          "Number of template packets transmitted.";
+      }
+    }
+
+    grouping exporter-instance-state {
+      leaf observation-domain {
+        type uint32;
+        description
+          "Observation Domain of this IPFIX exporter instance.";
+      }
+
+      leaf sequence-number {
+        type yang:zero-based-counter64;
+        description
+          "Current IPFIX sequence number. counts the cumulative number of data records
+           transmitted (i.e. excluding template and option records).";
+      }
+    }
+
+    grouping worker-state {
+      leaf pid {
+        type uint32;
+        description
+          "Process identifier of this worker.";
+      }
+    }
+
+    grouping template-state {
+      leaf id {
+        type numeric-id;
+        description
+          "Template ID. See apps/ipfix/README.templates.md.";
+      }
+
+      leaf packets-processed {
+        type yang:zero-based-counter64;
+        description
+          "Number of packets processed by this template.";
+      }
+
+      leaf flows-exported {
+        type yang:zero-based-counter64;
+        description
+          "Count of flows exported for this template.";
+      }
+
+      leaf flow-export-packets {
+        type yang:zero-based-counter64;
+        description
+          "Number of packets emitted for flow exports by this template.";
+      }
+    }
+
+    grouping template-instance-state {
+      container flow-table {
+        description
+          "Statistics for the table used to track active flows for this template.";
+
+        leaf last-scan-time {
+          type uint64;
+          description
+            "Seconds elapsed from start to completion of the last full flow table scan.";
+        }
+
+        uses table-state;
+      }
+
+      container flow-export-rate-table {
+        description
+          "Statistics for the table used to track flow export rates for this template.";
+          
+        uses table-state;
+      }
+    }
+
+    grouping table-state {
+      description
+        "Various data describing a table’s dimensions in memory.";
+
+      leaf occupancy {
+        type uint64;
+        description
+          "Number of entries stored in the table.";
+      }
+
+      leaf size {
+        type uint64;
+        description
+          "Current size of the table in entries.";
+      }
+
+      leaf byte-size {
+        type uint64;
+        description
+          "Current size of the table in bytes.";
+      }
+
+      leaf load-factor {
+        type decimal64;
+        description
+          "Ratio of table occupancy/size.";
+      }
+
+      leaf max-displacement {
+        type uint64;
+        description
+          "The most entries that currently map to a single hash bucket.
+          Large 'max-displacement' values indicate an unnaturally unbalanced table.";
+      }
+    }
+
+  }
+}

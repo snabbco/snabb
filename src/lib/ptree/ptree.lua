@@ -10,7 +10,6 @@ local lib = require("core.lib")
 local shm = require("core.shm")
 local timer = require("core.timer")
 local worker = require("core.worker")
-local cltable = require("lib.cltable")
 local cpuset = require("lib.cpuset")
 local rrd = require("lib.rrd")
 local scheduling = require("lib.scheduling")
@@ -60,7 +59,13 @@ local manager_config_spec = {
    log_level = {default=default_log_level},
    rpc_trace_file = {},
    cpuset = {default=cpuset.global_cpuset()},
-   Hz = {default=100},
+   Hz = {default=100}
+}
+
+local worker_opt_spec = {
+   acquire_cpu = {default=true}, -- Needs dedicated CPU core?
+   restart_intensity = {default=0}, -- How many restarts are permitted...
+   restart_period = {default=0} -- ...within period seconds.
 }
 
 local function ensure_absolute(file_name)
@@ -90,6 +95,8 @@ function new_manager (conf)
    ret.period = 1/conf.Hz
    ret.worker_default_scheduling = conf.worker_default_scheduling
    ret.workers = {}
+   ret.workers_aux = {}
+   ret.worker_app_graphs = {}
    ret.state_change_listeners = {}
    -- name->{aggregated=counter, active=pid->counter, archived=uint64[1]}
    ret.counters = {}
@@ -159,7 +166,8 @@ function Manager:set_initial_configuration (configuration)
    self.current_in_place_dependencies = {}
 
    -- Start the workers and configure them.
-   local worker_app_graphs = self.setup_fn(configuration)
+   local worker_app_graphs, worker_opts = self.setup_fn(configuration)
+   self.workers_aux = self:compute_workers_aux(worker_app_graphs, worker_opts)
 
    -- Calculate the dependences
    self.current_in_place_dependencies =
@@ -171,10 +179,13 @@ function Manager:set_initial_configuration (configuration)
    for id, worker_app_graph in pairs(worker_app_graphs) do
       self:start_worker_for_graph(id, worker_app_graph)
    end
+
+   self.worker_app_graphs = worker_app_graphs
 end
 
 function Manager:start ()
    if self.name then engine.claim_name(self.name) end
+   self:info(("Manager has started (PID %d)"):format(S.getpid()))
    self.cpuset:bind_to_numa_node()
    require('lib.fibers.file').install_poll_io_handler()
    self.sched = fiber.current_scheduler
@@ -250,12 +261,12 @@ function Manager:run_scheduler()
    self.sched:run(engine.now())
 end
 
-function Manager:start_worker(sched_opts)
+function Manager:start_worker(id, sched_opts)
    local code = {
       scheduling.stage(sched_opts),
       "require('lib.ptree.worker').main()"
    }
-   return worker.start("worker", table.concat(code, "\n"))
+   return worker.start(id, table.concat(code, "\n"))
 end
 
 function Manager:stop_worker(id)
@@ -287,25 +298,86 @@ function Manager:remove_stale_workers()
    end
 end
 
+function Manager:compute_workers_aux (worker_app_graphs, worker_opts)
+   worker_opts = worker_opts or {}
+   local workers_aux = {}
+   for id in pairs(worker_app_graphs) do
+      local worker_opt = lib.parse(worker_opts[id] or {}, worker_opt_spec)
+      local worker_aux = {
+         acquire_cpu = worker_opt.acquire_cpu,
+         restart = {
+            period = worker_opt.restart_period,
+            intensity = worker_opt.restart_intensity,
+            count = 0,
+            previous = false
+         }
+      }
+      workers_aux[id] = worker_aux
+   end
+   return workers_aux
+end
+
+function Manager:can_restart_worker(id)
+   local restart = self.workers_aux[id].restart
+   local now = engine.now()
+   local expired = 0
+   if restart.previous then
+      local elapsed = now - restart.previous
+      expired = (elapsed / restart.period) * restart.intensity
+   end
+   restart.count = math.max(0, restart.count - expired) + 1
+   restart.previous = now
+   self:info('Restart intensity for worker %s is at: %.1f/%.1f',
+             id, restart.count, restart.intensity)
+   return restart.count <= restart.intensity
+end
+
+function Manager:restart_crashed_workers()
+   for id, proc in pairs(worker.status()) do
+      local worker = self.workers[id]
+      if worker and not worker.shutting_down then
+         if not proc.alive then
+            self:warn('Worker %s (pid %d) crashed with status %d!',
+                        id, proc.pid, proc.status)
+            self:state_change_event('worker_stopped', id)
+            if self.workers[id].scheduling.cpu then
+               self.cpuset:release(self.workers[id].scheduling.cpu)
+            end
+            self.workers[id] = nil
+            if self:can_restart_worker(id) then
+               self:info('Restarting worker %s.', id)
+               self:start_worker_for_graph(id, self.worker_app_graphs[id])
+            else
+               self:warn('Too many worker crashes, exiting!')
+               self:stop()
+               os.exit(1)
+            end
+         end
+      end
+   end
+end
+
 function Manager:acquire_cpu_for_worker(id, app_graph)
    local pci_addresses = {}
    -- Grovel through app initargs for keys named "pciaddr".  Hacky!
    for name, init in pairs(app_graph.apps) do
       if type(init.arg) == 'table' then
          for k, v in pairs(init.arg) do
-            if k == 'pciaddr' and not lib.is_iface(v) then
+            if (k == 'pciaddr' or k == 'pciaddress') and not lib.is_iface(v) then
                table.insert(pci_addresses, v)
             end
          end
       end
    end
-   return self.cpuset:acquire_for_pci_addresses(pci_addresses)
+   return self.cpuset:acquire_for_pci_addresses(pci_addresses, id)
 end
 
 function Manager:compute_scheduling_for_worker(id, app_graph)
    local ret = {}
    for k, v in pairs(self.worker_default_scheduling) do ret[k] = v end
-   ret.cpu = self:acquire_cpu_for_worker(id, app_graph)
+   if self.workers_aux[id].acquire_cpu then
+      ret.cpu = self:acquire_cpu_for_worker(id, app_graph)
+   end
    return ret
 end
 
@@ -458,7 +530,7 @@ function Manager:start_worker_for_graph(id, graph)
    local scheduling = self:compute_scheduling_for_worker(id, graph)
    self:info('Starting worker %s.', id)
    self.workers[id] = { scheduling=scheduling,
-                        pid=self:start_worker(scheduling),
+                        pid=self:start_worker(id, scheduling),
                         queue={}, graph=graph,
                         cancel=cond.new() }
    self:state_change_event('worker_starting', id)
@@ -575,10 +647,11 @@ function Manager:update_configuration (update_fn, verb, path, ...)
          self.schema_name, self.current_configuration, verb, path,
          self.current_in_place_dependencies, ...)
    local new_config = update_fn(self.current_configuration, ...)
-   local new_graphs = self.setup_fn(new_config, ...)
+   local new_graphs, new_opts = self.setup_fn(new_config, ...)
+   self.workers_aux = self:compute_workers_aux(new_graphs, new_opts)
    for id, graph in pairs(new_graphs) do
       if self.workers[id] == nil then
-	 self:start_worker_for_graph(id, graph)
+         self:start_worker_for_graph(id, graph)
       end
    end
 
@@ -586,10 +659,10 @@ function Manager:update_configuration (update_fn, verb, path, ...)
       if new_graphs[id] == nil then
          self:stop_worker(id)
       else
-	 local actions = self.support.compute_config_actions(
-	    worker.graph, new_graphs[id], to_restart, verb, path, ...)
-	 self:enqueue_config_actions_for_worker(id, actions)
-	 worker.graph = new_graphs[id]
+         local actions = self.support.compute_config_actions(
+            worker.graph, new_graphs[id], to_restart, verb, path, ...)
+         self:enqueue_config_actions_for_worker(id, actions)
+	      worker.graph = new_graphs[id]
       end
    end
    self.current_configuration = new_config
@@ -597,6 +670,7 @@ function Manager:update_configuration (update_fn, verb, path, ...)
       self.support.update_mutable_objects_embedded_in_app_initargs (
          self.current_in_place_dependencies, new_graphs, self.schema_name,
          verb, path, ...)
+   self.worker_app_graphs = new_graphs
 end
 
 function Manager:handle_rpc_update_config (args, verb, compute_update_fn)
@@ -886,6 +960,7 @@ function Manager:main (duration)
       next_time = now + self.period
       if timer.ticks then timer.run_to_time(now * 1e9) end
       self:remove_stale_workers()
+      self:restart_crashed_workers()
       self:run_scheduler()
       self:send_messages_to_workers()
       self:receive_alarms_from_workers()

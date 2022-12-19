@@ -192,11 +192,12 @@ function map_pci_memory (f)
    -- unbind_device_from_linux() has already been called but it may take
    -- some time for the driver to release the device.
    if not mem and err.INVAL then
+      local filepath = S.readlink("/proc/self/fd/"..f:getfd())
       lib.waitfor2("mmap of "..filepath,
                    function ()
                       mem, err = f:mmap(nil, st.size, "read, write", "shared", 0)
                       return mem ~= nil or not err.INVAL
-                   end, 5, 1000000)
+                   end, 10, 1000000)
    end
    assert(mem, err)
    return ffi.cast("uint32_t *", mem)

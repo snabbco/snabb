@@ -59,15 +59,40 @@ function CPUSet:add(cpu)
    local node = numa.cpu_get_numa_node(cpu)
    assert(node ~= nil, 'Failed to get NUMA node for CPU: '..cpu)
    if self.by_node[node] == nil then self.by_node[node] = {} end
-   assert(self.by_node[cpu] == nil, 'CPU already in set: '..cpu)
+   assert(self.by_node[node][cpu] == nil, 'CPU already in set: '..cpu)
    self.by_node[node][cpu] = true
 end
 
-function CPUSet:acquire_for_pci_addresses(addrs)
-   return self:acquire(numa.choose_numa_node_for_pci_addresses(addrs))
+function CPUSet:contains(cpu)
+   local node = numa.cpu_get_numa_node(cpu)
+   assert(node ~= nil, 'Failed to get NUMA node for CPU: '..cpu)
+   return self.by_node[node] and (self.by_node[node][cpu] ~= nil)
 end
 
-function CPUSet:acquire(on_node)
+function CPUSet:remove (cpu)
+   assert(self:contains(cpu), 'CPU not in set: '..cpu)
+   local node = numa.cpu_get_numa_node(cpu)
+   if self.by_node[node][cpu] == false then
+      print("Warning: removing bound CPU from set: "..cpu)
+   end
+   self.by_node[node][cpu] = nil
+end
+
+function CPUSet:list ()
+   local list = {}
+   for node, cpus in pairs(self.by_node) do
+      for cpu in pairs(cpus) do
+         table.insert(list, cpu)
+      end
+   end
+   return list
+end
+
+function CPUSet:acquire_for_pci_addresses(addrs, worker)
+   return self:acquire(numa.choose_numa_node_for_pci_addresses(addrs), worker)
+end
+
+function CPUSet:acquire(on_node, worker)
    for node, cpus in pairs(self.by_node) do
       if on_node == nil or on_node == node then
          for cpu, avail in pairs(cpus) do
@@ -92,11 +117,11 @@ function CPUSet:acquire(on_node)
    end
    for node, cpus in pairs(self.by_node) do
       print(("Warning: All assignable CPUs in use; "..
-             "leaving data-plane PID %d without assigned CPU."):format(S.getpid()))
+             "leaving data-plane worker '%s' without assigned CPU."):format(worker))
       return
    end
    print(("Warning: No assignable CPUs declared; "..
-         "leaving data-plane PID %d without assigned CPU."):format(S.getpid()))
+         "leaving data-plane worker '%s' without assigned CPU."):format(worker))
 end
 
 function CPUSet:release(cpu)

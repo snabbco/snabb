@@ -1,0 +1,24 @@
+local pcap = require("apps.pcap.pcap")
+local basic = require("apps.basic.basic_apps")
+
+local input = assert(main.parameters[1])
+local output = assert(main.parameters[2])
+local size = assert(tonumber(main.parameters[3]))
+
+local c = config.new()
+
+config.app(c, "reader", pcap.PcapReader, input)
+config.app(c, "writer", pcap.PcapWriter, output)
+config.app(c, "truncate", basic.Truncate, size)
+
+config.link(c, "reader.output->truncate.input")
+config.link(c, "truncate.output->writer.input")
+
+engine.configure(c)
+
+local function is_done ()
+    return engine.app_table.reader.done
+end
+
+engine.main{done=is_done}
+engine.report_links()

@@ -16,13 +16,13 @@ root = os.getenv("SNABB_SHM_ROOT") or "/var/run/snabb"
 mappings = {}
 
 -- Map an object into memory.
-local function map (name, type, readonly, create)
+local function map (name, type, readonly, create, ...)
    local path = resolve(name)
    local mapmode = readonly and 'read' or 'read, write'
    local ctype = ffi.typeof(type)
-   local size = ffi.sizeof(ctype)
+   local size = ffi.sizeof(ctype, ...)
    local stat = S.stat(root..'/'..path)
-   if stat and stat.size ~= size then
+   if stat and stat.size < size then
       print(("shm warning: resizing %s from %d to %d bytes")
             :format(path, stat.size, size))
    end
@@ -38,7 +38,7 @@ local function map (name, type, readonly, create)
    if create then
       assert(fd:ftruncate(size), "shm: ftruncate failed")
    else
-      assert(fd:fstat().size == size, "shm: unexpected size")
+      assert(fd:fstat().size >= size, "shm: unexpected size")
    end
    local mem, err = S.mmap(nil, size, mapmode, "shared", fd, 0)
    fd:close()
@@ -47,12 +47,12 @@ local function map (name, type, readonly, create)
    return ffi.cast(ffi.typeof("$&", ctype), mem)
 end
 
-function create (name, type)
-   return map(name, type, false, true)
+function create (name, type, ...)
+   return map(name, type, false, true, ...)
 end
 
-function open (name, type, readonly)
-   return map(name, type, readonly, false)
+function open (name, type, readonly, ...)
+   return map(name, type, readonly, false, ...)
 end
 
 function exists (name)
@@ -214,6 +214,17 @@ function selftest ()
    assert(unlink(name))
    unmap(p1)
    assert(not exists(name))
+
+   -- Checking parameterized types
+   print("checking parameterized types..")
+   local name = "shm/selftest/parameterized"
+   local p1 = create(name, "struct { int x; int xs[?]; }", 10)
+   local p2 = open(name, "struct { int x; int xs[?]; }", 'read-only', 10)
+   p1.xs[9] = 42
+   assert(p2.xs[9] == 42)
+   unmap(p2)
+   unmap(p1)
+   assert(unlink(name))
 
    -- Test that we can open and cleanup many objects
    print("checking many objects..")

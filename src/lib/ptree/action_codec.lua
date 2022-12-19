@@ -82,6 +82,10 @@ local function find_public_name(obj)
    if public_names[obj] then return unpack(public_names[obj]) end
    for modname, mod in pairs(package.loaded) do
       if type(mod) == 'table' then
+         if mod == obj and type(mod.new) == 'function' then
+            public_names[obj] = { modname, '' }
+            return modname, ''
+         end
          for name, val in pairs(mod) do
             if val == obj then
                if type(val) == 'table' and type(val.new) == 'function' then
@@ -121,13 +125,21 @@ local function encoder()
       self:string(name)
    end
    function encoder:config(class, arg)
-      local file_name = random_file_name()
+      local ad_hoc_encodable = {
+            table=true, cdata=true, number=true, string=true, boolean=true
+      }
+      local file_name
       if class.yang_schema then
+         file_name = random_file_name()
          yang.compile_config_for_schema_by_name(class.yang_schema, arg,
                                                 file_name)
-      else
-         if arg == nil then arg = {} end
+      elseif ad_hoc_encodable[type(arg)] then
+         file_name = random_file_name()
          binary.compile_ad_hoc_lua_data_to_file(file_name, arg)
+      elseif arg == nil then
+         file_name = ''
+      else
+         error("NYI: encoding app arg of type "..type(arg))
       end
       self:string(file_name)
    end
@@ -176,13 +188,19 @@ local function decoder(buf, len)
    end
    function decoder:class()
       local require_path, name = self:string(), self:string()
-      return assert(require(require_path)[name])
+      if #name > 0 then
+         return assert(require(require_path)[name])
+      else
+         return assert(require(require_path))
+      end
    end
    function decoder:config()
       local filename = self:string()
-      local data = binary.load_compiled_data_file(filename).data
-      S.unlink(filename)
-      return data
+      if #filename > 0 then
+         local data = binary.load_compiled_data_file(filename).data
+         S.unlink(filename)
+         return data
+      end
    end
    function decoder:finish(...)
       return { ... }

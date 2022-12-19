@@ -509,7 +509,6 @@ end
 function LookupStreamer:stream()
    local width = self.width
    local entries = self.entries
-   local keys = self.keys
    local pointers = self.pointers
    local stream_entries = self.stream_entries
    local entries_per_lookup = self.entries_per_lookup

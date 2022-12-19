@@ -780,16 +780,10 @@ end
 
 function LwAftr:enqueue_encapsulation(pkt, ipv4, port, pkt_src_link)
    if pkt_src_link == PKT_FROM_INET then
-      if self.inet_lookup_queue:enqueue_lookup(pkt, ipv4, port) then
-         -- Flush the queue right away if enough packets are queued up already.
-         self:flush_encapsulation()
-      end
+      self.inet_lookup_queue:enqueue_lookup(pkt, ipv4, port)
    else
       assert(pkt_src_link == PKT_HAIRPINNED)
-      if self.hairpin_lookup_queue:enqueue_lookup(pkt, ipv4, port) then
-         -- Flush the queue right away if enough packets are queued up already.
-         self:flush_hairpin()
-      end
+      self.hairpin_lookup_queue:enqueue_lookup(pkt, ipv4, port)
    end
 end
 
@@ -977,10 +971,7 @@ function LwAftr:flush_decapsulation()
 end
 
 function LwAftr:enqueue_decapsulation(pkt, ipv4, port)
-   if self.inet_lookup_queue:enqueue_lookup(pkt, ipv4, port) then
-      -- Flush the queue right away if enough packets are queued up already.
-      self:flush_decapsulation()
-   end
+   self.inet_lookup_queue:enqueue_lookup(pkt, ipv4, port)
 end
 
 -- FIXME: Verify that the packet length is big enough?

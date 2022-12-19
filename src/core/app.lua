@@ -413,7 +413,7 @@ function apply_config_actions (actions)
          error(("bad return value from app '%s' start() method: %s"):format(
                   name, tostring(app)))
       end
-      local zone = app.zone or getfenv(class.new)._NAME or name
+      local zone = app.zone or rawget(getfenv(class.new), '_NAME') or name
       app_events[app] =
          timeline_mod.load_events(timeline(), "core.app", {app=name})
       app.appname = name
@@ -695,6 +695,7 @@ function breathe ()
    if tick() then
       for _, app in ipairs(breathe_ticks) do
          app_events[app].tick(linkstats(app))
+         setvmprofile(app.zone)
          app:tick()
          app_events[app].ticked(linkstats(app))
       end

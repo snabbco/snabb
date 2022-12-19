@@ -3,7 +3,6 @@ Usage:
   snabb lwaftr check
   snabb lwaftr compile-configuration
   snabb lwaftr generate-configuration
-  snabb lwaftr migrate-configuration
   snabb lwaftr monitor
   snabb lwaftr query
   snabb lwaftr quickcheck

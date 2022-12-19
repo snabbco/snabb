@@ -7,8 +7,7 @@ local equal = require('core.lib').equal
 local dirname = require('core.lib').dirname
 local mem = require('lib.stream.mem')
 local ipv6 = require('lib.protocol.ipv6')
-local ctable = require('lib.ctable')
-local cltable = require('lib.cltable')
+local list = require('lib.yang.list')
 local data = require('lib.yang.data')
 local state = require('lib.yang.state')
 local yang_util = require('lib.yang.util')
@@ -19,6 +18,40 @@ local path_data = require('lib.yang.path_data')
 local generic = require('lib.ptree.support').generic_schema_config_support
 local binding_table = require("apps.lwaftr.binding_table")
 
+local function snabb_softwire_getter(path, is_config)
+   local grammar = path_data.grammar_for_schema_by_name(
+      'snabb-softwire-v3', '/', is_config
+   )
+   return path_data.resolver(grammar, path)
+end
+
+local function ietf_softwire_br_getter(path, is_config)
+   local grammar = path_data.grammar_for_schema_by_name(
+      'ietf-softwire-br', '/', is_config
+   )
+   return path_data.resolver(grammar, path)
+end
+
+local function get_softwire_grammar(is_config)
+   return path_data.grammar_for_schema_by_name(
+      'snabb-softwire-v3', '/', is_config
+   )
+end
+
+local function get_ietf_bind_instance_grammar(is_config)
+   return path_data.grammar_for_schema_by_name(
+      'ietf-softwire-br', '/br-instances/binding/bind-instance', is_config
+   )
+end
+
+local function get_ietf_softwire_grammar(is_config)
+   return path_data.grammar_for_schema_by_name(
+      'ietf-softwire-br',
+      '/br-instances/binding/bind-instance/binding-table/binding-entry',
+      is_config
+   )
+end
+
 -- Packs snabb-softwire-v3 softwire entry into softwire and PSID blob
 --
 -- The data plane stores a separate table of psid maps and softwires. It
@@ -28,22 +61,19 @@ local binding_table = require("apps.lwaftr.binding_table")
 local function pack_softwire(app_graph, bt, entry)
    assert(app_graph.apps['lwaftr'])
    assert(entry.value.port_set, "Softwire lacks port-set definition")
-   local key, value = entry.key, entry.value
-   
-   local softwire_t = bt.softwires.entry_type()
-   psid_map_t = bt.psid_map.entry_type()
 
    -- Now lets pack the stuff!
-   local packed_softwire = ffi.new(softwire_t)
-   packed_softwire.key.ipv4 = key.ipv4
-   packed_softwire.key.psid = key.psid
-   packed_softwire.value.b4_ipv6 = value.b4_ipv6
-   packed_softwire.value.br_address = value.br_address
+   local packed_softwire = bt.softwires.entry_type()
+   packed_softwire.key.ipv4 = entry.ipv4
+   packed_softwire.key.psid = entry.psid
+   packed_softwire.value.b4_ipv6 = entry.b4_ipv6
+   packed_softwire.value.br_address = entry.br_address
 
-   local packed_psid_map = ffi.new(psid_map_t)
-   packed_psid_map.key.addr = key.ipv4
-   if value.port_set.psid_length then
-      packed_psid_map.value.psid_length = value.port_set.psid_length
+   local packed_psid_map = bt.psid_map.entry_type()
+   packed_psid_map.key.addr = entry.ipv4
+   if entry.port_set then
+      packed_psid_map.value.psid_length = entry.port_set.psid_length
+      packed_psid_map.value.shift = entry.port_set.shift
    end
 
    return packed_softwire, packed_psid_map
@@ -51,7 +81,7 @@ end
 
 local function add_softwire_entry_actions(app_graph, bt, entries)
    local ret = {}
-   for entry in entries:iterate() do
+   for _, entry in ipairs(entries) do
       local psoftwire, ppsid = pack_softwire(app_graph, bt, entry)
       assert(bt:is_managed_ipv4_address(psoftwire.key.ipv4))
 
@@ -62,24 +92,10 @@ local function add_softwire_entry_actions(app_graph, bt, entries)
    return ret
 end
 
-local softwire_grammar
-local function get_softwire_grammar()
-   if not softwire_grammar then
-      local schema = yang.load_schema_by_name('snabb-softwire-v3')
-      local grammar = data.config_grammar_from_schema(schema)
-      softwire_grammar =
-         assert(grammar.members['softwire-config'].
-                   members['binding-table'].members['softwire'])
-   end
-   return softwire_grammar
-end
-
 local function remove_softwire_entry_actions(app_graph, path)
    assert(app_graph.apps['lwaftr'])
-   path = path_mod.parse_path(path)
-   local grammar = get_softwire_grammar()
-   local key = path_data.prepare_table_lookup(
-      grammar.keys, grammar.key_ctype, path[#path].query)
+   path = path_mod.parse_path(path, get_softwire_grammar())
+   local key = binding_table.softwire_key_t(path[#path].key)
    local args = {'lwaftr', 'remove_softwire_entry', key}
    -- If it's the last softwire for the corresponding psid entry, remove it.
    -- TODO: check if last psid entry and then remove.
@@ -89,17 +105,12 @@ end
 local function compute_config_actions(get_binding_table_instance,
                                       old_graph, new_graph, to_restart,
                                       verb, path, arg)
-   -- If the binding cable changes, remove our cached version.
-   if path ~= nil and path:match("^/softwire%-config/binding%-table") then
-      binding_table_instance = nil
-   end
-
    if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       if to_restart == false then
          assert(new_graph.apps['lwaftr'])
          local bt_conf = app_graph.apps.lwaftr.arg.softwire_config.binding_table
          local bt = get_binding_table_instance(bt_conf)
-	 return add_softwire_entry_actions(new_graph, bt, arg)
+         return add_softwire_entry_actions(new_graph, bt, arg)
       end
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
@@ -132,10 +143,10 @@ local function compute_apps_to_restart_after_configuration_update(
       -- restart unfortunately. If not we can just add the softwire.
       local bt = get_binding_table_instance(configuration.softwire_config.binding_table)
       local to_restart = false
-      for entry in arg:iterate() do
-	 to_restart = (bt:is_managed_ipv4_address(entry.key.ipv4) == false) or false
+      for _, entry in ipairs(arg) do
+         to_restart = not bt:is_managed_ipv4_address(entry.ipv4)
       end
-      if to_restart == false then return {} end
+      if to_restart then return {} end
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
       return {}
@@ -146,73 +157,27 @@ local function compute_apps_to_restart_after_configuration_update(
       schema_name, configuration, verb, path, in_place_dependencies, arg)
 end
 
-local function memoize1(f)
-   local memoized_arg, memoized_result
-   return function(arg)
-      if arg == memoized_arg then return memoized_result end
-      memoized_result = f(arg)
-      memoized_arg = arg
-      return memoized_result
-   end
-end
-
-local function table_for_grammar(grammar)
-   if grammar.native_key then
-      return {}, function (key) return key[grammar.native_key] end
-   elseif grammar.key_ctype and not grammar.value_ctype then
-      local key_t = data.typeof(grammar.key_ctype)
-      return cltable.new({key_type=key_t}), key_t
-   else
-      error("Unsupported table type")
-   end
-end
-
-local ietf_bind_instance_grammar
-local function get_ietf_bind_instance_grammar()
-   if not ietf_bind_instance_grammar then
-      local schema = yang.load_schema_by_name('ietf-softwire-br')
-      local grammar = data.config_grammar_from_schema(schema)
-      grammar = assert(grammar.members['br-instances'])
-      grammar = assert(grammar.members['br-type'])
-      grammar = assert(grammar.choices['binding'].binding)
-      grammar = assert(grammar.members['bind-instance'])
-      ietf_bind_instance_grammar = grammar
-   end
-   return ietf_bind_instance_grammar
-end
-
-local ietf_softwire_grammar
-local function get_ietf_softwire_grammar()
-   if not ietf_softwire_grammar then
-      local grammar = get_ietf_bind_instance_grammar()
-      grammar = assert(grammar.values['binding-table'])
-      grammar = assert(grammar.members['binding-entry'])
-      ietf_softwire_grammar = grammar
-   end
-   return ietf_softwire_grammar
-end
-
 local function ietf_binding_table_from_native(bt)
-   local ret, key_t = table_for_grammar(get_ietf_softwire_grammar())
+   local ret = get_ietf_softwire_grammar().list.new()
    local warn_lossy = false
-   for softwire in bt.softwire:iterate() do
-      local k = key_t({ binding_ipv6info = softwire.value.b4_ipv6 })
-      if ret[k] ~= nil then
+   for i, softwire in ipairs(bt.softwire) do
+      if ret[softwire.b4_ipv6] then
          -- If two entries in the native softwire table have the same key in
          -- the ietf-softwire-br schema, we omit the duplicate entry and print
          -- a load warning to inform the user of this issue.
-         warn_lossy = warn_lossy or ret[k]
+         warn_lossy = warn_lossy or i
       else
-         local v = {
-            binding_ipv4_addr = softwire.key.ipv4,
+         local entry = {
+            binding_ipv6info = softwire.b4_ipv6,
+            binding_ipv4_addr = softwire.ipv4,
             port_set = {
-               psid_offset = softwire.value.port_set.reserved_ports_bit_count,
-               psid_len = softwire.value.port_set.psid_length,
-               psid = softwire.key.psid
+               psid_offset = softwire.port_set.reserved_ports_bit_count,
+               psid_len = softwire.port_set.psid_length,
+               psid = softwire.psid
             },
-            br_ipv6_addr = softwire.value.br_address,
+            br_ipv6_addr = softwire.br_address,
          }
-         ret[k] = v
+         ret[softwire.b4_ipv6] = entry
       end
    end
    if warn_lossy then
@@ -227,39 +192,23 @@ local function ietf_binding_table_from_native(bt)
    return ret
 end
 
-local function schema_getter(schema_name, path)
-   local schema = yang.load_schema_by_name(schema_name)
-   local grammar = data.config_grammar_from_schema(schema)
-   return path_data.resolver(grammar, path)
-end
-
-local function snabb_softwire_getter(path)
-   return schema_getter('snabb-softwire-v3', path)
-end
-
-local function ietf_softwire_br_getter(path)
-   return schema_getter('ietf-softwire-br', path)
-end
-
 local function native_binding_table_from_ietf(ietf)
    local _, softwire_grammar =
       snabb_softwire_getter('/softwire-config/binding-table/softwire')
-   local softwire_key_t = data.typeof(softwire_grammar.key_ctype)
-   local softwire_value_t = data.typeof(softwire_grammar.value_ctype)
-   local softwire = ctable.new({key_type=softwire_key_t,
-                                value_type=softwire_value_t})
-   for k,v in cltable.pairs(ietf) do
-      local softwire_key =
-         softwire_key_t({ipv4=v.binding_ipv4_addr, psid=v.port_set.psid})
-      local softwire_value = softwire_value_t({
-         br_address=v.br_ipv6_addr,
-         b4_ipv6=k.binding_ipv6info,
+   local softwire = softwire_grammar.list.new()
+   local l = list.object(softwire)
+   for _, entry in ipairs(ietf) do
+      l:add_entry{
+         ipv4=assert(entry.binding_ipv4_addr),
+         psid=entry.port_set.psid,
+         br_address=entry.br_ipv6_addr,
+         b4_ipv6=entry.binding_ipv6info,
          port_set={
-            psid_length=v.port_set.psid_len,
-            reserved_ports_bit_count=v.port_set.psid_offset
-         }
-      })
-      softwire:add(softwire_key, softwire_value)
+            psid_length=entry.port_set.psid_len,
+            reserved_ports_bit_count=entry.port_set.psid_offset
+         },
+         padding = 0
+      }
    end
    return {softwire=softwire}
 end
@@ -268,12 +217,6 @@ local function serialize_binding_table(bt)
    local _, grammar = snabb_softwire_getter('/softwire-config/binding-table')
    local printer = data.data_printer_from_grammar(grammar)
    return mem.call_with_output_string(printer, bt)
-end
-
-local uint64_ptr_t = ffi.typeof('uint64_t*')
-function ipv6_equals(a, b)
-   local x, y = ffi.cast(uint64_ptr_t, a), ffi.cast(uint64_ptr_t, b)
-   return x[0] == y[0] and x[1] == y[1]
 end
 
 local function instance_name (config)
@@ -319,7 +262,8 @@ local function ietf_softwire_br_translator ()
       local int_err = int.error_rate_limiting
       local ext = native_config.softwire_config.external_interface
       local ext_err = ext.error_rate_limiting
-      local instance = {
+      local bind_instance = get_ietf_bind_instance_grammar().list.new()
+      bind_instance[instance_name(native_config)] = {
          softwire_payload_mtu = int.mtu,
          softwire_path_mru = ext.mtu,
          -- FIXME: There's no equivalent of softwire-num-max in
@@ -345,9 +289,7 @@ local function ietf_softwire_br_translator ()
       cached_config = {
          br_instances = {
             binding = {
-               bind_instance = {
-                  [instance_name(native_config)] = instance
-               }
+               bind_instance = bind_instance
             }
          }
       }
@@ -383,14 +325,14 @@ local function ietf_softwire_br_translator ()
          hairpin_ipv4_packets = c.hairpin_ipv4_packets,
          active_softwire_num = 0, -- FIXME
       }
+      local bind_instance = get_ietf_bind_instance_grammar(false).list.new()
+      bind_instance[instance_name(native_config)] = {
+         traffic_stat = traffic_stat
+      }
       return {
          br_instances = {
             binding = {
-               bind_instance = {
-                  [instance_name(native_config)] = {
-                     traffic_stat = traffic_stat
-                  }
-               }
+               bind_instance = bind_instance
             }
          }
       }
@@ -589,11 +531,10 @@ local function ietf_softwire_br_translator ()
       local psid_map_path = '/softwire-config/binding-table/psid-map'
       -- Add softwires.
       local additions = {}
-      for entry in new_bt.softwire:iterate() do
-         local key, value = entry.key, entry.value
-         if old_bt.softwire:lookup_ptr(key) ~= nil then
+      for _, entry in ipairs(new_bt.softwire) do
+         if old_bt.softwire[entry] then
             error('softwire already present in table: '..
-                     ipv4_ntop(key.ipv4)..'/'..key.psid)
+                     ipv4_ntop(entry.ipv4)..'/'..entry.psid)
          end
          local config_str = string.format([[{
             ipv4 %s;
@@ -604,11 +545,11 @@ local function ietf_softwire_br_translator ()
                psid-length %s;
                reserved-ports-bit-count %s;
             }
-         }]], ipv4_ntop(key.ipv4), key.psid,
-              ipv6:ntop(value.br_address),
-              ipv6:ntop(value.b4_ipv6),
-              value.port_set.psid_length,
-              value.port_set.reserved_ports_bit_count
+         }]], ipv4_ntop(entry.ipv4), entry.psid,
+              ipv6:ntop(entry.br_address),
+              ipv6:ntop(entry.b4_ipv6),
+              entry.port_set.psid_length,
+              entry.port_set.reserved_ports_bit_count
          )
          table.insert(additions, config_str)
       end
@@ -662,11 +603,15 @@ end
 
 local function compute_state_reader(schema_name)
    -- The schema has two lists which we want to look in.
-   local schema = yang.load_schema_by_name(schema_name)
-   local grammar = data.data_grammar_from_schema(schema, false)
-
-   local instance_list_gmr = grammar.members["softwire-config"].members.instance
-   local instance_state_gmr = instance_list_gmr.values["softwire-state"]
+   local grammar = path_data.grammar_for_schema_by_name(
+      schema_name, '/', false
+   )
+   local instance_list_gmr = path_data.grammar_for_schema_by_name(
+      schema_name, '/softwire-config/instance', false
+   )
+   local instance_state_gmr = path_data.grammar_for_schema_by_name(
+      schema_name, '/softwire-config/instance/softwire-state', false
+   )
 
    local base_reader = state.state_reader_from_grammar(grammar)
    local instance_state_reader = state.state_reader_from_grammar(instance_state_gmr)
@@ -674,12 +619,13 @@ local function compute_state_reader(schema_name)
    return function(pid, data)
       local counters = state.counters_for_pid(pid)
       local ret = base_reader(counters)
-      ret.softwire_config.instance = {}
+      ret.softwire_config.instance = instance_list_gmr.list.new()
 
       for device, instance in pairs(data.softwire_config.instance) do
          local instance_state = instance_state_reader(counters)
-         ret.softwire_config.instance[device] = {}
-         ret.softwire_config.instance[device].softwire_state = instance_state
+         ret.softwire_config.instance[device] = {
+            softwire_state = instance_state
+         }
          -- TODO: Copy queue[id].external_interface.next_hop.ip.resolved_mac.
          -- TODO: Copy queue[id].internal_interface.next_hop.ip.resolved_mac.
       end
@@ -692,9 +638,16 @@ local function process_states(discontinuity_time, states)
    -- We need to create a summation of all the states as well as adding all the
    -- instance specific state data to create a total in software-state.
 
+   local instance_list_gmr = path_data.grammar_for_schema_by_name(
+      'snabb-softwire-v3', '/softwire-config/instance', false
+   )  
+
    local unified = {
-      softwire_config = {instance = {}},
-      softwire_state = {}
+      softwire_config = {instance = instance_list_gmr.list.new()},
+      softwire_state = {
+         discontinuity_time =
+            yang_util.format_date_as_iso_8601(discontinuity_time)
+      }
    }
 
    local function total_counter(name, softwire_stats, value)
@@ -706,15 +659,13 @@ local function process_states(discontinuity_time, states)
    end
 
    for _, inst_config in ipairs(states) do
-      local name, instance = next(inst_config.softwire_config.instance)
-      unified.softwire_config.instance[name] = instance
-
-      unified.softwire_state.discontinuity_time =
-         yang_util.format_date_as_iso_8601(discontinuity_time)
-
-      for name, value in pairs(instance.softwire_state) do
-         unified.softwire_state[name] = total_counter(
-            name, unified.softwire_state, value)
+      for name, instance in pairs(inst_config.softwire_config.instance) do
+         unified.softwire_config.instance[name] = instance
+         for name, value in pairs(instance.softwire_state) do
+            unified.softwire_state[name] = total_counter(
+               name, unified.softwire_state, value)
+         end
+         break
       end
    end
 

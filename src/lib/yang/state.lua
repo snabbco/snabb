@@ -53,18 +53,18 @@ function state_reader_from_grammar(production, maybe_keyword)
       end
       return ret
    end
-   function visitor.table(keyword, production)
+   function visitor.list(keyword, production)
       -- TODO: Right now we basically map leaves to counters; we have
       -- no structured way to know what keys we might use.  To make
       -- tables here we'd need more of a design!
-      io.stderr:write(
-         'WARNING: Reading state into tables not yet implemented\n')
+      -- io.stderr:write(
+      --    'WARNING: Reading state into lists is not yet implemented\n')
       return function(counters) return nil end
    end
    function visitor.array(keyword, production)
       -- For similar reasons as tables, no idea what to do here!
-      io.stderr:write(
-         'WARNING: Reading state into arrays not yet implemented\n')
+      -- io.stderr:write(
+      --    'WARNING: Reading state into arrays not yet implemented\n')
       return function(counters) return nil end
    end
    function visitor.struct(keyword, production)
@@ -109,6 +109,7 @@ state_reader_from_schema_by_name = util.memoize(state_reader_from_schema_by_name
 
 function selftest ()
    print("selftest: lib.yang.state")
+   local ffi = require("ffi")
    local simple_router_schema_src = [[module snabb-simple-router {
       namespace snabb:simple-router;
       prefix simple-router;
@@ -152,26 +153,18 @@ function selftest ()
          uses "detailed-counters";
       }
    }]]
-   local function table_length(tbl)
-      local rtn = 0
-      for k,v in pairs(tbl) do rtn = rtn + 1 end
-      return rtn
-   end
-   local function in_array(needle, haystack)
-      for _, i in pairs(haystack) do if needle == i then return true end end
-         return false
-   end
-
    local simple_router_schema = yang.load_schema(simple_router_schema_src,
                                                  "state-test")
    local reader = state_reader_from_schema(simple_router_schema)
-   local state = reader({})
-   assert(0 == state.state.total_packets)
-   assert(0 == state.state.dropped_packets)
-   assert(0 == state.detailed_state.dropped_wrong_route)
-   assert(0 == state.detailed_state.dropped_not_permitted)
-   -- Would like to assert "state.routes == nil" but state is actually
-   -- a cdata object, and trying to access the non-existent routes
-   -- property throws an error.
+   local state = reader({
+      ['total-packets'] = ffi.new("struct counter", {c=1}),
+      ['dropped-packets'] = ffi.new("struct counter", {c=2}),
+      ['dropped-wrong-route'] = ffi.new("struct counter", {c=3}),
+      ['dropped-not-permitted'] = ffi.new("struct counter", {c=4})
+   })
+   assert(1 == state.state.total_packets)
+   assert(2 == state.state.dropped_packets)
+   assert(3 == state.detailed_state.dropped_wrong_route)
+   assert(4 == state.detailed_state.dropped_not_permitted)
    print('selftest: ok')
 end

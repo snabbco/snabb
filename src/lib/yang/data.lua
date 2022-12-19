@@ -7,135 +7,15 @@ local parser_mod = require("lib.yang.parser")
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
+local list = require("lib.yang.list")
+      typeof = require("lib.yang.ctype").typeof
 local ffi = require("ffi")
-local ctable = require('lib.ctable')
-local cltable = require('lib.cltable')
 local lib = require('core.lib')
 local regexp = require("lib.xsd_regexp")
 local lib = require("core.lib")
 
 function normalize_id(id)
    return (id:gsub('[^%w_]', '_'))
-end
-
--- Helper for parsing C type declarations.
-local function parse_type(str, start, is_member)
-   local function err(msg, pos)
-      io.stderr:write('ERROR: While parsing type:\n')
-      io.stderr:write('ERROR:   '..str..'\n')
-      io.stderr:write('ERROR:   '..string.rep(' ', pos - 1)..'^\n')
-      io.stderr:write('ERROR: '..msg..'\n')
-      error(msg, 2)
-   end
-   local function assert_match(str, pat, pos, what)
-      local ret = { str:match(pat, pos) }
-      if not ret[1] then err('bad '..what, pos) end
-      return unpack(ret)
-   end
-   local t, array, member, pos
-   -- See if it's a struct.
-   t, pos = str:match('^%s*(struct%s*%b{})%s*()', start)
-   -- Otherwise it might be a scalar.
-   if not t then t, pos = str:match('^%s*([%a_][%w_]*)%s*()', start) end
-   -- We don't do unions currently.
-   if not t then err('invalid type', start) end
-   -- If we're parsing a struct or union member, get the name.
-   if is_member then
-      member, pos = assert_match(str, '^([%a_][%w_]*)%s*()', pos, 'member name')
-   end
-   -- Parse off the array suffix, if any.
-   if str:match('^%[', pos) then
-      array, pos = assert_match(str, '^(%b[])%s*()', pos, 'array component')
-   end
-   if is_member then
-      -- Members should have a trailing semicolon.
-      pos = assert_match(str, '^;%s*()', pos, 'semicolon')
-   else
-      -- Nonmembers should parse to the end of the string.
-      assert_match(str, '^()$', pos, 'suffix')
-   end
-   return t, array, member, pos
-end
-
--- We want structural typing, not nominal typing, for Yang data.  The
--- "foo" member in "struct { struct { uint16 a; } foo; }" should not
--- have a unique type; we want to be able to instantiate a "struct {
--- uint16 a; }" and get a compatible value.  To do this, we parse out
--- nested "struct" types and only ever make one FFI type for each
--- compatible struct kind.  The user-facing interface is the "typeof"
--- function below; the "compile_type" helper handles nesting.
---
--- It would be possible to avoid this complexity by having the grammar
--- generate something other than a string "ctype" representation, but
--- then we don't have a type name to serialize into binary data.  We
--- might as well embrace the type strings.
-local function compile_type(name)
-   local function maybe_array_type(t, array)
-      -- If ARRAY is something like "[10]", make a corresponding type.
-      -- Otherwise just return T.
-      if array then return ffi.typeof('$'..array, t) end
-      return t
-   end
-   local parsed, array = parse_type(name, 1, false)
-   local ret
-   if parsed:match('^struct[%s{]') then
-      -- It's a struct type; parse out the members and rebuild.
-      local struct_type = 'struct { '
-      local struct_type_args = {}
-      local function add_member(member_type, member_name)
-         struct_type = struct_type..'$ '..member_name..'; '
-         table.insert(struct_type_args, member_type)
-      end
-      -- Loop from initial "struct {" to final "}".
-      local pos = assert(parsed:match('^struct%s*{%s*()'))
-      while not parsed:match('^}$', pos) do
-         local mtype, mname, marray
-         mtype, marray, mname, pos = parse_type(parsed, pos, true)
-         -- Recurse on mtype by calling the caching "typeof" defined
-         -- below.
-         add_member(maybe_array_type(typeof(mtype), marray), mname)
-      end
-      struct_type = struct_type..'}'
-      ret = ffi.typeof(struct_type, unpack(struct_type_args))
-   else
-      -- Otherwise the type is already structural and we can just use
-      -- ffi.typeof.
-      ret = ffi.typeof(parsed)
-   end
-   return maybe_array_type(ret, array)
-end
-
-local type_cache = {}
-function typeof(name)
-   assert(type(name) == 'string')
-   if not type_cache[name] then type_cache[name] = compile_type(name) end
-   return type_cache[name]
-end
-
--- If a "list" node has a single key that is string-valued or representable as
--- a Lua number, we will represent instances of that node as normal Lua tables
--- where the key is the table key and the value does not contain the key.
-local function table_native_key(keys)
-   local native_number_types =
-      lib.set('int8', 'int16', 'int32', 'uint8', 'uint16', 'uint32')
-   local function representable_as_native(v)
-      return v.type == 'scalar' and
-             (v.argument_type.primitive_type == 'string' or
-              native_number_types[v.argument_type.primitive_type])
-   end
-   local native_key = nil
-   for k,v in pairs(keys) do
-      if native_key ~= nil then
-         -- Bail out if the list has multiple keys, native or otherwise.
-         return nil
-      elseif representable_as_native(v) then
-         -- Select the first native key, if any.
-         native_key = k
-      else
-         return nil
-      end
-   end
-   return native_key
 end
 
 -- We need to properly support unions.  It's a big FIXME!  As an
@@ -211,7 +91,7 @@ function data_grammar_from_schema(schema, is_config)
    handlers['leaf-list'] = function(node)
       if node.config ~= is_config then return end
       local t = elide_unions(node.type)
-      return {type='array', element_type=t, ctype=value_ctype(t),
+      return {type='array', element_type=t,
               min_elements=node.min_elements, max_elements=node.max_elements}
    end
    function handlers.list(node)
@@ -238,10 +118,66 @@ function data_grammar_from_schema(schema, is_config)
          end
       end
       if is_empty(values) and node.config ~= is_config then return end
-      return {type='table', keys=keys, values=values,
-              native_key=table_native_key(keys),
-              key_ctype=struct_ctype(keys),
-              value_ctype=struct_ctype(values),
+      local function list_spec(nodes, builder, validate)
+         local spec = {}
+         for name, node in pairs(nodes) do
+            builder(spec, normalize_id(name), node)
+         end
+         if validate then validate(spec) end
+         return spec
+      end
+      local function list_key(keys, name, node)
+         assert(node.type =='scalar')
+         if node.ctype then
+            keys[name] = {ctype=node.ctype}
+         elseif value_ctype(node.argument_type) then
+            keys[name] = {ctype=value_ctype(node.argument_type)}
+         else
+            keys[name] = {type=node.argument_type.primitive_type}
+         end
+      end
+      local function list_member(members, name, node)
+         if node.ctype then
+            members[name] = {
+               ctype = node.ctype
+            }
+         elseif node.type == 'scalar' then
+            if value_ctype(node.argument_type) then
+               members[name] = {
+                  ctype = value_ctype(node.argument_type),
+                  optional = not (node.default or node.mandatory)
+               }
+            else
+               members[name] = {
+                  type = node.argument_type.primitive_type,
+                  optional = not (node.default or node.mandatory)
+               }
+            end
+         elseif node.type == 'choice' then
+            for _, choices in pairs(node.choices) do
+               local choice_members = list_spec(choices, list_member)
+               for name, member in pairs(choice_members) do
+                  assert(not members[name])
+                  members[name] = member
+               end
+            end
+         else
+            members[name] = {
+               type = 'lvalue',
+               optional = not node.mandatory
+            }
+         end
+      end
+      local l = {}
+      if node.key then
+         l.keys = list_spec(keys, list_key, list.validate_keys)
+      else
+         l.keys = {__ikey={ctype='uint64_t'}}
+      end
+      l.members = list_spec(values, list_member, list.validate_members)
+      l.has_key = node.key and true
+      function l.new() return list.new(l.keys, l.members) end
+      return {type='list', keys=keys, values=values, list=l,
               unique = node.unique,
               min_elements=node.min_elements, max_elements=node.max_elements}
    end
@@ -464,7 +400,7 @@ local function array_parser(keyword, element_type, ctype)
    local array_t = ctype and ffi.typeof('$[?]', elt_t)
    local function finish(out)
       -- FIXME check min-elements
-      if array_t then
+      if out and array_t then
          out = util.ffi_array(array_t(#out, out), elt_t)
       end
       return out
@@ -546,89 +482,35 @@ function choice_parser(keyword, choices, members, default, mandatory)
    return {represents=represents, stateful_parser=stateful_parser}
 end
 
-local function ctable_builder(key_t, value_t)
-   local res = ctable.new({ key_type=key_t, value_type=value_t,
-                            max_occupancy_rate = 0.4 })
-   local builder = {}
-   -- Uncomment for progress counters.
-   -- local counter = 0
-   function builder:add(key, value)
-      -- counter = counter + 1
-      -- if counter % 1000 == 0 then print('ctable add', counter) end
-      res:add(key, value)
-   end
-   function builder:finish() return res end
-   return builder
-end
-
-local function native_keyed_table_builder(native_key)
-   local res = {}
-   local builder = {}
-   function builder:add(key, value)
-      local k = assert(key[native_key])
-      assert(res[k] == nil, 'duplicate key: '..k)
-      res[k] = value
-   end
-   function builder:finish() return res end
-   return builder
-end
-
-local function cltable_builder(key_t)
-   local res = cltable.new({ key_type=key_t })
-   local builder = {}
-   function builder:add(key, value)
-      assert(res[key] == nil, 'duplicate key')
-      res[key] = value
-   end
-   function builder:finish() return res end
-   return builder
-end
-
-local function ltable_builder()
-   local res = {}
-   local builder = {}
-   function builder:add(key, value) res[key] = value end
-   function builder:finish() return res end
-   return builder
-end
-
-local function table_parser(keyword, keys, values, native_key, key_ctype,
-                            value_ctype)
+function list_parser(keyword, keys, values, spec)
    local members = {}
    for k,v in pairs(keys) do members[k] = v end
    for k,v in pairs(values) do members[k] = v end
    local parser = struct_parser(keyword, members)
-   local key_t = key_ctype and typeof(key_ctype)
-   local value_t = value_ctype and typeof(value_ctype)
-   local init
-   if key_t and value_t then
-      function init() return ctable_builder(key_t, value_t) end
-   elseif native_key then
-      function init() return native_keyed_table_builder(native_key) end
-   elseif key_t then
-      function init() return cltable_builder(key_t) end
-   else
-      function init() return ltable_builder() end
+   local function init()
+      local res = spec.new()
+      local l = list.object(res)
+      local assoc = {}
+      function assoc:add(entry)
+         if not spec.has_key then
+            entry.__ikey = #res+1
+         end
+         l:add_entry(entry)
+      end
+      function assoc:finish() return res end
+      return assoc
    end
    local function parse1(P)
       return parser.finish(parser.parse(P, parser.init()))
    end
    local function parse(P, assoc)
       local struct = parse1(P)
-      local key, value = {}, {}
-      if key_t then key = key_t() end
-      if value_t then value = value_t() end
-      for k,_ in pairs(keys) do
+      local entry = {}
+      for k,_ in pairs(struct) do
          local id = normalize_id(k)
-         key[id] = struct[id]
+         entry[id] = struct[id]
       end
-      for k, v in pairs(struct) do
-         local id = normalize_id(k)
-         if keys[k] == nil then
-            value[id] = struct[id]
-         end
-      end
-      assoc:add(key, value)
+      assoc:add(entry)
       return assoc
    end
    local function finish(assoc)
@@ -658,10 +540,9 @@ function data_parser_from_grammar(production)
    function handlers.array(keyword, production)
       return array_parser(keyword, production.element_type, production.ctype)
    end
-   function handlers.table(keyword, production)
+   function handlers.list(keyword, production)
       local keys, values = visitn(production.keys), visitn(production.values)
-      return table_parser(keyword, keys, values, production.native_key,
-                          production.key_ctype, production.value_ctype)
+      return list_parser(keyword, keys, values, production.list)
    end
    function handlers.scalar(keyword, production)
       return scalar_parser(keyword, production.argument_type,
@@ -747,8 +628,8 @@ function data_parser_from_grammar(production)
          return parser.finish(out)
       end
    end
-   function top_parsers.table(production)
-      local parser = visit1('[bare table]', production)
+   function top_parsers.list(production)
+      local parser = visit1('[bare list]', production)
       return function(stream)
          local P = parser_mod.Parser.new(stream)
          local out = parser.init()
@@ -954,47 +835,18 @@ function xpath_printer_from_grammar(production, print_default, root)
          end
       end
    end
-   -- As a special case, the table handler allows the keyword to be nil,
-   -- for printing tables at the top level without keywords.
-   function handlers.table(keyword, production)
+   -- As a special case, the list handler allows the keyword to be nil,
+   -- for printing lists at the top level without keywords.
+   function handlers.list(keyword, production)
       local compose_key = key_composer(production.keys)
       local print_value = body_printer(production.values)
-      if production.key_ctype and production.value_ctype then
-         return function(data, file, path)
-            path = path or ''
-            for entry in data:iterate() do
-               local key = compose_key(entry.key)
-               local path = path..(keyword or '')..key..'/'
-               print_value(entry.value, file, path)
-            end
-         end
-      elseif production.native_key then
-         local id = normalize_id(production.native_key)
-         return function(data, file, path)
-            path = path or ''
-            for key, value in pairs(data) do
-               local key = compose_key({[id]=key})
-               local path = path..(keyword or '')..key..'/'
-               print_value(value, file, path)
-            end
-         end
-      elseif production.key_ctype then
-         return function(data, file, path)
-            path = path or ''
-            for key, value in cltable.pairs(data) do
-               local key = compose_key(key)
-               local path = path..(keyword or '')..key..'/'
-               print_value(value, file, path)
-            end
-         end
-      else
-         return function(data, file, path)
-            path = path or ''
-            for key, value in pairs(data) do
-               local key = compose_key(key)
-               local path = path..(keyword or '')..key..'/'
-               print_value(value, file, path)
-            end
+      return function(data, file, path)
+         assert(list.object(data))
+         path = path or ''
+         for _, entry in ipairs(data) do
+            local key = compose_key(entry)
+            local path = path..(keyword or '')..key..'/'
+            print_value(entry, file, path)
          end
       end
    end
@@ -1031,8 +883,8 @@ function xpath_printer_from_grammar(production, print_default, root)
          return file:flush()
       end
    end
-   function top_printers.table(production)
-      local printer = handlers.table(nil, production)
+   function top_printers.list(production)
+      local printer = handlers.list(nil, production)
       return function(data, file)
          printer(data, file, '')
          return file:flush()
@@ -1213,52 +1065,20 @@ function influxdb_printer_from_grammar(production, print_default, root)
       end
       return true
    end
-   -- As a special case, the table handler allows the keyword to be nil,
-   -- for printing tables at the top level without keywords.
-   function handlers.table(keyword, production)
+   -- As a special case, the list handler allows the keyword to be nil,
+   -- for printing lists at the top level without keywords.
+   function handlers.list(keyword, production)
       local is_key_unique = is_key_unique(production)
       local compose_key = key_composer(production.keys)
       local print_value = body_printer(production.values)
-      if production.key_ctype and production.value_ctype then
-         return function(data, file, path)
-            path = path or ''
-            for entry in data:iterate() do
-               local key = compose_key(entry.key)
-               local path = path..(keyword or '')..'/'
-               if not is_key_unique then key = path..key end
-               print_value(entry.value, file, path, key)
-            end
-         end
-      elseif production.native_key then
-         local id = normalize_id(production.native_key)
-         return function(data, file, path)
-            path = path or ''
-            for key, value in pairs(data) do
-               local key = compose_key({[id]=key})
-               local path = path..(keyword or '')..'/'
-               if not is_key_unique then key = path..key end
-               print_value(value, file, path, key)
-            end
-         end
-      elseif production.key_ctype then
-         return function(data, file, path)
-            path = path or ''
-            for key, value in cltable.pairs(data) do
-               local key = compose_key(key)
-               local path = path..(keyword or '')..'/'
-               if not is_key_unique then key = path..key end
-               print_value(value, file, path, key)
-            end
-         end
-      else
-         return function(data, file, path)
-            path = path or ''
-            for key, value in pairs(data) do
-               local key = compose_key(key)
-               local path = path..(keyword or '')..'/'
-               if not is_key_unique then key = path..key end
-               print_value(value, file, path, key)
-            end
+      return function(data, file, path)
+         assert(list.object(data))
+         path = path or ''
+         for _, entry in ipairs(data) do
+            local key = compose_key(entry)
+            local path = path..(keyword or '')..'/'
+            if not is_key_unique then key = path..key end
+            print_value(entry, file, path, key)
          end
       end
    end
@@ -1296,8 +1116,8 @@ function influxdb_printer_from_grammar(production, print_default, root)
          return file:flush()
       end
    end
-   function top_printers.table(production)
-      local printer = handlers.table(nil, production)
+   function top_printers.list(production)
+      local printer = handlers.list(nil, production)
       return function(data, file)
          printer(data, file, '')
          return file:flush()
@@ -1408,51 +1228,19 @@ function data_printer_from_grammar(production, print_default)
          end
       end
    end
-   -- As a special case, the table handler allows the keyword to be nil,
-   -- for printing tables at the top level without keywords.
-   function handlers.table(keyword, production)
+   -- As a special case, the list handler allows the keyword to be nil,
+   -- for printing lists at the top level without keywords.
+   function handlers.list(keyword, production)
       local print_key = body_printer(production.keys)
       local print_value = body_printer(production.values)
-      if production.key_ctype and production.value_ctype then
-         return function(data, file, indent)
-            for entry in data:iterate() do
-               if keyword then print_keyword(keyword, file, indent) end
-               file:write('{\n')
-               print_key(entry.key, file, indent..'  ')
-               print_value(entry.value, file, indent..'  ')
-               file:write(indent..'}\n')
-            end
-         end
-      elseif production.native_key then
-         local id = normalize_id(production.native_key)
-         return function(data, file, indent)
-            for key, value in pairs(data) do
-               if keyword then print_keyword(keyword, file, indent) end
-               file:write('{\n')
-               print_key({[id]=key}, file, indent..'  ')
-               print_value(value, file, indent..'  ')
-               file:write(indent..'}\n')
-            end
-         end
-      elseif production.key_ctype then
-         return function(data, file, indent)
-            for key, value in cltable.pairs(data) do
-               if keyword then print_keyword(keyword, file, indent) end
-               file:write('{\n')
-               print_key(key, file, indent..'  ')
-               print_value(value, file, indent..'  ')
-               file:write(indent..'}\n')
-            end
-         end
-      else
-         return function(data, file, indent)
-            for key, value in pairs(data) do
-               if keyword then print_keyword(keyword, file, indent) end
-               file:write('{\n')
-               print_key(key, file, indent..'  ')
-               print_value(value, file, indent..'  ')
-               file:write(indent..'}\n')
-            end
+      return function(data, file, indent)
+         assert(list.object(data))
+         for _, entry in ipairs(data) do
+            if keyword then print_keyword(keyword, file, indent) end
+            file:write('{\n')
+            print_key(entry, file, indent..'  ')
+            print_value(entry, file, indent..'  ')
+            file:write(indent..'}\n')
          end
       end
    end
@@ -1489,8 +1277,8 @@ function data_printer_from_grammar(production, print_default)
          return file:flush()
       end
    end
-   function top_printers.table(production)
-      local printer = handlers.table(nil, production)
+   function top_printers.list(production)
+      local printer = handlers.list(nil, production)
       return function(data, file)
          printer(data, file, '')
          return file:flush()
@@ -1729,7 +1517,7 @@ function selftest()
                enum plastic;
             }
          }
-         list contents { uses fruit; key name; }
+         list contents { uses fruit; key name; ordered-by user; }
       }
       leaf addr {
          description "internet of fruit";
@@ -1780,6 +1568,22 @@ function selftest()
       assert(data.addr == util.ipv4_pton('1.2.3.4'))
       assert(data.choices.one.blue == "hey")
       assert(data.choices.two.red == "bye")
+
+      -- Check list order
+      local score, total = 0, 0
+      for i, content in ipairs(contents) do
+         assert(score < content.score, "ipairs out of order: "..i)
+         score = content.score
+         total = total + 1
+      end
+      assert(total == #contents)
+      local score, total = 0, 0
+      for i, content in pairs(contents) do
+         assert(score < content.score, "pairs out of order: "..i)
+         score = content.score
+         total = total + 1
+      end
+      assert(total == #contents)
 
       local stream = mem.tmpfile()
       print_config_for_schema(test_schema, data, stream)
@@ -2070,6 +1874,25 @@ function selftest()
       length_test "++++++++++++++++++++++";
    ]])
    assert(success)
+
+   -- Test native numeric keys.
+   local natnumkey_schema = schema.load_schema([[module native-numeric-schema {
+      namespace "urn:ietf:params:xml:ns:yang:native-numeric-schema";
+      prefix "test";
+
+      list numbered {
+         key "id";
+         leaf id { type int32; }
+         leaf bo { type boolean; default true; }
+      }
+   }]])
+   local natnumkey_data = load_config_for_schema(natnumkey_schema,
+      mem.open_input_string [[
+      numbered { id -1; }
+      numbered { id 2; }
+   ]])
+   assert(natnumkey_data.numbered[-1])
+   assert(natnumkey_data.numbered[2])
 
    influxdb_printer_tests()
 
