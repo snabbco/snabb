@@ -642,11 +642,30 @@ function pace_breathing ()
    end
 end
 
+local function enginestats ()
+   local breaths = counter.read(breaths)
+   local frees = counter.read(frees)
+   local freebytes = counter.read(freebytes)
+   local freebits = counter.read(freebits)
+   return breaths, frees, freebytes, freebits
+end
+
+local function linkstats (app)
+   local inp, inb, outp, outb, dropp, dropb = 0, 0, 0, 0, 0, 0
+   for i = 1, #app.input do
+      inp  = inp  + tonumber(counter.read(app.input[i].stats.rxpackets))
+      inb  = inb  + tonumber(counter.read(app.input[i].stats.rxbytes))
+   end
+   for i = 1, #app.output do
+      outp = outp + tonumber(counter.read(app.output[i].stats.txpackets))
+      outb = outb + tonumber(counter.read(app.output[i].stats.txbytes))
+      dropp = dropp + tonumber(counter.read(app.output[i].stats.txdrop))
+   end
+   return inp, inb, outp, outb, dropp
+end
+
 function breathe ()
-   local freed_packets0 = counter.read(frees)
-   local freed_bytes0 = counter.read(freebytes)
-   events.breath_start(counter.read(breaths), freed_packets0, freed_bytes0,
-                       counter.read(freebits))
+   events.breath_start(enginestats())
    running = true
    monotonic_now = C.get_monotonic_time()
    events.got_monotonic_time(C.get_time_ns())
@@ -702,11 +721,7 @@ function breathe ()
       events.breath_ticked()
    end
    setvmprofile("engine")
-   local freed
-   local freed_packets = counter.read(frees) - freed_packets0
-   local freed_bytes = (counter.read(freebytes) - freed_bytes0)
-   local freed_bytes_per_packet = freed_bytes / math.max(tonumber(freed_packets), 1)
-   events.breath_end(counter.read(breaths), freed_packets, freed_bytes_per_packet)
+   events.breath_end(enginestats())
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then
@@ -714,21 +729,6 @@ function breathe ()
       events.commited_counters()
    end
    running = false
-end
-
-function linkstats (app)
-   local inp, inb, outp, outb, dropp, dropb = 0, 0, 0, 0, 0, 0
-   for i = 1, #app.input do
-      inp  = inp  + tonumber(counter.read(app.input[i].stats.rxpackets))
-      inb  = inb  + tonumber(counter.read(app.input[i].stats.rxbytes))
-   end
-   for i = 1, #app.output do
-      outp = outp + tonumber(counter.read(app.output[i].stats.txpackets))
-      outb = outb + tonumber(counter.read(app.output[i].stats.txbytes))
-      dropp = dropp + tonumber(counter.read(app.output[i].stats.txdrop))
-      dropb = dropb + tonumber(counter.read(app.output[i].stats.txdropbytes))
-   end
-   return inp, inb, outp, outb, dropp, dropb
 end
 
 function report (options)
