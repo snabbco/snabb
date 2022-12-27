@@ -10,8 +10,8 @@ local S = require("syscall")
 local shm = require("core.shm")
 local lib = require("core.lib")
 
--- Set to false to disable timeline logging
-enabled = true
+-- Set to true to enable timeline logging
+enabled = false
 
 -- Load a set of events for logging onto a timeline.
 -- Returns a set of logging functions.

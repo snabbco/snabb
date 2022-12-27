@@ -51,6 +51,8 @@ function timeline ()
 end
 
 function randomize_log_rate ()
+   -- Bail if timeline logging is not enabled.
+   if not timeline_log then return end
    -- Randomize the log rate. Enable each rate in 5x more breaths
    -- than the rate below by randomly picking from log5() distribution.
    -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
