@@ -652,20 +652,6 @@ local function enginestats ()
    return breaths, frees, freebytes, freebits
 end
 
-local function linkstats (app)
-   local inp, inb, outp, outb, dropp, dropb = 0, 0, 0, 0, 0, 0
-   for i = 1, #app.input do
-      inp  = inp  + tonumber(counter.read(app.input[i].stats.rxpackets))
-      inb  = inb  + tonumber(counter.read(app.input[i].stats.rxbytes))
-   end
-   for i = 1, #app.output do
-      outp = outp + tonumber(counter.read(app.output[i].stats.txpackets))
-      outb = outb + tonumber(counter.read(app.output[i].stats.txbytes))
-      dropp = dropp + tonumber(counter.read(app.output[i].stats.txdrop))
-   end
-   return inp, inb, outp, outb, dropp
-end
-
 function breathe ()
    events.breath_start(enginestats())
    running = true
@@ -678,13 +664,9 @@ function breathe ()
       if i > #breathe_pull_order then goto PULL_EXIT else
          local app = breathe_pull_order[i]
          setvmprofile(app.zone)
-         if timeline_mod.rate(timeline_log) <= 3 then
-            app_events[app].pull(linkstats(app))
-            app:pull()
-            app_events[app].pulled(linkstats(app))
-         else
-            app:pull()
-         end
+         app_events[app].pull()
+         app:pull()
+         app_events[app].pulled()
       end
       i = i+1
       goto PULL_LOOP
@@ -699,13 +681,9 @@ function breathe ()
          local spec = breathe_push_order[i]
          local app, push, link = spec.app, spec.push, spec.link
          setvmprofile(app.zone)
-         if timeline_mod.rate(timeline_log) <= 3 then
-            app_events[app].push(linkstats(app))
-            push(app, link)
-            app_events[app].pushed(linkstats(app))
-         else
-            push(app, link)
-         end
+         app_events[app].push()
+         push(app, link)
+         app_events[app].pushed()
       end
       i = i+1
       goto PUSH_LOOP
