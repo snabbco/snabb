@@ -12,11 +12,12 @@ A packet has been freed to the packet freelist.
 'length' is the byte size of the packet.
 
 
-9,4|group_freelist_wait:
-The process is waiting to acquire the group freelist’s lock.
+9,4|freelist_empty:
+The process is trying to allocate a packet but the freelist is empty.
 
-9,4|group_freelist_locked:
-The process has acquired the group freelist’s lock.
+9,4|freelist_need_rebalance:
+The process freed a packet. There are now too many packets on the
+local freelist which need to be expelled to the group freelist.
 
 9,4|group_freelist_released: packets
 The packet freelist was rebalanced with the group freelist.
@@ -27,6 +28,3 @@ The packet freelist was rebalanced with the group freelist.
 The packet freelist was refilled from the group freelist.
 
 'packets' is the number of packets reclaimed from the group freelist.
-
-9,4|group_freelist_unlocked:
-The process has released the group freelist’s lock.
