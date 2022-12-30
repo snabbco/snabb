@@ -715,10 +715,10 @@ function breathe ()
    -- Tick: call tick() methods at tick_Hz frequency
    if tick() then
       for _, app in ipairs(breathe_ticks) do
-         app_events[app].tick(linkstats(app))
          setvmprofile(app.zone)
+         app_events[app].tick()
          app:tick()
-         app_events[app].ticked(linkstats(app))
+         app_events[app].ticked()
       end
       events.breath_ticked()
    end
