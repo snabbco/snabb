@@ -20,13 +20,19 @@ function start (name, duration)
    engine.main{duration=duration}
 end
 
-function startn (name, duration, n)
+function startn (name, duration, n, core)
+   numa.bind_to_cpu(core, 'skip')
    local c = config.new()
    for i=1,n do
       configure(c, name..i)
    end
    engine.configure(c)
    engine.main{duration=duration}
+   local txpackets = txpackets()
+   engine.main{duration=1, no_report=true}
+   io.stderr:write(("%.3f Mpps\n"):format(txpackets / 1e6 / duration))
+   io.stderr:flush()
+   --engine.report_links()
 end
 
 function txpackets ()
@@ -35,25 +41,4 @@ function txpackets ()
       txpackets = txpackets + link.stats(output).rxpackets
    end
    return txpackets
-end
-
-local instr = require("apps.interlink.freelist_instrument")
-
-function startn_instrument (name, duration, n, core)
-   numa.bind_to_cpu(core, 'skip')
-   local _, reclaim_latency = instr.instrument_freelist()
-   startn(name, duration, n)
-   local txpackets = txpackets()
-   instr.histogram_csv(reclaim_latency, "reclaim")
-   local min, avg, max = reclaim_latency:summarize()
-   engine.main{duration=1, no_report=true}
-   io.stderr:write(("(%d) reclaim latency (ns)     min:%16s    avg:%16s    max:%16s\n")
-      :format(core,
-              lib.comma_value(math.floor(min)),
-              lib.comma_value(math.floor(avg)),
-              lib.comma_value(math.floor(max))))
-   io.stderr:write(("%.3f Mpps\n"):format(txpackets / 1e6 / duration))
-   io.stderr:flush()
-
-   --engine.report_links()
 end

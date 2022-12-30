@@ -135,40 +135,34 @@ end
 local group_fl_chunksize = group_freelist.chunksize
 
 -- Return borrowed packets to group freelist.
-function rebalance_step ()
-   events.group_freelist_wait()
+local function rebalance_step ()
    local chunk, seq = group_freelist.start_add(group_fl)
    if chunk then
-      events.group_freelist_locked()
       chunk.nfree = group_fl_chunksize
       for i=0, chunk.nfree-1 do
          chunk.list[i] = freelist_remove(packets_fl)
       end
-      events.group_freelist_released(chunk.nfree)
       group_freelist.finish(chunk, seq)
-      events.group_freelist_unlocked()
    else
       error("group freelist overflow")
    end
+   events.group_freelist_released(group_fl_chunksize)
 end
 
-function need_rebalance ()
+local function need_rebalance ()
    return freelist_nfree(packets_fl) >= (packets_allocated + group_fl_chunksize)
 end
 
 -- Reclaim packets from group freelist.
-function reclaim_step ()
-   events.group_freelist_wait()
+local function reclaim_step ()
    local chunk, seq = group_freelist.start_remove(group_fl)
    if chunk then
-      events.group_freelist_locked()
       for i=0, chunk.nfree-1 do
          freelist_add(packets_fl, chunk.list[i])
       end
-      events.group_freelist_reclaimed(chunk.nfree)
       group_freelist.finish(chunk, seq)
-      events.group_freelist_unlocked()
    end
+   events.group_freelist_reclaimed(group_fl_chunksize)
 end
 
 -- Register struct freelist as an abstract SHM object type so that the
@@ -181,6 +175,7 @@ end})
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
+      events.freelist_empty()
       if group_fl then
          reclaim_step()
       end
@@ -317,6 +312,7 @@ function free (p)
    account_free(p)
    free_internal(p)
    if group_fl and need_rebalance() then
+      events.freelist_need_rebalance()
       rebalance_step()
    end
 end

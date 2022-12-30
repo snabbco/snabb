@@ -17,15 +17,12 @@ for core in pairs(CPUS) do
    table.sort(cores)
 end
 
-require("apps.interlink.freelist_instrument").histogram_csv_header()
-io.stdout:flush()
-
 for i=1,NCONSUMERS do
-   worker.start("sink"..i, ([[require("apps.interlink.test_sink").start_instrument(%q, %d, %s)]])
+   worker.start("sink"..i, ([[require("apps.interlink.test_sink").start(%q, %d, %s)]])
       :format("test"..i, DURATION, cores[1+i]))
 end
 
-worker.start("source", ([[require("apps.interlink.test_source").startn_instrument(%q, %d, %d, %s)]])
+worker.start("source", ([[require("apps.interlink.test_source").startn(%q, %d, %d, %s)]])
    :format("test", DURATION, NCONSUMERS, assert(cores[1])))
 
 engine.main{done = function ()
