@@ -79,7 +79,7 @@ end
 function start_add (fl)
    local pos = sync.load(fl.enqueue_pos)
    local mask = fl.enqueue_mask
-   for _=1,1000 do
+   while true do
       local chunk = fl.chunk[band(pos, mask)]
       local seq = sync.load(chunk.sequence)
       local dif = seq - pos
@@ -93,13 +93,12 @@ function start_add (fl)
          pos = sync.load(fl.enqueue_pos)
       end
    end
-   error("BUG")
 end
 
 function start_remove (fl)
    local pos = sync.load(fl.dequeue_pos)
    local mask = fl.dequeue_mask
-   for _=1,1000 do
+   while true do
       local chunk = fl.chunk[band(pos, mask)]
       local seq = sync.load(chunk.sequence)
       local dif = seq - (pos+1)
@@ -113,7 +112,6 @@ function start_remove (fl)
          pos = sync.load(fl.dequeue_pos)
       end
    end
-   error("bug")
 end
 
 function finish (chunk, seq)
