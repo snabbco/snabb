@@ -70,18 +70,18 @@ end
 
 function freelist_open (name, readonly)
    local fl = shm.open(name, "struct group_freelist", 'read-only', 1)
-   waitfor(function () return fl.state[0] == READY end)
+   waitfor(function () return sync.load(fl.state) == READY end)
    local size = fl.size
    shm.unmap(fl)
    return shm.open(name, "struct group_freelist", readonly, size)
 end
 
 function start_add (fl)
-   local pos = fl.enqueue_pos[0]
+   local pos = sync.load(fl.enqueue_pos)
    local mask = fl.enqueue_mask
-   while true do
+   for _=1,1000 do
       local chunk = fl.chunk[band(pos, mask)]
-      local seq = chunk.sequence[0]
+      local seq = sync.load(chunk.sequence)
       local dif = seq - pos
       if dif == 0 then
          if sync.cas(fl.enqueue_pos, pos, pos+1) then
@@ -90,18 +90,18 @@ function start_add (fl)
       elseif dif < 0 then
          return
       else
-         compiler_barrier() -- ensure fresh load of enqueue_pos
-         pos = fl.enqueue_pos[0]
+         pos = sync.load(fl.enqueue_pos)
       end
    end
+   error("BUG")
 end
 
 function start_remove (fl)
-   local pos = fl.dequeue_pos[0]
+   local pos = sync.load(fl.dequeue_pos)
    local mask = fl.dequeue_mask
-   while true do
+   for _=1,1000 do
       local chunk = fl.chunk[band(pos, mask)]
-      local seq = chunk.sequence[0]
+      local seq = sync.load(chunk.sequence)
       local dif = seq - (pos+1)
       if dif == 0 then
          if sync.cas(fl.dequeue_pos, pos, pos+1) then
@@ -110,10 +110,10 @@ function start_remove (fl)
       elseif dif < 0 then
          return
       else
-         compiler_barrier() -- ensure fresh load of dequeue_pos
-         pos = fl.dequeue_pos[0]
+         pos = sync.load(fl.dequeue_pos)
       end
    end
+   error("bug")
 end
 
 function finish (chunk, seq)
