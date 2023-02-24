@@ -73,10 +73,10 @@ local BMI2 = (assert(lib.readfile("/proc/cpuinfo", "*a"),
 function lookup (Dst, Poptrie, keysize)
    if Poptrie.direct_pointing then
       -- v = extract(key, 0, Poptrie.s)
-      local direct_mask = bit.lshift(1ULL, Poptrie.s) - 1
-      -- v = band(key, direct_mask)
+      local direct_shift = 32 - Poptrie.s
       | mov v_dw, dword [key]
-      | and v, direct_mask
+      | bswap v_dw
+      | shr v_dw, direct_shift
       -- index = dmap[v]
       | mov index, dword [dmap+v*4]
       -- eax = band(index, leaf_tag - 1) (tag inverted)
@@ -101,28 +101,38 @@ function lookup (Dst, Poptrie, keysize)
    |2:
    -- v = extract(key, offset, k=6)
    if keysize == 32 then
+      | mov v_dw, dword [key]
+      | bswap v_dw
       if BMI2 then
-         | shrx v_dw, dword [key], offset
+         | shlx v_dw, v_dw, offset
       else
          | mov ecx, offset
-         | mov v_dw, dword [key]
-         | shr v, cl
+         | shl v_dw, cl
       end
+      local shift = 32 - 6
+      | shr v_dw, shift
    elseif keysize == 64 then
+      | mov v, [key]
+      | bswap v
       if BMI2 then
-         | shrx v, [key], offsetx
+         | shlx v, v, offsetx
       else
          | mov ecx, offset
-         | mov v, [key]
-         | shr v, cl
+         | shl v, cl
       end
+      local shift = 64 - 6
+      | shr v, shift
    elseif keysize == 128 then
       | mov ecx, offset
       | mov v, [key]
+      | bswap v
       | mov vec, [key+8]
+      | bswap vec
       | test cl, 64
       | cmovnz v, vec
-      | shrd v, vec, cl
+      | shld v, vec, cl
+      local shift = 64 - 6
+      | shr v, shift
    else error("NYI") end
    -- v = band(v, lshift(1, k=6) - 1)
    | and v_dw, 0x3F
