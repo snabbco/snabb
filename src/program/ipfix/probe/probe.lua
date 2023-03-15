@@ -23,10 +23,9 @@ local long_opts = {
    busywait ="b",
    ["real-time"] = "r",
    ["no-profile"] = "p",
-   ["timeline"] = "t",
    ["test-pcap"] = "T"
 }
-local opt = "hn:brptT:"
+local opt = "hn:brpT:"
 local opt_handler = {}
 local name
 local busywait, real_time, profile = false, false, true
@@ -35,8 +34,6 @@ function opt_handler.n (arg) name = arg end
 function opt_handler.b () busywait = true end
 function opt_handler.r () real_time = true end
 function opt_handler.p () profile = false end
-local timeline = false
-function opt_handler.t () timeline = true end
 local pcap_input
 function opt_handler.T (arg) pcap_input = arg end
 
@@ -100,7 +97,6 @@ function start (name, confpath)
          busywait = busywait,
          real_time = real_time,
          profile = profile,
-         timeline = timeline,
          group_freelist_size = update_group_freelist_size(
             conf.snabbflow_config.rss.software_scaling.group_freelist_size
          ),

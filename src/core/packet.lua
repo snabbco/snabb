@@ -116,9 +116,7 @@ function initialize (max_packets)
       shm.unlink("engine/packets.freelist")
    end
    packets_fl = freelist_create("engine/packets.freelist", max_packets)
-end
-
-function initialize_events ()
+   
    if not events then
       events = timeline.load_events(engine.timeline(), "core.packet")
    end
