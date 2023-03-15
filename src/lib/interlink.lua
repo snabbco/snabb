@@ -298,7 +298,7 @@ local function describe (r)
          [DOWN] = "deallocating"
       })[r.state[0]]
    end
-   return ("%d/%d (%s)"):format(queue_fill(r), size - 1, status(r))
+   return ("%d/%d (%s)"):format(queue_fill(r), r.size, status(r))
 end
 
 ffi.metatype("struct interlink", {__tostring=describe})
