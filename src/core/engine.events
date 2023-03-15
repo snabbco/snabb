@@ -1,0 +1,78 @@
+0,6|engine_started:
+The engine starts the traffic processing loop.
+
+
+1,5|breath_start: breath totalpackets totalbytes totaletherbits
+The engine starts an iteration of the packet-processing event loop (a
+"breath".)
+  
+The total count of packets, bytes, and bits (including layer-1
+ethernet overhead) that the engine has processed are included. These
+can be used to track the rate of traffic.
+
+
+2,3|got_monotonic_time: unixnanos
+The engine has completed initialization for the breath: synchronized
+the current time and handled any pending error recovery.
+
+'unixnanos' is the current wall-clock time in nanoseconds since the epoc.
+This can be used to synchronize the cycle timestamps with wall-clock time.
+
+
+2,4|breath_pulled:
+The engine has "pulled" new packets into the event loop for processing.
+
+2,4|breath_pushed:
+The engine has "pushed" packets one step through the processing network.
+
+2,4|breath_ticked:
+The engine has executed "tick" methods.
+
+
+1,5|breath_end: breath totalpackets totalbytes totaletherbits
+The engine completes an iteration of the event loop (a "breath.")
+
+The total count of packets, bytes, and bits (including layer-1
+ethernet overhead) that the engine has processed are included. These
+can be used to track the rate of traffic.
+
+
+1,5|commited_counters:
+The engine commits the latest counter values to externally visible shared
+memory.
+
+1,4|polled_timers:
+The engine polled its timers and executed any that were expired.
+
+
+1,4|sleep_Hz: usec Hz
+The engine requests that the kernel suspend this process for a period of
+microseconds in order to reduce CPU utilization and achieve a fixed
+frequency of breaths per second (Hz).
+
+1,4|sleep_on_idle: usec
+The engine requests that the kernel suspend this process for a period
+of microseconds in order to reduce CPU utilization because idleness
+has been detected (a breath in which no packets were processed.)
+
+1,4|wakeup_from_sleep:
+The engine resumes operation after sleeping voluntarily.
+
+
+0,6|engine_stopped:
+The engine stops the traffic processing loop.
+
+
+0,9|config_actions_computed:
+The engine has computed the actions required for applying a new configuration.
+
+0,9|configure: config
+The engine begins to apply a new configuration.
+
+'config' is the number of this configuration.
+
+0,9|config_applied:
+The engine has applied a new configuration.
+
+0,9|breathe_order_computed:
+The engine has computed the breath order of a new configuration.

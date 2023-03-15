@@ -28,7 +28,7 @@ end
 
 -- Reserve names that we want to use for global module.
 -- (This way we avoid errors from the 'strict' module.)
-_G.config, _G.engine, _G.memory, _G.link, _G.packet, _G.timer,
+_G.config, _G.engine, _G.memory, _G.link, _G.packet, _G.timer, _G.timeline,
    _G.main = nil
 
 ffi.cdef[[
@@ -164,6 +164,7 @@ function initialize ()
    _G.link   = require("core.link")
    _G.packet = require("core.packet"); _G.packet.initialize()
    _G.timer  = require("core.timer")
+   _G.timeline = require("core.timeline")
    _G.main   = getfenv()
 end
 
