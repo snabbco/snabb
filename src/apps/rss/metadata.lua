@@ -117,11 +117,6 @@ local ipv6_ext_hdr_fns = {
          local payload_len = ext_hdr.length
          return payload_len * 4 - 2, next_header
       end,
-   [59] =
-      -- No next header
-      function(ptr)
-         return 0, 255
-      end,
    [60] =
       -- Destination
       ipv6_generic_ext_hdr,
