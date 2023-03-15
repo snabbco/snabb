@@ -60,23 +60,39 @@ local BMI2 = (assert(lib.readfile("/proc/cpuinfo", "*a"),
 |.define leaves,  rdi -- pointer to leaves array
 |.define nodes,   rsi -- pointer to nodes array
 |.define key,     rdx -- key to look up
+|.define key_dw,  edx -- (key as dword)
 |.define dmap,    rcx -- pointer to directmap
 |.define index,   r8d -- index into node array
 |.define node,    r8  -- pointer into node array 
-|.define offset,  r9d -- offset into key
-|.define offsetx, r9  -- (offset as qword)
+|.define key_x,   r9  -- key extension (for 128 bit keys)
 |.define v,       r10 -- k or s bits extracted from key
 |.define v_dw,    r10d -- (v as dword)
 |.define vec,     r11 -- 64-bit vector or leafvec
 
 -- lookup(leaf_t *leaves, node_t *nodes, key) -> leaf_t
 function lookup (Dst, Poptrie, keysize)
+   if keysize == 32 then
+      | mov key_dw, dword [key]
+      | bswap key
+   elseif keysize == 64 then
+      | mov key, [key]
+      | bswap key
+   elseif keysize == 128 then
+      | mov key_x, [key+8]
+      | bswap key_x
+      | mov key, [key]
+      | bswap key
+   else error("NYI") end
    if Poptrie.direct_pointing then
       -- v = extract(key, 0, Poptrie.s)
-      local direct_mask = bit.lshift(1ULL, Poptrie.s) - 1
-      -- v = band(key, direct_mask)
-      | mov v_dw, dword [key]
-      | and v, direct_mask
+      | mov v, key
+      | shr v, (64 - Poptrie.s)
+      if keysize <= 64 then
+         | shl key, Poptrie.s
+      else
+         | shld key, key_x, Poptrie.s
+         | shl key_x, Poptrie.s
+      end
       -- index = dmap[v]
       | mov index, dword [dmap+v*4]
       -- eax = band(index, leaf_tag - 1) (tag inverted)
@@ -89,43 +105,22 @@ function lookup (Dst, Poptrie, keysize)
       |1:
       | imul index, 24 -- multiply by node size
       | lea node, [nodes+index]
-      -- offset = s
-      | mov offset, Poptrie.s
    else
-      -- index, node, offset = 0, nodes[index], 0
+      -- index, node = 0, nodes[index]
       | xor index, index
       | lea node, [nodes+0] -- nodes[0]
-      | xor offset, offset
    end
    -- while band(vec, lshift(1ULL, v)) ~= 0
    |2:
    -- v = extract(key, offset, k=6)
-   if keysize == 32 then
-      if BMI2 then
-         | shrx v_dw, dword [key], offset
-      else
-         | mov ecx, offset
-         | mov v_dw, dword [key]
-         | shr v, cl
-      end
-   elseif keysize == 64 then
-      if BMI2 then
-         | shrx v, [key], offsetx
-      else
-         | mov ecx, offset
-         | mov v, [key]
-         | shr v, cl
-      end
-   elseif keysize == 128 then
-      | mov ecx, offset
-      | mov v, [key]
-      | mov vec, [key+8]
-      | test cl, 64
-      | cmovnz v, vec
-      | shrd v, vec, cl
-   else error("NYI") end
-   -- v = band(v, lshift(1, k=6) - 1)
-   | and v_dw, 0x3F
+   | mov v, key
+   | shr v, (64 - Poptrie.k)
+   if keysize <= 64 then
+      | shl key, Poptrie.k
+   else
+      | shld key, key_x, Poptrie.k
+      | shl key_x, Poptrie.k
+   end
    -- vec = nodes[index].vector
    | mov vec, qword [node+8]
    -- is bit v set in vec?
@@ -151,8 +146,6 @@ function lookup (Dst, Poptrie, keysize)
    -- node = nodes[index]
    | imul index, 24 -- multiply by node size
    | lea node, [nodes+index]
-   -- offset = offset + k
-   | add offset, 6
    | jmp <2 -- loop
    -- end while
    |4:
