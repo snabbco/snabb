@@ -23,9 +23,10 @@ local long_opts = {
    busywait ="b",
    ["real-time"] = "r",
    ["no-profile"] = "p",
+   ["timeline"] = "t",
    ["test-pcap"] = "T"
 }
-local opt = "hn:brpT:"
+local opt = "hn:brptT:"
 local opt_handler = {}
 local name
 local busywait, real_time, profile = false, false, true
@@ -34,6 +35,8 @@ function opt_handler.n (arg) name = arg end
 function opt_handler.b () busywait = true end
 function opt_handler.r () real_time = true end
 function opt_handler.p () profile = false end
+local timeline = false
+function opt_handler.t () timeline = true end
 local pcap_input
 function opt_handler.T (arg) pcap_input = arg end
 
@@ -86,6 +89,7 @@ function start (name, confpath)
          busywait = busywait,
          real_time = real_time,
          profile = profile,
+         timeline = timeline,
          jit_opt = {
             sizemcode=256,
             maxmcode=8192,
