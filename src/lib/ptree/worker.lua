@@ -15,7 +15,7 @@ local channel      = require("lib.ptree.channel")
 local action_codec = require("lib.ptree.action_codec")
 local ptree_alarms = require("lib.ptree.alarms")
 local timeline     = require("core.timeline")
-local events       = timeline.load_events(engine.timeline(), "core.engine")
+local events
 
 local Worker = {}
 
@@ -105,7 +105,9 @@ function Worker:main ()
 
    if not engine.auditlog_enabled then engine.enable_auditlog() end
 
-   engine.timeline()
+   if not events then 
+      events = timeline.load_events(engine.timeline(), "core.engine")
+   end
 
    engine.enable_tick()
 
