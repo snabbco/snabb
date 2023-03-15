@@ -46,6 +46,7 @@ function timeline ()
       timeline_log = timeline_mod.new("events.timeline")
       timeline_mod.rate(timeline_log, 9) -- initially log events with rate >= 9
       events = timeline_mod.load_events(timeline_log, "core.engine")
+      packet.initialize_events()
    end
    return timeline_log
 end
@@ -267,6 +268,8 @@ end
 
 -- Return the configuration actions needed to migrate from old config to new.
 function compute_config_actions (old, new)
+   timeline() -- Ensure timeline is created and initialized
+
    local actions = {}
 
    -- First determine the links that are going away and remove them.
@@ -333,6 +336,8 @@ end
 
 -- Update the active app network by applying the necessary actions.
 function apply_config_actions (actions)
+   timeline() -- Ensure timeline is created and initialized
+
    -- Table of functions that execute config actions
    local ops = {}
    -- As an efficiency hack, some apps rely on the fact that we add
