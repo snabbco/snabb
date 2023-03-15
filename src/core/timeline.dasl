@@ -11,7 +11,7 @@ local shm = require("core.shm")
 local lib = require("core.lib")
 
 -- Set to true to enable timeline logging
-enabled = false
+enabled = (lib.getenv("SNABB_TIMELINE_ENABLE") and true) or false
 
 -- Load a set of events for logging onto a timeline.
 -- Returns a set of logging functions.
