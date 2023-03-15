@@ -278,6 +278,9 @@ event with rate 3 (0 args)
 -- messages.
 function selftest ()
    print("selftest: timeline")
+
+   enabled = true -- enable timeline
+
    local tl = new("selftest/timeline")
    local e = load_events_from_string(tl, test_events, "selftest",
                                      {module="timeline", func="selftest"})
@@ -308,7 +311,7 @@ function selftest ()
    local sample = {}
    for i = 1, 1000 do sample[i] = tl.entries[i].tsc - tl.entries[i-1].tsc end
    table.sort(sample)
-   print("median time delta for sample:", tonumber(sample[1]).." cycles")
+   print("median time delta for sample:", tonumber(sample[500]).." cycles")
    print("selftest: ok")
 end
 
