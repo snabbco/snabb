@@ -23,6 +23,7 @@ local scheduling_opts = {
    cpu = {},                  -- CPU index (integer).
    real_time = {},            -- Boolean.
    max_packets = {},          -- Positive integer.
+   group_freelist_size = {},
    ingress_drop_monitor = {}, -- Action string: one of 'flush' or 'warn'.
    profile = {default=true},  -- Boolean.
    busywait = {default=true}, -- Boolean.
@@ -59,6 +60,10 @@ end
 
 function sched_apply.max_packets (max_packets)
    packet.initialize(max_packets)
+end
+
+function sched_apply.group_freelist_size (nchunks)
+   packet.enable_group_freelist(nchunks)
 end
 
 function sched_apply.busywait (busywait)
