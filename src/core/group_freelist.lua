@@ -24,21 +24,22 @@ chunksize = 2048
 local default_size = 1024 -- must be a power of two
 
 local CACHELINE = 64 -- XXX - make dynamic
-local INT = ffi.sizeof("uint32_t")
+local QWORD = ffi.sizeof("uint64_t")
 
 ffi.cdef([[
 struct group_freelist_chunk {
-   uint32_t sequence[1], nfree;
+   uint64_t sequence[1];
+   uint32_t nfree, pad;
    struct packet *list[]]..chunksize..[[];
 } __attribute__((packed))]])
 
 ffi.cdef([[
 struct group_freelist {
-   uint32_t enqueue_pos[1], enqueue_mask;
-   uint8_t pad_enqueue_pos[]]..CACHELINE-2*INT..[[];
+   uint64_t enqueue_pos[1], enqueue_mask;
+   uint8_t pad_enqueue_pos[]]..CACHELINE-2*QWORD..[[];
 
-   uint32_t dequeue_pos[1], dequeue_mask;
-   uint8_t pad_dequeue_pos[]]..CACHELINE-2*INT..[[];
+   uint64_t dequeue_pos[1], dequeue_mask;
+   uint8_t pad_dequeue_pos[]]..CACHELINE-2*QWORD..[[];
 
    uint32_t size, state[1];
 
@@ -85,21 +86,21 @@ end
 
 function start_add (fl)
    local deadline
-   local pos = sync.load(fl.enqueue_pos)
+   local pos = sync.load64(fl.enqueue_pos)
    local mask = fl.enqueue_mask
    while true do
       for _=1,100000 do
          local chunk = fl.chunk[band(pos, mask)]
-         local seq = sync.load(chunk.sequence)
-         local dif = seq - pos
+         local seq = sync.load64(chunk.sequence)
+         local dif = ffi.cast("int64_t", seq) - ffi.cast("int64_t", pos)
          if dif == 0 then
-            if sync.cas(fl.enqueue_pos, pos, pos+1) then
+            if sync.cas64(fl.enqueue_pos, pos, pos+1) then
                return chunk, pos+1
             end
          elseif dif < 0 then
             return
          else
-            pos = sync.load(fl.enqueue_pos)
+            pos = sync.load64(fl.enqueue_pos)
          end
       end
       deadline = deadlock_timeout(deadline, 5,
@@ -109,21 +110,21 @@ end
 
 function start_remove (fl)
    local deadline
-   local pos = sync.load(fl.dequeue_pos)
+   local pos = sync.load64(fl.dequeue_pos)
    local mask = fl.dequeue_mask
    while true do
       for _=1,100000 do
          local chunk = fl.chunk[band(pos, mask)]
-         local seq = sync.load(chunk.sequence)
-         local dif = seq - (pos+1)
+         local seq = sync.load64(chunk.sequence)
+         local dif = ffi.cast("int64_t", seq) - ffi.cast("int64_t", pos+1)
          if dif == 0 then
-            if sync.cas(fl.dequeue_pos, pos, pos+1) then
+            if sync.cas64(fl.dequeue_pos, pos, pos+1) then
                return chunk, pos+mask+1
             end
          elseif dif < 0 then
             return
          else
-            pos = sync.load(fl.dequeue_pos)
+            pos = sync.load64(fl.dequeue_pos)
          end
       end
       deadline = deadlock_timeout(deadline, 5,
@@ -137,11 +138,7 @@ end
 
 local function occupied_chunks (fl)
    local enqueue, dequeue = fl.enqueue_pos[0], fl.dequeue_pos[0]
-   if dequeue > enqueue then
-      return enqueue + fl.size - dequeue
-   else
-      return enqueue - dequeue
-   end
+   return tonumber(enqueue - dequeue)
 end
 
 -- Register struct group_freelist as an abstract SHM object type so that
