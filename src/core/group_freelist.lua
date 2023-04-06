@@ -7,7 +7,6 @@ local shm  = require("core.shm")
 local lib  = require("core.lib")
 local ffi  = require("ffi")
 
-local waitfor, compiler_barrier = lib.waitfor, lib.compiler_barrier
 local band = bit.band
 
 -- Group freelist: lock-free multi-producer multi-consumer ring buffer
@@ -70,7 +69,7 @@ end
 
 function freelist_open (name, readonly)
    local fl = shm.open(name, "struct group_freelist", 'read-only', 1)
-   waitfor(function () return sync.load(fl.state) == READY end)
+   lib.waitfor(function () return sync.load(fl.state) == READY end)
    local size = fl.size
    shm.unmap(fl)
    return shm.open(name, "struct group_freelist", readonly, size)
