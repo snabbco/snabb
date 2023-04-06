@@ -15,7 +15,6 @@ local band = bit.band
 --
 -- https://www.1024cores.net/home/lock-free-algorithms/queues/bounded-mpmc-queue
 --
--- NB: assumes 32-bit wide loads/stores are atomic (as is the fact on x86_64)!
 
 -- Group freelist holds up to n chunks of chunksize packets each
 chunksize = 2048
@@ -133,7 +132,7 @@ function start_remove (fl)
 end
 
 function finish (chunk, seq)
-   chunk.sequence[0] = seq
+   assert(sync.cas64(chunk.sequence, chunk.sequence[0], seq))
 end
 
 local function occupied_chunks (fl)
