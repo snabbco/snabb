@@ -14,6 +14,8 @@ local alarms       = require("lib.yang.alarms")
 local channel      = require("lib.ptree.channel")
 local action_codec = require("lib.ptree.action_codec")
 local ptree_alarms = require("lib.ptree.alarms")
+local timeline     = require("core.timeline")
+local events       = timeline.load_events(engine.timeline(), "core.engine")
 
 local Worker = {}
 
@@ -103,6 +105,8 @@ function Worker:main ()
 
    if not engine.auditlog_enabled then engine.enable_auditlog() end
 
+   engine.timeline()
+
    engine.enable_tick()
 
    engine.setvmprofile("engine")
@@ -110,10 +114,14 @@ function Worker:main ()
       self.breathe()
       if next_time < engine.now() then
          next_time = engine.now() + self.period
+         events.engine_stopped()
          self:handle_actions_from_manager()
+         events.engine_started()
          timer.run()
+         events.polled_timers()
       end
       if not engine.busywait then engine.pace_breathing() end
+      engine.randomize_log_rate()
    until stop < engine.now()
    counter.commit()
    if not self.no_report then engine.report(self.report) end

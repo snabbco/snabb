@@ -67,6 +67,17 @@ local function update_cpuset (cpu_pool)
    end
 end
 
+local probe_group_freelist_size
+
+local function update_group_freelist_size (nchunks)
+   if not probe_group_freelist_size then
+      probe_group_freelist_size = nchunks
+   elseif probe_group_freelist_size ~= nchunks then
+      error("Can not change group-freelist-size after probe has started.")
+   end
+   return probe_group_freelist_size
+end
+
 local function warn (msg, ...)
    io.stderr:write("Warning: "..msg:format(...).."\n")
    io.stderr:flush()
@@ -86,6 +97,9 @@ function start (name, confpath)
          busywait = busywait,
          real_time = real_time,
          profile = profile,
+         group_freelist_size = update_group_freelist_size(
+            conf.snabbflow_config.rss.software_scaling.group_freelist_size
+         ),
          jit_opt = {
             sizemcode=256,
             maxmcode=8192,
@@ -121,6 +135,8 @@ function setup_workers (config)
    local rss = config.snabbflow_config.rss
    local flow_director = config.snabbflow_config.flow_director
    local ipfix = config.snabbflow_config.ipfix
+
+   update_group_freelist_size(rss.software_scaling.group_freelist_size)
 
    local collector_pools = {}
    for name, p in pairs(ipfix.collector_pool) do
@@ -298,10 +314,14 @@ function setup_workers (config)
                   args = iconfig
                }
             else
-               output = { type = "interlink", link_name = rss_link }
+               output = {
+                  type = "interlink",
+                  link_name = rss_link,
+                  link_size = rss.software_scaling.interlink_size
+               }
                workers[rss_link] =
                   probe.configure_interlink_ipfix_tap_instance(
-                     rss_link, iconfig
+                     rss_link, output.link_size, iconfig
                   )
                -- Dedicated exporter processes are restartable
                worker_opts[rss_link] = {

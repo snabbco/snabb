@@ -23,6 +23,7 @@ RMSRC  = $(shell find . -name '*.md' -not -regex './obj.*' -printf '%P ')
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 # sort to eliminate potential duplicate of programs.inc
 INCSRC = $(sort $(shell find . -regex '[^\#]*\.inc' -printf '%P ') programs.inc)
+EVTSRC = $(sort $(shell find . -regex '[^\#]*\.events' -printf '%P '))
 YANGSRC= $(shell find . -regex '[^\#]*\.yang' -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
@@ -35,6 +36,7 @@ JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %,obj/%,$(RMSRC))
 INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
+EVTOBJ := $(patsubst %.events,obj/%_events.o, $(EVTSRC))
 YANGOBJ:= $(patsubst %.yang,obj/%_yang.o, $(YANGSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
@@ -54,7 +56,7 @@ TESTSCRIPTS = $(shell find . -name "selftest.*" -executable | xargs)
 
 PATH := ../lib/luajit/src:$(PATH)
 
-snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(YANGOBJ) $(LUAJIT_A)
+snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(EVTOBJ) $(YANGOBJ) $(LUAJIT_A)
 	$(E) "GEN       obj/version.lua.gen"
 	$(Q) ../generate-version-lua.sh > obj/version.lua.gen
 	$(E) "LUA       obj/version.lua"
@@ -77,6 +79,7 @@ $(EXE): snabb bin
 	$(Q) upx -f --brute -o$@ snabb
 	@echo -n "BINARY    "
 	@ls -sh $@
+
 markdown: $(RMOBJS)
 
 test: $(TESTMODS) $(TESTSCRIPTS)
@@ -167,6 +170,13 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	 cat $<; \
 	 echo "]=============]") > $(basename $@).luainc
 	$(Q) raptorjit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
+
+$(EVTOBJ): obj/%_events.o: %.events Makefile | $(OBJDIR)
+	$(E) "EVENTS    $@"
+	@(echo -n "return [=============["; \
+	 cat $<; \
+	 echo "]=============]") > $(basename $@).luainc
+	$(Q) raptorjit -bg -n $(subst /,.,$*)_events $(basename $@).luainc $@
 
 $(YANGOBJ): obj/%_yang.o: %.yang Makefile | $(OBJDIR)
 	$(E) "YANG      $@"

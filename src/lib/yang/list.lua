@@ -829,16 +829,14 @@ function List:remove_obsolete_nodes (k, r, d, s, h)
       self:free_node(r)
       return self:remove_obsolete_nodes(k, node.parent, d, s, h)
    elseif band(node.occupied, node.occupied-1) == 0 then
-      -- Node has only one child, move it to parent.
+      -- Node has only one child, move to parent if it is a leaf.
       local index = msb_set(node.occupied)
-      parent.children[parent_index] = node.children[index]
       if self:node_leaf(node, index) then
+         parent.children[parent_index] = node.children[index]
          self:node_leaf(parent, parent_index, true)
-      else
-         self:node(node.children[index]).parent = node.parent
+         self:free_node(r)
+         return self:remove_obsolete_nodes(k, node.parent, d, s, h)
       end
-      self:free_node(r)
-      return self:remove_obsolete_nodes(k, node.parent, d, s, h)
    end
 end
 

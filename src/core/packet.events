@@ -1,0 +1,30 @@
+9,9|packets_preallocated: packets
+DMA memory for packets has been preallocated from the operating system.
+
+'packets' is the number of packets for which space has been reserved.
+
+9,1|packet_allocated:
+A packet has been allocated from the packet freelist.
+
+9,1|packet_freed: length
+A packet has been freed to the packet freelist.
+
+'length' is the byte size of the packet.
+
+
+9,4|freelist_empty:
+The process is trying to allocate a packet but the freelist is empty.
+
+9,4|freelist_need_rebalance:
+The process freed a packet. There are now too many packets on the
+local freelist which need to be expelled to the group freelist.
+
+9,4|group_freelist_released: packets
+The packet freelist was rebalanced with the group freelist.
+
+'packets' is the number of packets released to the group freelist.
+
+9,4|group_freelist_reclaimed: packets
+The packet freelist was refilled from the group freelist.
+
+'packets' is the number of packets reclaimed from the group freelist.

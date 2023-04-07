@@ -103,17 +103,23 @@ end
 -- Extract bits at offset
 -- key=uint8_t[?]
 function extract (key, offset, length)
-   local bits, read = 0, 0
-   local byte = math.floor(offset/8)
-   while read < length do
-      offset = math.max(offset - byte*8, 0)
-      local nbits = math.min(length - read, 8 - offset)
-      local x = band(rshift(key[byte], offset), lshift(1, nbits) - 1)
-      bits = bor(bits, lshift(x, read))
-      read = read + nbits
-      byte = math.min(byte + 1, ffi.sizeof(key) - 1)
+   local bits = 0
+   local skip = math.floor(offset/8)
+   offset = offset - skip*8
+   for i = skip, 15 do
+      for j = 7, 0, -1 do
+         if offset == 0 then
+            local bit = rshift(band(key[i], lshift(1, j)), j)
+            length = length - 1
+            bits = bor(bits, lshift(bit, length))
+            if length == 0 then
+               return bits
+            end
+         else
+            offset = offset - 1
+         end
+      end
    end
-   return bits
 end
 
 -- Add key/value pair to RIB (intermediary binary trie)
@@ -153,6 +159,7 @@ end
 
 -- Map f over keys of length in RIB
 function Poptrie:rib_map (f, length, root)
+   local bit = lshift(1, length-1)
    local function map (node, offset, key, value)
       value = (node and node.value) or value
       local left, right = node and node.left, node and node.right
@@ -160,7 +167,7 @@ function Poptrie:rib_map (f, length, root)
          f(key, value, (left or right) and node)
       else
          map(left, offset + 1, key, value)
-         map(right, offset + 1, bor(key, lshift(1, offset)), value)
+         map(right, offset + 1, bor(key, rshift(bit, offset)), value)
       end
    end
    return map(root or self.rib, 0, 0)
@@ -384,80 +391,250 @@ function selftest ()
       for i = 1, 16 do bs[i] = math.random(256) - 1 end
       return s(unpack(bs))
    end
-   -- To test direct pointing: direct_pointing = true
-   local t = new{}
-   -- Tets building empty RIB
-   t:build()
-   -- Test RIB
-   t:add(s(0x00), 8, 1) -- 00000000
-   t:add(s(0x0F), 8, 2) -- 00001111
-   t:add(s(0x07), 4, 3) --     0111
-   t:add(s(0xFF), 8, 4) -- 11111111
-   t:add(s(0xFF), 5, 5) --    11111
-   -- 111111111111111111111111111111111111111111111111111111111111111111110000
-   t:add(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F), 72, 6)
-   local v, n = t:rib_lookup(s(0x0), 1)
-   assert(not v and n.left and not n.right)
-   local v, n = t:rib_lookup(s(0x00), 8)
-   assert(v == 1 and not n)
-   local v, n = t:rib_lookup(s(0x07), 3)
-   assert(not v and (n.left and n.right))
-   local v, n = t:rib_lookup(s(0x0), 1, n)
-   assert(v == 3 and not n)
-   local v, n = t:rib_lookup(s(0xFF), 5)
-   assert(v == 5 and (not n.left) and n.right)
-   local v, n = t:rib_lookup(s(0x0F), 3, n)
-   assert(v == 4 and not n)
-   local v, n = t:rib_lookup(s(0x3F), 8)
-   assert(v == 5 and not n)
-   local v, n = t:rib_lookup(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F), 72)
-   assert(v == 6 and not n)
-   -- Test FIB
-   t:build()
-   if debug then t:fib_info() end
-   assert(t:lookup(s(0x00)) == 1) -- 00000000
-   assert(t:lookup(s(0x03)) == 0) -- 00000011
-   assert(t:lookup(s(0x07)) == 3) -- 00000111
-   assert(t:lookup(s(0x0F)) == 2) -- 00001111
-   assert(t:lookup(s(0x1F)) == 5) -- 00011111
-   assert(t:lookup(s(0x3F)) == 5) -- 00111111
-   assert(t:lookup(s(0xFF)) == 4) -- 11111111
-   assert(t:lookup(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F)) == 6)
-   assert(t:lookup32(s(0x00)) == 1)
-   assert(t:lookup32(s(0x03)) == 0)
-   assert(t:lookup32(s(0x07)) == 3)
-   assert(t:lookup32(s(0x0F)) == 2)
-   assert(t:lookup32(s(0x1F)) == 5)
-   assert(t:lookup32(s(0x3F)) == 5)
-   assert(t:lookup32(s(0xFF)) == 4)
-   assert(t:lookup64(s(0x00)) == 1)
-   assert(t:lookup64(s(0x03)) == 0)
-   assert(t:lookup64(s(0x07)) == 3)
-   assert(t:lookup64(s(0x0F)) == 2)
-   assert(t:lookup64(s(0x1F)) == 5)
-   assert(t:lookup64(s(0x3F)) == 5)
-   assert(t:lookup64(s(0xFF)) == 4)
-   assert(t:lookup128(s(0x00)) == 1)
-   assert(t:lookup128(s(0x03)) == 0)
-   assert(t:lookup128(s(0x07)) == 3)
-   assert(t:lookup128(s(0x0F)) == 2)
-   assert(t:lookup128(s(0x1F)) == 5)
-   assert(t:lookup128(s(0x3F)) == 5)
-   assert(t:lookup128(s(0xFF)) == 4)
-   assert(t:lookup128(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F)) == 6)
-   -- Test 32-bit leaves
-   local t = new{direct_pointing=true, s=8, leaf_t=ffi.typeof("uint32_t")}
-   t:add(s(0xff,0x00), 9, 0xffffffff)
-   t:add(s(0xff,0x01), 9, 0xfffffffe)
-   t:build()
-   assert(t:lookup(s(0xff,0x00)) == 0xffffffff)
-   assert(t:lookup(s(0xff,0x01)) == 0xfffffffe)
-   assert(t:lookup32(s(0xff,0x00)) == 0xffffffff)
-   assert(t:lookup32(s(0xff,0x01)) == 0xfffffffe)
-   assert(t:lookup64(s(0xff,0x00)) == 0xffffffff)
-   assert(t:lookup64(s(0xff,0x01)) == 0xfffffffe)
-   assert(t:lookup128(s(0xff,0x00)) == 0xffffffff)
-   assert(t:lookup128(s(0xff,0x01)) == 0xfffffffe)
+
+   for _, leaf_t in ipairs{"uint16_t", "uint32_t"} do
+      for _, direct_pointing in ipairs{false, true} do
+         print("unit tests with:")
+         print("", "direct_pointing", direct_pointing)
+         print("", "leaf_t", leaf_t)
+
+         local t = new{direct_pointing=direct_pointing, leaf_t=ffi.typeof(leaf_t)}
+         t:add(s(128,178,0,0), 15, 559)
+         local v, n = t:rib_lookup(s(128,178,0,1), 32)
+         assert(t:rib_lookup(s(128,178,0,1), 32) == 559)
+         assert(t:rib_lookup(s(128,179,0,1), 32) == 559)
+         t:build()
+         assert(t:lookup(s(128,178,0,1)) == 559)
+         assert(t:lookup(s(128,179,0,1)) == 559)
+         assert(t:lookup32(s(128,178,0,1)) == 559)
+         assert(t:lookup32(s(128,179,0,1)) == 559)
+         assert(t:lookup(s(128,178,0,1)) == 559)
+         assert(t:lookup(s(128,179,0,1)) == 559)
+         assert(t:lookup64(s(128,178,0,1)) == 559)
+         assert(t:lookup64(s(128,179,0,1)) == 559)
+         assert(t:lookup(s(128,178,0,1)) == 559)
+         assert(t:lookup(s(128,179,0,1)) == 559)
+         assert(t:lookup128(s(128,178,0,1)) == 559)
+         assert(t:lookup128(s(128,179,0,1)) == 559)
+
+         local t = new{direct_pointing=direct_pointing, leaf_t=ffi.typeof(leaf_t)}
+         t:add(s(128,0,0,0), 7, 7)
+         t:add(s(128,178,0,0), 15, 15)
+         t:add(s(128,178,154,160), 27, 27)
+         t:add(s(128,178,154,196), 31, 31)
+         t:build()
+         -- /7
+         assert(t:rib_lookup(s(128,0,0,0), 32) == 7)
+         assert(t:rib_lookup(s(128,0,0,1), 32) == 7)
+         assert(t:rib_lookup(s(129,0,0,1), 32) == 7)
+         assert(t:rib_lookup(s(127,0,0,1), 32) == nil)
+         assert(t:rib_lookup(s(130,0,0,1), 32) == nil)
+         assert(t:lookup(s(128,0,0,0)) == 7)
+         assert(t:lookup(s(128,0,0,1)) == 7)
+         assert(t:lookup(s(129,0,0,1)) == 7)
+         assert(t:lookup(s(127,0,0,1)) == 0)
+         assert(t:lookup(s(130,0,0,1)) == 0)
+         assert(t:lookup32(s(128,0,0,0)) == 7)
+         assert(t:lookup32(s(128,0,0,1)) == 7)
+         assert(t:lookup32(s(129,0,0,1)) == 7)
+         assert(t:lookup32(s(127,0,0,1)) == 0)
+         assert(t:lookup32(s(130,0,0,1)) == 0)
+         assert(t:lookup64(s(128,0,0,0)) == 7)
+         assert(t:lookup64(s(128,0,0,1)) == 7)
+         assert(t:lookup64(s(129,0,0,1)) == 7)
+         assert(t:lookup64(s(127,0,0,1)) == 0)
+         assert(t:lookup64(s(130,0,0,1)) == 0)
+         assert(t:lookup128(s(128,0,0,0)) == 7)
+         assert(t:lookup128(s(128,0,0,1)) == 7)
+         assert(t:lookup128(s(129,0,0,1)) == 7)
+         assert(t:lookup128(s(127,0,0,1)) == 0)
+         assert(t:lookup128(s(130,0,0,1)) == 0)
+         -- /15
+         assert(t:rib_lookup(s(128,178,0,0), 32) == 15)
+         assert(t:rib_lookup(s(128,178,0,1), 32) == 15)
+         assert(t:rib_lookup(s(128,179,0,1), 32) == 15)
+         assert(t:rib_lookup(s(128,177,0,1), 32) == 7)
+         assert(t:rib_lookup(s(128,180,0,1), 32) == 7)
+         assert(t:lookup(s(128,178,0,0)) == 15)
+         assert(t:lookup(s(128,178,0,1)) == 15)
+         assert(t:lookup(s(128,179,0,1)) == 15)
+         assert(t:lookup(s(128,177,0,1)) == 7)
+         assert(t:lookup(s(128,180,0,1)) == 7)
+         assert(t:lookup32(s(128,178,0,0)) == 15)
+         assert(t:lookup32(s(128,178,0,1)) == 15)
+         assert(t:lookup32(s(128,179,0,1)) == 15)
+         assert(t:lookup32(s(128,177,0,1)) == 7)
+         assert(t:lookup32(s(128,180,0,1)) == 7)
+         assert(t:lookup64(s(128,178,0,0)) == 15)
+         assert(t:lookup64(s(128,178,0,1)) == 15)
+         assert(t:lookup64(s(128,179,0,1)) == 15)
+         assert(t:lookup64(s(128,177,0,1)) == 7)
+         assert(t:lookup64(s(128,180,0,1)) == 7)
+         assert(t:lookup128(s(128,178,0,0)) == 15)
+         assert(t:lookup128(s(128,178,0,1)) == 15)
+         assert(t:lookup128(s(128,179,0,1)) == 15)
+         assert(t:lookup128(s(128,177,0,1)) == 7)
+         assert(t:lookup128(s(128,180,0,1)) == 7)
+         -- /27
+         assert(t:rib_lookup(s(128,178,154,160), 32) == 27)
+         assert(t:rib_lookup(s(128,178,154,161), 32) == 27)
+         assert(t:rib_lookup(s(128,178,154,191), 32) == 27)
+         assert(t:rib_lookup(s(128,179,154,160), 32) == 15)
+         assert(t:rib_lookup(s(128,178,154,159), 32) == 15)
+         assert(t:lookup(s(128,178,154,160)) == 27)
+         assert(t:lookup(s(128,178,154,161)) == 27)
+         assert(t:lookup(s(128,178,154,191)) == 27)
+         assert(t:lookup(s(128,179,154,160)) == 15)
+         assert(t:lookup(s(128,178,154,159)) == 15)
+         assert(t:lookup32(s(128,178,154,160)) == 27)
+         assert(t:lookup32(s(128,178,154,161)) == 27)
+         assert(t:lookup32(s(128,178,154,191)) == 27)
+         assert(t:lookup32(s(128,179,154,160)) == 15)
+         assert(t:lookup32(s(128,178,154,159)) == 15)
+         assert(t:lookup64(s(128,178,154,160)) == 27)
+         assert(t:lookup64(s(128,178,154,161)) == 27)
+         assert(t:lookup64(s(128,178,154,191)) == 27)
+         assert(t:lookup64(s(128,179,154,160)) == 15)
+         assert(t:lookup64(s(128,178,154,159)) == 15)
+         assert(t:lookup128(s(128,178,154,160)) == 27)
+         assert(t:lookup128(s(128,178,154,161)) == 27)
+         assert(t:lookup128(s(128,178,154,191)) == 27)
+         assert(t:lookup128(s(128,179,154,160)) == 15)
+         assert(t:lookup128(s(128,178,154,159)) == 15)
+         -- /31
+         assert(t:rib_lookup(s(128,178,154,196), 32) == 31)
+         assert(t:rib_lookup(s(128,178,154,197), 32) == 31)
+         assert(t:rib_lookup(s(128,178,154,180), 32) == 27)
+         assert(t:rib_lookup(s(128,178,154,198), 32) == 15)
+         assert(t:lookup(s(128,178,154,196)) == 31)
+         assert(t:lookup(s(128,178,154,197)) == 31)
+         assert(t:lookup(s(128,178,154,180)) == 27)
+         assert(t:lookup(s(128,178,154,198)) == 15)
+         assert(t:lookup32(s(128,178,154,196)) == 31)
+         assert(t:lookup32(s(128,178,154,197)) == 31)
+         assert(t:lookup32(s(128,178,154,180)) == 27)
+         assert(t:lookup32(s(128,178,154,198)) == 15)
+         assert(t:lookup64(s(128,178,154,196)) == 31)
+         assert(t:lookup64(s(128,178,154,197)) == 31)
+         assert(t:lookup64(s(128,178,154,180)) == 27)
+         assert(t:lookup64(s(128,178,154,198)) == 15)
+         assert(t:lookup128(s(128,178,154,196)) == 31)
+         assert(t:lookup128(s(128,178,154,197)) == 31)
+         assert(t:lookup128(s(128,178,154,180)) == 27)
+         assert(t:lookup128(s(128,178,154,198)) == 15)
+
+         local t = new{direct_pointing=direct_pointing, leaf_t=ffi.typeof(leaf_t)}
+         t:add(s(128,0,0,0,1,224,0,0), 43, 43)
+         t:add(s(128,0,0,0,1,224,178,196), 63, 63)
+         t:build()
+         -- /43
+         assert(t:rib_lookup(s(128,0,0,0,1,224,0,0), 64) == 43)
+         assert(t:rib_lookup(s(128,0,0,0,1,224,0,1), 64) == 43)
+         assert(t:rib_lookup(s(128,0,0,0,1,225,0,0), 64) == 43)
+         assert(t:rib_lookup(s(128,0,0,0,1,254,100,12), 64) == 43)
+         assert(t:rib_lookup(s(128,0,0,0,1,200,100,12), 64) == nil)
+         assert(t:rib_lookup(s(128,0,0,0,2,224,0,0), 64) == nil)
+         assert(t:lookup(s(128,0,0,0,1,224,0,0)) == 43)
+         assert(t:lookup(s(128,0,0,0,1,224,0,1)) == 43)
+         assert(t:lookup(s(128,0,0,0,1,225,0,0)) == 43)
+         assert(t:lookup(s(128,0,0,0,1,254,100,12)) == 43)
+         assert(t:lookup(s(128,0,0,0,1,200,100,12)) == 0)
+         assert(t:lookup(s(128,0,0,0,2,224,0,0)) == 0)
+         assert(t:lookup64(s(128,0,0,0,1,224,0,0)) == 43)
+         assert(t:lookup64(s(128,0,0,0,1,224,0,1)) == 43)
+         assert(t:lookup64(s(128,0,0,0,1,225,0,0)) == 43)
+         assert(t:lookup64(s(128,0,0,0,1,254,100,12)) == 43)
+         assert(t:lookup64(s(128,0,0,0,1,200,100,12)) == 0)
+         assert(t:lookup64(s(128,0,0,0,2,224,0,0)) == 0)
+         assert(t:lookup128(s(128,0,0,0,1,224,0,0)) == 43)
+         assert(t:lookup128(s(128,0,0,0,1,224,0,1)) == 43)
+         assert(t:lookup128(s(128,0,0,0,1,225,0,0)) == 43)
+         assert(t:lookup128(s(128,0,0,0,1,254,100,12)) == 43)
+         assert(t:lookup128(s(128,0,0,0,1,200,100,12)) == 0)
+         assert(t:lookup128(s(128,0,0,0,2,224,0,0)) == 0)
+         -- /63
+         assert(t:rib_lookup(s(128,0,0,0,1,224,178,196), 64) == 63)
+         assert(t:rib_lookup(s(128,0,0,0,1,224,178,197), 64) == 63)
+         assert(t:rib_lookup(s(128,0,0,0,1,225,178,197), 64) == 43)
+         assert(t:rib_lookup(s(128,0,0,0,1,224,179,196), 64) == 43)
+         assert(t:rib_lookup(s(128,0,0,0,2,225,178,197), 64) == nil)
+         assert(t:lookup(s(128,0,0,0,1,224,178,196)) == 63)
+         assert(t:lookup(s(128,0,0,0,1,224,178,197)) == 63)
+         assert(t:lookup(s(128,0,0,0,1,225,178,197)) == 43)
+         assert(t:lookup(s(128,0,0,0,1,224,179,196)) == 43)
+         assert(t:lookup(s(128,0,0,0,2,225,178,197)) == 0)
+         assert(t:lookup64(s(128,0,0,0,1,224,178,196)) == 63)
+         assert(t:lookup64(s(128,0,0,0,1,224,178,197)) == 63)
+         assert(t:lookup64(s(128,0,0,0,1,225,178,197)) == 43)
+         assert(t:lookup64(s(128,0,0,0,1,224,179,196)) == 43)
+         assert(t:lookup64(s(128,0,0,0,2,225,178,197)) == 0)
+         assert(t:lookup128(s(128,0,0,0,1,224,178,196)) == 63)
+         assert(t:lookup128(s(128,0,0,0,1,224,178,197)) == 63)
+         assert(t:lookup128(s(128,0,0,0,1,225,178,197)) == 43)
+         assert(t:lookup128(s(128,0,0,0,1,224,179,196)) == 43)
+         assert(t:lookup128(s(128,0,0,0,2,225,178,197)) == 0)
+
+         local t = new{direct_pointing=direct_pointing, leaf_t=ffi.typeof(leaf_t)}
+         -- Tets building empty RIB
+         t:build()
+         -- Test RIB
+         t:add(s(0x00), 8, 1) -- 00000000
+         t:add(s(0xF0), 8, 2) -- 11110000
+         t:add(s(0xE0), 4, 3) -- 11100000
+         t:add(s(0xFF), 8, 4) -- 11111111
+         t:add(s(0xFF), 5, 5) -- 11111000
+         t:add(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F), 72, 6)
+         local v, n = t:rib_lookup(s(0x0), 1)
+         assert(not v and n.left and not n.right)
+         local v, n = t:rib_lookup(s(0x00), 8)
+         assert(v == 1 and not n)
+         local v, n = t:rib_lookup(s(0xE0), 3)
+         assert(not v and (n.left and n.right))
+         local v, n = t:rib_lookup(s(0x0), 1, n)
+         assert(v == 3 and not n)
+         local v, n = t:rib_lookup(s(0xFF), 5)
+         assert(v == 5 and (not n.left) and n.right)
+         local v, n = t:rib_lookup(s(0xF0), 3, n)
+         assert(v == 4 and not n)
+         local v, n = t:rib_lookup(s(0xF8), 8)
+         assert(v == 5 and not n)
+         local v, n = t:rib_lookup(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F), 72)
+         assert(v == 6 and not n)
+         -- Test FIB
+         t:build()
+         if debug then t:fib_info() end
+         assert(t:lookup(s(0x00)) == 1) -- 00000000
+         assert(t:lookup(s(0xC0)) == 0) -- 11000000
+         assert(t:lookup(s(0xE0)) == 3) -- 11100000
+         assert(t:lookup(s(0xF0)) == 2) -- 11110000
+         assert(t:lookup(s(0xF8)) == 5) -- 11111000
+         assert(t:lookup(s(0xFC)) == 5) -- 11111100
+         assert(t:lookup(s(0xFF)) == 4) -- 11111111
+         assert(t:lookup(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F)) == 6)
+         assert(t:lookup32(s(0x00)) == 1)
+         assert(t:lookup32(s(0xC0)) == 0)
+         assert(t:lookup32(s(0xE0)) == 3)
+         assert(t:lookup32(s(0xF0)) == 2)
+         assert(t:lookup32(s(0xF8)) == 5)
+         assert(t:lookup32(s(0xFC)) == 5)
+         assert(t:lookup32(s(0xFF)) == 4)
+         assert(t:lookup64(s(0x00)) == 1)
+         assert(t:lookup64(s(0xC0)) == 0)
+         assert(t:lookup64(s(0xE0)) == 3)
+         assert(t:lookup64(s(0xF0)) == 2)
+         assert(t:lookup64(s(0xF8)) == 5)
+         assert(t:lookup64(s(0xFC)) == 5)
+         assert(t:lookup64(s(0xFF)) == 4)
+         assert(t:lookup128(s(0x00)) == 1)
+         assert(t:lookup128(s(0xC0)) == 0)
+         assert(t:lookup128(s(0xE0)) == 3)
+         assert(t:lookup128(s(0xF0)) == 2)
+         assert(t:lookup128(s(0xF8)) == 5)
+         assert(t:lookup128(s(0xFC)) == 5)
+         assert(t:lookup128(s(0xFF)) == 4)
+         assert(t:lookup128(s(0xF0,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x0F)) == 6)
+      end
+   end
 
    -- Random testing
    local function reproduce (cases, config)

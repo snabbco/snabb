@@ -12,6 +12,7 @@ local lib      = require("core.lib")
 local memory   = require("core.memory")
 local shm      = require("core.shm")
 local counter  = require("core.counter")
+local timeline = require("core.timeline")
 
 require("core.packet_h")
 
@@ -105,7 +106,7 @@ end
 local packet_allocation_step = 1000
 local packets_allocated = 0
  -- Initialized on demand.
-local packets_fl, group_fl
+local packets_fl, group_fl, events
 
 -- Call to ensure packet freelist is enabled.
 function initialize (max_packets)
@@ -115,6 +116,10 @@ function initialize (max_packets)
       shm.unlink("engine/packets.freelist")
    end
    packets_fl = freelist_create("engine/packets.freelist", max_packets)
+   
+   if not events then
+      events = timeline.load_events(engine.timeline(), "core.packet")
+   end
 end
 
 -- Call to ensure group freelist is enabled.
@@ -130,7 +135,7 @@ end
 local group_fl_chunksize = group_freelist.chunksize
 
 -- Return borrowed packets to group freelist.
-function rebalance_step ()
+local function rebalance_step ()
    local chunk, seq = group_freelist.start_add(group_fl)
    if chunk then
       chunk.nfree = group_fl_chunksize
@@ -141,14 +146,15 @@ function rebalance_step ()
    else
       error("group freelist overflow")
    end
+   events.group_freelist_released(group_fl_chunksize)
 end
 
-function need_rebalance ()
+local function need_rebalance ()
    return freelist_nfree(packets_fl) >= (packets_allocated + group_fl_chunksize)
 end
 
 -- Reclaim packets from group freelist.
-function reclaim_step ()
+local function reclaim_step ()
    local chunk, seq = group_freelist.start_remove(group_fl)
    if chunk then
       for i=0, chunk.nfree-1 do
@@ -156,6 +162,7 @@ function reclaim_step ()
       end
       group_freelist.finish(chunk, seq)
    end
+   events.group_freelist_reclaimed(group_fl_chunksize)
 end
 
 -- Register struct freelist as an abstract SHM object type so that the
@@ -168,6 +175,7 @@ end})
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
+      events.freelist_empty()
       if group_fl then
          reclaim_step()
       end
@@ -175,6 +183,7 @@ function allocate ()
          preallocate_step()
       end
    end
+   events.packet_allocated()
    return freelist_remove(packets_fl)
 end
 
@@ -299,9 +308,11 @@ end
 local free_internal, account_free =
    free_internal, account_free
 function free (p)
+   events.packet_freed(p.length)
    account_free(p)
    free_internal(p)
    if group_fl and need_rebalance() then
+      events.freelist_need_rebalance()
       rebalance_step()
    end
 end
@@ -324,6 +335,7 @@ function preallocate_step()
    end
    packets_allocated = packets_allocated + packet_allocation_step
    packet_allocation_step = 2 * packet_allocation_step
+   events.packets_preallocated(packet_allocation_step)
 end
 
 function selftest ()

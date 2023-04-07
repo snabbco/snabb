@@ -6,6 +6,7 @@ local S = require("syscall")
 local lib = require("core.lib")
 local numa = require("lib.numa")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
+local timeline = require("core.timeline")
 
 local function fatal (msg)
    print(msg)
@@ -22,9 +23,11 @@ local scheduling_opts = {
    cpu = {},                  -- CPU index (integer).
    real_time = {},            -- Boolean.
    max_packets = {},          -- Positive integer.
+   group_freelist_size = {},
    ingress_drop_monitor = {}, -- Action string: one of 'flush' or 'warn'.
    profile = {default=true},  -- Boolean.
    busywait = {default=true}, -- Boolean.
+   timeline = {},             -- Boolean. Enable timeline logging?
    enable_xdp = {},           -- Enable Snabb XDP mode (see apps.xdp.xdp).
    eval = {}                  -- String.
 }
@@ -59,8 +62,16 @@ function sched_apply.max_packets (max_packets)
    packet.initialize(max_packets)
 end
 
+function sched_apply.group_freelist_size (nchunks)
+   packet.enable_group_freelist(nchunks)
+end
+
 function sched_apply.busywait (busywait)
    engine.busywait = busywait
+end
+
+function sched_apply.timeline (enabled)
+   timeline.enabled = enabled
 end
 
 function sched_apply.enable_xdp (opt)

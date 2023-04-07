@@ -1,0 +1,317 @@
+-- timeline: high-resolution event log using in-memory ring buffer
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(..., package.seeall)
+
+local dasm = require("dasm")
+local ffi = require("ffi")
+local C = ffi.C
+local S = require("syscall")
+local shm = require("core.shm")
+local lib = require("core.lib")
+
+-- Set to true to enable timeline logging
+enabled = (lib.getenv("SNABB_TIMELINE_ENABLE") and true) or false
+
+-- Load a set of events for logging onto a timeline.
+-- Returns a set of logging functions.
+--
+-- For example:
+--   e = load_events(engine.timeline, "core.app", {name="myapp", class="intel10g"})
+-- Loads the events defined in src/core/app.events and tags each event
+-- with the name of the app and class. Events can then be logged:
+--   e:app_pulled(inpackets, inbytes, outpackets, outbytes)
+function load_events (tl, eventmodule, extra)
+   local category = eventmodule:match("[^.]+$") -- "core.engine" -> "engine"
+   -- Convert extra into " key1=value1 key2=value2 ..." attributes string.
+   local spec = require(eventmodule.."_events")
+   return load_events_from_string(tl, spec, category, extra)
+end
+
+-- (Helper function)
+function load_events_from_string (tl, spec, category, extra)
+   local events = {}
+   -- Insert a delimiter character (\a "alarm") between log messages.
+   spec = spec:gsub("\n(%d,%d|)", "\n\a%1")
+   for message in spec:gmatch("[^\a]+") do
+      message = message:gsub("(.-)%s*$", "%1") -- trim trailing spaces
+      local event = message:match("([%w_]+):")
+      events[event] = mkevent(tl, category, message, extra)
+   end
+   -- Return the set of functions in an efficient-to-call FFI object.
+   local mt = {__index = events}
+   return ffi.new(ffi.metatype(ffi.typeof("struct{}"), mt))
+end
+
+------------------------------------------------------------
+-- Binary data structures
+
+ffi.cdef[[
+  // 64B file header
+  struct timeline_header {
+    uint64_t magic;
+    uint16_t major_version;
+    uint16_t minor_version;
+    uint32_t log_bytes;
+    uint32_t strings_bytes;
+    uint8_t reserved[44];
+  };
+
+  // 64B log entry
+  struct timeline_entry {
+    double tsc;       // CPU timestamp (note: assumed to be first elem below)
+    uint16_t msgid;     // msgid*16 is index into string table
+    uint16_t core_numa; // TSC_AUX: core (bits 0-7) + numa (12-15)
+    uint32_t reserved;  // (available for future use)
+    double arg0, arg1, arg2, arg3, arg4, arg5; // message arguments
+  };
+
+  // Private local state for updating the log
+  struct timeline_state {
+    // state for the entries ring buffer
+    struct timeline_entry *entries;
+    uint32_t rate;
+    uint32_t next_entry;
+    uint32_t num_entries;
+    // state for the string table
+    char *stringtable;
+    int stringtable_size;
+    int next_string;
+  };
+]]
+
+-- Header of the log file
+local magic = 0xa3ff7223441d0001ULL
+local major, minor = 2, 1
+
+------------------------------------------------------------
+-- API
+
+-- Create a new timeline under the given shared memory path.
+function new (shmpath,  num_entries, size_stringtable)
+   if not enabled then return false end
+   num_entries = num_entries or 1e6
+   size_stringtable = size_stringtable or 1e6
+   -- Calculate size based on number of log entries
+   local size_header = ffi.sizeof("struct timeline_header")
+   local size_entries = num_entries * ffi.sizeof("struct timeline_entry")
+   local size = size_header + size_entries + size_stringtable
+   -- Allocate one shm object with memory for all data structures
+   local memory      = shm.create(shmpath, ffi.typeof("char["..size.."]"))
+   local header      = ffi.cast("struct timeline_header *", memory)
+   local ring        = ffi.cast("struct timeline_entry *", memory + size_header)
+   local stringtable = ffi.cast("char*", memory + size_header + size_entries)
+   -- Fill in header values
+   header.magic = 0xa3ff7223441d0001ULL
+   header.major_version = 3
+   header.minor_version = 0
+   header.log_bytes = size_entries
+   header.strings_bytes = size_stringtable
+   -- Private state
+   local state = ffi.new("struct timeline_state")
+   state.entries = ring
+   state.rate = 0
+   state.next_entry = 0
+   state.num_entries = num_entries
+   state.stringtable = stringtable
+   state.stringtable_size = size_stringtable
+   state.next_string = 0
+   -- Return an object
+   return state
+end
+
+function mkevent (timeline, category, message, attrs)
+   if not message:match("^%d,%d|([^:]+):") then
+      error(("event syntax error: %q"):format(message))
+   end
+   -- Extract the sampling rate for the message
+   local rate = tonumber(message:match("^%d,(%d)|"))
+   -- Insert the category ("0,3|event:" -> "0,3|category.event:")
+   message = message:gsub("|", "|"..category..".", 1)
+   -- Insert the additional attributes.
+   -- e.g. "1|foo: arg" with {a1="x",a2="y"} becomes "1|foo a1=x a2=y: arg"
+   for k,v in pairs(attrs or {}) do
+      message = message:gsub(":", (" %s=%s:"):format(k, v), 1)
+   end
+   -- Count the number of arguments.
+   -- (See http://stackoverflow.com/a/11158158/1523491)
+   local _, n = (message:match(":([^\n]*)")):gsub("[^%s]+","")
+   assert(n >= 0 and n <= 6, "illegal number of arguments: "..n)
+   if not enabled then return function () end end
+   local id = intern(timeline, message)
+   local event = event -- move asm function into local scope
+   local log = timeline
+   if n==0 then return function ()            event(log,rate,id,0,0,0,0,0,0) end end
+   if n==1 then return function (a)           event(log,rate,id,a,0,0,0,0,0) end end
+   if n==2 then return function (a,b)         event(log,rate,id,a,b,0,0,0,0) end end
+   if n==3 then return function (a,b,c)       event(log,rate,id,a,b,c,0,0,0) end end
+   if n==4 then return function (a,b,c,d)     event(log,rate,id,a,b,c,d,0,0) end end
+   if n==5 then return function (a,b,c,d,e)   event(log,rate,id,a,b,c,d,e,0) end end
+   if n==6 then return function (a,b,c,d,e,f) event(log,rate,id,a,b,c,d,e,f) end end
+end
+
+-- Get or set the current timeline log rate.
+function rate (timeline, rate)
+   if not enabled then return 1/0 end
+   if rate then timeline.rate = rate end
+   return timeline.rate
+end
+
+------------------------------------------------------------
+-- Defining log message formats
+
+-- Intern a string in the timeline stringtable.
+-- Return a unique ID (16-bit offset in 16-byte words) or 0xFFFF if
+-- the table is full.
+
+-- Cache known strings in a weak table keyed on timeline object.
+-- (Timeline object is an FFI struct that can't contain a Lua tables.)
+local known = setmetatable({}, {__mode='k'})
+
+function intern (timeline, str)
+   known[timeline] = known[timeline] or {}
+   if known[timeline][str] then
+      return known[timeline][str]
+   end
+   local len = #str+1 -- count null terminator
+   if timeline.next_string + len >= timeline.stringtable_size then
+      return 0xFFFF -- overflow
+   else
+      local position = timeline.next_string
+      ffi.copy(timeline.stringtable + position, str)
+      timeline.next_string = lib.align(position + len, 16)
+      local id = position/16
+      assert(id == math.floor(id), "timeline string alignment error")
+      known[timeline][str] = id
+      return id
+   end
+end
+
+------------------------------------------------------------
+-- Logging messages
+
+|.arch x64
+|.actionlist actions
+|.globalnames globalnames
+
+
+-- Registers holding function parameters for x86-64 calling convention.
+|.define p0, rdi
+|.define p1, rsi
+|.define p2, rdx
+|.define p3, rcx
+|.define p4, r8
+|.define p5, r9
+
+|.type log, struct timeline_state
+|.type msg, struct timeline_entry
+-- void log(timeline, rate, msg, arg0, ..., arg5)
+local function asmlog (Dst)
+   |->log:
+   -- Check that the enabled log rate is >= the event log rate
+   | mov eax, log:p0->rate
+   | cmp p1, rax
+   | jge >1
+   | ret
+   |1:
+   -- Load index to write into r11
+   | mov r11d, log:p0->next_entry
+   -- Increment next index and check for wrap-around
+   | mov eax, r11d
+   | add eax, 1
+   | xor ecx, ecx
+   | cmp eax, log:p0->num_entries
+   | cmove eax, ecx
+   | mov log:p0->next_entry, eax
+   -- Convert log entry number to pointer
+   | shl r11, 6     -- 64B element number -> byte index
+   | mov r10, log:p0->entries
+   | add r10, r11
+   -- Log the arguments from register parameters
+   | mov msg:r10->msgid, dx
+   | movsd qword msg:r10->arg0, xmm0
+   | movsd qword msg:r10->arg1, xmm1
+   | movsd qword msg:r10->arg2, xmm2
+   | movsd qword msg:r10->arg3, xmm3
+   | movsd qword msg:r10->arg4, xmm4
+   | movsd qword msg:r10->arg5, xmm5
+   -- Log the timestamp and core/numa aux info
+   | rdtscp
+   | mov msg:r10->core_numa, cx
+   -- Convert TSC in EAX:EDX to double
+   | shl rdx, 32
+   | or rax, rdx
+   | cvtsi2sd xmm0, rax
+   | movsd qword msg:r10->tsc, xmm0
+
+   | ret
+end
+
+local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
+asmlog(Dst)
+local mcode, size = Dst:build()
+local entry = dasm.globals(globals, globalnames)
+
+event = ffi.cast("void(*)(struct timeline_state *, int, int, double, double, double, double, double, double)", entry.log)
+
+_anchor = mcode
+
+--dasm.dump(mcode, size)
+
+local test_events = [[
+0,6|six:
+event with rate 6 (0 args)
+
+0,5|five: a b c
+event with rate 5 (3 args)
+
+0,4|four: a b c d e f
+event with rate 4 (6 args)
+
+0,3|three:
+event with rate 3 (0 args)
+]]
+
+-- selftest is designed mostly to check that timeline logging does not
+-- crash the snabb process e.g. including overflow of the log entries
+-- and the string table. it does not verify the contents of the log
+-- messages.
+function selftest ()
+   print("selftest: timeline")
+
+   enabled = true -- enable timeline
+
+   local tl = new("selftest/timeline")
+   local e = load_events_from_string(tl, test_events, "selftest",
+                                     {module="timeline", func="selftest"})
+   rate(tl, 4) -- won't log event three
+
+   print("check logging individual messages")
+   -- First check that log entries are created
+   assert(tl.next_entry == 0)
+   e.six()                      assert(tl.next_entry == 1)
+   e.five(1, 2, 3)              assert(tl.next_entry == 2)
+   e.four(1, 2, 3, 4, 5, 6)     assert(tl.next_entry == 3)
+   e.three()                    assert(tl.next_entry == 3) -- skipped
+
+   local n = tl.num_entries*10
+   print("check wrap-around on "..lib.comma_value(n).." events")
+   for i = 1, n do
+      e.six()
+      e.five(1, 2, 3)
+      e.four(1, 2, 3, 4, 5, 6)
+      e.three()
+   end
+   -- overflow the string table
+   print("overflowing string table")
+   for i = 1, 1e5 do
+      mkevent(tl, "selftest", "0,9|dummy_event_definition:", {i=i})
+   end
+   -- report median logging time
+   local sample = {}
+   for i = 1, 1000 do sample[i] = tl.entries[i].tsc - tl.entries[i-1].tsc end
+   table.sort(sample)
+   print("median time delta for sample:", tonumber(sample[500]).." cycles")
+   print("selftest: ok")
+end
+
