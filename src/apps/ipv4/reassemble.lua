@@ -266,7 +266,7 @@ function Reassembler:handle_fragment(h, fragment)
       -- Prevent a buffer overflow.  The relevant RFC allows hosts to
       -- silently discard reassemblies above a certain rather small
       -- size, smaller than this.
-      return self:reassembly_error()
+      return self:reassembly_error(entry)
    end
    ffi.copy(reassembly.packet.data + dst_offset, fragment.data + skip_headers,
             frag_size)
@@ -349,9 +349,10 @@ function selftest()
 
    -- Returns a new packet containing an Ethernet frame with an IPv4
    -- header followed by PAYLOAD_SIZE random bytes.
-   local function make_test_packet(payload_size)
-      local pkt = packet.from_pointer(lib.random_bytes(payload_size),
-                                      payload_size)
+   local function make_test_packet(payload_size, pkt)
+      pkt = pkt or packet.allocate()
+      ffi.copy(pkt.data, lib.random_bytes(payload_size), payload_size)
+      pkt.length = payload_size
       local eth_h = ether:new({ src = random_mac(), dst = random_mac(),
                                 type = ethertype_ipv4 })
       local ip_h  = ipv4:new({ src = random_ipv4(), dst = random_ipv4(),
@@ -370,7 +371,7 @@ function selftest()
       fragment.shm = shm.create_frame("apps/fragmenter", fragment.shm)
       fragment.input = { input = link.new('fragment input') }
       fragment.output = { output = link.new('fragment output') }
-      link.transmit(fragment.input.input, packet.clone(pkt))
+      link.transmit(fragment.input.input, pkt)
       fragment:push()
       local ret = {}
       while not link.empty(fragment.output.output) do
@@ -398,7 +399,7 @@ function selftest()
    for _, size in ipairs({100, 400, 1000, 1500, 2000}) do
       local pkt = make_test_packet(size)
       for _, mtu in ipairs({512, 1000, 1500}) do
-         local fragments = fragment(pkt, mtu)
+         local fragments = fragment(packet.clone(pkt), mtu)
          for _, order in ipairs(permute_indices(1, #fragments)) do
             local reassembler = Reassembler:new {
                max_concurrent_reassemblies = 100,
@@ -436,5 +437,99 @@ function selftest()
       packet.free(pkt)
    end
 
+   -- test reassembly errors
+
+   -- too many fragments
+   local pkt = make_test_packet(9000)
+   local fragments = fragment(pkt, 128)
+   local reassembler = Reassembler:new {
+         max_concurrent_reassemblies = 100,
+         max_fragments_per_reassembly = 20
+   }
+   reassembler.shm = shm.create_frame(
+      "apps/reassembler", reassembler.shm)
+   reassembler.input = { input = link.new('reassembly input') }
+   reassembler.output = { output = link.new('reassembly output') }
+   for _, f in ipairs(fragments) do
+      link.transmit(reassembler.input.input, f)
+   end
+   reassembler:push()
+   assert(link.empty(reassembler.output.output))
+   assert(counter.read(reassembler.shm["drop-ipv4-frag-invalid-reassembly"]) == 4)
+   shm.delete_frame(reassembler.shm)
+   -- more than one final fragment 
+   local pkt = make_test_packet(1500)
+   local fragments = fragment(pkt, 512)
+   local reassembler = Reassembler:new {
+         max_concurrent_reassemblies = 100,
+         max_fragments_per_reassembly = 20
+   }
+   reassembler.shm = shm.create_frame(
+      "apps/reassembler", reassembler.shm)
+   reassembler.input = { input = link.new('reassembly input') }
+   reassembler.output = { output = link.new('reassembly output') }
+   link.transmit(reassembler.input.input, packet.clone(fragments[#fragments]))
+   link.transmit(reassembler.input.input, packet.clone(fragments[#fragments]))
+   reassembler:push()
+   assert(link.empty(reassembler.output.output))
+   assert(counter.read(reassembler.shm["drop-ipv4-frag-invalid-reassembly"]) == 1)
+   shm.delete_frame(reassembler.shm)
+   -- reassembly buffer overflow
+   local buffer = ffi.new("uint8_t[?]", 50000)
+   local p = ffi.cast(
+      "struct packet *",
+      lib.align(ffi.cast("uintptr_t", buffer), packet.packet_alignment) +
+         packet.default_headroom
+   )
+   local pkt = make_test_packet(15000, p)
+   local fragments = fragment(pkt, 1500)
+   local reassembler = Reassembler:new {
+         max_concurrent_reassemblies = 100,
+         max_fragments_per_reassembly = 20
+   }
+   reassembler.shm = shm.create_frame(
+      "apps/reassembler", reassembler.shm)
+   reassembler.input = { input = link.new('reassembly input') }
+   reassembler.output = { output = link.new('reassembly output') }
+   for _, f in ipairs(fragments) do
+      link.transmit(reassembler.input.input, f)
+   end
+   reassembler:push()
+   assert(link.empty(reassembler.output.output))
+   assert(counter.read(reassembler.shm["drop-ipv4-frag-invalid-reassembly"]) == 5)
+   shm.delete_frame(reassembler.shm)
+   -- invalid offsets
+   local pkt = make_test_packet(1500)
+   local fragments = fragment(pkt, 768)
+   local reassembler = Reassembler:new {
+         max_concurrent_reassemblies = 100,
+         max_fragments_per_reassembly = 20
+   }
+   reassembler.shm = shm.create_frame(
+      "apps/reassembler", reassembler.shm)
+   reassembler.input = { input = link.new('reassembly input') }
+   reassembler.output = { output = link.new('reassembly output') }
+   link.transmit(reassembler.input.input, packet.clone(fragments[1]))
+   link.transmit(reassembler.input.input, packet.clone(fragments[2]))
+   reassembler:push()
+   local final = fragments[3]
+   local h = ffi.cast(ether_ipv4_header_ptr_t, final.data)
+   local reassembly = reassembler:lookup_reassembly(h, final).value
+   reassembly.fragment_starts[0] = 1
+   link.transmit(reassembler.input.input, packet.clone(final))
+   reassembler:push()
+   link.transmit(reassembler.input.input, packet.clone(fragments[1]))
+   link.transmit(reassembler.input.input, packet.clone(fragments[2]))
+   reassembler:push()
+   local final = fragments[3]
+   local h = ffi.cast(ether_ipv4_header_ptr_t, final.data)
+   local reassembly = reassembler:lookup_reassembly(h, final).value
+   reassembly.fragment_starts[0] = 0
+   reassembly.fragment_ends[0] = 10
+   link.transmit(reassembler.input.input, packet.clone(final))
+   reassembler:push()
+   assert(link.empty(reassembler.output.output))
+   assert(counter.read(reassembler.shm["drop-ipv4-frag-invalid-reassembly"]) == 2)
+   shm.delete_frame(reassembler.shm)
    print("selftest: ok")
 end
