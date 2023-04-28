@@ -8,6 +8,7 @@ local ipv4     = require("lib.protocol.ipv4")
 local ipv6     = require("lib.protocol.ipv6")
 local poptrie  = require("lib.poptrie")
 local logger   = require("lib.logger")
+local S        = require("syscall")
 
 -- Map MAC addresses to peer AS number
 --
@@ -125,12 +126,16 @@ local maps = {}
 
 function mk_map(name, file, log_rate, log_fh)
    local info = assert(map_info[name])
-   local map = maps[name]
-   if not map then
-      map = info.create_fn(file)
-      maps[name] = map
+   local stat = assert(S.stat(file))
+   local map_cache = maps[name]
+   if not map_cache or map_cache.ctime ~= stat.ctime then
+      map_cache = {
+	 map = info.create_fn(file),
+	 ctime = stat.ctime
+      }
+      maps[name] = map_cache
    end
-   local map = { map = map }
+   local map = { map = map_cache.map }
    if log_fh then
       map.logger = logger.new({ rate = log_rate or 0.05,
                                 fh = log_fh,
