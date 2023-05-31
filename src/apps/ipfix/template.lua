@@ -15,6 +15,7 @@ local ipv6     = require("lib.protocol.ipv6")
 local metadata = require("apps.rss.metadata")
 local strings  = require("apps.ipfix.strings")
 local dns      = require("apps.ipfix.dns")
+local tls      = require("apps.ipfix.tls")
 local S        = require("syscall")
 
 local ntohs  = lib.ntohs
@@ -498,6 +499,12 @@ local function HTTP_accumulate(self, dst, new, pkt)
    end
 end
 
+local function HTTPS_accumulate(self, dst, new, pkt)
+   accumulate_generic(dst, new)
+   accumulate_tcp_flags_reduced(dst, new)
+   tls.accumulate(self, dst.value, pkt)
+end
+
 local function DNS_extract(self, pkt, timestamp, entry, extract_addr_fn)
    local md = metadata_get(pkt)
    extract_5_tuple(pkt, timestamp, entry, md, extract_addr_fn)
@@ -720,6 +727,24 @@ templates = {
       end,
       accumulate = DNS_accumulate
    },
+   v4_HTTPS = {
+      id     = 259,
+      filter = "ip and tcp and (dst port 443 or dst port 8443)",
+      aggregation_type = 'v4',
+      keys   = { "sourceIPv4Address",
+                 "destinationIPv4Address",
+                 "protocolIdentifier",
+                 "sourceTransportPort",
+                 "destinationTransportPort" },
+      values = { "flowStartMilliseconds",
+                 "flowEndMilliseconds",
+                 "packetDeltaCount",
+                 "octetDeltaCount",
+                 "tcpControlBitsReduced",
+                 "tlsSNI=64" },
+      extract = v4_extract,
+      accumulate = HTTPS_accumulate,
+   },
    v4_extended = {
       id     = 1256,
       filter = "ip",
@@ -838,6 +863,24 @@ templates = {
          DNS_extract(self, pkt, timestamp, entry, extract_v6_addr)
       end,
       accumulate = DNS_accumulate
+   },
+   v6_HTTPS = {
+      id     = 514,
+      filter = "ip6 and tcp and (dst port 443 or dst port 8443)",
+      aggregation_type = 'v6',
+      keys   = { "sourceIPv6Address",
+                 "destinationIPv6Address",
+                 "protocolIdentifier",
+                 "sourceTransportPort",
+                 "destinationTransportPort" },
+      values = { "flowStartMilliseconds",
+                 "flowEndMilliseconds",
+                 "packetDeltaCount",
+                 "octetDeltaCount",
+                 "tcpControlBitsReduced",
+                 "tlsSNI=64" },
+      extract = v6_extract,
+      accumulate = HTTPS_accumulate,
    },
    v6_extended = {
       id     = 1512,
