@@ -137,7 +137,7 @@ function accumulate(self, entry, pkt)
          local sni = ffi.cast(ptrs.sni_t, tlv.value)
          if sni.name_type ~= 0 then return end
          local name_length = ntohs(sni.name_length)
-         ffi.copy(entry.tlsSNI, sni.name, math.min(ffi.sizeof(entry.tlsSNI, name_length)))
+         ffi.copy(entry.tlsSNI, sni.name, math.min(ffi.sizeof(entry.tlsSNI), name_length))
          entry.tlsSNILength = name_length
          return
       end
