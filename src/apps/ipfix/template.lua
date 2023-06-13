@@ -502,9 +502,9 @@ end
 -- HTTPS-specific statistics counters
 local function HTTPS_counters()
    return {
-      client_hellos = 0,
-      extensions_present = 0,
-      snis = 0,
+      HTTPS_client_hellos = 0,
+      HTTPS_extensions_present = 0,
+      HTTPS_snis = 0,
    }
 end
 

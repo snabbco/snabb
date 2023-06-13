@@ -130,7 +130,7 @@ function accumulate(self, entry, pkt)
    local client_hello = ffi.cast(ptrs.client_hello_t, handshake.data)
    -- Extensions are only supported since TLS 1.2
    if ntohs(client_hello.version) < 0x0303 then return end
-   self.counters.client_hellos = self.counters.client_hellos + 1
+   self.counters.HTTPS_client_hellos = self.counters.HTTPS_client_hellos + 1
 
    -- End Of Client Hello, used to check for the presence of extensions
    local eoh = ffi.cast("uint8_t *", client_hello) + ntohs(handshake.length) + 65536 * handshake.length_msb
@@ -147,7 +147,7 @@ function accumulate(self, entry, pkt)
    local extensions = ffi.cast(ptrs.extensions_t, skip_lv1(tmp))
    -- Extensions present?
    if ffi.cast("uint8_t *", extensions) >= eoh then return end
-   self.counters.extensions_present = self.counters.extensions_present + 1
+   self.counters.HTTPS_extensions_present = self.counters.HTTPS_extensions_present + 1
 
    local extensions_length = ntohs(extensions.length)
    -- Find the SNI extension
@@ -165,7 +165,7 @@ function accumulate(self, entry, pkt)
          local name_length = ntohs(sni.name_length)
          ffi.copy(entry.tlsSNI, sni.name, math.min(ffi.sizeof(entry.tlsSNI), name_length))
          entry.tlsSNILength = name_length
-         self.counters.snis = self.counters.snis + 1
+         self.counters.HTTPS_snis = self.counters.HTTPS_snis + 1
          return
       end
       local length = ntohs(tlv.length)
