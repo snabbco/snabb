@@ -499,6 +499,15 @@ local function HTTP_accumulate(self, dst, new, pkt)
    end
 end
 
+-- HTTPS-specific statistics counters
+local function HTTPS_counters()
+   return {
+      client_hellos = 0,
+      extensions_present = 0,
+      snis = 0,
+   }
+end
+
 local function HTTPS_accumulate(self, dst, new, pkt)
    accumulate_generic(dst, new)
    accumulate_tcp_flags_reduced(dst, new)
@@ -743,6 +752,7 @@ templates = {
                  "tcpControlBitsReduced",
                  "tlsSNI=64",
                  "tlsSNILength"},
+      counters = HTTPS_counters(),
       extract = v4_extract,
       accumulate = HTTPS_accumulate,
    },
@@ -881,6 +891,7 @@ templates = {
                  "tcpControlBitsReduced",
                  "tlsSNI=64",
                  "tlsSNILength"},
+      counters = HTTPS_counters(),
       extract = v6_extract,
       accumulate = HTTPS_accumulate,
    },

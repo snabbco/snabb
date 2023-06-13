@@ -85,6 +85,10 @@ local function tcp_header_size(l4)
    return offset * 4
 end
 
+local function out_of_bounds (eop, ptr, size)
+   return ffi.cast("uint8_t *", ptr) + size >= eop
+end
+
 function accumulate(self, entry, pkt)
    local md = metadata_get(pkt)
    -- The TLS handshake starts right after the TCP handshake,
@@ -102,27 +106,49 @@ function accumulate(self, entry, pkt)
         entry.packetDeltaCount > 3)) then
       return
    end
+   -- End Of Payload (first byte after the effective payload), used
+   -- for bounds check
+   local eop = payload + eff_payload_size
+
+   -- Check bounds for the fixed-size part of the message
+   if out_of_bounds(eop, payload,
+                    ffi.sizeof(types.record_t) +
+                    ffi.sizeof(types.handshake_t) +
+                    ffi.sizeof(types.client_hello_t) +
+                    -- Header of session ID TLV
+                    ffi.sizeof(types.lv1_t)) then
+      return
+   end
+
    local record = ffi.cast(ptrs.record_t, payload)
    -- Handshake record?
    if record.type ~= 22 then return end
-   -- We assume that the record is completely contained in the first
-   -- data segment.
-   if ntohs(record.length) > eff_payload_size then return end
    local handshake = ffi.cast(ptrs.handshake_t, record.data)
+
    -- Client Hello?
    if handshake.msg_type ~= 1 then return end
    local client_hello = ffi.cast(ptrs.client_hello_t, handshake.data)
    -- Extensions are only supported since TLS 1.2
    if ntohs(client_hello.version) < 0x0303 then return end
+   self.counters.client_hellos = self.counters.client_hellos + 1
+
+   -- End Of Client Hello, used to check for the presence of extensions
+   local eoh = ffi.cast("uint8_t *", client_hello) + ntohs(handshake.length) + 65536 * handshake.length_msb
+
    -- Skip session ID
    local tmp = skip_lv1(client_hello.data)
+   if out_of_bounds(eop, tmp, ffi.sizeof(types.lv2_t)) then return end
+
    -- Skip cipher suits
    tmp = skip_lv2(tmp)
+   if out_of_bounds(eop, tmp, ffi.sizeof(types.lv1_t)) then return end
+
    -- Skip compress methods
-   tmp = skip_lv1(tmp)
-   local extensions = ffi.cast(ptrs.extensions_t, tmp)
+   local extensions = ffi.cast(ptrs.extensions_t, skip_lv1(tmp))
    -- Extensions present?
-   if extensions == handshake.data + ntohs(handshake.length) then return end
+   if ffi.cast("uint8_t *", extensions) >= eoh then return end
+   self.counters.extensions_present = self.counters.extensions_present + 1
+
    local extensions_length = ntohs(extensions.length)
    -- Find the SNI extension
    local extension = extensions.data
@@ -139,6 +165,7 @@ function accumulate(self, entry, pkt)
          local name_length = ntohs(sni.name_length)
          ffi.copy(entry.tlsSNI, sni.name, math.min(ffi.sizeof(entry.tlsSNI), name_length))
          entry.tlsSNILength = name_length
+         self.counters.snis = self.counters.snis + 1
          return
       end
       local length = ntohs(tlv.length)
