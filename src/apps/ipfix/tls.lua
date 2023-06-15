@@ -86,7 +86,7 @@ local function tcp_header_size(l4)
 end
 
 local function out_of_bounds (eop, ptr, size)
-   return ffi.cast("uint8_t *", ptr) + size >= eop
+   return ffi.cast("uint8_t *", ptr) + size > eop
 end
 
 function accumulate(self, entry, pkt)
@@ -153,6 +153,7 @@ function accumulate(self, entry, pkt)
    -- Find the SNI extension
    local extension = extensions.data
    while (extensions_length > 0) do
+      if out_of_bounds(eop, extension, ffi.sizeof(types.tlv_t)) then return end
       local tlv = ffi.cast(ptrs.tlv_t, extension)
       if ntohs(tlv.type) == 0 then
          -- SNI, list of server names (RFC6066), extract the entry of
@@ -163,6 +164,7 @@ function accumulate(self, entry, pkt)
          local sni = ffi.cast(ptrs.sni_t, tlv.value)
          if sni.name_type ~= 0 then return end
          local name_length = ntohs(sni.name_length)
+         if out_of_bounds(eop, sni.name, name_length) then return end
          ffi.copy(entry.tlsSNI, sni.name, math.min(ffi.sizeof(entry.tlsSNI), name_length))
          entry.tlsSNILength = name_length
          self.counters.HTTPS_snis = self.counters.HTTPS_snis + 1
