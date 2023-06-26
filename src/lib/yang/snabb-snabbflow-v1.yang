@@ -132,6 +132,15 @@ module snabb-snabbflow-v1 {
               executed in one or more instances, each in its own dedicated
               worker process (using a dedicated CPU core).";
           }
+
+          leaf acquire-cpu {
+            type boolean;
+            default true;
+            description
+              "When 'embed' is false, select whether the worker process should
+               be pinned to a CPU or not. Has no effect when 'embed' is set
+               to true.";
+          }
           
           leaf instances {
             type uint32 { range 1..max; }
