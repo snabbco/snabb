@@ -116,9 +116,9 @@ and link #2 will get 2/3 of the traffic.
 
 In order to compute the hash over the header fields, the `rss` app
 must parse the packets to a certain extent.  Internally, the result of
-this analysis is appended as a block of data to the end of the actual
-packet data.  Because this data can be useful to other apps downstream
-of the `rss` app, it is exposed as part of the API.
+this analysis is prepended as a block of data to the start of the
+actual packet data.  Because this data can be useful to other apps
+downstream of the `rss` app, it is exposed as part of the API.
 
 The meta-data is structured as follows
 
@@ -378,7 +378,12 @@ real VLAN ID or not).
 ## Meta-data API
 
 The meta-data functionality is provided by the module
-`apps.rss.metadata` and provides the following API.
+`apps.rss.metadata` and provides the following API. The metadata is
+stored in the area of the packet buffer that is reserved as headroom
+for prepending headers to the packet. Consequently, using any of the
+functions that add or remove headers (`append`, `prepend`,
+`shiftleft`, `shiftright` from `core.packet`) will invalidate the
+metadata.
 
 — Function **add** *packet*, *remove_extension_headers*, *vlan*
 

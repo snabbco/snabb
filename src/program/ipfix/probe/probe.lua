@@ -326,7 +326,8 @@ function setup_workers (config)
                -- Dedicated exporter processes are restartable
                worker_opts[rss_link] = {
                   restart_intensity = software_scaling.restart.intensity,
-                  restart_period = software_scaling.restart.period
+                  restart_period = software_scaling.restart.period,
+                  acquire_cpu = software_scaling.acquire_cpu
                }
             end
             table.insert(outputs, output)
