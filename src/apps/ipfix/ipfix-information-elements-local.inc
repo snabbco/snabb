@@ -13,3 +13,5 @@ this is the name of the first non-CNAME answer record or the name of the last CN
 2946:110,dnsAnswerRdata,octetArray,"On-the-wire encoding of the answer record's rdata section. For well-known record types, 
 compressed domain names have been replaced with their uncompressed counterparts",,,,,,,,
 2946:111,dnsAnswerRdataLen,unsigned16,,,,,,,,,
+39499:338,tlsSNI,string,DNS name from the TLS Server Name Indication extension,,,,,,,,
+39499:339,tlsSNILength,unsigned16,Length of tlsSNI in bytes,,,,,,,,
