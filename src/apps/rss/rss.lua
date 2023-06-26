@@ -177,7 +177,7 @@ function rss:new (config)
             end
          end
       else
-         pf_fn = pf.compile_filter(config.filter)
+         local pf_fn = pf.compile_filter(config.filter)
          match_fn = function(md)
             return pf_fn(md.filter_start, md.filter_length)
          end
