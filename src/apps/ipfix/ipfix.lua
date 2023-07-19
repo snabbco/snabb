@@ -27,6 +27,8 @@ local token_bucket = require("lib.token_bucket")
 local C        = ffi.C
 local S        = require("syscall")
 
+local events = timeline.load_events(engine.timeline(), "apps.ipfix.ipfix")
+
 local htonl, htons = lib.htonl, lib.htons
 local metadata_add, metadata_get = metadata.add, metadata.get
 
@@ -305,18 +307,21 @@ end
 function FlowSet:record_flows(timestamp)
    local entry = self.scratch_entry
    timestamp = to_milliseconds(timestamp)
-   for i=1,link.nreadable(self.incoming) do
+   local npackets = link.nreadable(self.incoming)
+   for _=1, npackets do
       local pkt = link.receive(self.incoming)
       counter.add(self.shm.packets_in)
       self.template:extract(pkt, timestamp, entry)
       local lookup_result = self.table:lookup_ptr(entry.key)
       if lookup_result == nil then
          self.table:add(entry.key, entry.value)
+         events.added_flow(self.template.id)
       else
          self.template:accumulate(lookup_result, entry, pkt)
       end
       packet.free(pkt)
    end
+   events.recorded(self.template.id, npackets)
 end
 
 function FlowSet:append_template_record(pkt)
@@ -352,6 +357,8 @@ end
 function FlowSet:flush_data_records(out)
    if self.record_count == 0 then return end
 
+   local nrecords = self.record_count
+
    -- Pop off the now-full record buffer and replace it with a fresh one.
    local pkt, record_count = self.record_buffer, self.record_count
    self.record_buffer, self.record_count = packet.allocate(), 0
@@ -371,6 +378,8 @@ function FlowSet:flush_data_records(out)
    pkt = self.parent:add_transport_headers(pkt)
    link.transmit(out, pkt)
    counter.add(self.shm.flow_export_packets)
+
+   events.exported_data_records(nrecords)
 end
 
 -- Print debugging messages for a flow.
@@ -390,7 +399,9 @@ function FlowSet:expire_flow_rate_records(now)
    local cursor = self.sp.expiry_cursor
    local now_ms = to_milliseconds(now)
    local interval = to_milliseconds(self.scan_protection.interval)
-   for i = 1, self.sp.table_tb:take_burst() do
+   local expired = 0
+   local burst = self.sp.table_tb:take_burst()
+   for i = 1, burst do
       local entry
       cursor, entry = self.sp.table:next_entry(cursor, cursor + 1)
       if entry then
@@ -402,6 +413,7 @@ function FlowSet:expire_flow_rate_records(now)
       end
    end
    self.sp.expiry_cursor = cursor
+   events.expired_flow_rate_record(self.template.id, burst, expired)
 end
 
 local function reset_rate_entry(entry, flow_entry, timestamp)
@@ -496,6 +508,7 @@ function FlowSet:suppress_flow(flow_entry, timestamp)
             return false
          else
             aggr.drops = aggr.drops + 1
+            events.suppressed_flow(self.template.id)
             return true
          end
       end
@@ -503,6 +516,7 @@ function FlowSet:suppress_flow(flow_entry, timestamp)
       ffi.fill(entry.value, ffi.sizeof(entry.value))
       reset_rate_entry(entry, flow_entry, timestamp)
       self.sp.table:add(entry.key, entry.value)
+      events.added_flow_rate_record(self.template.id)
    end
    return false
 end
@@ -514,7 +528,9 @@ function FlowSet:expire_records(out, now)
    now_ms = to_milliseconds(now)
    local active = to_milliseconds(self.active_timeout)
    local idle = to_milliseconds(self.idle_timeout)
-   for i = 1, self.table_tb:take_burst() do
+   local expired = 0
+   local burst = self.table_tb:take_burst()
+   for i = 1, burst do
       local entry
       cursor, entry = self.table:next_entry(cursor, cursor + 1)
       if entry then
@@ -526,6 +542,7 @@ function FlowSet:expire_records(out, now)
                self:add_data_record(entry.key, out)
             end
             self.table:remove_ptr(entry)
+            expired = expired + 1
          elseif now_ms - tonumber(entry.value.flowStartMilliseconds) > active then
             self:debug_flow(entry, "expire active")
             if (not self:suppress_flow(entry, now_ms) and
@@ -536,6 +553,7 @@ function FlowSet:expire_records(out, now)
             entry.value.flowEndMilliseconds = now_ms
             entry.value.packetDeltaCount = 0
             entry.value.octetDeltaCount = 0
+            expired = expired + 1
             cursor = cursor + 1
          else
             -- Flow still live.
@@ -550,6 +568,7 @@ function FlowSet:expire_records(out, now)
       end
    end
    self.expiry_cursor = cursor
+   events.expired_flows(self.template.id, burst, expired)
 
    if self.flush_timer() then self:flush_data_records(out) end
 end
@@ -778,6 +797,7 @@ function IPFIX:send_template_records(out)
    pkt = self:add_transport_headers(pkt)
    counter.add(self.shm.template_packets)
    link.transmit(out, pkt)
+   events.exported_template_records()
 end
 
 function IPFIX:add_ipfix_header(pkt, count)
@@ -836,6 +856,7 @@ function IPFIX:push1(input)
          metadata_add(p)
          link.transmit(input, p)
       end
+      events.added_metadata()
    end
 
    for _,set in ipairs(flow_sets) do
@@ -848,6 +869,7 @@ function IPFIX:push1(input)
             link.transmit(input, p)
          end
       end
+      events.matched(set.template.id, nreadable)
       nreadable = link.nreadable(input)
    end
 
@@ -855,6 +877,7 @@ function IPFIX:push1(input)
    for _ = 1, nreadable do
       packet.free(link.receive(input))
    end
+   events.dropped(nreadable)
 
    for _,set in ipairs(flow_sets) do set:record_flows(timestamp) end
 
