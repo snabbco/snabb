@@ -63,6 +63,7 @@ local manager_config_spec = {
 }
 
 local worker_opt_spec = {
+   scheduling = {},
    acquire_cpu = {default=true}, -- Needs dedicated CPU core?
    restart_intensity = {default=0}, -- How many restarts are permitted...
    restart_period = {default=0} -- ...within period seconds.
@@ -304,6 +305,7 @@ function Manager:compute_workers_aux (worker_app_graphs, worker_opts)
    for id in pairs(worker_app_graphs) do
       local worker_opt = lib.parse(worker_opts[id] or {}, worker_opt_spec)
       local worker_aux = {
+         scheduling = worker_opt.scheduling,
          acquire_cpu = worker_opt.acquire_cpu,
          restart = {
             period = worker_opt.restart_period,
@@ -375,6 +377,9 @@ end
 function Manager:compute_scheduling_for_worker(id, app_graph)
    local ret = {}
    for k, v in pairs(self.worker_default_scheduling) do ret[k] = v end
+   if self.workers_aux[id].scheduling then
+      for k, v in pairs(self.workers_aux[id].scheduling) do ret[k] = v end
+   end
    if self.workers_aux[id].acquire_cpu then
       ret.cpu = self:acquire_cpu_for_worker(id, app_graph)
    end
