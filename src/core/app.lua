@@ -623,7 +623,7 @@ function pace_breathing ()
       nextbreath = nextbreath or monotonic_now
       local sleep = tonumber(nextbreath - monotonic_now)
       if sleep > 1e-6 then
-         events.sleep_Hz(Hz, math.round(sleep*1e6))
+         events.sleep_Hz(Hz, math.floor(sleep*1e6))
          C.usleep(sleep * 1e6)
          monotonic_now = C.get_monotonic_time()
          events.wakeup_from_sleep()
