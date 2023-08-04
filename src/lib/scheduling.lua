@@ -27,6 +27,7 @@ local scheduling_opts = {
    ingress_drop_monitor = {}, -- Action string: one of 'flush' or 'warn'.
    profile = {default=true},  -- Boolean.
    busywait = {default=true}, -- Boolean.
+   Hz = {},                   -- Positive integer. Enable Hz breathing when set.
    timeline = {},             -- Boolean. Enable timeline logging?
    enable_xdp = {},           -- Enable Snabb XDP mode (see apps.xdp.xdp).
    eval = {}                  -- String.
@@ -68,6 +69,10 @@ end
 
 function sched_apply.busywait (busywait)
    engine.busywait = busywait
+end
+
+function sched_apply.Hz (Hz)
+   engine.Hz = Hz
 end
 
 function sched_apply.timeline (enabled)
