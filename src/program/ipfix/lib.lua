@@ -106,6 +106,10 @@ local function configure_pci_input (config, in_graph)
    local pci_name = normalize_pci_name(config.device)
    local in_name = "input_"..pci_name
    local device_info = pci.device_info(config.device)
+   assert(device_info.usable == "yes",
+          ("Unsupported device %s (%x:%x)"):format(config.device,
+                                                   device_info.vendor,
+                                                   device_info.device))
    local driver = require(device_info.driver).driver
    local conf
    if device_info.driver == 'apps.intel_mp.intel_mp' then
