@@ -598,7 +598,6 @@ function main (options)
 
    events.engine_started()
 
-   monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
       if not no_timers then timer.run() events.polled_timers() end
@@ -615,32 +614,33 @@ end
 
 local nextbreath
 local lastfrees = 0
-local lastfreebits = 0
-local lastfreebytes = 0
+local lastfreenow = 0
 -- Wait between breaths to keep frequency with Hz.
 function pace_breathing ()
    if Hz then
       nextbreath = nextbreath or monotonic_now
-      local sleep = tonumber(nextbreath - monotonic_now)
+      local sleep = nextbreath - monotonic_now
       if sleep > 1e-6 then
          events.sleep_Hz(Hz, math.floor(sleep*1e6))
          C.usleep(sleep * 1e6)
-         monotonic_now = C.get_monotonic_time()
          events.wakeup_from_sleep()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
       if lastfrees == counter.read(frees) then
-         sleep = math.min(sleep + 1, maxsleep)
-         events.sleep_on_idle(sleep)
-         C.usleep(sleep)
-         events.wakeup_from_sleep()
+         -- Only start pacing when we are idle for at least 1us
+         -- (which is the minimum sleep duration)
+         if (monotonic_now - lastfreenow) > 1/1e6 then
+            sleep = math.min(sleep + 1, maxsleep)
+            events.sleep_on_idle(sleep)
+            C.usleep(sleep)
+            events.wakeup_from_sleep()
+         end
       else
          sleep = math.floor(sleep/2)
+         lastfrees = tonumber(counter.read(frees))
+         lastfreenow = monotonic_now
       end
-      lastfrees = tonumber(counter.read(frees))
-      lastfreebytes = tonumber(counter.read(freebytes))
-      lastfreebits = tonumber(counter.read(freebits))
    end
 end
 
@@ -975,4 +975,21 @@ function selftest ()
    assert(progs[newname] == nil)
    assert(not program_name)
    
+   -- Test pace_breathing and engine.Hz
+   local App = {}
+   local pull_count = 0
+   function App:new () return setmetatable({}, {__index = App}) end
+   function App:pull () pull_count = pull_count + 1 end
+   local c = config.new()
+   config.app(c, "a", App)
+   engine.configure(c)
+   engine.main{duration=0.1}
+   assert(pull_count > 600 and pull_count < 700)
+   pull_count = 0
+   engine.Hz = 1000
+   local c = config.new()
+   config.app(c, "a", App)
+   engine.configure(c)
+   engine.main{duration=0.1}
+   assert(pull_count > 95 and pull_count < 105)
 end
