@@ -1,6 +1,6 @@
 /*
 ** Machine code management.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_mcode_c
@@ -13,6 +13,7 @@
 #include "lj_mcode.h"
 #include "lj_trace.h"
 #include "lj_dispatch.h"
+#include "lj_prng.h"
 #include "lj_vm.h"
 
 /* -- OS-specific functions ----------------------------------------------- */
@@ -30,7 +31,7 @@ void lj_mcode_sync(void *start, void *end)
 #ifdef LUAJIT_USE_VALGRIND
   VALGRIND_DISCARD_TRANSLATIONS(start, (char *)end-(char *)start);
 #endif
-  UNUSED(start); UNUSED(end);
+  __clear_cache(start, end);
 }
 
 
@@ -70,25 +71,26 @@ static int mcode_setprot(void *p, size_t sz, int prot)
 
 /* -- MCode area protection ----------------------------------------------- */
 
-/* Define this ONLY if page protection twiddling becomes a bottleneck. */
-#ifdef LUAJIT_UNPROTECT_MCODE
+#if LUAJIT_SECURITY_MCODE == 0
 
-/* It's generally considered to be a potential security risk to have
+/* Define this ONLY if page protection twiddling becomes a bottleneck.
+**
+** It's generally considered to be a potential security risk to have
 ** pages with simultaneous write *and* execute access in a process.
 **
 ** Do not even think about using this mode for server processes or
-** apps handling untrusted external data (such as a browser).
+** apps handling untrusted external data.
 **
 ** The security risk is not in LuaJIT itself -- but if an adversary finds
-** any *other* flaw in your C application logic, then any RWX memory page
-** simplifies writing an exploit considerably.
+** any *other* flaw in your C application logic, then any RWX memory pages
+** simplify writing an exploit considerably.
 */
 #define MCPROT_GEN	MCPROT_RWX
 #define MCPROT_RUN	MCPROT_RWX
 
 static void mcode_protect(jit_State *J, int prot)
 {
-  UNUSED(J); UNUSED(prot);
+  UNUSED(J); UNUSED(prot); UNUSED(mcode_setprot);
 }
 
 #else
@@ -105,7 +107,7 @@ static void mcode_protect(jit_State *J, int prot)
 #define MCPROT_RUN	MCPROT_RX
 
 /* Protection twiddling failed. Probably due to kernel security. */
-static LJ_NOINLINE void mcode_protfail(jit_State *J)
+static LJ_NORET LJ_NOINLINE void mcode_protfail(jit_State *J)
 {
   lua_CFunction panic = J2G(J)->panic;
   if (panic) {
@@ -113,6 +115,7 @@ static LJ_NOINLINE void mcode_protfail(jit_State *J)
     setstrV(L, L->top++, lj_err_str(L, LJ_ERR_JITPROT));
     panic(L);
   }
+  exit(EXIT_FAILURE);
 }
 
 /* Change protection of MCode area. */
@@ -157,7 +160,7 @@ static void *mcode_alloc(jit_State *J, size_t sz)
     }
     /* Next try probing 64K-aligned pseudo-random addresses. */
     do {
-      hint = LJ_PRNG_BITS(J, LJ_TARGET_JUMPRANGE-16) << 16;
+      hint = lj_prng_u64(&J2G(J)->prng) & ((1u<<LJ_TARGET_JUMPRANGE)-0x10000);
     } while (!(hint + sz < range+range));
     hint = target + hint - range;
   }
@@ -197,6 +200,7 @@ static void mcode_allocarea(jit_State *J)
   ((MCLink *)J->mcarea)->next = oldarea;
   ((MCLink *)J->mcarea)->size = sz;
   J->szallmcarea += sz;
+  J->mcbot = (MCode *)lj_err_register_mcode(J->mcarea, sz, (uint8_t *)J->mcbot);
 }
 
 /* Free all MCode areas. */
@@ -207,7 +211,9 @@ void lj_mcode_free(jit_State *J)
   J->szallmcarea = 0;
   while (mc) {
     MCode *next = ((MCLink *)mc)->next;
-    mcode_free(J, mc, ((MCLink *)mc)->size);
+    size_t sz = ((MCLink *)mc)->size;
+    lj_err_deregister_mcode(mc, sz, (uint8_t *)mc + sizeof(MCLink));
+    mcode_free(J, mc, sz);
     mc = next;
   }
 }
@@ -242,35 +248,36 @@ void lj_mcode_abort(jit_State *J)
 /* Set/reset protection to allow patching of MCode areas. */
 MCode *lj_mcode_patch(jit_State *J, MCode *ptr, int finish)
 {
-#ifdef LUAJIT_UNPROTECT_MCODE
-  UNUSED(J); UNUSED(ptr); UNUSED(finish);
-  return NULL;
-#else
   if (finish) {
+#if LUAJIT_SECURITY_MCODE
     if (J->mcarea == ptr)
       mcode_protect(J, MCPROT_RUN);
     else if (LJ_UNLIKELY(mcode_setprot(ptr, ((MCLink *)ptr)->size, MCPROT_RUN)))
       mcode_protfail(J);
+#endif
     return NULL;
   } else {
     MCode *mc = J->mcarea;
     /* Try current area first to use the protection cache. */
     if (ptr >= mc && ptr < (MCode *)((char *)mc + J->szmcarea)) {
+#if LUAJIT_SECURITY_MCODE
       mcode_protect(J, MCPROT_GEN);
+#endif
       return mc;
     }
     /* Otherwise search through the list of MCode areas. */
     for (;;) {
       mc = ((MCLink *)mc)->next;
-      lua_assert(mc != NULL);
+      lj_assertJ(mc != NULL, "broken MCode area chain");
       if (ptr >= mc && ptr < (MCode *)((char *)mc + ((MCLink *)mc)->size)) {
+#if LUAJIT_SECURITY_MCODE
 	if (LJ_UNLIKELY(mcode_setprot(mc, ((MCLink *)mc)->size, MCPROT_GEN)))
 	  mcode_protfail(J);
+#endif
 	return mc;
       }
     }
   }
-#endif
 }
 
 /* Limit of MCode reservation reached. */

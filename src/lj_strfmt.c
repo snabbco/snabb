@@ -9,11 +9,15 @@
 #define LUA_CORE
 
 #include "lj_obj.h"
+#include "lj_err.h"
 #include "lj_buf.h"
 #include "lj_str.h"
+#include "lj_meta.h"
 #include "lj_state.h"
 #include "lj_char.h"
 #include "lj_strfmt.h"
+#include "lj_ctype.h"
+#include "lj_lib.h"
 
 /* -- Format parser ------------------------------------------------------- */
 
@@ -159,13 +163,17 @@ const char *lj_strfmt_wstrnum(lua_State *L, cTValue *o, MSize *lenp)
   if (tvisstr(o)) {
     *lenp = strV(o)->len;
     return strVdata(o);
+  } else if (tvisbuf(o)) {
+    SBufExt *sbx = bufV(o);
+    *lenp = sbufxlen(sbx);
+    return sbx->r;
   } else if (tvisnum(o)) {
     sb = lj_strfmt_putfnum(lj_buf_tmp_(L), STRFMT_G14, o->n);
   } else {
     return NULL;
   }
   *lenp = sbuflen(sb);
-  return sbufB(sb);
+  return sb->b;
 }
 
 /* -- Unformatted conversions to buffer ----------------------------------- */
@@ -173,7 +181,7 @@ const char *lj_strfmt_wstrnum(lua_State *L, cTValue *o, MSize *lenp)
 /* Add integer to buffer. */
 SBuf * lj_strfmt_putint(SBuf *sb, int32_t k)
 {
-  setsbufP(sb, lj_strfmt_wint(lj_buf_more(sb, STRFMT_MAXBUF_INT), k));
+  sb->w = lj_strfmt_wint(lj_buf_more(sb, STRFMT_MAXBUF_INT), k);
   return sb;
 }
 
@@ -185,38 +193,41 @@ SBuf * lj_strfmt_putnum(SBuf *sb, cTValue *o)
 
 SBuf * lj_strfmt_putptr(SBuf *sb, const void *v)
 {
-  setsbufP(sb, lj_strfmt_wptr(lj_buf_more(sb, STRFMT_MAXBUF_PTR), v));
+  sb->w = lj_strfmt_wptr(lj_buf_more(sb, STRFMT_MAXBUF_PTR), v);
   return sb;
 }
 
 /* Add quoted string to buffer. */
-SBuf * lj_strfmt_putquoted(SBuf *sb, GCstr *str)
+static SBuf *strfmt_putquotedlen(SBuf *sb, const char *s, MSize len)
 {
-  const char *s = strdata(str);
-  MSize len = str->len;
   lj_buf_putb(sb, '"');
   while (len--) {
     uint32_t c = (uint32_t)(uint8_t)*s++;
-    char *p = lj_buf_more(sb, 4);
+    char *w = lj_buf_more(sb, 4);
     if (c == '"' || c == '\\' || c == '\n') {
-      *p++ = '\\';
+      *w++ = '\\';
     } else if (lj_char_iscntrl(c)) {  /* This can only be 0-31 or 127. */
       uint32_t d;
-      *p++ = '\\';
+      *w++ = '\\';
       if (c >= 100 || lj_char_isdigit((uint8_t)*s)) {
-	*p++ = (char)('0'+(c >= 100)); if (c >= 100) c -= 100;
+	*w++ = (char)('0'+(c >= 100)); if (c >= 100) c -= 100;
 	goto tens;
       } else if (c >= 10) {
       tens:
-	d = (c * 205) >> 11; c -= d * 10; *p++ = (char)('0'+d);
+	d = (c * 205) >> 11; c -= d * 10; *w++ = (char)('0'+d);
       }
       c += '0';
     }
-    *p++ = (char)c;
-    setsbufP(sb, p);
+    *w++ = (char)c;
+    sb->w = w;
   }
   lj_buf_putb(sb, '"');
   return sb;
+}
+
+SBuf * lj_strfmt_putquoted(SBuf *sb, GCstr *str)
+{
+  return strfmt_putquotedlen(sb, strdata(str), str->len);
 }
 
 /* -- Formatted conversions to buffer ------------------------------------- */
@@ -225,33 +236,39 @@ SBuf * lj_strfmt_putquoted(SBuf *sb, GCstr *str)
 SBuf *lj_strfmt_putfchar(SBuf *sb, SFormat sf, int32_t c)
 {
   MSize width = STRFMT_WIDTH(sf);
-  char *p = lj_buf_more(sb, width > 1 ? width : 1);
-  if ((sf & STRFMT_F_LEFT)) *p++ = (char)c;
-  while (width-- > 1) *p++ = ' ';
-  if (!(sf & STRFMT_F_LEFT)) *p++ = (char)c;
-  setsbufP(sb, p);
+  char *w = lj_buf_more(sb, width > 1 ? width : 1);
+  if ((sf & STRFMT_F_LEFT)) *w++ = (char)c;
+  while (width-- > 1) *w++ = ' ';
+  if (!(sf & STRFMT_F_LEFT)) *w++ = (char)c;
+  sb->w = w;
   return sb;
 }
 
 /* Add formatted string to buffer. */
+static SBuf *strfmt_putfstrlen(SBuf *sb, SFormat sf, const char *s, MSize len)
+{
+  MSize width = STRFMT_WIDTH(sf);
+  char *w;
+  if (len > STRFMT_PREC(sf)) len = STRFMT_PREC(sf);
+  w = lj_buf_more(sb, width > len ? width : len);
+  if ((sf & STRFMT_F_LEFT)) w = lj_buf_wmem(w, s, len);
+  while (width-- > len) *w++ = ' ';
+  if (!(sf & STRFMT_F_LEFT)) w = lj_buf_wmem(w, s, len);
+  sb->w = w;
+  return sb;
+}
+
 SBuf *lj_strfmt_putfstr(SBuf *sb, SFormat sf, GCstr *str)
 {
-  MSize len = str->len <= STRFMT_PREC(sf) ? str->len : STRFMT_PREC(sf);
-  MSize width = STRFMT_WIDTH(sf);
-  char *p = lj_buf_more(sb, width > len ? width : len);
-  if ((sf & STRFMT_F_LEFT)) p = lj_buf_wmem(p, strdata(str), len);
-  while (width-- > len) *p++ = ' ';
-  if (!(sf & STRFMT_F_LEFT)) p = lj_buf_wmem(p, strdata(str), len);
-  setsbufP(sb, p);
-  return sb;
+  return strfmt_putfstrlen(sb, sf, strdata(str), str->len);
 }
 
 /* Add formatted signed/unsigned integer to buffer. */
 SBuf *lj_strfmt_putfxint(SBuf *sb, SFormat sf, uint64_t k)
 {
-  char buf[STRFMT_MAXBUF_XINT], *q = buf + sizeof(buf), *p;
+  char buf[STRFMT_MAXBUF_XINT], *q = buf + sizeof(buf), *w;
 #ifdef LUA_USE_ASSERT
-  char *ps;
+  char *ws;
 #endif
   MSize prefix = 0, len, prec, pprec, width, need;
 
@@ -295,27 +312,27 @@ SBuf *lj_strfmt_putfxint(SBuf *sb, SFormat sf, uint64_t k)
   width = STRFMT_WIDTH(sf);
   pprec = prec + (prefix >> 8);
   need = width > pprec ? width : pprec;
-  p = lj_buf_more(sb, need);
+  w = lj_buf_more(sb, need);
 #ifdef LUA_USE_ASSERT
-  ps = p;
+  ws = w;
 #endif
 
   /* Format number with leading/trailing whitespace and zeros. */
   if ((sf & (STRFMT_F_LEFT|STRFMT_F_ZERO)) == 0)
-    while (width-- > pprec) *p++ = ' ';
+    while (width-- > pprec) *w++ = ' ';
   if (prefix) {
-    if ((char)prefix >= 'X') *p++ = '0';
-    *p++ = (char)prefix;
+    if ((char)prefix >= 'X') *w++ = '0';
+    *w++ = (char)prefix;
   }
   if ((sf & (STRFMT_F_LEFT|STRFMT_F_ZERO)) == STRFMT_F_ZERO)
-    while (width-- > pprec) *p++ = '0';
-  while (prec-- > len) *p++ = '0';
-  while (q < buf + sizeof(buf)) *p++ = *q++;  /* Add number itself. */
+    while (width-- > pprec) *w++ = '0';
+  while (prec-- > len) *w++ = '0';
+  while (q < buf + sizeof(buf)) *w++ = *q++;  /* Add number itself. */
   if ((sf & STRFMT_F_LEFT))
-    while (width-- > pprec) *p++ = ' ';
+    while (width-- > pprec) *w++ = ' ';
 
-  lua_assert(need == (MSize)(p - ps));
-  setsbufP(sb, p);
+  lj_assertX(need == (MSize)(w - ws), "miscalculated format size");
+  sb->w = w;
   return sb;
 }
 
@@ -338,6 +355,101 @@ SBuf *lj_strfmt_putfnum_uint(SBuf *sb, SFormat sf, lua_Number n)
   else
     k = (int64_t)n;
   return lj_strfmt_putfxint(sb, sf, (uint64_t)k);
+}
+
+/* Format stack arguments to buffer. */
+int lj_strfmt_putarg(lua_State *L, SBuf *sb, int arg, int retry)
+{
+  int narg = (int)(L->top - L->base);
+  GCstr *fmt = lj_lib_checkstr(L, arg);
+  FormatState fs;
+  SFormat sf;
+  lj_strfmt_init(&fs, strdata(fmt), fmt->len);
+  while ((sf = lj_strfmt_parse(&fs)) != STRFMT_EOF) {
+    if (sf == STRFMT_LIT) {
+      lj_buf_putmem(sb, fs.str, fs.len);
+    } else if (sf == STRFMT_ERR) {
+      lj_err_callerv(L, LJ_ERR_STRFMT,
+		     strdata(lj_str_new(L, fs.str, fs.len)));
+    } else {
+      TValue *o = &L->base[arg++];
+      if (arg > narg)
+	lj_err_arg(L, arg, LJ_ERR_NOVAL);
+      switch (STRFMT_TYPE(sf)) {
+      case STRFMT_INT:
+	if (tviscdata(o)) {
+	  GCcdata *cd = cdataV(o);
+	  if (cd->ctypeid == CTID_INT64 || cd->ctypeid == CTID_UINT64) {
+	    lj_strfmt_putfxint(sb, sf, *(uint64_t *)cdataptr(cd));
+	    break;
+	  }
+	}
+	lj_strfmt_putfnum_int(sb, sf, lj_lib_checknum(L, arg));
+	break;
+      case STRFMT_UINT:
+	if (tviscdata(o)) {
+	  GCcdata *cd = cdataV(o);
+	  if (cd->ctypeid == CTID_INT64 || cd->ctypeid == CTID_UINT64) {
+	    lj_strfmt_putfxint(sb, sf, *(uint64_t *)cdataptr(cd));
+	    break;
+	  }
+	}
+	lj_strfmt_putfnum_uint(sb, sf, lj_lib_checknum(L, arg));
+	break;
+      case STRFMT_NUM:
+	lj_strfmt_putfnum(sb, sf, lj_lib_checknum(L, arg));
+	break;
+      case STRFMT_STR: {
+	MSize len;
+	const char *s;
+	cTValue *mo;
+	if (LJ_UNLIKELY(!tvisstr(o) && !tvisbuf(o)) && retry >= 0 &&
+	    !tvisnil(mo = lj_meta_lookup(L, o, MM_tostring))) {
+	  /* Call __tostring metamethod once. */
+	  copyTV(L, L->top++, mo);
+	  copyTV(L, L->top++, o);
+	  lua_call(L, 1, 1);
+	  o = &L->base[arg-1];  /* Stack may have been reallocated. */
+	  copyTV(L, o, --L->top);  /* Replace inline for retry. */
+	  if (retry < 2) {  /* Global buffer may have been overwritten. */
+	    retry = 1;
+	    break;
+	  }
+	}
+	if (LJ_LIKELY(tvisstr(o))) {
+	  len = strV(o)->len;
+	  s = strVdata(o);
+#if LJ_HASBUFFER
+	} else if (tvisbuf(o)) {
+	  SBufExt *sbx = bufV(o);
+	  if (sbx == (SBufExt *)sb) lj_err_arg(L, arg+1, LJ_ERR_BUFFER_SELF);
+	  len = sbufxlen(sbx);
+	  s = sbx->r;
+#endif
+	} else {
+	  GCstr *str = lj_strfmt_obj(L, o);
+	  len = str->len;
+	  s = strdata(str);
+	}
+	if ((sf & STRFMT_T_QUOTED))
+	  strfmt_putquotedlen(sb, s, len);  /* No formatting. */
+	else
+	  strfmt_putfstrlen(sb, sf, s, len);
+	break;
+	}
+      case STRFMT_CHAR:
+	lj_strfmt_putfchar(sb, sf, lj_lib_checkint(L, arg));
+	break;
+      case STRFMT_PTR:  /* No formatting. */
+	lj_strfmt_putptr(sb, lj_obj_ptr(G(L), o));
+	break;
+      default:
+	lj_assertL(0, "bad string format type");
+	break;
+      }
+    }
+  }
+  return retry;
 }
 
 /* -- Conversions to strings ---------------------------------------------- */
@@ -385,7 +497,7 @@ GCstr * lj_strfmt_obj(lua_State *L, cTValue *o)
       p = lj_buf_wmem(p, "builtin#", 8);
       p = lj_strfmt_wint(p, funcV(o)->c.ffid);
     } else {
-      p = lj_strfmt_wptr(p, lj_obj_ptr(o));
+      p = lj_strfmt_wptr(p, lj_obj_ptr(G(L), o));
     }
     return lj_str_new(L, buf, (size_t)(p - buf));
   }
@@ -441,7 +553,7 @@ const char *lj_strfmt_pushvf(lua_State *L, const char *fmt, va_list argp)
     case STRFMT_ERR:
     default:
       lj_buf_putb(sb, '?');
-      lua_assert(0);
+      lj_assertL(0, "bad string format near offset %d", fs.len);
       break;
     }
   }

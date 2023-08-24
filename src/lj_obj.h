@@ -1,6 +1,6 @@
 /*
 ** LuaJIT VM tags, values and objects.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -13,7 +13,7 @@
 #include "lj_def.h"
 #include "lj_arch.h"
 
-/* -- Memory references (32 bit address space) ---------------------------- */
+/* -- Memory references --------------------------------------------------- */
 
 /* Memory and GC object sizes. */
 typedef uint32_t MSize;
@@ -23,11 +23,13 @@ typedef uint64_t GCSize;
 typedef void * MRef;
 
 #define mref(r, t)	((t *)(r))
+#define mrefu(r)	((uint64_t)(r))
 
 #define setmref(r, p)	((r) = (void *)(p))
+#define setmrefu(r, p)	((r) = (void *)(uint64_t)(p))
 #define setmrefr(r, v)	((r) = (v))
 
-/* -- GC object references (32 bit address space) ------------------------- */
+/* -- GC object references ------------------------------------------------ */
 
 /* Forward declaration. */
 union GCobj;
@@ -121,11 +123,9 @@ typedef int32_t BCLine;  /* Bytecode line number. */
 typedef void (*ASMFunction)(void);
 
 /* Resizable string buffer. Need this here, details in lj_buf.h. */
+#define SBufHeader	char *w, *e, *b; MRef L
 typedef struct SBuf {
-  MRef p;		/* String buffer pointer. */
-  MRef e;		/* String buffer end pointer. */
-  MRef b;		/* String buffer base. */
-  MRef L;		/* lua_State, used for buffer resizing. */
+  SBufHeader;
 } SBuf;
 
 /* -- Tags and values ----------------------------------------------------- */
@@ -176,7 +176,9 @@ typedef const TValue cTValue;
 **
 **                     ------MSW------.------LSW------
 ** primitive types    |1..1|itype|1..................1|
-** GC objects/lightud |1..1|itype|-------GCRef--------|
+** GC objects         |1..1|itype|-------GCRef--------|
+** lightuserdata      |1..1|itype|seg|------ofs-------|
+** int (LJ_DUALNUM)   |1..1|itype|0..0|-----int-------|
 ** number              ------------double-------------
 **
 ** ORDER LJ_T
@@ -207,16 +209,26 @@ typedef const TValue cTValue;
 #define LJ_TISGCV		(LJ_TSTR+1)
 #define LJ_TISTABUD		LJ_TTAB
 
+/* Type marker for slot holding a traversal index. Must be lightuserdata. */
+#define LJ_KEYINDEX		0xfffe7fffu
 #define LJ_GCVMASK		(((uint64_t)1 << 47) - 1)
 
+/* To stay within 47 bits, lightuserdata is segmented. */
+#define LJ_LIGHTUD_BITS_SEG	8
+#define LJ_LIGHTUD_BITS_LO	(47 - LJ_LIGHTUD_BITS_SEG)
+
 /* -- String object ------------------------------------------------------- */
+
+typedef uint32_t StrHash;	/* String hash value. */
+typedef uint32_t StrID;		/* String ID. */
 
 /* String object header. String payload follows. */
 typedef struct GCstr {
   GCHeader;
   uint8_t reserved;	/* Used by lexer for fast lookup of reserved words. */
-  uint8_t unused;
-  MSize hash;		/* Hash of string. */
+  uint8_t hashalg;	/* Hash algorithm. */
+  StrID sid;		/* Interned string ID. */
+  StrHash hash;		/* Hash of string. */
   MSize len;		/* Size of string. */
 } GCstr;
 
@@ -224,7 +236,6 @@ typedef struct GCstr {
 #define strdata(s)	((const char *)((s)+1))
 #define strdatawr(s)	((char *)((s)+1))
 #define strVdata(o)	strdata(strV(o))
-#define sizestring(s)	(sizeof(struct GCstr)+(s)->len+1)
 
 /* -- Userdata object ----------------------------------------------------- */
 
@@ -244,6 +255,7 @@ enum {
   UDTYPE_USERDATA,	/* Regular userdata. */
   UDTYPE_IO_FILE,	/* I/O library FILE. */
   UDTYPE_FFI_CLIB,	/* FFI C library namespace. */
+  UDTYPE_BUFFER,	/* String buffer. */
   UDTYPE__MAX
 };
 
@@ -320,7 +332,7 @@ typedef struct GCproto {
 #define PROTO_UV_IMMUTABLE	0x4000	/* Immutable upvalue. */
 
 #define proto_kgc(pt, idx) \
-  check_exp((uintptr_t)(intptr_t)(idx) >= (uintptr_t)-(intptr_t)(pt)->sizekgc, \
+  check_exp((uintptr_t)(intptr_t)(idx) >= ~(uintptr_t)(pt)->sizekgc+1u, \
 	    gcref(mref((pt)->k, GCRef)[(idx)]))
 #define proto_knumtv(pt, idx) \
   check_exp((uintptr_t)(idx) < (pt)->sizekn, &mref((pt)->k, TValue)[(idx)])
@@ -414,7 +426,7 @@ typedef struct GCtab {
 } GCtab;
 
 #define sizetabcolo(n)	((n)*sizeof(TValue) + sizeof(GCtab))
-#define tabref(r)	(&gcref((r))->tab)
+#define tabref(r)	((GCtab *)gcref((r)))
 #define noderef(r)	(mref((r), Node))
 #define nextnode(n)	(mref((n)->next, Node))
 #define getfreetop(t, n)	(noderef((t)->freetop))
@@ -483,13 +495,14 @@ typedef enum {
 #define basemt_obj(g, o)	((g)->gcroot[GCROOT_BASEMT+itypemap(o)])
 #define mmname_str(g, mm)	(strref((g)->gcroot[GCROOT_MMNAME+(mm)]))
 
+/* Garbage collector state. */
 typedef struct GCState {
   GCSize total;		/* Memory currently allocated. */
   GCSize threshold;	/* Memory threshold. */
   uint8_t currentwhite;	/* Current white color. */
   uint8_t state;	/* GC state. */
   uint8_t nocdatafin;	/* No cdata finalizer called. */
-  uint8_t unused2;
+  uint8_t lightudnum;	/* Number of lightuserdata segments - 1. */
   MSize sweepstr;	/* Sweep position in string table. */
   GCRef root;		/* List of all collectable objects. */
   MRef sweep;		/* Sweep position in root list. */
@@ -501,29 +514,41 @@ typedef struct GCState {
   GCSize estimate;	/* Estimate of memory actually in use. */
   MSize stepmul;	/* Incremental GC step granularity. */
   MSize pause;		/* Pause between successive GC cycles. */
+  MRef lightudseg;	/* Upper bits of lightuserdata segments. */
 } GCState;
+
+/* String interning state. */
+typedef struct StrInternState {
+  GCRef *tab;		/* String hash table anchors. */
+  MSize mask;		/* String hash mask (size of hash table - 1). */
+  MSize num;		/* Number of strings in hash table. */
+  StrID id;		/* Next string ID. */
+  uint8_t idreseed;	/* String ID reseed counter. */
+  uint8_t second;	/* String interning table uses secondary hashing. */
+  uint8_t unused1;
+  uint8_t unused2;
+  LJ_ALIGN(8) uint64_t seed;	/* Random string seed. */
+} StrInternState;
 
 /* Global state, shared by all threads of a Lua universe. */
 typedef struct global_State {
-  GCRef *strhash;	/* String hash table (hash chain anchors). */
-  MSize strmask;	/* String hash mask (size of hash table - 1). */
-  MSize strnum;		/* Number of strings in hash table. */
   lua_Alloc allocf;	/* Memory allocator. */
   void *allocd;		/* Memory allocator data. */
   GCState gc;		/* Garbage collector. */
-  volatile int32_t vmstate;   /* VM state or current JIT code trace number. */
-  volatile int32_t gcvmstate; /* Previous VM state (only when state is GC). */
-  volatile int32_t lasttrace; /* VM state before exit to interpreter. */
-  SBuf tmpbuf;		/* Temporary string buffer. */
   GCstr strempty;	/* Empty string. */
   uint8_t stremptyz;	/* Zero terminator of empty string. */
   uint8_t hookmask;	/* Hook mask. */
   uint8_t dispatchmode;	/* Dispatch mode. */
   uint8_t vmevmask;	/* VM event mask. */
+  StrInternState str;	/* String interning. */
+  volatile int32_t vmstate;  /* VM state or current JIT code trace number. */
+  volatile int32_t gcvmstate; /* Previous VM state (only when state is GC). */
+  volatile int32_t lasttrace; /* VM state before exit to interpreter. */
   GCRef mainthref;	/* Link to main thread. */
-  TValue registrytv;	/* Anchor for registry. */
+  SBuf tmpbuf;		/* Temporary string buffer. */
   TValue tmptv, tmptv2;	/* Temporary TValues. */
   Node nilnode;		/* Fallback 1-element hash part (nil key and value). */
+  TValue registrytv;	/* Anchor for registry. */
   GCupval uvhead;	/* Head of double-linked list of all open upvalues. */
   int32_t hookcount;	/* Instruction hook countdown. */
   int32_t hookcstart;	/* Start count for instruction hook counter. */
@@ -535,6 +560,7 @@ typedef struct global_State {
   GCRef cur_L;		/* Currently executing lua_State. */
   MRef jit_base;	/* Current JIT code L->base or NULL. */
   MRef ctype_state;	/* Pointer to C type state. */
+  PRNGState prng;	/* Global PRNG state. */
   GCRef gcroot[GCROOT_MAX];  /* GC roots. */
 } global_State;
 
@@ -583,6 +609,11 @@ struct lua_State {
 #define curr_proto(L)		(funcproto(curr_func(L)))
 #define curr_topL(L)		(L->base + curr_proto(L)->framesize)
 #define curr_top(L)		(curr_funcisL(L) ? curr_topL(L) : L->top)
+
+#if defined(LUA_USE_ASSERT) || defined(LUA_USE_APICHECK)
+LJ_FUNC_NORET void lj_assert_fail(global_State *g, const char *file, int line,
+				  const char *func, const char *fmt, ...);
+#endif
 
 /* -- GC object definition and conversions -------------------------------- */
 
@@ -637,10 +668,6 @@ typedef union GCobj {
 
 /* -- TValue getters/setters ---------------------------------------------- */
 
-#ifdef LUA_USE_ASSERT
-#include "lj_gc.h"
-#endif
-
 /* Macros to test types. */
 #define itype(o)	((uint32_t)((o)->it64 >> 47))
 #define tvisnil(o)	((o)->it64 == -1)
@@ -677,8 +704,22 @@ typedef union GCobj {
 /* Macros to get tagged values. */
 #define gcval(o)	((GCobj *)(gcrefu((o)->gcr) & LJ_GCVMASK))
 #define boolV(o)	check_exp(tvisbool(o), (LJ_TFALSE - itype(o)))
-#define lightudV(o) \
-  check_exp(tvislightud(o), (void *)((o)->u64 & U64x(00007fff,ffffffff)))
+#define lightudseg(u) \
+  (((u) >> LJ_LIGHTUD_BITS_LO) & ((1 << LJ_LIGHTUD_BITS_SEG)-1))
+#define lightudlo(u) \
+  ((u) & (((uint64_t)1 << LJ_LIGHTUD_BITS_LO) - 1))
+#define lightudup(p) \
+  ((uint32_t)(((p) >> LJ_LIGHTUD_BITS_LO) << (LJ_LIGHTUD_BITS_LO-32)))
+static LJ_AINLINE void *lightudV(global_State *g, cTValue *o)
+{
+  uint64_t u = o->u64;
+  uint64_t seg = lightudseg(u);
+  uint32_t *segmap = mref(g->gc.lightudseg, uint32_t);
+  lj_assertG(tvislightud(o), "lightuserdata expected");
+  if (seg == (1 << LJ_LIGHTUD_BITS_SEG)-1) return NULL;
+  lj_assertG(seg <= g->gc.lightudnum, "bad lightuserdata segment %d", seg);
+  return (void *)(((uint64_t)segmap[seg] << 32) | lightudlo(u));
+}
 #define gcV(o)		check_exp(tvisgcv(o), gcval(o))
 #define strV(o)		check_exp(tvisstr(o), &gcval(o)->str)
 #define funcV(o)	check_exp(tvisfunc(o), &gcval(o)->fn)
@@ -688,7 +729,6 @@ typedef union GCobj {
 #define tabV(o)		check_exp(tvistab(o), &gcval(o)->tab)
 #define udataV(o)	check_exp(tvisudata(o), &gcval(o)->ud)
 #define numV(o)		check_exp(tvisnum(o), (o)->n)
-#define intV(o)		check_exp(tvisint(o), (int32_t)(o)->i)
 
 /* Macros to set tagged values. */
 #define setitype(o, i)		((o)->it = ((i) << 15))
@@ -696,20 +736,27 @@ typedef union GCobj {
 #define setpriV(o, x)		((o)->it64 = (int64_t)~((uint64_t)~(x)<<47))
 #define setboolV(o, x)		((o)->it64 = (int64_t)~((uint64_t)((x)+1)<<47))
 
-static LJ_AINLINE void setlightudV(TValue *o, void *p)
+static LJ_AINLINE void setrawlightudV(TValue *o, void *p)
 {
   o->u64 = (uint64_t)p | (((uint64_t)LJ_TLIGHTUD) << 47);
 }
 
-#define checklightudptr(L, p) \
-  (((uint64_t)(p) >> 47) ? (lj_err_msg(L, LJ_ERR_BADLU), NULL) : (p))
-
 #define contptr(f)		((void *)(f))
 #define setcont(o, f)		((o)->u64 = (uint64_t)(uintptr_t)contptr(f))
 
-#define tvchecklive(L, o) \
-  UNUSED(L), lua_assert(!tvisgcv(o) || \
-  ((~itype(o) == gcval(o)->gch.gct) && !isdead(G(L), gcval(o))))
+static LJ_AINLINE void checklivetv(lua_State *L, TValue *o, const char *msg)
+{
+  UNUSED(L); UNUSED(o); UNUSED(msg);
+#if LUA_USE_ASSERT
+  if (tvisgcv(o)) {
+    lj_assertL(~itype(o) == gcval(o)->gch.gct,
+	       "mismatch of TValue type %d vs GC type %d",
+	       ~itype(o), gcval(o)->gch.gct);
+    /* Copy of isdead check from lj_gc.h to avoid circular include. */
+    lj_assertL(!(gcval(o)->gch.marked & (G(L)->gc.currentwhite ^ 3) & 3), msg);
+  }
+#endif
+}
 
 static LJ_AINLINE void setgcVraw(TValue *o, GCobj *v, uint32_t itype)
 {
@@ -718,11 +765,12 @@ static LJ_AINLINE void setgcVraw(TValue *o, GCobj *v, uint32_t itype)
 
 static LJ_AINLINE void setgcV(lua_State *L, TValue *o, GCobj *v, uint32_t it)
 {
-  setgcVraw(o, v, it); tvchecklive(L, o);
+  setgcVraw(o, v, it);
+  checklivetv(L, o, "store to dead GC object");
 }
 
 #define define_setV(name, type, tag) \
-static LJ_AINLINE void name(lua_State *L, TValue *o, type *v) \
+static LJ_AINLINE void name(lua_State *L, TValue *o, const type *v) \
 { \
   setgcV(L, o, obj2gco(v), tag); \
 }
@@ -754,7 +802,8 @@ static LJ_AINLINE void setint64V(TValue *o, int64_t i)
 /* Copy tagged values. */
 static LJ_AINLINE void copyTV(lua_State *L, TValue *o1, const TValue *o2)
 {
-  *o1 = *o2; tvchecklive(L, o1);
+  *o1 = *o2;
+  checklivetv(L, o1, "copy of dead GC object");
 }
 
 /* -- Number to integer conversion ---------------------------------------- */
@@ -769,9 +818,18 @@ static LJ_AINLINE int32_t lj_num2bit(lua_Number n)
 
 #define lj_num2int(n)   ((int32_t)(n))
 
+/*
+** This must match the JIT backend behavior. In particular for archs
+** that don't have a common hardware instruction for this conversion.
+** Note that signed FP to unsigned int conversions have an undefined
+** result and should never be relied upon in portable FFI code.
+** See also: C99 or C11 standard, 6.3.1.4, footnote of (1).
+*/
 static LJ_AINLINE uint64_t lj_num2u64(lua_Number n)
 {
-    return (uint64_t)n;
+  int64_t i = (int64_t)n;
+  if (i < 0) i = (int64_t)(n - 18446744073709551616.0);
+  return (uint64_t)i;
 }
 
 static LJ_AINLINE int32_t numberVint(cTValue *o)
@@ -794,6 +852,6 @@ LJ_DATA const char *const lj_obj_itypename[~LJ_TNUMX+1];
 
 /* Compare two objects without calling metamethods. */
 LJ_FUNC int lj_obj_equal(cTValue *o1, cTValue *o2);
-LJ_FUNC const void * lj_obj_ptr(cTValue *o);
+LJ_FUNC const void * lj_obj_ptr(global_State *g, cTValue *o);
 
 #endif

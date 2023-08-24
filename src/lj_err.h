@@ -1,6 +1,6 @@
 /*
 ** Error handling.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_ERR_H
@@ -24,6 +24,7 @@ LJ_FUNC GCstr *lj_err_str(lua_State *L, ErrMsg em);
 LJ_FUNCA_NORET void lj_err_throw(lua_State *L, int errcode);
 LJ_FUNC_NORET void lj_err_mem(lua_State *L);
 LJ_FUNC_NORET void lj_err_run(lua_State *L);
+LJ_FUNCA_NORET void lj_err_trace(lua_State *L, int errcode);
 LJ_FUNC_NORET void lj_err_msg(lua_State *L, ErrMsg em);
 LJ_FUNC_NORET void lj_err_lex(lua_State *L, GCstr *src, const char *tok,
 			      BCLine line, ErrMsg em, va_list argp);
@@ -37,5 +38,10 @@ LJ_FUNC_NORET void lj_err_arg(lua_State *L, int narg, ErrMsg em);
 LJ_FUNC_NORET void lj_err_argv(lua_State *L, int narg, ErrMsg em, ...);
 LJ_FUNC_NORET void lj_err_argtype(lua_State *L, int narg, const char *xname);
 LJ_FUNC_NORET void lj_err_argt(lua_State *L, int narg, int tt);
+
+#define lj_err_register_mcode(base, sz, info)	(info)
+#define lj_err_deregister_mcode(base, sz, info)	UNUSED(base)
+
+#define lj_err_verify()		((void)0)
 
 #endif

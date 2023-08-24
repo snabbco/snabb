@@ -1,6 +1,6 @@
 /*
 ** Common header for IR emitter and optimizations.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_IROPT_H
@@ -12,7 +12,6 @@
 #include "lj_jit.h"
 
 /* IR emitter. */
-LJ_FUNC void lj_ir_growtop(jit_State *J);
 LJ_FUNC TRef lj_ir_emit(jit_State *J);
 
 /* Save current IR in J->fold.ins, but do not emit it (yet). */
@@ -112,10 +111,11 @@ LJ_FUNC TRef lj_opt_fwd_hload(jit_State *J);
 LJ_FUNC TRef lj_opt_fwd_uload(jit_State *J);
 LJ_FUNC TRef lj_opt_fwd_fload(jit_State *J);
 LJ_FUNC TRef lj_opt_fwd_xload(jit_State *J);
-LJ_FUNC TRef lj_opt_fwd_tab_len(jit_State *J);
+LJ_FUNC TRef lj_opt_fwd_alen(jit_State *J);
 LJ_FUNC TRef lj_opt_fwd_hrefk(jit_State *J);
 LJ_FUNC int lj_opt_fwd_href_nokey(jit_State *J);
 LJ_FUNC int lj_opt_fwd_tptr(jit_State *J, IRRef lim);
+LJ_FUNC int lj_opt_fwd_sbuf(jit_State *J, IRRef lim);
 LJ_FUNC int lj_opt_fwd_wasnonnil(jit_State *J, IROpT loadop, IRRef xref);
 
 /* Dead-store elimination. */
@@ -134,7 +134,6 @@ LJ_FUNC TRef lj_opt_narrow_arith(jit_State *J, TRef rb, TRef rc,
 				 TValue *vb, TValue *vc, IROp op);
 LJ_FUNC TRef lj_opt_narrow_unm(jit_State *J, TRef rc, TValue *vc);
 LJ_FUNC TRef lj_opt_narrow_mod(jit_State *J, TRef rb, TRef rc, TValue *vb, TValue *vc);
-LJ_FUNC TRef lj_opt_narrow_pow(jit_State *J, TRef rb, TRef rc, TValue *vb, TValue *vc);
 LJ_FUNC IRType lj_opt_narrow_forl(jit_State *J, cTValue *forbase);
 
 /* Optimization passes. */

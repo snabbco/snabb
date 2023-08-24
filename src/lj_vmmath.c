@@ -1,6 +1,6 @@
 /*
 ** Math helper functions for assembler VM.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_vmmath_c
@@ -16,7 +16,18 @@
 /* -- Wrapper functions --------------------------------------------------- */
 
 
-/* -- Helper functions for generated machine code ------------------------- */
+/* -- Helper functions ---------------------------------------------------- */
+
+/* Required to prevent the C compiler from applying FMA optimizations.
+**
+** Yes, there's -ffp-contract and the FP_CONTRACT pragma ... in theory.
+** But the current state of C compilers is a mess in this regard.
+** Also, this function is not performance sensitive at all.
+*/
+LJ_NOINLINE static double lj_vm_floormul(double x, double y)
+{
+  return lj_vm_floor(x / y) * y;
+}
 
 double lj_vm_foldarith(double x, double y, int op)
 {
@@ -25,27 +36,28 @@ double lj_vm_foldarith(double x, double y, int op)
   case IR_SUB - IR_ADD: return x-y; break;
   case IR_MUL - IR_ADD: return x*y; break;
   case IR_DIV - IR_ADD: return x/y; break;
-  case IR_MOD - IR_ADD: return x-lj_vm_floor(x/y)*y; break;
+  case IR_MOD - IR_ADD: return x-lj_vm_floormul(x, y); break;
   case IR_POW - IR_ADD: return pow(x, y); break;
   case IR_NEG - IR_ADD: return -x; break;
   case IR_ABS - IR_ADD: return fabs(x); break;
-  case IR_ATAN2 - IR_ADD: return atan2(x, y); break;
   case IR_LDEXP - IR_ADD: return ldexp(x, (int)y); break;
-  case IR_MIN - IR_ADD: return x > y ? y : x; break;
-  case IR_MAX - IR_ADD: return x < y ? y : x; break;
+  case IR_MIN - IR_ADD: return x < y ? x : y; break;
+  case IR_MAX - IR_ADD: return x > y ? x : y; break;
   default: return x;
   }
 }
 
+/* -- Helper functions for generated machine code ------------------------- */
+
 int32_t lj_vm_modi(int32_t a, int32_t b)
 {
   uint32_t y, ua, ub;
-  lua_assert(b != 0);  /* This must be checked before using this function. */
-  ua = a < 0 ? (uint32_t)-a : (uint32_t)a;
-  ub = b < 0 ? (uint32_t)-b : (uint32_t)b;
+  lj_assertX(b != 0, "modulo with zero divisor");
+  ua = a < 0 ? ~(uint32_t)a+1u : (uint32_t)a;
+  ub = b < 0 ? ~(uint32_t)b+1u : (uint32_t)b;
   y = ua % ub;
   if (y != 0 && (a^b) < 0) y = y - ub;
-  if (((int32_t)y^b) < 0) y = (uint32_t)-(int32_t)y;
+  if (((int32_t)y^b) < 0) y = ~y+1u;
   return (int32_t)y;
 }
 
@@ -57,14 +69,6 @@ double lj_vm_log2(double a)
 }
 #endif
 
-#ifdef LUAJIT_NO_EXP2
-double lj_vm_exp2(double a)
-{
-  return exp(a * 0.6931471805599453);
-}
-#endif
-
-
 /* Computes fpm(x) for extended math functions. */
 double lj_vm_foldfpm(double x, int fpm)
 {
@@ -73,15 +77,9 @@ double lj_vm_foldfpm(double x, int fpm)
   case IRFPM_CEIL: return lj_vm_ceil(x);
   case IRFPM_TRUNC: return lj_vm_trunc(x);
   case IRFPM_SQRT: return sqrt(x);
-  case IRFPM_EXP: return exp(x);
-  case IRFPM_EXP2: return lj_vm_exp2(x);
   case IRFPM_LOG: return log(x);
   case IRFPM_LOG2: return lj_vm_log2(x);
-  case IRFPM_LOG10: return log10(x);
-  case IRFPM_SIN: return sin(x);
-  case IRFPM_COS: return cos(x);
-  case IRFPM_TAN: return tan(x);
-  default: lua_assert(0);
+  default: lj_assertX(0, "bad fpm %d", fpm);
   }
   return 0;
 }

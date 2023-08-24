@@ -1,6 +1,6 @@
 /*
 ** Bit manipulation library.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lib_bit_c
@@ -101,16 +101,14 @@ LJLIB_CF(bit_tohex)		LJLIB_REC(.)
 {
   CTypeID id = 0, id2 = 0;
   uint64_t b = lj_carith_check64(L, 1, &id);
-  int32_t n = L->base+1>=L->top ? (id ? 16 : 8) :
+  int32_t i, n = L->base+1>=L->top ? (id ? 16 : 8) :
 				  (int32_t)lj_carith_check64(L, 2, &id2);
-  SBuf *sb = lj_buf_tmp_(L);
-  SFormat sf = (STRFMT_UINT|STRFMT_T_HEX);
-  if (n < 0) { n = -n; sf |= STRFMT_F_UPPER; }
-  sf |= ((SFormat)((n+1)&255) << STRFMT_SH_PREC);
-  if (n < 16) b &= ((uint64_t)1 << 4*n)-1;
-  sb = lj_strfmt_putfxint(sb, sf, b);
-  setstrV(L, L->top-1, lj_buf_str(L, sb));
-  lj_gc_check(L);
+  const char *hexdigits = "0123456789abcdef";
+  char buf[8];
+  if (n < 0) { n = (int32_t)(~(uint32_t)n+1u); hexdigits = "0123456789ABCDEF"; }
+  if ((uint32_t)n > 8) n = 8;
+  for (i = n; --i >= 0; ) { buf[i] = hexdigits[b & 15]; b >>= 4; }
+  lua_pushlstring(L, buf, (size_t)n);
   return 1;
 }
 

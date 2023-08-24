@@ -1,6 +1,6 @@
 /*
 ** String scanning.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_STRSCAN_H
@@ -22,7 +22,8 @@ typedef enum {
   STRSCAN_INT, STRSCAN_U32, STRSCAN_I64, STRSCAN_U64,
 } StrScanFmt;
 
-LJ_FUNC StrScanFmt lj_strscan_scan(const uint8_t *p, TValue *o, uint32_t opt);
+LJ_FUNC StrScanFmt lj_strscan_scan(const uint8_t *p, MSize len, TValue *o,
+				   uint32_t opt);
 LJ_FUNC int lj_strscan_num(GCstr *str, TValue *o);
 #define lj_strscan_number(s, o)		lj_strscan_num((s), (o))
 
