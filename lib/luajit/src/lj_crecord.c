@@ -108,7 +108,7 @@ static IRType crec_ct2irt(CTState *cts, CType *ct)
 	return IRT_I8 + 2*b + ((ct->info & CTF_UNSIGNED) ? 1 : 0);
     }
   } else if (ctype_isptr(ct->info)) {
-    return (LJ_64 && ct->size == 8) ? IRT_P64 : IRT_P32;
+    return (ct->size == 8) ? IRT_P64 : IRT_P32;
   } else if (ctype_iscomplex(ct->info)) {
     if (ct->size == 2*sizeof(double))
       return IRT_NUM;
@@ -418,7 +418,7 @@ static TRef crec_ct_ct(jit_State *J, CType *d, CType *s, TRef dp, TRef sp,
   conv_I_I:
     if (dt == IRT_CDATA || st == IRT_CDATA) goto err_nyi;
     /* Extend 32 to 64 bit integer. */
-    if (dsize == 8 && ssize < 8 && !(LJ_64 && (sinfo & CTF_UNSIGNED)))
+    if (dsize == 8 && ssize < 8 && !(sinfo & CTF_UNSIGNED))
       sp = emitconv(sp, dt, ssize < 4 ? IRT_INT : st,
 		    (sinfo & CTF_UNSIGNED) ? 0 : IRCONV_SEXT);
     else if (dsize < 8 && ssize == 8)  /* Truncate from 64 bit integer. */
@@ -508,13 +508,11 @@ static TRef crec_ct_ct(jit_State *J, CType *d, CType *s, TRef dp, TRef sp,
     goto xstore;
   case CCX(P, I):
     if (st == IRT_CDATA) goto err_nyi;
-    if (!LJ_64 && ssize == 8)  /* Truncate from 64 bit integer. */
-      sp = emitconv(sp, IRT_U32, st, 0);
     goto xstore;
   case CCX(P, F):
     if (st == IRT_CDATA) goto err_nyi;
     /* The signed conversion is cheaper. x64 really has 47 bit pointers. */
-    sp = emitconv(sp, (LJ_64 && dsize == 8) ? IRT_I64 : IRT_U32,
+    sp = emitconv(sp, (dsize == 8) ? IRT_I64 : IRT_U32,
 		  st, IRCONV_ANY);
     goto xstore;
 
@@ -693,7 +691,7 @@ static TRef crec_reassoc_ofs(jit_State *J, TRef tr, ptrdiff_t *ofsp, MSize sz)
       (ir->o == IR_ADD || ir->o == IR_ADDOV || ir->o == IR_SUBOV)) {
     IRIns *irk = IR(ir->op2);
     ptrdiff_t k;
-    if (LJ_64 && irk->o == IR_KINT64)
+    if (irk->o == IR_KINT64)
       k = (ptrdiff_t)ir_kint64(irk)->u64 * sz;
     else
       k = (ptrdiff_t)irk->i * sz;
@@ -791,7 +789,7 @@ void recff_cdata_index(jit_State *J, RecordFFData *rd)
 
   /* Resolve pointer or reference for cdata object. */
   if (ctype_isptr(ct->info)) {
-    IRType t = (LJ_64 && ct->size == 8) ? IRT_P64 : IRT_P32;
+    IRType t = (ct->size == 8) ? IRT_P64 : IRT_P32;
     if (ctype_isref(ct->info)) ct = ctype_rawchild(cts, ct);
     ptr = emitir(IRT(IR_FLOAD, t), ptr, IRFL_CDATA_PTR);
     ofs = 0;
@@ -826,12 +824,8 @@ again:
 		     lj_ir_kintp(J, sizeof(GCcdata)));
 	idx = emitir(IRT(IR_XLOAD, t), idx, 0);
       }
-      if (LJ_64 && ctk->size < sizeof(intptr_t) && !(ctk->info & CTF_UNSIGNED))
+      if (ctk->size < sizeof(intptr_t) && !(ctk->info & CTF_UNSIGNED))
 	idx = emitconv(idx, IRT_INTP, IRT_INT, IRCONV_SEXT);
-      if (!LJ_64 && ctk->size > sizeof(intptr_t)) {
-	idx = emitconv(idx, IRT_INTP, t, 0);
-	lj_needsplit(J);
-      }
       goto integer_key;
     }
   } else if (tref_isstr(idx)) {
@@ -1136,7 +1130,7 @@ static int crec_call(jit_State *J, RecordFFData *rd, GCcdata *cd)
   CType *ct = ctype_raw(cts, cd->ctypeid);
   IRType tp = IRT_PTR;
   if (ctype_isptr(ct->info)) {
-    tp = (LJ_64 && ct->size == 8) ? IRT_P64 : IRT_P32;
+    tp = (ct->size == 8) ? IRT_P64 : IRT_P32;
     ct = ctype_rawchild(cts, ct);
   }
   if (ctype_isfunc(ct->info)) {
@@ -1147,7 +1141,7 @@ static int crec_call(jit_State *J, RecordFFData *rd, GCcdata *cd)
     TValue tv;
     /* Check for blacklisted C functions that might call a callback. */
     setlightudV(&tv,
-		cdata_getptr(cdataptr(cd), (LJ_64 && tp == IRT_P64) ? 8 : 4));
+		cdata_getptr(cdataptr(cd), (tp == IRT_P64) ? 8 : 4));
     if (tvistrue(lj_tab_get(J->L, cts->miscmap, &tv)))
       lj_trace_err(J, LJ_TRERR_BLACKL);
     if (ctype_isvoid(ctr->info)) {
@@ -1173,7 +1167,7 @@ static int crec_call(jit_State *J, RecordFFData *rd, GCcdata *cd)
 	J->postproc = LJ_POST_FIXGUARDSNAP;
 	tr = TREF_TRUE;
       }
-    } else if (t == IRT_PTR || (LJ_64 && t == IRT_P32) ||
+    } else if (t == IRT_PTR || t == IRT_P32 ||
 	       t == IRT_I64 || t == IRT_U64 || ctype_isenum(ctr->info)) {
       TRef trid = lj_ir_kint(J, ctype_cid(ct->info));
       tr = emitir(IRTG(IR_CNEWI, IRT_CDATA), trid, tr);
@@ -1500,7 +1494,7 @@ void recff_clib_index(jit_State *J, RecordFFData *rd)
 	void *sp = *(void **)cdataptr(cdataV(tv));
 	TRef ptr;
 	ct = ctype_raw(cts, sid);
-	if (LJ_64 && !checkptr32(sp))
+	if (!checkptr32(sp))
 	  ptr = lj_ir_kintp(J, (uintptr_t)sp);
 	else
 	  ptr = lj_ir_kptr(J, sp);

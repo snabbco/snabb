@@ -627,13 +627,13 @@ static AliasRet aa_xref(jit_State *J, IRIns *refa, IRIns *xa, IRIns *xb)
   if (refa->o == IR_ADD && irref_isk(refa->op2)) {
     IRIns *irk = IR(refa->op2);
     basea = IR(refa->op1);
-    ofsa = (LJ_64 && irk->o == IR_KINT64) ? (ptrdiff_t)ir_k64(irk)->u64 :
+    ofsa = (irk->o == IR_KINT64) ? (ptrdiff_t)ir_k64(irk)->u64 :
 					    (ptrdiff_t)irk->i;
   }
   if (refb->o == IR_ADD && irref_isk(refb->op2)) {
     IRIns *irk = IR(refb->op2);
     baseb = IR(refb->op1);
-    ofsb = (LJ_64 && irk->o == IR_KINT64) ? (ptrdiff_t)ir_k64(irk)->u64 :
+    ofsb = (irk->o == IR_KINT64) ? (ptrdiff_t)ir_k64(irk)->u64 :
 					    (ptrdiff_t)irk->i;
   }
   /* Treat constified pointers like base vs. base+offset. */
@@ -685,7 +685,7 @@ static IRRef reassoc_xref(jit_State *J, IRIns *ir)
   ptrdiff_t ofs = 0;
   if (ir->o == IR_ADD && irref_isk(ir->op2)) {  /* Get constant offset. */
     IRIns *irk = IR(ir->op2);
-    ofs = (LJ_64 && irk->o == IR_KINT64) ? (ptrdiff_t)ir_k64(irk)->u64 :
+    ofs = (irk->o == IR_KINT64) ? (ptrdiff_t)ir_k64(irk)->u64 :
 					   (ptrdiff_t)irk->i;
     ir = IR(ir->op1);
   }

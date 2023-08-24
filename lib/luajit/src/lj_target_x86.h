@@ -50,7 +50,7 @@ enum {
 /* Make use of all registers, except the stack pointer (and maybe DISPATCH). */
 #define RSET_GPR	(RSET_RANGE(RID_MIN_GPR, RID_MAX_GPR) \
 			 - RID2RSET(RID_ESP) \
-			 - LJ_GC64*RID2RSET(RID_DISPATCH))
+			 - RID2RSET(RID_DISPATCH))
 #define RSET_FPR	(RSET_RANGE(RID_MIN_FPR, RID_MAX_FPR))
 #define RSET_ALL	(RSET_GPR|RSET_FPR)
 #define RSET_INIT	RSET_ALL

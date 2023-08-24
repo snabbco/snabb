@@ -14,7 +14,7 @@
 /* Get C data pointer. */
 static LJ_AINLINE void *cdata_getptr(void *p, CTSize sz)
 {
-  if (LJ_64 && sz == 4) {  /* Support 32 bit pointers on 64 bit targets. */
+  if (sz == 4) {  /* Support 32 bit pointers on 64 bit targets. */
     return ((void *)(uintptr_t)*(uint32_t *)p);
   } else {
     lua_assert(sz == CTSIZE_PTR);
@@ -25,7 +25,7 @@ static LJ_AINLINE void *cdata_getptr(void *p, CTSize sz)
 /* Set C data pointer. */
 static LJ_AINLINE void cdata_setptr(void *p, CTSize sz, const void *v)
 {
-  if (LJ_64 && sz == 4) {  /* Support 32 bit pointers on 64 bit targets. */
+  if (sz == 4) {  /* Support 32 bit pointers on 64 bit targets. */
     *(uint32_t *)p = (uint32_t)(uintptr_t)v;
   } else {
     lua_assert(sz == CTSIZE_PTR);

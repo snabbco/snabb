@@ -229,7 +229,7 @@ TRef lj_ir_kgc(jit_State *J, GCobj *o, IRType t)
   ir = IR(ref);
   /* NOBARRIER: Current trace is a GC root. */
   ir->op12 = 0;
-  setgcref(ir[LJ_GC64].gcr, o);
+  setgcref(ir[1].gcr, o);
   ir->t.irt = (uint8_t)t;
   ir->o = IR_KGC;
   ir->prev = J->chain[IR_KGC];
@@ -245,7 +245,7 @@ TRef lj_ir_ktrace(jit_State *J)
   IRIns *ir = IR(ref);
   lua_assert(irt_toitype_(IRT_P64) == LJ_TTRACE);
   ir->t.irt = IRT_P64;
-  ir->o = LJ_GC64 ? IR_KNUM : IR_KNULL;  /* Not IR_KGC yet, but same size. */
+  ir->o = IR_KNUM;  /* Not IR_KGC yet, but same size. */
   ir->op12 = 0;
   ir->prev = 0;
   return TREF(ref, IRT_P64);
@@ -262,7 +262,7 @@ TRef lj_ir_kptr_(jit_State *J, IROp op, void *ptr)
   ref = ir_nextk64(J);
   ir = IR(ref);
   ir->op12 = 0;
-  setmref(ir[LJ_GC64].ptr, ptr);
+  setmref(ir[1].ptr, ptr);
   ir->t.irt = IRT_PGC;
   ir->o = op;
   ir->prev = J->chain[op];

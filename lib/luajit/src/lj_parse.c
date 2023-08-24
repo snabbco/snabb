@@ -910,7 +910,7 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
     if (e->k == VKNIL || e->k == VKFALSE) {
       e->k = VKTRUE;
       return;
-    } else if (expr_isk(e) || (LJ_HASFFI && e->k == VKCDATA)) {
+    } else if (expr_isk(e) || e->k == VKCDATA) {
       e->k = VKFALSE;
       return;
     } else if (e->k == VJMP) {
@@ -1891,7 +1891,7 @@ static void expr_simple(LexState *ls, ExpDesc *v)
 {
   switch (ls->tok) {
   case TK_number:
-    expr_init(v, (LJ_HASFFI && tviscdata(&ls->tokval)) ? VKCDATA : VKNUM, 0);
+    expr_init(v, tviscdata(&ls->tokval) ? VKCDATA : VKNUM, 0);
     copyTV(ls->L, &v->u.nval, &ls->tokval);
     break;
   case TK_string:

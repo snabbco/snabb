@@ -22,10 +22,8 @@
 #include "lj_ircall.h"
 #include "lj_frame.h"
 #include "lj_dispatch.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
 #include "lj_ccall.h"
-#endif
 #include "luajit.h"
 
 #if defined(_WIN32)
@@ -98,20 +96,11 @@ static const char *sym_decorate(BuildCtx *ctx,
 {
   char name[256];
   char *p;
-#if LJ_64
   const char *symprefix = ctx->mode == BUILD_machasm ? "_" : "";
-#elif LJ_TARGET_XBOX360
-  const char *symprefix = "";
-#else
-  const char *symprefix = ctx->mode != BUILD_elfasm ? "_" : "";
-#endif
   sprintf(name, "%s%s%s", symprefix, prefix, suffix);
   p = strchr(name, '@');
   if (p) {
 #if LJ_TARGET_X86ORX64
-    if (!LJ_64 && (ctx->mode == BUILD_coffasm || ctx->mode == BUILD_peobj))
-      name[0] = name[1] == 'R' ? '_' : '@';  /* Just for _RtlUnwind@16. */
-    else
       *p = '\0';
 #elif LJ_TARGET_PPC && !LJ_TARGET_CONSOLE
     /* Keep @plt etc. */
@@ -214,7 +203,7 @@ static int build_code(BuildCtx *ctx)
     if ((LJ_HASJIT ||
 	 !(i == BC_JFORI || i == BC_JFORL || i == BC_JITERL || i == BC_JLOOP ||
 	   i == BC_IFORL || i == BC_IITERL || i == BC_ILOOP)) &&
-	(LJ_HASFFI || i != BC_KCDATA))
+	i != BC_KCDATA)
       sym_insert(ctx, ofs, LABEL_PREFIX_BC, bc_names[i]);
   }
 
@@ -434,7 +423,7 @@ int main(int argc, char **argv)
   BuildCtx *ctx = &ctx_;
   int status, binmode;
 
-  if (sizeof(void *) != 4*LJ_32+8*LJ_64) {
+  if (sizeof(void *) != 8) {
     fprintf(stderr,"Error: pointer size mismatch in cross-build.\n");
     fprintf(stderr,"Try: make HOST_CC=\"gcc -m32\" CROSS=...\n\n");
     return 1;

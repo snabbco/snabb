@@ -293,7 +293,7 @@ LJ_DATA const uint8_t lj_ir_mode[IR__MAX+1];
 
 /* -- IR instruction types ------------------------------------------------ */
 
-#define IRTSIZE_PGC		(LJ_GC64 ? 8 : 4)
+#define IRTSIZE_PGC		8
 
 /* Map of itypes to non-negative numbers and their sizes. ORDER LJ_T.
 ** LJ_TUPVAL/LJ_TTRACE never appear in a TValue. Use these itypes for
@@ -303,7 +303,7 @@ LJ_DATA const uint8_t lj_ir_mode[IR__MAX+1];
 ** contiguous and next to IRT_NUM (see the typerange macros below).
 */
 #define IRTDEF(_) \
-  _(NIL, 4) _(FALSE, 4) _(TRUE, 4) _(LIGHTUD, LJ_64 ? 8 : 4) \
+  _(NIL, 4) _(FALSE, 4) _(TRUE, 4) _(LIGHTUD, 8) \
   _(STR, IRTSIZE_PGC) _(P32, 4) _(THREAD, IRTSIZE_PGC) _(PROTO, IRTSIZE_PGC) \
   _(FUNC, IRTSIZE_PGC) _(P64, 8) _(CDATA, IRTSIZE_PGC) _(TAB, IRTSIZE_PGC) \
   _(UDATA, IRTSIZE_PGC) \
@@ -319,11 +319,11 @@ IRTDEF(IRTENUM)
   IRT__MAX,
 
   /* Native pointer type and the corresponding integer type. */
-  IRT_PTR = LJ_64 ? IRT_P64 : IRT_P32,
-  IRT_PGC = LJ_GC64 ? IRT_P64 : IRT_P32,
-  IRT_IGC = LJ_GC64 ? IRT_I64 : IRT_INT,
-  IRT_INTP = LJ_64 ? IRT_I64 : IRT_INT,
-  IRT_UINTP = LJ_64 ? IRT_U64 : IRT_U32,
+  IRT_PTR = IRT_P64,
+  IRT_PGC = IRT_P64,
+  IRT_IGC = IRT_I64,
+  IRT_INTP = IRT_I64,
+  IRT_UINTP = IRT_U64,
 
   /* Additional flags. */
   IRT_MARK = 0x20,	/* Marker for misc. purposes. */
@@ -399,7 +399,6 @@ static LJ_AINLINE IRType itype2irt(const TValue *tv)
 
 static LJ_AINLINE uint32_t irt_toitype_(IRType t)
 {
-  lua_assert(!LJ_64 || LJ_GC64 || t != IRT_LIGHTUD);
   lua_assert(t <= IRT_NUM);
   return ~(uint32_t)t;
 }
@@ -543,22 +542,21 @@ typedef union IRIns {
   TValue tv;		/* TValue constant (overlaps entire slot). */
 } IRIns;
 
-#define ir_kgc(ir)	check_exp((ir)->o == IR_KGC, gcref((ir)[LJ_GC64].gcr))
+#define ir_isk64(ir)	 ((ir)->o == IR_KNUM || (ir)->o == IR_KINT64 || \
+                          (ir)->o == IR_KGC ||                          \
+                          (ir)->o == IR_KPTR || (ir)->o == IR_KKPTR)
+
+#define ir_kgc(ir)	check_exp((ir)->o == IR_KGC, gcref((ir)[1].gcr))
 #define ir_kstr(ir)	(gco2str(ir_kgc((ir))))
 #define ir_ktab(ir)	(gco2tab(ir_kgc((ir))))
 #define ir_kfunc(ir)	(gco2func(ir_kgc((ir))))
 #define ir_kcdata(ir)	(gco2cd(ir_kgc((ir))))
 #define ir_knum(ir)	check_exp((ir)->o == IR_KNUM, &(ir)[1].tv)
 #define ir_kint64(ir)	check_exp((ir)->o == IR_KINT64, &(ir)[1].tv)
-#define ir_k64(ir) \
-  check_exp((ir)->o == IR_KNUM || (ir)->o == IR_KINT64 || \
-	    (LJ_GC64 && \
-	     ((ir)->o == IR_KGC || \
-	      (ir)->o == IR_KPTR || (ir)->o == IR_KKPTR)), \
-	    &(ir)[1].tv)
+#define ir_k64(ir)	check_exp(ir_isk64(ir), &(ir)[1].tv)
 #define ir_kptr(ir) \
   check_exp((ir)->o == IR_KPTR || (ir)->o == IR_KKPTR, \
-    mref((ir)[LJ_GC64].ptr, void))
+    mref((ir)[1].ptr, void))
 
 /* A store or any other op with a non-weak guard has a side-effect. */
 static LJ_AINLINE int ir_sideeff(IRIns *ir)

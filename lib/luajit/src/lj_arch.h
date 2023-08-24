@@ -91,9 +91,6 @@
 #endif
 #endif
 
-/* 64 bit GC references. */
-#define LJ_GC64			1
-
 /* 2-slot frame info. */
 #define LJ_FR2			1
 
@@ -104,9 +101,6 @@
 #define LJ_HASJIT		1
 #endif
 
-/* Disable or enable the FFI extension. */
-#define LJ_HASFFI		1
-
 #ifndef LJ_ARCH_HASFPU
 #define LJ_ARCH_HASFPU		1
 #endif
@@ -114,19 +108,12 @@
 #define LJ_SOFTFP		(!LJ_ARCH_HASFPU)
 
 #if LJ_ARCH_ENDIAN == LUAJIT_BE
-#define LJ_LE			0
-#define LJ_BE			1
 #define LJ_ENDIAN_SELECT(le, be)	be
 #define LJ_ENDIAN_LOHI(lo, hi)		hi lo
 #else
-#define LJ_LE			1
-#define LJ_BE			0
 #define LJ_ENDIAN_SELECT(le, be)	le
 #define LJ_ENDIAN_LOHI(lo, hi)		lo hi
 #endif
-
-#define LJ_32			0
-#define LJ_64			1
 
 #ifndef LJ_TARGET_UNALIGNED
 #define LJ_TARGET_UNALIGNED	0

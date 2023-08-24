@@ -5,4 +5,6 @@ script:
   - nix-build -A test-O2
   - nix-build -A test-O1
   - nix-build -A test-nojit
+  - nix-build -A test-capi
+  - nix-build -A test-libraptorjit
   - nix-build -A check-generated-code --arg check true

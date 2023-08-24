@@ -494,7 +494,7 @@ static void ctype_repr(CTRepr *ctr, CTypeID id)
 	ctype_prepc(ctr, '&');
       } else {
 	ctype_prepqual(ctr, (qual|info));
-	if (LJ_64 && size == 4) ctype_preplit(ctr, "__ptr32");
+	if (size == 4) ctype_preplit(ctr, "__ptr32");
 	ctype_prepc(ctr, '*');
       }
       qual = 0;

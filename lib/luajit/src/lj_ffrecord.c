@@ -191,8 +191,6 @@ static void recff_type(jit_State *J, RecordFFData *rd)
   uint32_t t;
   if (tvisnumber(&rd->argv[0]))
     t = ~LJ_TNUMX;
-  else if (LJ_64 && !LJ_GC64 && tvislightud(&rd->argv[0]))
-    t = ~LJ_TLIGHTUD;
   else
     t = ~itype(&rd->argv[0]);
   J->base[0] = lj_ir_kstr(J, strV(&J->fn->c.upvalue[t]));
@@ -428,7 +426,7 @@ static void recff_ipairs_aux(jit_State *J, RecordFFData *rd)
 static void recff_xpairs(jit_State *J, RecordFFData *rd)
 {
   TRef tr = J->base[0];
-  if (!((LJ_52 || (LJ_HASFFI && tref_iscdata(tr))) &&
+  if (!((LJ_52 || tref_iscdata(tr)) &&
 	recff_metacall(J, rd, MM_pairs + rd->data))) {
     if (tref_istab(tr)) {
       J->base[0] = lj_ir_kfunc(J, funcV(&J->fn->c.upvalue[0]));

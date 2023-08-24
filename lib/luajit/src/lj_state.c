@@ -24,7 +24,6 @@
 #include "lj_dispatch.h"
 #include "lj_vm.h"
 #include "lj_lex.h"
-#include "lj_alloc.h"
 #include "luajit.h"
 
 /* -- Stack handling ------------------------------------------------------ */
@@ -174,12 +173,7 @@ static void close_state(lua_State *L)
   lj_mem_free(g, J->irbuf, 65536*sizeof(IRIns));
   lj_mem_free(g, J->trace, TRACE_MAX * sizeof(GCRef *));
   lua_assert(g->gc.total == sizeof(GG_State));
-#ifndef LUAJIT_USE_SYSMALLOC
-  if (g->allocf == lj_alloc_f)
-    lj_alloc_destroy(g->allocd);
-  else
-#endif
-    g->allocf(g->allocd, G2GG(g), sizeof(GG_State), 0);
+  g->allocf(g->allocd, G2GG(g), sizeof(GG_State), 0);
 }
 
 LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)

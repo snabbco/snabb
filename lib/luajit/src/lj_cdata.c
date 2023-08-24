@@ -129,7 +129,7 @@ collect_attrib:
 
   if (tvisnum(key)) {  /* Numeric key. */
     lua_Number n = numV(key);
-    idx = LJ_64 ? (ptrdiff_t)n : (ptrdiff_t)lj_num2int(n);
+    idx = (ptrdiff_t)n;
   integer_key:
     if (ctype_ispointer(ct->info)) {
       CTSize sz = lj_ctype_size(cts, ctype_cid(ct->info));  /* Element size. */

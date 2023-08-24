@@ -441,7 +441,7 @@ static TRef narrow_stripov(jit_State *J, TRef tr, int lastop, IRRef mode)
 		      ((mode & IRCONV_DSTMASK) >> IRCONV_DSH)), op1, op2);
       narrow_bpc_set(J, ref, tref_ref(tr), mode);
     }
-  } else if (LJ_64 && (mode & IRCONV_SEXT) && !irt_is64(ir->t)) {
+  } else if ((mode & IRCONV_SEXT) && !irt_is64(ir->t)) {
     tr = emitir(IRT(IR_CONV, IRT_INTP), tr, mode);
   }
   return tr;
@@ -501,9 +501,7 @@ TRef lj_opt_narrow_cindex(jit_State *J, TRef tr)
   if (tref_isnum(tr))
     return emitir(IRT(IR_CONV, IRT_INTP), tr, (IRT_INTP<<5)|IRT_NUM|IRCONV_ANY);
   /* Undefined overflow semantics allow stripping of ADDOV, SUBOV and MULOV. */
-  return narrow_stripov(J, tr, IR_MULOV,
-			LJ_64 ? ((IRT_INTP<<5)|IRT_INT|IRCONV_SEXT) :
-				((IRT_INTP<<5)|IRT_INT|IRCONV_TOBIT));
+  return narrow_stripov(J, tr, IR_MULOV, ((IRT_INTP<<5)|IRT_INT|IRCONV_SEXT));
 }
 
 /* -- Narrowing of arithmetic operators ----------------------------------- */

@@ -27,7 +27,7 @@ The most notable technical changes since forking LuaJIT are:
   support, 32-bit heap support, and non-x86 backends. This is a
   necessary short-term expedient to make the code maintainable while
   we bootstrap the project.
-- Compiler heursitics tightened to reduce the risk of bytecode
+- Compiler heuristics tightened to reduce the risk of bytecode
   blacklisting causing catastrophic performance drops.
 - Started using `git merge` to accept contributions of both code and
   development history from other forks.
@@ -173,7 +173,7 @@ These are the authoritative optimization resources for processors
 supported by RaptorJIT. If you are confused by references to CPU
 details in discussions then these are the places to look for answers.
 
-- [Computer Architecture: A Quantitiave Approach](https://www.amazon.com/Computer-Architecture-Fifth-Quantitative-Approach/dp/012383872X) by Hennessy and Patterson.
+- [Computer Architecture: A Quantitative Approach](https://www.amazon.com/Computer-Architecture-Fifth-Quantitative-Approach/dp/012383872X) by Hennessy and Patterson.
 - [Intel Architectures Optimization Reference Manual](http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html).
 - Agner Fog's [software optimization resources](http://www.agner.org/optimize/):
     - [Instruction latency and throughput tables](http://www.agner.org/optimize/instruction_tables.pdf).
@@ -191,7 +191,7 @@ Here are some borrowed words to put this branch into context:
 
 > Optimal code is not optimal to maintain. _[Vyacheslav Egorov](https://www.youtube.com/watch?v=EaLboOUG9VQ)_
 
-> If a programmer is indispensible, get rid of him as quickly as possible. _[Gerald M. Weinberg](https://www.amazon.com/Psychology-Computer-Programming-Silver-Anniversary/dp/0932633420)_
+> If a programmer is indispensable, get rid of him as quickly as possible. _[Gerald M. Weinberg](https://www.amazon.com/Psychology-Computer-Programming-Silver-Anniversary/dp/0932633420)_
 
 > If a system is to serve the creative spirit, it
 > must be entirely comprehensible to a single individual. _[Dan

@@ -163,21 +163,11 @@ void lj_cconv_ct_ct(CTState *cts, CType *d, CType *s,
   case CCX(I, I):
   conv_I_I:
     if (dsize > ssize) {  /* Zero-extend or sign-extend LSB. */
-#if LJ_LE
       uint8_t fill = (!(sinfo & CTF_UNSIGNED) && (sp[ssize-1]&0x80)) ? 0xff : 0;
       memcpy(dp, sp, ssize);
       memset(dp + ssize, fill, dsize-ssize);
-#else
-      uint8_t fill = (!(sinfo & CTF_UNSIGNED) && (sp[0]&0x80)) ? 0xff : 0;
-      memset(dp, fill, dsize-ssize);
-      memcpy(dp + (dsize-ssize), sp, ssize);
-#endif
     } else {  /* Copy LSB. */
-#if LJ_LE
       memcpy(dp, sp, dsize);
-#else
-      memcpy(dp, sp + (ssize-dsize), dsize);
-#endif
     }
     break;
   case CCX(I, F): {
@@ -330,7 +320,7 @@ void lj_cconv_ct_ct(CTState *cts, CType *d, CType *s,
   case CCX(P, F):
     if (!(flags & CCF_CAST) || !(flags & CCF_FROMTV)) goto err_conv;
     /* The signed conversion is cheaper. x64 really has 47 bit pointers. */
-    dinfo = CTINFO(CT_NUM, (LJ_64 && dsize == 8) ? 0 : CTF_UNSIGNED);
+    dinfo = CTINFO(CT_NUM, (dsize == 8) ? 0 : CTF_UNSIGNED);
     goto conv_I_F;
 
   case CCX(P, P):

@@ -761,8 +761,6 @@ static void asm_snap_alloc1(ASMState *as, IRRef ref)
       ir->r = RID_SUNK;
       if (ir->o == IR_CNEWI) {  /* Allocate CNEWI value. */
 	asm_snap_alloc1(as, ir->op2);
-	if (LJ_32 && (ir+1)->o == IR_HIOP)
-	  asm_snap_alloc1(as, (ir+1)->op2);
       } else
       {  /* Allocate stored values for TNEW, TDUP and CNEW. */
 	IRIns *irs;
@@ -772,8 +770,6 @@ static void asm_snap_alloc1(ASMState *as, IRRef ref)
 	    lua_assert(irs->o == IR_ASTORE || irs->o == IR_HSTORE ||
 		       irs->o == IR_FSTORE || irs->o == IR_XSTORE);
 	    asm_snap_alloc1(as, irs->op2);
-	    if (LJ_32 && (irs+1)->o == IR_HIOP)
-	      asm_snap_alloc1(as, (irs+1)->op2);
 	  }
       }
     } else {
@@ -948,7 +944,7 @@ static void asm_gcstep(ASMState *as, IRIns *ir)
   IRIns *ira;
   for (ira = IR(as->stopins+1); ira < ir; ira++)
     if ((ira->o == IR_TNEW || ira->o == IR_TDUP ||
-	 (LJ_HASFFI && (ira->o == IR_CNEW || ira->o == IR_CNEWI))) &&
+	 (ira->o == IR_CNEW || ira->o == IR_CNEWI)) &&
 	ra_used(ira))
       as->gcsteps++;
   if (as->gcsteps)
@@ -1769,7 +1765,7 @@ static void asm_tail_link(ASMState *as)
   emit_addptr(as, RID_BASE, 8*(int32_t)baseslot);
 
   if (as->J->ktrace) {  /* Patch ktrace slot with the final GCtrace pointer. */
-    setgcref(IR(as->J->ktrace)[LJ_GC64].gcr, obj2gco(as->J->curfinal));
+    setgcref(IR(as->J->ktrace)[1].gcr, obj2gco(as->J->curfinal));
     IR(as->J->ktrace)->o = IR_KGC;
   }
 
@@ -1905,9 +1901,6 @@ static void asm_setup_regsp(ASMState *as)
 	  continue;
 	}
 	break;
-      } else if (ir->op2 == IRFPM_EXP2 && !LJ_64) {
-	if (as->evenspill < 4)  /* Leave room to call pow(). */
-	  as->evenspill = 4;
       }
       if (inloop)
 	as->modset |= RSET_SCRATCH;
@@ -2062,7 +2055,6 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
     for (as->curins--; as->curins > as->stopins; as->curins--) {
       IRIns *ir = IR(as->curins);
       MCode *end = as->mcp;
-      lua_assert(!(LJ_32 && irt_isint64(ir->t)));  /* Handled by SPLIT. */
       if (!ra_used(ir) && !ir_sideeff(ir) && (as->flags & JIT_F_OPT_DCE))
 	continue;  /* Dead-code elimination can be soooo easy. */
       if (irt_isguard(ir->t))

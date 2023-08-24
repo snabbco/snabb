@@ -2487,7 +2487,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  add PC, 4
     |  checkstr RB, >3
     |  cmp RB, [KBASE+RD*8]
-  iseqne_test:
     if (vk) {
       |  jne >2
     } else {
@@ -2513,7 +2512,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  sar RB, 47
     |  add PC, 4
     |  cmp RBd, RDd
-    if (!LJ_HASFFI) goto iseqne_test;
     if (vk) {
       |  jne >3
       |  movzx RDd, PC_RD

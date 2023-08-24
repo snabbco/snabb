@@ -168,21 +168,6 @@ typedef const TValue cTValue;
 
 /* Internal object tags.
 **
-** Format for 32 bit GC references (!LJ_GC64):
-**
-** Internal tags overlap the MSW of a number object (must be a double).
-** Interpreted as a double these are special NaNs. The FPU only generates
-** one type of NaN (0xfff8_0000_0000_0000). So MSWs > 0xfff80000 are available
-** for use as internal tags. Small negative numbers are used to shorten the
-** encoding of type comparisons (reg/mem against sign-ext. 8 bit immediate).
-**
-**                  ---MSW---.---LSW---
-** primitive types |  itype  |         |
-** lightuserdata   |  itype  |  void * |  (32 bit platforms)
-** lightuserdata   |ffff|    void *    |  (64 bit platforms, 47 bit pointers)
-** GC objects      |  itype  |  GCRef  |
-** number           -------double------
-**
 ** Format for 64 bit GC references (LJ_GC64):
 **
 ** The upper 13 bits must be 1 (0xfff8...) for a special NaN. The next

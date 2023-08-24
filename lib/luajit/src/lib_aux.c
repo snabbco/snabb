@@ -301,9 +301,6 @@ static int panic(lua_State *L)
   return 0;
 }
 
-#ifdef LUAJIT_USE_SYSMALLOC
-
-
 static void *mem_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
 {
   (void)ud;
@@ -322,21 +319,3 @@ LUALIB_API lua_State *luaL_newstate(void)
   if (L) G(L)->panic = panic;
   return L;
 }
-
-#else
-
-#include "lj_alloc.h"
-
-LUALIB_API lua_State *luaL_newstate(void)
-{
-  lua_State *L;
-  void *ud = lj_alloc_create();
-  if (ud == NULL) return NULL;
-  L = lua_newstate(lj_alloc_f, ud);
-  if (L) G(L)->panic = panic;
-  return L;
-}
-
-
-#endif
-

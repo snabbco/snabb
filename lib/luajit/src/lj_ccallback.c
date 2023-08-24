@@ -25,8 +25,8 @@
 #define CALLBACK_MCODE_SIZE	(LJ_PAGESIZE * LJ_NUM_CBPAGE)
 
 
-#define CALLBACK_MCODE_HEAD	(LJ_64 ? 8 : 0)
-#define CALLBACK_MCODE_GROUP	(-2+1+2+(LJ_GC64 ? 10 : 5)+(LJ_64 ? 6 : 5))
+#define CALLBACK_MCODE_HEAD	8
+#define CALLBACK_MCODE_GROUP	(-2+1+2+10+6)
 
 #define CALLBACK_SLOT2OFS(slot) \
   (CALLBACK_MCODE_HEAD + CALLBACK_MCODE_GROUP*((slot)/32) + 4*(slot))
@@ -214,15 +214,10 @@ static void callback_conv_args(CTState *cts, lua_State *L)
       CALLBACK_HANDLE_REGARG  /* Handle register arguments. */
 
       /* Otherwise pass argument on stack. */
-      if (CCALL_ALIGN_STACKARG && LJ_32 && sz == 8)
-	nsp = (nsp + 1) & ~1u;  /* Align 64 bit argument on stack. */
       sp = &stack[nsp];
       nsp += n;
 
     done:
-      if (LJ_BE && cta->size < CTSIZE_PTR
-	 )
-	sp = (void *)((uint8_t *)sp + CTSIZE_PTR-cta->size);
       gcsteps += lj_cconv_tv_ct(cts, cta, 0, o++, sp);
     }
     fid = ctf->sib;
@@ -333,7 +328,7 @@ found:
 static CType *callback_checkfunc(CTState *cts, CType *ct)
 {
   int narg = 0;
-  if (!ctype_isptr(ct->info) || (LJ_64 && ct->size != CTSIZE_PTR))
+  if (!ctype_isptr(ct->info) || ct->size != CTSIZE_PTR)
     return NULL;
   ct = ctype_rawchild(cts, ct);
   if (ctype_isfunc(ct->info)) {

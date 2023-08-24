@@ -40,7 +40,7 @@ const void * lj_obj_ptr(cTValue *o)
     return uddata(udataV(o));
   else if (tvislightud(o))
     return lightudV(o);
-  else if (LJ_HASFFI && tviscdata(o))
+  else if (tviscdata(o))
     return cdataptr(cdataV(o));
   else if (tvisgcv(o))
     return gcV(o);

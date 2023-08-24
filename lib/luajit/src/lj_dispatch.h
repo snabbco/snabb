@@ -69,7 +69,7 @@ LJ_FUNCA void lj_dispatch_ins(lua_State *L, const BCIns *pc);
 LJ_FUNCA ASMFunction lj_dispatch_call(lua_State *L, const BCIns*pc);
 LJ_FUNCA void lj_dispatch_stitch(jit_State *J, const BCIns *pc);
 
-#if LJ_HASFFI && !defined(_BUILDVM_H)
+#if !defined(_BUILDVM_H)
 /* Save/restore errno and GetLastError() around hooks, exits and recording. */
 #include <errno.h>
 #define ERRNO_SAVE	int olderr = errno;

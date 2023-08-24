@@ -71,7 +71,7 @@ static void emit_rr(ASMState *as, x86Op xo, Reg r1, Reg r2)
   as->mcp = emit_opm(xo, XM_REG, r1, r2, p, 0);
 }
 
-#if LJ_64 && defined(LUA_USE_ASSERT)
+#if defined(LUA_USE_ASSERT)
 /* [addr] is sign-extended in x64 and must be in lower 2G (not 4G). */
 static int32_t ptr2addr(const void *p)
 {
@@ -88,7 +88,7 @@ static void emit_rmro(ASMState *as, x86Op xo, Reg rr, Reg rb, int32_t ofs)
   MCode *p = as->mcp;
   x86Mode mode;
   if (ra_hasreg(rb)) {
-    if (LJ_GC64 && rb == RID_RIP) {
+    if (rb == RID_RIP) {
       mode = XM_OFS0;
       p -= 4;
       *(int32_t *)p = ofs;
@@ -183,7 +183,7 @@ static void emit_mrm(ASMState *as, x86Op xo, Reg rr, Reg rb)
 	goto mrmidx;
       *--p = MODRM(XM_SCALE1, RID_ESP, RID_EBP);
       rb = RID_ESP;
-    } else if (LJ_GC64 && rb == RID_RIP) {
+    } else if (rb == RID_RIP) {
       lua_assert(as->mrm.idx == RID_NONE);
       mode = XM_OFS0;
       p -= 4;
@@ -251,9 +251,7 @@ static void emit_movmroi(ASMState *as, Reg base, int32_t ofs, int32_t i)
 static void emit_loadi(ASMState *as, Reg r, int32_t i)
 {
   /* XOR r,r is shorter, but modifies the flags. This is bad for HIOP. */
-  if (i == 0 && !(LJ_32 && (IR(as->curins)->o == IR_HIOP ||
-			    (as->curins+1 < as->T->nins &&
-			     IR(as->curins+1)->o == IR_HIOP)))) {
+  if (i == 0) {
     emit_rr(as, XO_ARITH(XOg_XOR), r, r);
   } else {
     MCode *p = as->mcp;

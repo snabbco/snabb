@@ -18,7 +18,7 @@
 #define LJ_MAX_MEM32	0x7fffff00	/* Max. 32 bit memory allocation. */
 #define LJ_MAX_MEM64	((uint64_t)1<<47)  /* Max. 64 bit memory allocation. */
 /* Max. total memory allocation. */
-#define LJ_MAX_MEM	(LJ_GC64 ? LJ_MAX_MEM64 : LJ_MAX_MEM32)
+#define LJ_MAX_MEM	LJ_MAX_MEM64
 #define LJ_MAX_ALLOC	LJ_MAX_MEM	/* Max. individual allocation length. */
 #define LJ_MAX_STR	LJ_MAX_MEM32	/* Max. string length. */
 #define LJ_MAX_BUF	LJ_MAX_MEM32	/* Max. buffer length. */
@@ -65,7 +65,7 @@
 #define u32ptr(p)	((uint32_t)(intptr_t)(void *)(p))
 #define i64ptr(p)	((int64_t)(intptr_t)(void *)(p))
 #define u64ptr(p)	((uint64_t)(intptr_t)(void *)(p))
-#define igcptr(p)	(LJ_GC64 ? i64ptr(p) : i32ptr(p))
+#define igcptr(p)	i64ptr(p)
 
 #define checki8(x)	((x) == (int32_t)(int8_t)(x))
 #define checku8(x)	((x) == (int32_t)(uint8_t)(x))
@@ -75,7 +75,7 @@
 #define checku32(x)	((x) == (uint32_t)(x))
 #define checkptr32(x)	((uintptr_t)(x) == (uint32_t)(uintptr_t)(x))
 #define checkptr47(x)	(((uint64_t)(uintptr_t)(x) >> 47) == 0)
-#define checkptrGC(x)	(LJ_GC64 ? checkptr47((x)) : LJ_64 ? checkptr32((x)) :1)
+#define checkptrGC(x)	checkptr47((x))
 
 /* Every half-decent C compiler transforms this into a rotate instruction. */
 #define lj_rol(x, n)	(((x)<<(n)) | ((x)>>(-(int)(n)&(8*sizeof(x)-1))))

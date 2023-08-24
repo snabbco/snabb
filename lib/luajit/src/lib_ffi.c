@@ -433,7 +433,7 @@ static int ffi_callback_set(lua_State *L, GCfunc *fn)
   GCcdata *cd = ffi_checkcdata(L, 1);
   CTState *cts = ctype_cts(L);
   CType *ct = ctype_raw(cts, cd->ctypeid);
-  if (ctype_isptr(ct->info) && (LJ_32 || ct->size == 8)) {
+  if (ctype_isptr(ct->info) && ct->size == 8) {
     MSize slot = lj_ccallback_ptr2slot(cts, *(void **)cdataptr(cd));
     if (slot < cts->cb.sizeid && cts->cb.cbid[slot] != 0) {
       GCtab *t = cts->miscmap;

@@ -25,7 +25,7 @@
 /* Reuse some lexer fields for our own purposes. */
 #define bcread_flags(ls)	ls->level
 #define bcread_swap(ls) \
-  ((bcread_flags(ls) & BCDUMP_F_BE) != LJ_BE*BCDUMP_F_BE)
+  ((bcread_flags(ls) & BCDUMP_F_BE) != 0)
 #define bcread_oldtop(L, ls)	restorestack(L, ls->lastline)
 #define bcread_savetop(L, ls, top) \
   ls->lastline = (BCLine)savestack(L, (top))

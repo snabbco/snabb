@@ -343,7 +343,7 @@ void lj_trace_initstate(global_State *g)
   /* Initialize 32/64 bit constants. */
   J->k64[LJ_K64_TOBIT].u64 = U64x(43380000,00000000);
   J->k64[LJ_K64_2P64].u64 = U64x(43f00000,00000000);
-  J->k32[LJ_K32_M2P64_31] = LJ_64 ? 0xdf800000 : 0xcf000000;
+  J->k32[LJ_K32_M2P64_31] = 0xdf800000;
   J->k64[LJ_K64_M2P64].u64 = U64x(c3f00000,00000000);
 }
 

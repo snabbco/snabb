@@ -369,7 +369,7 @@ TValue * lj_meta_equal_cd(lua_State *L, BCIns ins)
 /* Helper for ordered comparisons. String compare, __lt/__le metamethods. */
 TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
 {
-  if (LJ_HASFFI && (tviscdata(o1) || tviscdata(o2))) {
+  if (tviscdata(o1) || tviscdata(o2)) {
     ASMFunction cont = (op & 1) ? lj_cont_condf : lj_cont_condt;
     MMS mm = (op & 2) ? MM_le : MM_lt;
     cTValue *mo = lj_meta_lookup(L, tviscdata(o1) ? o1 : o2, mm);

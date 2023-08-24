@@ -1641,7 +1641,6 @@ LJFOLD(BAND BOR KINT64)
 LJFOLD(BOR BAND KINT64)
 LJFOLDF(simplify_andor_k64)
 {
-#if LJ_HASFFI
   IRIns *irk = IR(fleft->op2);
   PHIBARRIER(fleft);
   if (irk->o == IR_KINT64) {
@@ -1655,9 +1654,6 @@ LJFOLDF(simplify_andor_k64)
     }
   }
   return NEXTFOLD;
-#else
-  UNUSED(J); lua_assert(0); return FAILFOLD;
-#endif
 }
 
 /* -- Reassociation ------------------------------------------------------- */

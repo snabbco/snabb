@@ -381,9 +381,6 @@ static int ccall_get_results(lua_State *L, CTState *cts, CType *ct,
     CCALL_HANDLE_COMPLEXRET2
     return 1;  /* One GC step. */
   }
-  if (LJ_BE && ctr->size < CTSIZE_PTR &&
-      (ctype_isinteger_or_bool(ctr->info) || ctype_isenum(ctr->info)))
-    sp += (CTSIZE_PTR - ctr->size);
 #if CCALL_NUM_FPR
   if (ctype_isfp(ctr->info) || ctype_isvector(ctr->info))
     sp = (uint8_t *)&cc->fpr[0];
