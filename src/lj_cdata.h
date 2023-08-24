@@ -10,12 +10,11 @@
 #include "lj_gc.h"
 #include "lj_ctype.h"
 
-#if LJ_HASFFI
 
 /* Get C data pointer. */
 static LJ_AINLINE void *cdata_getptr(void *p, CTSize sz)
 {
-  if (LJ_64 && sz == 4) {  /* Support 32 bit pointers on 64 bit targets. */
+  if (sz == 4) {  /* Support 32 bit pointers on 64 bit targets. */
     return ((void *)(uintptr_t)*(uint32_t *)p);
   } else {
     lua_assert(sz == CTSIZE_PTR);
@@ -26,7 +25,7 @@ static LJ_AINLINE void *cdata_getptr(void *p, CTSize sz)
 /* Set C data pointer. */
 static LJ_AINLINE void cdata_setptr(void *p, CTSize sz, const void *v)
 {
-  if (LJ_64 && sz == 4) {  /* Support 32 bit pointers on 64 bit targets. */
+  if (sz == 4) {  /* Support 32 bit pointers on 64 bit targets. */
     *(uint32_t *)p = (uint32_t)(uintptr_t)v;
   } else {
     lua_assert(sz == CTSIZE_PTR);
@@ -63,7 +62,7 @@ LJ_FUNC GCcdata *lj_cdata_newv(lua_State *L, CTypeID id, CTSize sz,
 LJ_FUNC GCcdata *lj_cdata_newx(CTState *cts, CTypeID id, CTSize sz,
 			       CTInfo info);
 
-LJ_FUNC void LJ_FASTCALL lj_cdata_free(global_State *g, GCcdata *cd);
+LJ_FUNC void lj_cdata_free(global_State *g, GCcdata *cd);
 LJ_FUNC void lj_cdata_setfin(lua_State *L, GCcdata *cd, GCobj *obj,
 			     uint32_t it);
 
@@ -73,6 +72,5 @@ LJ_FUNC int lj_cdata_get(CTState *cts, CType *s, TValue *o, uint8_t *sp);
 LJ_FUNC void lj_cdata_set(CTState *cts, CType *d, uint8_t *dp, TValue *o,
 			  CTInfo qual);
 
-#endif
 
 #endif

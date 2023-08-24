@@ -14,7 +14,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASFFI
 
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -434,7 +433,7 @@ static int ffi_callback_set(lua_State *L, GCfunc *fn)
   GCcdata *cd = ffi_checkcdata(L, 1);
   CTState *cts = ctype_cts(L);
   CType *ct = ctype_raw(cts, cd->ctypeid);
-  if (ctype_isptr(ct->info) && (LJ_32 || ct->size == 8)) {
+  if (ctype_isptr(ct->info) && ct->size == 8) {
     MSize slot = lj_ccallback_ptr2slot(cts, *(void **)cdataptr(cd));
     if (slot < cts->cb.sizeid && cts->cb.cbid[slot] != 0) {
       GCtab *t = cts->miscmap;
@@ -728,29 +727,13 @@ LJLIB_CF(ffi_abi)	LJLIB_REC(.)
   GCstr *s = lj_lib_checkstr(L, 1);
   int b = 0;
   switch (s->hash) {
-#if LJ_64
   case H_(849858eb,ad35fd06): b = 1; break;  /* 64bit */
-#else
-  case H_(662d3c79,d0e22477): b = 1; break;  /* 32bit */
-#endif
 #if LJ_ARCH_HASFPU
   case H_(e33ee463,e33ee463): b = 1; break;  /* fpu */
 #endif
-#if LJ_ABI_SOFTFP
-  case H_(61211a23,c2e8c81c): b = 1; break;  /* softfp */
-#else
   case H_(539417a8,8ce0812f): b = 1; break;  /* hardfp */
-#endif
-#if LJ_ABI_EABI
-  case H_(2182df8f,f2ed1152): b = 1; break;  /* eabi */
-#endif
-#if LJ_ABI_WIN
-  case H_(4ab624a8,4ab624a8): b = 1; break;  /* win */
-#endif
   case H_(3af93066,1f001464): b = 1; break;  /* le/be */
-#if LJ_GC64
   case H_(9e89d2c9,13c83c92): b = 1; break;  /* gc64 */
-#endif
   default:
     break;
   }
@@ -866,4 +849,3 @@ LUALIB_API int luaopen_ffi(lua_State *L)
   return 1;
 }
 
-#endif

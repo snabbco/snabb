@@ -9,7 +9,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_bc.h"
 #include "lj_ir.h"
@@ -403,7 +402,7 @@ static IRRef narrow_conv_emit(jit_State *J, NarrowConv *nc)
 }
 
 /* Narrow a type conversion of an arithmetic operation. */
-TRef LJ_FASTCALL lj_opt_narrow_convert(jit_State *J)
+TRef lj_opt_narrow_convert(jit_State *J)
 {
   if ((J->flags & JIT_F_OPT_NARROW)) {
     NarrowConv nc;
@@ -442,14 +441,14 @@ static TRef narrow_stripov(jit_State *J, TRef tr, int lastop, IRRef mode)
 		      ((mode & IRCONV_DSTMASK) >> IRCONV_DSH)), op1, op2);
       narrow_bpc_set(J, ref, tref_ref(tr), mode);
     }
-  } else if (LJ_64 && (mode & IRCONV_SEXT) && !irt_is64(ir->t)) {
+  } else if ((mode & IRCONV_SEXT) && !irt_is64(ir->t)) {
     tr = emitir(IRT(IR_CONV, IRT_INTP), tr, mode);
   }
   return tr;
 }
 
 /* Narrow array index. */
-TRef LJ_FASTCALL lj_opt_narrow_index(jit_State *J, TRef tr)
+TRef lj_opt_narrow_index(jit_State *J, TRef tr)
 {
   IRIns *ir;
   lua_assert(tref_isnumber(tr));
@@ -464,7 +463,7 @@ TRef LJ_FASTCALL lj_opt_narrow_index(jit_State *J, TRef tr)
 }
 
 /* Narrow conversion to integer operand (overflow undefined). */
-TRef LJ_FASTCALL lj_opt_narrow_toint(jit_State *J, TRef tr)
+TRef lj_opt_narrow_toint(jit_State *J, TRef tr)
 {
   if (tref_isstr(tr))
     tr = emitir(IRTG(IR_STRTO, IRT_NUM), tr, 0);
@@ -480,7 +479,7 @@ TRef LJ_FASTCALL lj_opt_narrow_toint(jit_State *J, TRef tr)
 }
 
 /* Narrow conversion to bitop operand (overflow wrapped). */
-TRef LJ_FASTCALL lj_opt_narrow_tobit(jit_State *J, TRef tr)
+TRef lj_opt_narrow_tobit(jit_State *J, TRef tr)
 {
   if (tref_isstr(tr))
     tr = emitir(IRTG(IR_STRTO, IRT_NUM), tr, 0);
@@ -495,19 +494,15 @@ TRef LJ_FASTCALL lj_opt_narrow_tobit(jit_State *J, TRef tr)
   return narrow_stripov(J, tr, IR_SUBOV, (IRT_INT<<5)|IRT_INT|IRCONV_TOBIT);
 }
 
-#if LJ_HASFFI
 /* Narrow C array index (overflow undefined). */
-TRef LJ_FASTCALL lj_opt_narrow_cindex(jit_State *J, TRef tr)
+TRef lj_opt_narrow_cindex(jit_State *J, TRef tr)
 {
   lua_assert(tref_isnumber(tr));
   if (tref_isnum(tr))
     return emitir(IRT(IR_CONV, IRT_INTP), tr, (IRT_INTP<<5)|IRT_NUM|IRCONV_ANY);
   /* Undefined overflow semantics allow stripping of ADDOV, SUBOV and MULOV. */
-  return narrow_stripov(J, tr, IR_MULOV,
-			LJ_64 ? ((IRT_INTP<<5)|IRT_INT|IRCONV_SEXT) :
-				((IRT_INTP<<5)|IRT_INT|IRCONV_TOBIT));
+  return narrow_stripov(J, tr, IR_MULOV, ((IRT_INTP<<5)|IRT_INT|IRCONV_SEXT));
 }
-#endif
 
 /* -- Narrowing of arithmetic operators ----------------------------------- */
 
@@ -535,8 +530,8 @@ TRef lj_opt_narrow_arith(jit_State *J, TRef rb, TRef rc,
 {
   rb = conv_str_tonum(J, rb, vb);
   rc = conv_str_tonum(J, rc, vc);
-  /* Must not narrow MUL in non-DUALNUM variant, because it loses -0. */
-  if ((op >= IR_ADD && op <= (LJ_DUALNUM ? IR_MUL : IR_SUB)) &&
+  /* Must not narrow MUL, because it loses -0. */
+  if ((op >= IR_ADD && op <= IR_SUB) &&
       tref_isinteger(rb) && tref_isinteger(rc) &&
       numisint(lj_vm_foldarith(numberVnum(vb), numberVnum(vc),
 			       (int)op - (int)IR_ADD)))
@@ -564,9 +559,9 @@ TRef lj_opt_narrow_mod(jit_State *J, TRef rb, TRef rc, TValue *vb, TValue *vc)
   TRef tmp;
   rb = conv_str_tonum(J, rb, vb);
   rc = conv_str_tonum(J, rc, vc);
-  if ((LJ_DUALNUM || (J->flags & JIT_F_OPT_NARROW)) &&
+  if (((J->flags & JIT_F_OPT_NARROW)) &&
       tref_isinteger(rb) && tref_isinteger(rc) &&
-      (tvisint(vc) ? intV(vc) != 0 : !tviszero(vc))) {
+      !tviszero(vc)) {
     emitir(IRTGI(IR_NE), rc, lj_ir_kint(J, 0));
     return emitir(IRTI(IR_MOD), rb, rc);
   }
@@ -586,7 +581,7 @@ TRef lj_opt_narrow_pow(jit_State *J, TRef rb, TRef rc, TValue *vb, TValue *vc)
   rb = lj_ir_tonum(J, rb);  /* Left arg is always treated as an FP number. */
   rc = conv_str_tonum(J, rc, vc);
   /* Narrowing must be unconditional to preserve (-x)^i semantics. */
-  if (tvisint(vc) || numisint(numV(vc))) {
+  if (numisint(numV(vc))) {
     int checkrange = 0;
     /* Split pow is faster for bigger exponents. But do this only for (+k)^i. */
     if (tref_isk(rb) && (int32_t)ir_knum(IR(tref_ref(rb)))->u32.hi >= 0) {
@@ -622,8 +617,7 @@ split_pow:
 /* Narrow a single runtime value. */
 static int narrow_forl(jit_State *J, cTValue *o)
 {
-  if (tvisint(o)) return 1;
-  if (LJ_DUALNUM || (J->flags & JIT_F_OPT_NARROW)) return numisint(numV(o));
+  if (J->flags & JIT_F_OPT_NARROW) return numisint(numV(o));
   return 0;
 }
 
@@ -651,4 +645,3 @@ IRType lj_opt_narrow_forl(jit_State *J, cTValue *tv)
 #undef emitir
 #undef emitir_raw
 
-#endif

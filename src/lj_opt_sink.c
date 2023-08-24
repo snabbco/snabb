@@ -8,7 +8,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_ir.h"
 #include "lj_jit.h"
@@ -93,21 +92,14 @@ static void sink_mark_ins(jit_State *J)
       irt_setmark(IR(ir->op2)->t);  /* Mark stored value. */
       break;
       }
-#if LJ_HASFFI
     case IR_CNEWI:
-      if (irt_isphi(ir->t) &&
-	  (!sink_checkphi(J, ir, ir->op2) ||
-	   (LJ_32 && ir+1 < irlast && (ir+1)->o == IR_HIOP &&
-	    !sink_checkphi(J, ir, (ir+1)->op2))))
+      if (irt_isphi(ir->t) && !sink_checkphi(J, ir, ir->op2))
 	irt_setmark(ir->t);  /* Mark ineligible allocation. */
       /* fallthrough */
-#endif
     case IR_USTORE:
       irt_setmark(IR(ir->op2)->t);  /* Mark stored value. */
       break;
-#if LJ_HASFFI
     case IR_CALLXS:
-#endif
     case IR_CALLS:
       irt_setmark(IR(ir->op1)->t);  /* Mark (potentially) stored values. */
       break;
@@ -116,7 +108,7 @@ static void sink_mark_ins(jit_State *J)
       irl->prev = irr->prev = 0;  /* Clear PHI value counts. */
       if (irl->o == irr->o &&
 	  (irl->o == IR_TNEW || irl->o == IR_TDUP ||
-	   (LJ_HASFFI && (irl->o == IR_CNEW || irl->o == IR_CNEWI))))
+	   (irl->o == IR_CNEW || irl->o == IR_CNEWI)))
 	break;
       irt_setmark(irl->t);
       irt_setmark(irr->t);
@@ -186,9 +178,7 @@ static void sink_sweep_ins(jit_State *J)
 	ir->prev = REGSP_INIT;
       }
       break;
-#if LJ_HASFFI
     case IR_CNEW: case IR_CNEWI:
-#endif
     case IR_TNEW: case IR_TDUP:
       if (!irt_ismarked(ir->t)) {
 	ir->t.irt &= ~IRT_GUARD;
@@ -203,7 +193,7 @@ static void sink_sweep_ins(jit_State *J)
       IRIns *ira = IR(ir->op2);
       if (!irt_ismarked(ira->t) &&
 	  (ira->o == IR_TNEW || ira->o == IR_TDUP ||
-	   (LJ_HASFFI && (ira->o == IR_CNEW || ira->o == IR_CNEWI)))) {
+	   (ira->o == IR_CNEW || ira->o == IR_CNEWI))) {
 	ir->prev = REGSP(RID_SINK, 0);
       } else {
 	ir->prev = REGSP_INIT;
@@ -219,6 +209,7 @@ static void sink_sweep_ins(jit_State *J)
   for (ir = IR(J->cur.nk); ir < irbase; ir++) {
     irt_clearmark(ir->t);
     ir->prev = REGSP_INIT;
+    /* The false-positive of irt_is64() for ASMREF_L (REF_NIL) is OK here. */
     if (irt_is64(ir->t) && ir->o != IR_KNULL)
       ir++;
   }
@@ -235,7 +226,7 @@ void lj_opt_sink(jit_State *J)
 			 JIT_F_OPT_DCE|JIT_F_OPT_CSE|JIT_F_OPT_FOLD);
   if ((J->flags & need) == need &&
       (J->chain[IR_TNEW] || J->chain[IR_TDUP] ||
-       (LJ_HASFFI && (J->chain[IR_CNEW] || J->chain[IR_CNEWI])))) {
+       (J->chain[IR_CNEW] || J->chain[IR_CNEWI]))) {
     if (!J->loopref)
       sink_mark_snap(J, &J->cur.snap[J->cur.nsnap-1]);
     sink_mark_ins(J);
@@ -247,4 +238,3 @@ void lj_opt_sink(jit_State *J)
 
 #undef IR
 
-#endif

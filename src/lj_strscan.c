@@ -79,7 +79,7 @@ static void strscan_double(uint64_t x, TValue *o, int32_t ex2, int32_t neg)
   /* Avoid double rounding for denormals. */
   if (LJ_UNLIKELY(ex2 <= -1075 && x != 0)) {
     /* NYI: all of this generates way too much code on 32 bit CPUs. */
-#if defined(__GNUC__) && LJ_64
+#if defined(__GNUC__)
     int32_t b = (int32_t)(__builtin_clzll(x)^63);
 #else
     int32_t b = (x>>32) ? 32+(int32_t)lj_fls((uint32_t)(x>>32)) :
@@ -522,7 +522,7 @@ StrScanFmt lj_strscan_scan(const uint8_t *p, TValue *o, uint32_t opt)
   }
 }
 
-int LJ_FASTCALL lj_strscan_num(GCstr *str, TValue *o)
+int lj_strscan_num(GCstr *str, TValue *o)
 {
   StrScanFmt fmt = lj_strscan_scan((const uint8_t *)strdata(str), o,
 				   STRSCAN_OPT_TONUM);
@@ -530,16 +530,6 @@ int LJ_FASTCALL lj_strscan_num(GCstr *str, TValue *o)
   return (fmt != STRSCAN_ERROR);
 }
 
-#if LJ_DUALNUM
-int LJ_FASTCALL lj_strscan_number(GCstr *str, TValue *o)
-{
-  StrScanFmt fmt = lj_strscan_scan((const uint8_t *)strdata(str), o,
-				   STRSCAN_OPT_TOINT);
-  lua_assert(fmt == STRSCAN_ERROR || fmt == STRSCAN_NUM || fmt == STRSCAN_INT);
-  if (fmt == STRSCAN_INT) setitype(o, LJ_TISNUM);
-  return (fmt != STRSCAN_ERROR);
-}
-#endif
 
 #undef DNEXT
 #undef DPREV

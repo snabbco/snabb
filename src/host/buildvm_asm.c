@@ -74,14 +74,7 @@ err:
   if (strncmp(sym+(*sym == '_'), LABEL_PREFIX, sizeof(LABEL_PREFIX)-1)) {
     /* Various fixups for external symbols outside of our binary. */
     if (ctx->mode == BUILD_elfasm) {
-      if (LJ_32)
-	fprintf(ctx->fp, "#if __PIC__\n\t%s lj_wrap_%s\n#else\n", opname, sym);
       fprintf(ctx->fp, "\t%s %s@PLT\n", opname, sym);
-      if (LJ_32)
-	fprintf(ctx->fp, "#endif\n");
-      return;
-    } else if (LJ_32 && ctx->mode == BUILD_machasm) {
-      fprintf(ctx->fp, "\t%s L%s$stub\n", opname, sym);
       return;
     }
   }
@@ -282,7 +275,7 @@ void emit_asm(BuildCtx *ctx)
   for (i = rel = 0; i < ctx->nsym; i++) {
     int32_t ofs = ctx->sym[i].ofs;
     int32_t next = ctx->sym[i+1].ofs;
-#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND && LJ_HASFFI
+#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND
     if (!strcmp(ctx->sym[i].name, "lj_vm_ffi_call"))
       fprintf(ctx->fp,
 	      ".globl lj_err_unwind_arm\n"
@@ -320,10 +313,6 @@ void emit_asm(BuildCtx *ctx)
 
 #if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND
   fprintf(ctx->fp,
-#if !LJ_HASFFI
-	  ".globl lj_err_unwind_arm\n"
-	  ".personality lj_err_unwind_arm\n"
-#endif
 	  ".fnend\n");
 #endif
 
