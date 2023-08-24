@@ -79,7 +79,8 @@ static LJ_AINLINE void lj_strfmt_init(FormatState *fs, const char *p, MSize len)
 {
   fs->p = (const uint8_t *)p;
   fs->e = (const uint8_t *)p + len;
-  lua_assert(*fs->e == 0);  /* Must be NUL-terminated (may have NULs inside). */
+  /* Must be NUL-terminated. May have NULs inside, too. */
+  lj_assertX(*fs->e == 0, "format not NUL-terminated");
 }
 
 /* Raw conversions. */
@@ -101,6 +102,7 @@ LJ_FUNC SBuf *lj_strfmt_putfnum_uint(SBuf *sb, SFormat sf, lua_Number n);
 LJ_FUNC SBuf *lj_strfmt_putfnum(SBuf *sb, SFormat, lua_Number n);
 LJ_FUNC SBuf *lj_strfmt_putfchar(SBuf *sb, SFormat, int32_t c);
 LJ_FUNC SBuf *lj_strfmt_putfstr(SBuf *sb, SFormat, GCstr *str);
+LJ_FUNC int lj_strfmt_putarg(lua_State *L, SBuf *sb, int arg, int retry);
 
 /* Conversions to strings. */
 LJ_FUNC GCstr * lj_strfmt_int(lua_State *L, int32_t k);
@@ -113,7 +115,7 @@ LJ_FUNC GCstr * lj_strfmt_obj(lua_State *L, cTValue *o);
 LJ_FUNC const char *lj_strfmt_pushvf(lua_State *L, const char *fmt,
 				     va_list argp);
 LJ_FUNC const char *lj_strfmt_pushf(lua_State *L, const char *fmt, ...)
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(__clang__)
   __attribute__ ((format (printf, 2, 3)))
 #endif
   ;

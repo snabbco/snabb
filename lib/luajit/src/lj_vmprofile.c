@@ -22,6 +22,7 @@
 
 #include "lj_err.h"
 #include "lj_obj.h"
+#include "lj_udata.h"
 #include "lj_dispatch.h"
 #include "lj_jit.h"
 #include "lj_trace.h"
@@ -76,8 +77,8 @@ static void vmprofile_signal(int sig, siginfo_t *si, void *data)
     /* Handle overflow from individual trace counters. */
     trace = trace <= LJ_VMPROFILE_TRACE_MAX ? trace : 0;
     /* Phew! We have calculated the indices and now we can bump the counter. */
-    lua_assert(vmstate >= 0 && vmstate <= LJ_VMST__MAX);
-    lua_assert(trace >= 0 && trace <= LJ_VMPROFILE_TRACE_MAX);
+    lj_assertX(vmstate >= 0 && vmstate <= LJ_VMST__MAX, "invalid vmstate");
+    lj_assertX(trace >= 0 && trace <= LJ_VMPROFILE_TRACE_MAX, "invalid trace id");
     profile->count[trace][vmstate]++;
   }
 }
@@ -157,7 +158,7 @@ LUA_API int luaJIT_vmprofile_open(lua_State *L, const char *str, int noselect, i
 {
   void *ptr;
   if ((ptr = vmprofile_open_file(str)) != NULL) {
-    setlightudV(L->base, checklightudptr(L, ptr));
+    setrawlightudV(L->base, lj_lightud_intern(L, ptr));
     if (!noselect) vmprofile_set_profile(ptr);
     if (!nostart) vmprofile_start(L);
   } else {
@@ -174,7 +175,7 @@ LUA_API int luaJIT_vmprofile_close(lua_State *L, void *ud)
 
 LUA_API int luaJIT_vmprofile_select(lua_State *L, void *ud)
 {
-  setlightudV(L->base, checklightudptr(L, profile));
+  setrawlightudV(L->base, lj_lightud_intern(L, profile));
   vmprofile_set_profile(ud);
   return 1;
 }

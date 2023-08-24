@@ -1,6 +1,6 @@
 /*
 ** Package library.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2012 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -56,7 +56,7 @@ static lua_CFunction ll_sym(lua_State *L, void *lib, const char *sym)
 
 static const char *ll_bcsym(void *lib, const char *sym)
 {
-#if defined(RTLD_DEFAULT)
+#if defined(RTLD_DEFAULT) && !defined(NO_RTLD_DEFAULT)
   if (lib == NULL) lib = RTLD_DEFAULT;
 #elif LJ_TARGET_OSX || LJ_TARGET_BSD
   if (lib == NULL) lib = (void *)(intptr_t)-2;
@@ -100,7 +100,12 @@ static const char *mksymname(lua_State *L, const char *modname,
 
 static int ll_loadfunc(lua_State *L, const char *path, const char *name, int r)
 {
-  void **reg = ll_register(L, path);
+  void **reg;
+  if (strlen(path) >= 4096) {
+    lua_pushliteral(L, "path too long");
+    return PACKAGE_ERR_LIB;
+  }
+  reg = ll_register(L, path);
   if (*reg == NULL) *reg = ll_load(L, path, (*name == '*'));
   if (*reg == NULL) {
     return PACKAGE_ERR_LIB;  /* Unable to load library. */
@@ -283,7 +288,7 @@ static int lj_cf_package_loader_preload(lua_State *L)
 
 /* ------------------------------------------------------------------------ */
 
-#define sentinel	((void *)0x4004)
+#define KEY_SENTINEL	(U64x(80000000,00000000)|'s')
 
 static int lj_cf_package_require(lua_State *L)
 {
@@ -293,7 +298,7 @@ static int lj_cf_package_require(lua_State *L)
   lua_getfield(L, LUA_REGISTRYINDEX, "_LOADED");
   lua_getfield(L, 2, name);
   if (lua_toboolean(L, -1)) {  /* is it there? */
-    if (lua_touserdata(L, -1) == sentinel)  /* check loops */
+    if ((L->top-1)->u64 == KEY_SENTINEL)  /* check loops */
       luaL_error(L, "loop or previous error loading module " LUA_QS, name);
     return 1;  /* package is already loaded */
   }
@@ -316,14 +321,14 @@ static int lj_cf_package_require(lua_State *L)
     else
       lua_pop(L, 1);
   }
-  lua_pushlightuserdata(L, sentinel);
+  (L->top++)->u64 = KEY_SENTINEL;
   lua_setfield(L, 2, name);  /* _LOADED[name] = sentinel */
   lua_pushstring(L, name);  /* pass name as argument to module */
   lua_call(L, 1, 1);  /* run loaded module */
   if (!lua_isnil(L, -1))  /* non-nil return? */
     lua_setfield(L, 2, name);  /* _LOADED[name] = returned value */
   lua_getfield(L, 2, name);
-  if (lua_touserdata(L, -1) == sentinel) {   /* module did not set a value? */
+  if ((L->top-1)->u64 == KEY_SENTINEL) {   /* module did not set a value? */
     lua_pushboolean(L, 1);  /* use true as result */
     lua_pushvalue(L, -1);  /* extra copy to be returned */
     lua_setfield(L, 2, name);  /* _LOADED[name] = true */

@@ -1,11 +1,14 @@
 // Config file for the 'unifdef' program to strip out unwanted source code.
 
 #define LJ_HASJIT 1
+#define LJ_HASFFI 1
 #define LJ_NO_UNWIND 1
 #define LUAJIT_DISABLE_PROFILE 1
 #define LUAJIT_DISABLE_VMEVENT 1
 #define LUAJIT_ENABLE_GC64 1
 #define LUAJIT_ENABLE_JIT 1
+#define LJ_64 1
+#define LJ_GC64 1
 #undef LJ_HASPROFILE
 #undef LJ_UNWIND_EXT
 #undef LUAJIT_DISABLE_FFI
@@ -81,6 +84,7 @@
 #undef LUAJIT_ARCH_MIPS32
 #undef LUAJIT_ARCH_X86
 #undef LUAJIT_BE
+#undef LJ_BE
 #undef MINGW_SDK_INIT
 #undef _ARCH_PPCSQ
 #undef _ARCH_PWR4

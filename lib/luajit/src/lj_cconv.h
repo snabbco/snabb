@@ -1,6 +1,6 @@
 /*
 ** C type conversions.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_CCONV_H
@@ -26,9 +26,10 @@ enum {
 static LJ_AINLINE uint32_t cconv_idx(CTInfo info)
 {
   uint32_t idx = ((info >> 26) & 15u);  /* Dispatch bits. */
-  lua_assert(ctype_type(info) <= CT_MAYCONVERT);
+  lj_assertX(ctype_type(info) <= CT_MAYCONVERT,
+	     "cannot convert ctype %08x", info);
   idx = ((uint32_t)(U64x(f436fff5,fff7f021) >> 4*idx) & 15u);
-  lua_assert(idx < 8);
+  lj_assertX(idx < 8, "cannot convert ctype %08x", info);
   return idx;
 }
 

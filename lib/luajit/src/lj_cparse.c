@@ -1,6 +1,6 @@
 /*
 ** C declaration parser.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #include "lj_obj.h"
@@ -27,6 +27,30 @@
 ** If in doubt, please check the input against your favorite C compiler.
 */
 
+#ifdef LUA_USE_ASSERT
+#define lj_assertCP(c, ...)	(lj_assertG_(G(cp->L), (c), __VA_ARGS__))
+#else
+#define lj_assertCP(c, ...)	((void)cp)
+#endif
+
+/* -- Miscellaneous ------------------------------------------------------- */
+
+/* Match string against a C literal. */
+#define cp_str_is(str, k) \
+  ((str)->len == sizeof(k)-1 && !memcmp(strdata(str), k, sizeof(k)-1))
+
+/* Check string against a linear list of matches. */
+int lj_cparse_case(GCstr *str, const char *match)
+{
+  MSize len;
+  int n;
+  for  (n = 0; (len = (MSize)*match++); n++, match += len) {
+    if (str->len == len && !memcmp(match, strdata(str), len))
+      return n;
+  }
+  return -1;
+}
+
 /* -- C lexer ------------------------------------------------------------- */
 
 /* C lexer token names. */
@@ -42,7 +66,7 @@ LJ_NORET static void cp_err(CPState *cp, ErrMsg em);
 
 static const char *cp_tok2str(CPState *cp, CPToken tok)
 {
-  lua_assert(tok < CTOK_FIRSTDECL);
+  lj_assertCP(tok < CTOK_FIRSTDECL, "bad CPToken %d", tok);
   if (tok > CTOK_OFS)
     return ctoknames[tok-CTOK_OFS-1];
   else if (!lj_char_iscntrl(tok))
@@ -108,9 +132,9 @@ LJ_NORET static void cp_errmsg(CPState *cp, CPToken tok, ErrMsg em, ...)
     tokstr = NULL;
   } else if (tok == CTOK_IDENT || tok == CTOK_INTEGER || tok == CTOK_STRING ||
 	     tok >= CTOK_FIRSTDECL) {
-    if (sbufP(&cp->sb) == sbufB(&cp->sb)) cp_save(cp, '$');
+    if (cp->sb.w == cp->sb.b) cp_save(cp, '$');
     cp_save(cp, '\0');
-    tokstr = sbufB(&cp->sb);
+    tokstr = cp->sb.b;
   } else {
     tokstr = cp_tok2str(cp, tok);
   }
@@ -150,7 +174,8 @@ static CPToken cp_number(CPState *cp)
   TValue o;
   do { cp_save(cp, cp->c); } while (lj_char_isident(cp_get(cp)));
   cp_save(cp, '\0');
-  fmt = lj_strscan_scan((const uint8_t *)sbufB(&cp->sb), &o, STRSCAN_OPT_C);
+  fmt = lj_strscan_scan((const uint8_t *)(cp->sb.b), sbuflen(&cp->sb)-1,
+			&o, STRSCAN_OPT_C);
   if (fmt == STRSCAN_INT) cp->val.id = CTID_INT32;
   else if (fmt == STRSCAN_U32) cp->val.id = CTID_UINT32;
   else if (!(cp->mode & CPARSE_MODE_SKIP))
@@ -253,7 +278,7 @@ static CPToken cp_string(CPState *cp)
     return CTOK_STRING;
   } else {
     if (sbuflen(&cp->sb) != 1) cp_err_token(cp, '\'');
-    cp->val.i32 = (int32_t)(char)*sbufB(&cp->sb);
+    cp->val.i32 = (int32_t)(char)*cp->sb.b;
     cp->val.id = CTID_INT32;
     return CTOK_INTEGER;
   }
@@ -372,7 +397,7 @@ static void cp_init(CPState *cp)
   cp->curpack = 0;
   cp->packstack[0] = 255;
   lj_buf_init(cp->L, &cp->sb);
-  lua_assert(cp->p != NULL);
+  lj_assertCP(cp->p != NULL, "uninitialized cp->p");
   cp_get(cp);  /* Read-ahead first char. */
   cp->tok = 0;
   cp->tmask = CPNS_DEFAULT;
@@ -442,7 +467,7 @@ static void cp_expr_sizeof(CPState *cp, CPValue *k, int wantsz)
   } else {
     cp_expr_unary(cp, k);
   }
-  info = lj_ctype_info(cp->cts, k->id, &sz);
+  info = lj_ctype_info_raw(cp->cts, k->id, &sz);
   if (wantsz) {
     if (sz != CTSIZE_INVALID)
       k->u32 = sz;
@@ -462,7 +487,7 @@ static void cp_expr_prefix(CPState *cp, CPValue *k)
   } else if (cp_opt(cp, '+')) {
     cp_expr_unary(cp, k);  /* Nothing to do (well, integer promotion). */
   } else if (cp_opt(cp, '-')) {
-    cp_expr_unary(cp, k); k->i32 = -k->i32;
+    cp_expr_unary(cp, k); k->i32 = (int32_t)(~(uint32_t)k->i32+1);
   } else if (cp_opt(cp, '~')) {
     cp_expr_unary(cp, k); k->i32 = ~k->i32;
   } else if (cp_opt(cp, '!')) {
@@ -575,28 +600,34 @@ static void cp_expr_infix(CPState *cp, CPValue *k, int pri)
 	k->id = k2.id > k3.id ? k2.id : k3.id;
 	continue;
       }
+      /* fallthrough */
     case 1:
       if (cp_opt(cp, CTOK_OROR)) {
 	cp_expr_sub(cp, &k2, 2); k->i32 = k->u32 || k2.u32; k->id = CTID_INT32;
 	continue;
       }
+      /* fallthrough */
     case 2:
       if (cp_opt(cp, CTOK_ANDAND)) {
 	cp_expr_sub(cp, &k2, 3); k->i32 = k->u32 && k2.u32; k->id = CTID_INT32;
 	continue;
       }
+      /* fallthrough */
     case 3:
       if (cp_opt(cp, '|')) {
 	cp_expr_sub(cp, &k2, 4); k->u32 = k->u32 | k2.u32; goto arith_result;
       }
+      /* fallthrough */
     case 4:
       if (cp_opt(cp, '^')) {
 	cp_expr_sub(cp, &k2, 5); k->u32 = k->u32 ^ k2.u32; goto arith_result;
       }
+      /* fallthrough */
     case 5:
       if (cp_opt(cp, '&')) {
 	cp_expr_sub(cp, &k2, 6); k->u32 = k->u32 & k2.u32; goto arith_result;
       }
+      /* fallthrough */
     case 6:
       if (cp_opt(cp, CTOK_EQ)) {
 	cp_expr_sub(cp, &k2, 7); k->i32 = k->u32 == k2.u32; k->id = CTID_INT32;
@@ -605,6 +636,7 @@ static void cp_expr_infix(CPState *cp, CPValue *k, int pri)
 	cp_expr_sub(cp, &k2, 7); k->i32 = k->u32 != k2.u32; k->id = CTID_INT32;
 	continue;
       }
+      /* fallthrough */
     case 7:
       if (cp_opt(cp, '<')) {
 	cp_expr_sub(cp, &k2, 8);
@@ -639,6 +671,7 @@ static void cp_expr_infix(CPState *cp, CPValue *k, int pri)
 	k->id = CTID_INT32;
 	continue;
       }
+      /* fallthrough */
     case 8:
       if (cp_opt(cp, CTOK_SHL)) {
 	cp_expr_sub(cp, &k2, 9); k->u32 = k->u32 << k2.u32;
@@ -651,6 +684,7 @@ static void cp_expr_infix(CPState *cp, CPValue *k, int pri)
 	  k->u32 = k->u32 >> k2.u32;
 	continue;
       }
+      /* fallthrough */
     case 9:
       if (cp_opt(cp, '+')) {
 	cp_expr_sub(cp, &k2, 10); k->u32 = k->u32 + k2.u32;
@@ -660,6 +694,7 @@ static void cp_expr_infix(CPState *cp, CPValue *k, int pri)
       } else if (cp_opt(cp, '-')) {
 	cp_expr_sub(cp, &k2, 10); k->u32 = k->u32 - k2.u32; goto arith_result;
       }
+      /* fallthrough */
     case 10:
       if (cp_opt(cp, '*')) {
 	cp_expr_unary(cp, &k2); k->u32 = k->u32 * k2.u32; goto arith_result;
@@ -818,12 +853,13 @@ static CTypeID cp_decl_intern(CPState *cp, CPDecl *decl)
     /* The cid is already part of info for copies of pointers/functions. */
     idx = ct->next;
     if (ctype_istypedef(info)) {
-      lua_assert(id == 0);
+      lj_assertCP(id == 0, "typedef not at toplevel");
       id = ctype_cid(info);
       /* Always refetch info/size, since struct/enum may have been completed. */
       cinfo = ctype_get(cp->cts, id)->info;
       csize = ctype_get(cp->cts, id)->size;
-      lua_assert(ctype_isstruct(cinfo) || ctype_isenum(cinfo));
+      lj_assertCP(ctype_isstruct(cinfo) || ctype_isenum(cinfo),
+		  "typedef of bad type");
     } else if (ctype_isfunc(info)) {  /* Intern function. */
       CType *fct;
       CTypeID fid;
@@ -856,7 +892,7 @@ static CTypeID cp_decl_intern(CPState *cp, CPDecl *decl)
       /* Inherit csize/cinfo from original type. */
     } else {
       if (ctype_isnum(info)) {  /* Handle mode/vector-size attributes. */
-	lua_assert(id == 0);
+	lj_assertCP(id == 0, "number not at toplevel");
 	if (!(info & CTF_BOOL)) {
 	  CTSize msize = ctype_msizeP(decl->attr);
 	  CTSize vsize = ctype_vsizeP(decl->attr);
@@ -911,7 +947,7 @@ static CTypeID cp_decl_intern(CPState *cp, CPDecl *decl)
 	  info = (info & ~CTF_ALIGN) | (cinfo & CTF_ALIGN);
 	info |= (cinfo & CTF_QUAL);  /* Inherit qual. */
       } else {
-	lua_assert(ctype_isvoid(info));
+	lj_assertCP(ctype_isvoid(info), "bad ctype %08x", info);
       }
       csize = size;
       cinfo = info+id;
@@ -922,8 +958,6 @@ static CTypeID cp_decl_intern(CPState *cp, CPDecl *decl)
 }
 
 /* -- C declaration parser ------------------------------------------------ */
-
-#define H_(le, be)	LJ_ENDIAN_SELECT(0x##le, 0x##be)
 
 /* Reset declaration state to declaration specifier. */
 static void cp_decl_reset(CPDecl *decl)
@@ -1053,17 +1087,22 @@ static void cp_decl_gccattribute(CPState *cp, CPDecl *decl)
     if (cp->tok == CTOK_IDENT) {
       GCstr *attrstr = cp->str;
       cp_next(cp);
-      switch (attrstr->hash) {
-      case H_(64a9208e,8ce14319): case H_(8e6331b2,95a282af):  /* aligned */
+      switch (lj_cparse_case(attrstr,
+		"\007aligned" "\013__aligned__"
+		"\006packed" "\012__packed__"
+		"\004mode" "\010__mode__"
+		"\013vector_size" "\017__vector_size__"
+	      )) {
+      case 0: case 1: /* aligned */
 	cp_decl_align(cp, decl);
 	break;
-      case H_(42eb47de,f0ede26c): case H_(29f48a09,cf383e0c):  /* packed */
+      case 2: case 3: /* packed */
 	decl->attr |= CTFP_PACKED;
 	break;
-      case H_(0a84eef6,8dfab04c): case H_(995cf92c,d5696591):  /* mode */
+      case 4: case 5: /* mode */
 	cp_decl_mode(cp, decl);
 	break;
-      case H_(0ab31997,2d5213fa): case H_(bf875611,200e9990):  /* vector_size */
+      case 6: case 7: /* vector_size */
 	{
 	  CTSize vsize = cp_decl_sizeattr(cp);
 	  if (vsize) CTF_INSERT(decl->attr, VSIZEP, lj_fls(vsize));
@@ -1096,16 +1135,13 @@ static void cp_decl_msvcattribute(CPState *cp, CPDecl *decl)
   while (cp->tok == CTOK_IDENT) {
     GCstr *attrstr = cp->str;
     cp_next(cp);
-    switch (attrstr->hash) {
-    case H_(bc2395fa,98f267f8):  /* align */
+    if (cp_str_is(attrstr, "align")) {
       cp_decl_align(cp, decl);
-      break;
-    default:  /* Ignore all other attributes. */
+    } else {  /* Ignore all other attributes. */
       if (cp_opt(cp, '(')) {
 	while (cp->tok != ')' && cp->tok != CTOK_EOF) cp_next(cp);
 	cp_check(cp, ')');
       }
-      break;
     }
   }
   cp_check(cp, ')');
@@ -1493,7 +1529,7 @@ end_decl:
 	cp_errmsg(cp, cp->tok, LJ_ERR_FFI_DECLSPEC);
       sz = sizeof(int);
     }
-    lua_assert(sz != 0);
+    lj_assertCP(sz != 0, "basic ctype with zero size");
     info += CTALIGN(lj_fls(sz));  /* Use natural alignment. */
     info += (decl->attr & CTF_QUAL);  /* Merge qualifiers. */
     cp_push(decl, info, sz);
@@ -1660,17 +1696,16 @@ static CTypeID cp_decl_abstract(CPState *cp)
 static void cp_pragma(CPState *cp, BCLine pragmaline)
 {
   cp_next(cp);
-  if (cp->tok == CTOK_IDENT &&
-      cp->str->hash == H_(e79b999f,42ca3e85))  {  /* pack */
+  if (cp->tok == CTOK_IDENT && cp_str_is(cp->str, "pack"))  {
     cp_next(cp);
     cp_check(cp, '(');
     if (cp->tok == CTOK_IDENT) {
-      if (cp->str->hash == H_(738e923c,a1b65954)) {  /* push */
+      if (cp_str_is(cp->str, "push")) {
 	if (cp->curpack < CPARSE_MAX_PACKSTACK) {
 	  cp->packstack[cp->curpack+1] = cp->packstack[cp->curpack];
 	  cp->curpack++;
 	}
-      } else if (cp->str->hash == H_(6c71cf27,6c71cf27)) {  /* pop */
+      } else if (cp_str_is(cp->str, "pop")) {
 	if (cp->curpack > 0) cp->curpack--;
       } else {
 	cp_errmsg(cp, cp->tok, LJ_ERR_XSYMBOL);
@@ -1719,13 +1754,11 @@ static void cp_decl_multi(CPState *cp)
       if (tok == CTOK_INTEGER) {
 	cp_line(cp, hashline);
 	continue;
-      } else if (tok == CTOK_IDENT &&
-		 cp->str->hash == H_(187aab88,fcb60b42)) { /* line */
+      } else if (tok == CTOK_IDENT && cp_str_is(cp->str, "line")) {
 	if (cp_next(cp) != CTOK_INTEGER) cp_err_token(cp, tok);
 	cp_line(cp, hashline);
 	continue;
-      } else if (tok == CTOK_IDENT &&
-	  cp->str->hash == H_(f5e6b4f8,1d509107)) { /* pragma */
+      } else if (tok == CTOK_IDENT && cp_str_is(cp->str, "pragma")) {
 	cp_pragma(cp, hashline);
 	continue;
       } else {
@@ -1754,7 +1787,7 @@ static void cp_decl_multi(CPState *cp)
 	  /* Treat both static and extern function declarations as extern. */
 	  ct = ctype_get(cp->cts, ctypeid);
 	  /* We always get new anonymous functions (typedefs are copied). */
-	  lua_assert(gcref(ct->name) == NULL);
+	  lj_assertCP(gcref(ct->name) == NULL, "unexpected named function");
 	  id = ctypeid;  /* Just name it. */
 	} else if ((scl & CDF_STATIC)) {  /* Accept static constants. */
 	  id = cp_decl_constinit(cp, &ct, ctypeid);
@@ -1796,8 +1829,6 @@ static void cp_decl_single(CPState *cp)
   if (cp->tok != CTOK_EOF) cp_err_token(cp, CTOK_EOF);
 }
 
-#undef H_
-
 /* ------------------------------------------------------------------------ */
 
 /* Protected callback for C parser. */
@@ -1813,7 +1844,7 @@ static TValue *cpcparser(lua_State *L, lua_CFunction dummy, void *ud)
     cp_decl_single(cp);
   if (cp->param && cp->param != cp->L->top)
     cp_err(cp, LJ_ERR_FFI_NUMPARAM);
-  lua_assert(cp->depth == 0);
+  lj_assertCP(cp->depth == 0, "unbalanced cparser declaration depth");
   return NULL;
 }
 

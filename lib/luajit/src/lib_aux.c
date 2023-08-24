@@ -1,6 +1,6 @@
 /*
 ** Auxiliary library for the Lua/C API.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major parts taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -208,8 +208,15 @@ LUALIB_API char *luaL_prepbuffer(luaL_Buffer *B)
 
 LUALIB_API void luaL_addlstring(luaL_Buffer *B, const char *s, size_t l)
 {
-  while (l--)
-    luaL_addchar(B, *s++);
+  if (l <= bufffree(B)) {
+    memcpy(B->p, s, l);
+    B->p += l;
+  } else {
+    emptybuffer(B);
+    lua_pushlstring(B->L, s, l);
+    B->lvl++;
+    adjuststack(B);
+  }
 }
 
 LUALIB_API void luaL_addstring(luaL_Buffer *B, const char *s)
@@ -316,6 +323,8 @@ static void *mem_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
 LUALIB_API lua_State *luaL_newstate(void)
 {
   lua_State *L = lua_newstate(mem_alloc, NULL);
-  if (L) G(L)->panic = panic;
+  if (L) {
+    G(L)->panic = panic;
+  }
   return L;
 }
