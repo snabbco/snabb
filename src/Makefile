@@ -378,13 +378,13 @@ $(DWARF_DWO): $(ALL_HDRGEN)
 
 $(DWARF_DWO): %.dwo: %.c
 	$(E) "CC(debug) $@"
-	$(Q)$(TARGET_CC) -g3 -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
+	$(Q)$(TARGET_CC) -g3 -gdwarf-4 -gdwarf32 -gz=none -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
 
 # Embed DWARF debug information as binary data available to raptorjit.
 lj_dwarf_dwo.o lj_dwarf_dwo_dyn.o: $(DWARF_DWO)
 	$(E) "EMBED     $@"
-	$(Q)$(LD) -r -b binary -o $@ $<
-	$(Q)$(LD) -r -b binary -o $(@:.o=_dyn.o) $<
+	$(Q)$(LD) -r -b binary -z noexecstack -o $@ $<
+	$(Q)$(LD) -r -b binary -z noexecstack -o $(@:.o=_dyn.o) $<
 
 include Makefile.dep
 
