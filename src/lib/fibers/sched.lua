@@ -93,7 +93,7 @@ end
 
 function Scheduler:shutdown()
    for i=1,100 do
-      for i=1,#self.sources do self.sources[i]:cancel_all_tasks(self) end
+      for i=1,#self.sources do self.sources[i]:cancel_all_tasks(self, 'shutdown') end
       if #self.next == 0 then return true end
       self:run()
    end

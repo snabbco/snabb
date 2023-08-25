@@ -6,6 +6,7 @@ Usage:
   snabb config load
   snabb config remove
   snabb config set
+  snabb config shutdown
 
 Use --help for per-command usage.
 Example:

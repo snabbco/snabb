@@ -27,6 +27,12 @@ module snabb-config-leader-v1 {
     leaf error { type string; }
   }
 
+  rpc shutdown {
+    description
+      "Request the configuration leader to terminate all workers and
+       exit. This call will always return success.";
+  }
+
   rpc describe {
     output {
       leaf native-schema { type string; mandatory true; }
