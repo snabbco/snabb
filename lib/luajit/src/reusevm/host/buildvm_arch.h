@@ -2297,11 +2297,11 @@ static void build_subroutines(BuildCtx *ctx)
   //|  mov [BASE-16], TAB:RC		// Store metatable as default result.
   //|  mov STR:RC, [DISPATCH+DISPATCH_GL(gcroot)+8*(GCROOT_MMNAME+MM_metatable)]
   //|  mov RAd, TAB:RB->hmask
-  //|  and RAd, STR:RC->sid
+  //|  and RAd, STR:RC->hash
   //|  settp STR:RC, LJ_TSTR
   //|  imul RAd, #NODE
   //|  add NODE:RA, TAB:RB->node
-  dasm_put(Dst, 2429, LJ_TTAB, Dt6(->metatable), LJ_TNIL, (unsigned int)(((uint64_t)LJ_TTAB<<47)), (unsigned int)((((uint64_t)LJ_TTAB<<47))>>32), DISPATCH_GL(gcroot)+8*(GCROOT_MMNAME+MM_metatable), Dt6(->hmask), Dt5(->sid), (unsigned int)(((uint64_t)LJ_TSTR<<47)), (unsigned int)((((uint64_t)LJ_TSTR<<47))>>32), sizeof(Node));
+  dasm_put(Dst, 2429, LJ_TTAB, Dt6(->metatable), LJ_TNIL, (unsigned int)(((uint64_t)LJ_TTAB<<47)), (unsigned int)((((uint64_t)LJ_TTAB<<47))>>32), DISPATCH_GL(gcroot)+8*(GCROOT_MMNAME+MM_metatable), Dt6(->hmask), Dt5(->hash), (unsigned int)(((uint64_t)LJ_TSTR<<47)), (unsigned int)((((uint64_t)LJ_TSTR<<47))>>32), sizeof(Node));
 #line 1066 "vm_x64.dasc"
   //|3:  // Rearranged logic, because we expect _not_ to find the key.
   //|  cmp NODE:RA->key, STR:RC
@@ -4705,7 +4705,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     //|  checktab TAB:RB, ->vmeta_tgets
     //|->BC_TGETS_Z:	// RB = GCtab *, RC = GCstr *
     //|  mov TMPRd, TAB:RB->hmask
-    //|  and TMPRd, STR:RC->sid
+    //|  and TMPRd, STR:RC->hash
     //|  imul TMPRd, #NODE
     //|  add NODE:TMPR, TAB:RB->node
     //|  settp ITYPE, STR:RC, LJ_TSTR
@@ -4718,7 +4718,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     //|  je >5				// Key found, but nil value?
     //|2:
     //|  mov [BASE+RA*8], ITYPE
-    dasm_put(Dst, 12686, LJ_TTAB, Dt6(->hmask), Dt5(->sid), sizeof(Node), Dt6(->node), (unsigned int)(((uint64_t)LJ_TSTR<<47)), (unsigned int)((((uint64_t)LJ_TSTR<<47))>>32), DtB(->key), DtB(->val), LJ_TNIL);
+    dasm_put(Dst, 12686, LJ_TTAB, Dt6(->hmask), Dt5(->hash), sizeof(Node), Dt6(->node), (unsigned int)(((uint64_t)LJ_TSTR<<47)), (unsigned int)((((uint64_t)LJ_TSTR<<47))>>32), DtB(->key), DtB(->val), LJ_TNIL);
 #line 3102 "vm_x64.dasc"
     //|  ins_next
     //|
@@ -4844,7 +4844,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     //|  checktab TAB:RB, ->vmeta_tsets
     //|->BC_TSETS_Z:	// RB = GCtab *, RC = GCstr *
     //|  mov TMPRd, TAB:RB->hmask
-    //|  and TMPRd, STR:RC->sid
+    //|  and TMPRd, STR:RC->hash
     //|  imul TMPRd, #NODE
     //|  mov byte TAB:RB->nomm, 0		// Clear metamethod cache.
     //|  add NODE:TMPR, TAB:RB->node
@@ -4857,7 +4857,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     //|  je >4				// Previous value is nil?
     //|2:
     //|  test byte TAB:RB->marked, LJ_GC_BLACK	// isblack(table)
-    dasm_put(Dst, 13265, LJ_TTAB, Dt6(->hmask), Dt5(->sid), sizeof(Node), Dt6(->nomm), Dt6(->node), (unsigned int)(((uint64_t)LJ_TSTR<<47)), (unsigned int)((((uint64_t)LJ_TSTR<<47))>>32), DtB(->key), LJ_TNIL);
+    dasm_put(Dst, 13265, LJ_TTAB, Dt6(->hmask), Dt5(->hash), sizeof(Node), Dt6(->nomm), Dt6(->node), (unsigned int)(((uint64_t)LJ_TSTR<<47)), (unsigned int)((((uint64_t)LJ_TSTR<<47))>>32), DtB(->key), LJ_TNIL);
 #line 3226 "vm_x64.dasc"
     //|  jnz >7
     //|3:  // Set node value.

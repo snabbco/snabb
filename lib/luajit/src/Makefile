@@ -83,6 +83,7 @@ XCFLAGS=
 #
 # This define is required to run LuaJIT under Valgrind. The Valgrind
 # header files must be installed. You should enable debug information, too.
+# Use --suppressions=lj.supp to avoid some false positives.
 #XCFLAGS+= -DLUAJIT_USE_VALGRIND
 #
 # This is the client for the GDB JIT API. GDB 7.0 or higher is required
@@ -378,7 +379,7 @@ $(DWARF_DWO): $(ALL_HDRGEN)
 
 $(DWARF_DWO): %.dwo: %.c
 	$(E) "CC(debug) $@"
-	$(Q)$(TARGET_CC) -g3 -gdwarf-4 -gdwarf32 -gz=none -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
+	$(Q)$(TARGET_CC) -g3 -gdwarf-4 -gz=none -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
 
 # Embed DWARF debug information as binary data available to raptorjit.
 lj_dwarf_dwo.o lj_dwarf_dwo_dyn.o: $(DWARF_DWO)
