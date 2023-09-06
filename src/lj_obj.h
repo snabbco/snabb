@@ -812,9 +812,7 @@ static LJ_AINLINE int32_t lj_num2bit(lua_Number n)
 */
 static LJ_AINLINE uint64_t lj_num2u64(lua_Number n)
 {
-  int64_t i = (int64_t)n;
-  if (i < 0) i = (int64_t)(n - 18446744073709551616.0);
-  return (uint64_t)i;
+  return (uint64_t)n;
 }
 
 static LJ_AINLINE int32_t numberVint(cTValue *o)
