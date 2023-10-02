@@ -1,6 +1,6 @@
 /*
 ** Assembler VM interface definitions.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_VM_H
@@ -34,10 +34,11 @@ LJ_ASMF void lj_vm_record(void);
 LJ_ASMF void lj_vm_inshook(void);
 LJ_ASMF void lj_vm_rethook(void);
 LJ_ASMF void lj_vm_callhook(void);
+LJ_ASMF void lj_vm_IITERN(void);
 
 /* Trace exit handling. */
-LJ_ASMF void lj_vm_exit_handler(void);
-LJ_ASMF void lj_vm_exit_interp(void);
+LJ_ASMF char lj_vm_exit_handler[];
+LJ_ASMF char lj_vm_exit_interp[];
 LJ_ASMF void lj_vm_exit_interp_notrack(void);
 
 /* Internal math helper functions. */
@@ -53,15 +54,9 @@ LJ_ASMF int32_t lj_vm_modi(int32_t, int32_t);
 LJ_ASMF void lj_vm_floor_sse(void);
 LJ_ASMF void lj_vm_ceil_sse(void);
 LJ_ASMF void lj_vm_trunc_sse(void);
-LJ_ASMF void lj_vm_powi_sse(void);
-#define lj_vm_powi	NULL
 LJ_ASMF double lj_vm_trunc(double);
-#ifdef LUAJIT_NO_EXP2
-LJ_ASMF double lj_vm_exp2(double);
-#else
-#define lj_vm_exp2	exp2
-#endif
 LJ_ASMF int lj_vm_errno(void);
+LJ_ASMF TValue *lj_vm_next(GCtab *t, uint32_t idx);
 
 /* Continuations for metamethods. */
 LJ_ASMF void lj_cont_cat(void);  /* Continue with concatenation. */
@@ -76,6 +71,6 @@ LJ_ASMF void lj_cont_stitch(void);  /* Trace stitching. */
 LJ_ASMF char lj_vm_asm_begin[];
 
 /* Bytecode offsets are relative to lj_vm_asm_begin. */
-#define makeasmfunc(ofs)	((ASMFunction)(lj_vm_asm_begin + (ofs)))
+#define makeasmfunc(ofs) (ASMFunction)(lj_vm_asm_begin + (ofs))
 
 #endif

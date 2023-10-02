@@ -1,6 +1,6 @@
 /*
 ** LuaJIT common internal definitions.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_DEF_H
@@ -18,7 +18,7 @@
 #define LJ_MAX_MEM32	0x7fffff00	/* Max. 32 bit memory allocation. */
 #define LJ_MAX_MEM64	((uint64_t)1<<47)  /* Max. 64 bit memory allocation. */
 /* Max. total memory allocation. */
-#define LJ_MAX_MEM	(LJ_GC64 ? LJ_MAX_MEM64 : LJ_MAX_MEM32)
+#define LJ_MAX_MEM	LJ_MAX_MEM64
 #define LJ_MAX_ALLOC	LJ_MAX_MEM	/* Max. individual allocation length. */
 #define LJ_MAX_STR	LJ_MAX_MEM32	/* Max. string length. */
 #define LJ_MAX_BUF	LJ_MAX_MEM32	/* Max. buffer length. */
@@ -65,7 +65,7 @@
 #define u32ptr(p)	((uint32_t)(intptr_t)(void *)(p))
 #define i64ptr(p)	((int64_t)(intptr_t)(void *)(p))
 #define u64ptr(p)	((uint64_t)(intptr_t)(void *)(p))
-#define igcptr(p)	(LJ_GC64 ? i64ptr(p) : i32ptr(p))
+#define igcptr(p)	i64ptr(p)
 
 #define checki8(x)	((x) == (int32_t)(int8_t)(x))
 #define checku8(x)	((x) == (int32_t)(uint8_t)(x))
@@ -75,7 +75,7 @@
 #define checku32(x)	((x) == (uint32_t)(x))
 #define checkptr32(x)	((uintptr_t)(x) == (uint32_t)(uintptr_t)(x))
 #define checkptr47(x)	(((uint64_t)(uintptr_t)(x) >> 47) == 0)
-#define checkptrGC(x)	(LJ_GC64 ? checkptr47((x)) : LJ_64 ? checkptr32((x)) :1)
+#define checkptrGC(x)	checkptr47((x))
 
 /* Every half-decent C compiler transforms this into a rotate instruction. */
 #define lj_rol(x, n)	(((x)<<(n)) | ((x)>>(-(int)(n)&(8*sizeof(x)-1))))
@@ -88,7 +88,7 @@ typedef uintptr_t BloomFilter;
 #define bloomset(b, x)	((b) |= bloombit((x)))
 #define bloomtest(b, x)	((b) & bloombit((x)))
 
-#if defined(__GNUC__) || defined(__psp2__)
+#if defined(__GNUC__) || defined(__clang__) || defined(__psp2__)
 
 #define LJ_NORET	__attribute__((noreturn))
 #define LJ_ALIGN(n)	__attribute__((aligned(n)))
@@ -119,7 +119,7 @@ static LJ_AINLINE uint32_t lj_fls(uint32_t x)
 #define lj_fls(x)	((uint32_t)(__builtin_clz(x)^31))
 #endif
 
-#if   (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3)
+#if   (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __clang__
 static LJ_AINLINE uint32_t lj_bswap(uint32_t x)
 {
   return (uint32_t)__builtin_bswap32((int32_t)x);
@@ -200,14 +200,28 @@ static LJ_AINLINE uint32_t lj_getu32(const void *p)
 #define LJ_FUNCA_NORET	LJ_FUNCA LJ_NORET
 #define LJ_ASMF_NORET	LJ_ASMF LJ_NORET
 
-/* Runtime assertions. */
-#ifdef lua_assert
-#define check_exp(c, e)		(lua_assert(c), (e))
-#define api_check(l, e)		lua_assert(e)
+/* Internal assertions. */
+#if defined(LUA_USE_ASSERT) || defined(LUA_USE_APICHECK)
+#define lj_assert_check(g, c, ...) \
+  ((c) ? (void)0 : \
+   (lj_assert_fail((g), __FILE__, __LINE__, __func__, __VA_ARGS__), 0))
+#define lj_checkapi(c, ...)	lj_assert_check(G(L), (c), __VA_ARGS__)
 #else
-#define lua_assert(c)		((void)0)
+#define lj_checkapi(c, ...)	((void)L)
+#endif
+
+#ifdef LUA_USE_ASSERT
+#define lj_assertG_(g, c, ...)	lj_assert_check((g), (c), __VA_ARGS__)
+#define lj_assertG(c, ...)	lj_assert_check(g, (c), __VA_ARGS__)
+#define lj_assertL(c, ...)	lj_assert_check(G(L), (c), __VA_ARGS__)
+#define lj_assertX(c, ...)	lj_assert_check(NULL, (c), __VA_ARGS__)
+#define check_exp(c, e)		(lj_assertX((c), #c), (e))
+#else
+#define lj_assertG_(g, c, ...)	((void)0)
+#define lj_assertG(c, ...)	((void)g)
+#define lj_assertL(c, ...)	((void)L)
+#define lj_assertX(c, ...)	((void)0)
 #define check_exp(c, e)		(e)
-#define api_check		luai_apicheck
 #endif
 
 /* Static assertions. */
@@ -220,5 +234,10 @@ static LJ_AINLINE uint32_t lj_getu32(const void *p)
 #define LJ_STATIC_ASSERT(cond) \
   extern void LJ_ASSERT_NAME(__LINE__)(int STATIC_ASSERTION_FAILED[(cond)?1:-1])
 #endif
+
+/* PRNG state. Need this here, details in lj_prng.h. */
+typedef struct PRNGState {
+  uint64_t u[4];
+} PRNGState;
 
 #endif

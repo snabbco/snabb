@@ -7,7 +7,7 @@
 # Also works with MinGW and Cygwin on Windows.
 # Please check msvcbuild.bat for building with MSVC on Windows.
 #
-# Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+# Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
 MAJVER=  1
@@ -72,9 +72,6 @@ XCFLAGS=
 #XCFLAGS+= -DLUAJIT_NUMMODE=1
 #XCFLAGS+= -DLUAJIT_NUMMODE=2
 #
-# Enable GC64 mode for x64.
-#XCFLAGS+= -DLUAJIT_ENABLE_GC64
-#
 ##############################################################################
 
 ##############################################################################
@@ -83,14 +80,6 @@ XCFLAGS=
 # Enable these options as needed, but make sure you force a full recompile
 # with "make clean", followed by "make".
 # Note that most of these are NOT suitable for benchmarking or release mode!
-#
-# Use the system provided memory allocator (realloc) instead of the
-# bundled memory allocator. This is slower, but sometimes helpful for
-# debugging. This option cannot be enabled on x64 without GC64, since
-# realloc usually doesn't return addresses in the right address range.
-# OTOH this option is mandatory for Valgrind's memcheck tool on x64 and
-# the only way to get useful results from it for all other architectures.
-#XCFLAGS+= -DLUAJIT_USE_SYSMALLOC
 #
 # This define is required to run LuaJIT under Valgrind. The Valgrind
 # header files must be installed. You should enable debug information, too.
@@ -157,12 +146,13 @@ TARGET_SONAME= libraptorjit-$(ABIVER).so.$(MAJVER)
 TARGET_DYLIBNAME= libraptorjit-$(ABIVER).$(MAJVER).dylib
 TARGET_DYLIBPATH= $(TARGET_LIBPATH)/$(TARGET_DYLIBNAME)
 TARGET_DLLNAME= lua$(NODOTABIVER).dll
+TARGET_DLLDOTANAME= libluajit-$(ABIVER).dll.a
 TARGET_XSHLDFLAGS= -shared -fPIC -Wl,-soname,$(TARGET_SONAME)
 TARGET_DYNXLDOPTS=
 
 TARGET_LFSFLAGS= -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
 TARGET_XCFLAGS= $(TARGET_LFSFLAGS) -U_FORTIFY_SOURCE
-TARGET_XLDFLAGS=
+TARGET_XLDFLAGS= -Wl,-E
 TARGET_XLIBS= -lm
 TARGET_TCFLAGS= $(CCOPTIONS) $(TARGET_XCFLAGS) $(TARGET_FLAGS) $(TARGET_CFLAGS)
 TARGET_ACFLAGS= $(CCOPTIONS) $(TARGET_XCFLAGS) $(TARGET_FLAGS) $(TARGET_CFLAGS)
@@ -222,13 +212,15 @@ LJVM_BOUT= $(LJVM_S)
 LJVM_MODE= elfasm
 
 LJLIB_O= lib_base.o lib_math.o lib_bit.o lib_string.o lib_table.o \
-	 lib_io.o lib_os.o lib_package.o lib_debug.o lib_jit.o lib_ffi.o
+	 lib_io.o lib_os.o lib_package.o lib_debug.o lib_jit.o lib_ffi.o \
+	 lib_buffer.o
 LJLIB_C= $(LJLIB_O:.o=.c)
 
-LJCORE_O= lj_gc.o lj_err.o lj_char.o lj_bc.o lj_obj.o lj_buf.o \
+LJCORE_O= lj_assert.o lj_gc.o lj_err.o lj_char.o lj_bc.o lj_obj.o lj_buf.o \
 	  lj_str.o lj_tab.o lj_func.o lj_udata.o lj_meta.o lj_debug.o \
-	  lj_state.o lj_dispatch.o lj_vmmath.o lj_strscan.o \
-	  lj_strfmt.o lj_strfmt_num.o lj_api.o lj_vmprofile.o \
+	  lj_prng.o lj_state.o lj_dispatch.o lj_vmmath.o \
+	  lj_strscan.o lj_strfmt.o lj_strfmt_num.o lj_serialize.o \
+	  lj_api.o lj_vmprofile.o \
 	  lj_lex.o lj_parse.o lj_bcread.o lj_bcwrite.o lj_load.o \
 	  lj_ir.o lj_opt_mem.o lj_opt_fold.o lj_opt_narrow.o \
 	  lj_opt_dce.o lj_opt_loop.o lj_opt_split.o lj_opt_sink.o \
@@ -236,8 +228,7 @@ LJCORE_O= lj_gc.o lj_err.o lj_char.o lj_bc.o lj_obj.o lj_buf.o \
 	  lj_asm.o lj_trace.o lj_gdbjit.o lj_auditlog.o \
 	  lj_ctype.o lj_cdata.o lj_cconv.o lj_ccall.o lj_ccallback.o \
 	  lj_carith.o lj_clib.o lj_cparse.o \
-	  lj_lib.o lj_alloc.o lib_aux.o \
-	  lj_dwarf_dwo.o \
+	  lj_lib.o lib_aux.o lj_dwarf_dwo.o \
 	  $(LJLIB_O) lib_init.o
 
 DWARF_DWO= lj_dwarf.dwo
@@ -284,6 +275,10 @@ reusevm:
 	cd reusevm; \
 	cp -r * ../
 	@echo "Copied reference VM. Ready to build."
+
+update_reusevm:
+	cp lj_bcdef.h lj_ffdef.h lj_folddef.h lj_libdef.h lj_recdef.h lj_vm.S reusevm/
+	cp host/buildvm_arch.h reusevm/host/
 
 libbc:
 	./$(LUAJIT_T) host/genlibbc.lua -o host/buildvm_libbc.h $(LJLIB_C)
@@ -384,13 +379,13 @@ $(DWARF_DWO): $(ALL_HDRGEN)
 
 $(DWARF_DWO): %.dwo: %.c
 	$(E) "CC(debug) $@"
-	$(Q)$(TARGET_CC) -g3 -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
+	$(Q)$(TARGET_CC) -g3 -gdwarf-4 -gz=none -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
 
 # Embed DWARF debug information as binary data available to raptorjit.
 lj_dwarf_dwo.o lj_dwarf_dwo_dyn.o: $(DWARF_DWO)
 	$(E) "EMBED     $@"
-	$(Q)$(LD) -r -b binary -o $@ $<
-	$(Q)$(LD) -shared -b binary -o $(@:.o=_dyn.o) $<
+	$(Q)$(LD) -r -b binary -z noexecstack -o $@ $<
+	$(Q)$(LD) -r -b binary -z noexecstack -o $(@:.o=_dyn.o) $<
 
 include Makefile.dep
 

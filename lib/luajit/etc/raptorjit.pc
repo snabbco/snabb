@@ -1,23 +1,23 @@
-# Package information for LuaJIT to be used by pkg-config.
-majver=2
-minver=1
+# Package information for RaptorJIT be used by pkg-config.
+majver=1
+minver=0
 relver=0
-version=${majver}.${minver}.${relver}-beta2
+version=${majver}.${minver}.${relver}
 abiver=5.1
 
 prefix=/usr/local
 multilib=lib
 exec_prefix=${prefix}
 libdir=${exec_prefix}/${multilib}
-libname=luajit-${abiver}
-includedir=${prefix}/include/luajit-${majver}.${minver}
+libname=raptorjit-${abiver}
+includedir=${prefix}/include/raptorjit-${majver}.${minver}
 
 INSTALL_LMOD=${prefix}/share/lua/${abiver}
 INSTALL_CMOD=${prefix}/${multilib}/lua/${abiver}
 
-Name: LuaJIT
+Name: RaptorJIT
 Description: Just-in-time compiler for Lua
-URL: http://luajit.org
+URL: https://luajit.org
 Version: ${version}
 Requires:
 Libs: -L${libdir} -l${libname}

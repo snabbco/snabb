@@ -26,7 +26,7 @@ function tointeger(str, what, min, max)
    -- FIXME: check that res did not overflow the 64-bit number
    local res = ffi.C.strtoull(str:sub(start), nil, base)
    if is_negative then
-      res = ffi.new('int64_t[1]', -1*res)[0]
+      res = -1LL*ffi.cast("int64_t", res)
       if res > 0 then
          error('invalid numeric value for '..what..': '..str)
       end
