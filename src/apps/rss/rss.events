@@ -1,0 +1,57 @@
+4,2|demuxed: npackets
+The rss app has demuxed new packets.
+
+'npackets' is the number of packets processed.
+
+4,2|demuxed_dot1q: npackets
+The rss app has demuxed new VLAN-tagged packets.
+
+'npackets' is the number of packets processed.
+
+4,2|added_md_hash_default: npackets
+The rss app has added metadata and a hash for non-IP packets.
+
+'npackets' is the number of packets processed.
+
+4,2|added_md_hash_default_dot1q: npackets
+The rss app has added metadata and a hash for VLAN-tagged non-IP packets.
+
+'npackets' is the number of packets processed.
+
+4,2|added_md_hash_ipv4: npackets
+The rss app has added metadata and a hash for IPv4 packets.
+
+'npackets' is the number of packets processed.
+
+4,2|added_md_hash_ipv6: npackets
+The rss app has added metadata and a hash for IPv6 packets.
+
+'npackets' is the number of packets processed.
+
+4,2|added_md_hash_ipv4_dot1q: npackets
+The rss app has added metadata and a hash for VLAN-tagged IPv4 packets.
+
+'npackets' is the number of packets processed.
+
+4,2|added_md_hash_ipv6_dot1q: npackets
+The rss app has added metadata and a hash for VLAN-tagged IPv6 packets.
+
+'npackets' is the number of packets processed.
+
+4,2|classified: class npackets
+The rss app has matched packets against a class.
+
+'class' is the class index.
+'npackets' is the number of packets processed.
+
+4,2|dropped: npackets
+The rss app has dropped packets that do not match any class.
+
+'npackets' is the number of packets dropped.
+
+
+4,2|distributed: class npackets
+The rss app has distributed packets that match a class.
+
+'class' is the class index.
+'npackets' is the number of packets distributed.

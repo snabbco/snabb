@@ -1,0 +1,58 @@
+4,2|added_metadata:
+The ipfix app has added metadata to packets.
+
+4,2|matched: template npackets
+The ipfix app has matched packets against a template.
+
+'template' is the template identifier.
+'npackets' is the number of packets processed.
+
+4,2|dropped: npackets
+The ipfix app dropped packets that do not match any template.
+
+'npackets' is the number of packets dropped.
+
+4,2|recorded: template npackets
+The ipfix app has recorded flows.
+
+'template' is the template identifier.
+'npackets' is the number of packets recorded.
+
+4,2|added_flow: template
+The ipfix has started tracking a new flow.
+
+'template' is the template identifier.
+
+4,5|expired_flows: template nflows nexpired
+The ipfix app has scanned flows for expiry.
+
+'template' is the template identifier.
+'nflows' is the number of flows processed.
+'nexpired' is the number of flows expired.
+
+4,5|exported_template_records:
+The ipfix app has exported template records.
+
+4,5|exported_data_records: nrecords
+The ipfix app has exported data records.
+
+'nrecords' is the number of data records exported.
+
+4,2|added_flow_rate_record: template
+The ipfix app has added a flow rate tracking record
+used for 'scan protection'.
+
+'template' is the template identifier.
+
+4,5|expired_flow_rate_record: template nrecords nexpired
+The ipfix app has expired flow rate tracking records
+used for 'scan protection'.
+
+'template' is the template identifier.
+'nrecords' is the number of records processed.
+'nexpired' is the number of records expired.
+
+4,2|suppressed_flow: template
+The ipfix app has suppressed a flow due to 'scan protection'.
+
+'template' is the template identifier.
