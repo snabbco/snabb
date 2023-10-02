@@ -276,6 +276,7 @@ function ConnectX:new (conf)
    hca:set_issi(1)
    hca:alloc_pages(hca:query_pages("boot"))
    local max_cap = hca:query_hca_general_cap('max')
+   local cur_cap = hca:query_hca_general_cap('current')
    if debug_trace then self:dump_capabilities(hca) end
 
    -- Initialize the card
@@ -283,6 +284,13 @@ function ConnectX:new (conf)
    hca:alloc_pages(hca:query_pages("init"))
    hca:init_hca()
    hca:alloc_pages(hca:query_pages("regular"))
+
+   -- Check for extended ethernet capabilities, must be done after
+   -- init_hca()
+   if cur_cap['pcam_reg'] == 1 then
+      local pcap = hca:query_ports_cap()
+      self.extended_ethernet = pcap['ptys_extended_ethernet'] == 1 and true or false
+   end
 
    if debug_trace then self:check_vport() end
 
@@ -577,6 +585,7 @@ function ConnectX:new (conf)
       {
         start_fn = HCA.get_port_speed_start,
         finish_fn = HCA.get_port_speed_finish,
+        args = self.extended_ethernet,
         process_fn = function (r, stats)
            counter.set(stats.speed, r)
         end
@@ -891,6 +900,7 @@ function HCA:query_hca_general_cap (max_or_current)
       vport_counters           = self:output(0x10 + 0x30, 30, 30),
       vport_group_manager      = self:output(0x10 + 0x34, 31, 31),
       nic_flow_table           = self:output(0x10 + 0x34, 25, 25),
+      pcam_reg                 = self:output(0x10 + 0x34, 21, 21),
       port_type                = self:output(0x10 + 0x34,  9,  8),
       num_ports                = self:output(0x10 + 0x34,  7,  0),
       log_max_msg              = self:output(0x10 + 0x38, 28, 24),
@@ -1918,6 +1928,7 @@ PAOS  = 0x5006 -- Port Administrative & Operational Status
 PFCC  = 0x5007 -- Port Flow Control Configuration
 PPCNT = 0x5008 -- Ports Performance Counters
 PPLR  = 0x5018 -- Port Physical Loopback Register
+PCAM  = 0x507F -- Ports Capabilities Mask
 
 -- Mapping of speed/protocols per 11.1.2 to speed in units of gbps
 local port_speed = {
@@ -1944,9 +1955,40 @@ local port_speed = {
    [0x40000000] =  50, --  50GBase-CR2
    [0x80000000] =  50, --  50GBase-KR2
 }
+local ext_port_speed = {
+   [0x00000002] =   1, -- 1000Base-X
+   [0x00000004] =   2, -- 2.5GBase-X
+   [0x00000008] =   5, -- 5GBase-R
+   [0x00000010] =  10, -- 10G XFI / XAUI-1
+   [0x00000020] =  40, -- 40G XLAUI-4/XLPPI-4
+   [0x00000040] =  25, -- 25GAUI-1 / 25GBase-CR / KR
+   [0x00000080] =  50, -- 50GAUI-2 / LAUI-2 / 50GBase-CR2/KR2
+   [0x00000100] =  50, -- 50GAUI-2 / LAUI-2 / 50GBase-CR/KR
+   [0x00000200] = 100, -- CAUI-4 / 100Gbase-CR4/KR4
+   [0x00000400] = 100, -- 100GAUI-2 / 100GBase-CR2/KR2
+   [0x00000800] = 100, -- 100GAUI-1 / 100GBase-CR/KR
+   [0x00001000] = 200, -- 200GAUI-4 / 200GBase-CR4/KR4
+   [0x00002000] = 200, -- 200GAUI-2 / 200GBase-CR2/KR2
+   [0x00008000] = 400, -- 400GAUI-8
+   [0x00010000] = 400, -- 400GAUI-4
+}
+
+-- Only valid if pcam_reg HCA capability is set
+function HCA:query_ports_cap ()
+   self:command("ACCESS_REGISTER", 0x4C, 0x4C)
+      :input("opcode",       0x00, 31, 16, 0x805)
+      :input("opmod",        0x04, 15,  0, 1) -- read
+      :input("register_id",  0x08, 15,  0, PCAM)
+      :input("feature_group",0x10, 23, 16, 0) -- enhanced features
+      :execute()
+   return {
+      ptys_extended_ethernet = self:output(0x10 + 0x34, 13, 13),
+   }
+end
 
 -- Get the speed of the port in bps
-function HCA:get_port_speed_start ()
+function HCA:get_port_speed_start (extended)
+   self.extended = extended
    self:command("ACCESS_REGISTER", 0x4C, 0x4C)
       :input("opcode",       0x00, 31, 16, 0x805)
       :input("opmod",        0x04, 15,  0, 1) -- read
@@ -1957,8 +1999,15 @@ function HCA:get_port_speed_start ()
 end
 
 function HCA:get_port_speed_finish ()
-   local eth_proto_oper = self:output(0x10 + 0x24, 31, 0)
-   return (port_speed[eth_proto_oper] or 0) * 1e9
+   local speed = 0
+   if self.extended then
+      local ext_eth_proto_oper = self:output(0x10 + 0x20, 31, 0)
+      speed = ext_port_speed[ext_eth_proto_oper]
+   else
+      local eth_proto_oper = self:output(0x10 + 0x24, 31, 0)
+      speed = port_speed[eth_proto_oper]
+   end
+   return (speed or 0) * 1e9
 end
 
 -- Set the administrative status of the port (boolean up/down).
