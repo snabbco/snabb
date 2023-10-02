@@ -96,6 +96,7 @@ local cards = {
            ["0x1017" ] = {model = 'MT27800', driver = 'apps.mellanox.connectx'},
            ["0x1019" ] = {model = 'MT28800', driver = 'apps.mellanox.connectx'},
            ["0x101d" ] = {model = 'MT2892',  driver = 'apps.mellanox.connectx'},
+           ["0x1021" ] = {model = 'MT2910',  driver = 'apps.mellanox.connectx'},
 	},
 }
 

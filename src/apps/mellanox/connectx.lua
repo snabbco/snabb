@@ -207,6 +207,7 @@ local mlx_types = {
    ["0x1017" ] = 5, -- ConnectX5
    ["0x1019" ] = 5, -- ConnectX5
    ["0x101d" ] = 6, -- ConnectX6
+   ["0x1021" ] = 7, -- ConnectX7
 }
 
 ConnectX.config = {
