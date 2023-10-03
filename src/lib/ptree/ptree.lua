@@ -944,9 +944,9 @@ function Manager:stop ()
    for id, worker in pairs(self.workers) do
       if not worker.shutting_down then self:stop_worker(id) end
    end
-   -- Wait 750ms for workers to shut down nicely, polling every 5ms.
+   -- Wait 2s for workers to shut down nicely, polling every 5ms.
    local start = C.get_monotonic_time()
-   local wait = 0.75
+   local wait = 2.0
    while C.get_monotonic_time() < start + wait do
       self:remove_stale_workers()
       if not next(self.workers) then break end
