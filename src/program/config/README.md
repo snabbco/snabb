@@ -39,6 +39,9 @@ include:
 * [`snabb config compress-alarms`](./compress_alarms/README): compress entries
   in the alarm list by removing all but the latest state change for all alarms
 
+* [`snabb config shutdown`](./shutdown/README): terminate all workers
+  and exit
+
 The `snabb config get` et al commands are the normal way that Snabb
 users interact with Snabb applications in an ad-hoc fashion via the
 command line.  `snabb config listen` is the standard way that a NETCONF

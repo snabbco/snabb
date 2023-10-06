@@ -81,6 +81,7 @@ function new_manager (conf)
    local conf = lib.parse(conf, manager_config_spec)
 
    local ret = setmetatable({}, {__index=Manager})
+   ret.shutdown = false
    ret.name = conf.name
    ret.log_level = assert(log_levels[conf.log_level])
    ret.cpuset = conf.cpuset
@@ -199,7 +200,12 @@ end
 function Manager:call_with_cleanup(closeable, f, ...)
    local ok, err = pcall(f, ...)
    closeable:close()
-   if not ok then self:warn('%s', tostring(err)) end
+   if not ok then
+      local errstr = tostring(err)
+      if not string.find(errstr, "shutdown") then
+	 self:warn('%s', errstr)
+      end
+   end
 end
 
 function Manager:accept_rpc_peers ()
@@ -295,7 +301,7 @@ function Manager:remove_stale_workers()
 	 self.cpuset:release(self.workers[id].scheduling.cpu)
       end
       self.workers[id] = nil
-
+      self:info('Worker %s has terminated', id)
    end
 end
 
@@ -566,6 +572,12 @@ function Manager:enqueue_config_actions (actions)
    for id,_ in pairs(self.workers) do
       self.enqueue_config_actions_for_worker(id, actions)
    end
+end
+
+function Manager:rpc_shutdown (args)
+   self:info("Shutdown request received")
+   self.shutdown = true
+   return { status = 0 }
 end
 
 function Manager:rpc_describe (args)
@@ -937,9 +949,9 @@ function Manager:stop ()
    for id, worker in pairs(self.workers) do
       if not worker.shutting_down then self:stop_worker(id) end
    end
-   -- Wait 250ms for workers to shut down nicely, polling every 5ms.
+   -- Wait 2s for workers to shut down nicely, polling every 5ms.
    local start = C.get_monotonic_time()
-   local wait = 0.25
+   local wait = 2.0
    while C.get_monotonic_time() < start + wait do
       self:remove_stale_workers()
       if not next(self.workers) then break end
@@ -961,7 +973,7 @@ end
 function Manager:main (duration)
    local now = C.get_monotonic_time()
    local stop = now + (duration or 1/0)
-   while now < stop do
+   while now < stop and not self.shutdown do
       next_time = now + self.period
       if timer.ticks then timer.run_to_time(now * 1e9) end
       self:remove_stale_workers()
@@ -975,12 +987,12 @@ function Manager:main (duration)
          now = C.get_monotonic_time()
       end
    end
+   self:stop()
 end
 
 function main (opts, duration)
    local m = new_manager(opts)
    m:main(duration)
-   m:stop()
 end
 
 function selftest ()
