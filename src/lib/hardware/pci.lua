@@ -240,7 +240,7 @@ function shutdown (pid)
    for _, device in ipairs(dma) do
       -- Only disable bus mastering if we are able to get an exclusive lock on
       -- resource 0 (i.e., no process left using the device.)
-      if pcall(open_pci_resource_locked(device, 0)) then
+      if pcall(function () return open_pci_resource_locked(device, 0) end) then
          set_bus_master(device, false)
       end
    end
