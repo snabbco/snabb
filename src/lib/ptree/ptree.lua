@@ -982,12 +982,15 @@ function Manager:main (duration)
          now = C.get_monotonic_time()
       end
    end
-   self:stop()
+   if self.shutdown then self:stop() end
 end
 
 function main (opts, duration)
    local m = new_manager(opts)
    m:main(duration)
+   if not m.shutdown then
+      m:stop()
+   end
 end
 
 function selftest ()
