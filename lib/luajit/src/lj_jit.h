@@ -56,16 +56,15 @@
 
 /* -- JIT engine parameters ----------------------------------------------- */
 
-/* See: http://blogs.msdn.com/oldnewthing/archive/2003/10/08/55239.aspx */
-#define JIT_P_sizemcode_DEFAULT		64
+#define JIT_P_sizemcode_DEFAULT		256
 
 /* Optimization parameters and their defaults. Length is a char in octal! */
 #define JIT_PARAMDEF(_) \
   _(\010, maxtrace,	10000)	/* Max. # of traces in cache. */ \
-  _(\011, maxrecord,	4000)	/* Max. # of recorded IR instructions. */ \
-  _(\012, maxirconst,	500)	/* Max. # of IR constants of a trace. */ \
-  _(\007, maxside,	100)	/* Max. # of side traces of a root trace. */ \
-  _(\007, maxsnap,	500)	/* Max. # of snapshots for a trace. */ \
+  _(\011, maxrecord,	10000)	/* Max. # of recorded IR instructions. */ \
+  _(\012, maxirconst,	5000)	/* Max. # of IR constants of a trace. */ \
+  _(\007, maxside,	1000)	/* Max. # of side traces of a root trace. */ \
+  _(\007, maxsnap,	2000)	/* Max. # of snapshots for a trace. */ \
   _(\011, minstitch,	0)	/* Min. # of IR ins for a stitched trace. */ \
   \
   _(\007, hotloop,	56)	/* # of iter. to detect a hot loop/call. */ \
@@ -80,7 +79,7 @@
   /* Size of each machine code area (in KBytes). */ \
   _(\011, sizemcode,	JIT_P_sizemcode_DEFAULT) \
   /* Max. total size of all machine code areas (in KBytes). */ \
-  _(\010, maxmcode,	512) \
+  _(\010, maxmcode,	8192) \
   /* End of list. */
 
 enum {
