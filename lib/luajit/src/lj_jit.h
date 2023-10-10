@@ -62,7 +62,7 @@
 #define JIT_PARAMDEF(_) \
   _(\010, maxtrace,	10000)	/* Max. # of traces in cache. */ \
   _(\011, maxrecord,	10000)	/* Max. # of recorded IR instructions. */ \
-  _(\012, maxirconst,	5000)	/* Max. # of IR constants of a trace. */ \
+  _(\012, maxirconst,	10000)	/* Max. # of IR constants of a trace. */ \
   _(\007, maxside,	1000)	/* Max. # of side traces of a root trace. */ \
   _(\007, maxsnap,	2000)	/* Max. # of snapshots for a trace. */ \
   _(\011, minstitch,	0)	/* Min. # of IR ins for a stitched trace. */ \
