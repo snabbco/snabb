@@ -105,7 +105,7 @@ function start (name, confpath)
             maxmcode=8192,
             maxtrace=8000,
             maxrecord=50000,
-            maxirconst=25000,
+            maxirconst=50000,
             maxsnap=20000,
             maxside=10000
          }
