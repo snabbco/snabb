@@ -107,11 +107,11 @@ end
 
 PollIOHandler.wait_for_events = PollIOHandler.schedule_tasks
 
-function PollIOHandler:cancel_tasks_for_fd(fd)
+function PollIOHandler:cancel_tasks_for_fd(fd, reason)
    local function cancel_tasks(waiting)
       local tasks = waiting[fd]
       if tasks ~= nil then
-         for i=1,#tasks do tasks[i]:cancel() end
+         for i=1,#tasks do tasks[i]:cancel(reason) end
          waiting[fd] = nil
       end
    end
@@ -119,12 +119,12 @@ function PollIOHandler:cancel_tasks_for_fd(fd)
    cancel_tasks(self.waiting_for_writable)
 end
 
-function PollIOHandler:cancel_all_tasks()
+function PollIOHandler:cancel_all_tasks(sched, reason)
    for fd,_ in pairs(self.waiting_for_readable) do
-      self:cancel_tasks_for_fd(fd)
+      self:cancel_tasks_for_fd(fd, reason)
    end
    for fd,_ in pairs(self.waiting_for_writable) do
-      self:cancel_tasks_for_fd(fd)
+      self:cancel_tasks_for_fd(fd, reason)
    end
 end
 

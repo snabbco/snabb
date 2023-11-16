@@ -1,6 +1,6 @@
 /*
 ** SINK: Allocation Sinking and Store Sinking.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_opt_sink_c
@@ -35,12 +35,14 @@ static IRIns *sink_checkalloc(jit_State *J, IRIns *irs)
 }
 
 /* Recursively check whether a value depends on a PHI. */
-static int sink_phidep(jit_State *J, IRRef ref)
+static int sink_phidep(jit_State *J, IRRef ref, int *workp)
 {
   IRIns *ir = IR(ref);
+  if (!*workp) return 1;  /* Give up and pretend it does. */
+  (*workp)--;
   if (irt_isphi(ir->t)) return 1;
-  if (ir->op1 >= REF_FIRST && sink_phidep(J, ir->op1)) return 1;
-  if (ir->op2 >= REF_FIRST && sink_phidep(J, ir->op2)) return 1;
+  if (ir->op1 >= REF_FIRST && sink_phidep(J, ir->op1, workp)) return 1;
+  if (ir->op2 >= REF_FIRST && sink_phidep(J, ir->op2, workp)) return 1;
   return 0;
 }
 
@@ -55,7 +57,13 @@ static int sink_checkphi(jit_State *J, IRIns *ira, IRRef ref)
       return 1;  /* Sinkable PHI. */
     }
     /* Otherwise the value must be loop-invariant. */
-    return ref < J->loopref && !sink_phidep(J, ref);
+    if (ref < J->loopref) {
+      /* Check for PHI dependencies, but give up after reasonable effort. */
+      int work = 64;
+      return !sink_phidep(J, ref, &work);
+    } else {
+      return 0;  /* Loop-variant. */
+    }
   }
   return 1;  /* Constant (non-PHI). */
 }
@@ -77,8 +85,7 @@ static void sink_mark_ins(jit_State *J)
     switch (ir->o) {
     case IR_BASE:
       return;  /* Finished. */
-    case IR_CALLL:  /* IRCALL_lj_tab_len */
-    case IR_ALOAD: case IR_HLOAD: case IR_XLOAD: case IR_TBAR:
+    case IR_ALOAD: case IR_HLOAD: case IR_XLOAD: case IR_TBAR: case IR_ALEN:
       irt_setmark(IR(ir->op1)->t);  /* Mark ref for remaining loads. */
       break;
     case IR_FLOAD:
@@ -93,10 +100,7 @@ static void sink_mark_ins(jit_State *J)
       break;
       }
     case IR_CNEWI:
-      if (irt_isphi(ir->t) &&
-	  (!sink_checkphi(J, ir, ir->op2) ||
-	   (LJ_32 && ir+1 < irlast && (ir+1)->o == IR_HIOP &&
-	    !sink_checkphi(J, ir, (ir+1)->op2))))
+      if (irt_isphi(ir->t) && !sink_checkphi(J, ir, ir->op2))
 	irt_setmark(ir->t);  /* Mark ineligible allocation. */
       /* fallthrough */
     case IR_USTORE:
@@ -111,7 +115,7 @@ static void sink_mark_ins(jit_State *J)
       irl->prev = irr->prev = 0;  /* Clear PHI value counts. */
       if (irl->o == irr->o &&
 	  (irl->o == IR_TNEW || irl->o == IR_TDUP ||
-	   (LJ_HASFFI && (irl->o == IR_CNEW || irl->o == IR_CNEWI))))
+	   (irl->o == IR_CNEW || irl->o == IR_CNEWI)))
 	break;
       irt_setmark(irl->t);
       irt_setmark(irr->t);
@@ -196,7 +200,7 @@ static void sink_sweep_ins(jit_State *J)
       IRIns *ira = IR(ir->op2);
       if (!irt_ismarked(ira->t) &&
 	  (ira->o == IR_TNEW || ira->o == IR_TDUP ||
-	   (LJ_HASFFI && (ira->o == IR_CNEW || ira->o == IR_CNEWI)))) {
+	   (ira->o == IR_CNEW || ira->o == IR_CNEWI))) {
 	ir->prev = REGSP(RID_SINK, 0);
       } else {
 	ir->prev = REGSP_INIT;
@@ -229,7 +233,7 @@ void lj_opt_sink(jit_State *J)
 			 JIT_F_OPT_DCE|JIT_F_OPT_CSE|JIT_F_OPT_FOLD);
   if ((J->flags & need) == need &&
       (J->chain[IR_TNEW] || J->chain[IR_TDUP] ||
-       (LJ_HASFFI && (J->chain[IR_CNEW] || J->chain[IR_CNEWI])))) {
+       (J->chain[IR_CNEW] || J->chain[IR_CNEWI]))) {
     if (!J->loopref)
       sink_mark_snap(J, &J->cur.snap[J->cur.nsnap-1]);
     sink_mark_ins(J);

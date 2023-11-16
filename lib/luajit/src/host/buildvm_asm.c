@@ -1,6 +1,6 @@
 /*
 ** LuaJIT VM builder: Assembler source code emitter.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #include "buildvm.h"
@@ -74,14 +74,7 @@ err:
   if (strncmp(sym+(*sym == '_'), LABEL_PREFIX, sizeof(LABEL_PREFIX)-1)) {
     /* Various fixups for external symbols outside of our binary. */
     if (ctx->mode == BUILD_elfasm) {
-      if (LJ_32)
-	fprintf(ctx->fp, "#if __PIC__\n\t%s lj_wrap_%s\n#else\n", opname, sym);
       fprintf(ctx->fp, "\t%s %s@PLT\n", opname, sym);
-      if (LJ_32)
-	fprintf(ctx->fp, "#endif\n");
-      return;
-    } else if (LJ_32 && ctx->mode == BUILD_machasm) {
-      fprintf(ctx->fp, "\t%s L%s$stub\n", opname, sym);
       return;
     }
   }
@@ -140,14 +133,6 @@ static void emit_asm_wordreloc(BuildCtx *ctx, uint8_t *p, int n,
     fprintf(ctx->fp, "\t%s %d, %d, " TOCPREFIX "%s\n",
 	    (ins & 1) ? "bcl" : "bc", (ins >> 21) & 31, (ins >> 16) & 31, sym);
   } else if ((ins >> 26) == 18) {
-#if LJ_ARCH_PPC64
-    const char *suffix = strchr(sym, '@');
-    if (suffix && suffix[1] == 'h') {
-      fprintf(ctx->fp, "\taddis 11, 2, %s\n", sym);
-    } else if (suffix && suffix[1] == 'l') {
-      fprintf(ctx->fp, "\tld 12, %s\n", sym);
-    } else
-#endif
     fprintf(ctx->fp, "\t%s " TOCPREFIX "%s\n", (ins & 1) ? "bl" : "b", sym);
   } else {
     fprintf(stderr,
@@ -245,10 +230,13 @@ void emit_asm(BuildCtx *ctx)
   int i, rel;
 
   fprintf(ctx->fp, "\t.file \"buildvm_%s.dasc\"\n", ctx->dasm_arch);
-#if LJ_ARCH_PPC64
-  fprintf(ctx->fp, "\t.abiversion 2\n");
-#endif
   fprintf(ctx->fp, "\t.text\n");
+#if LJ_TARGET_MIPS32 && !LJ_ABI_SOFTFP
+  fprintf(ctx->fp, "\t.module fp=32\n");
+#endif
+#if LJ_TARGET_MIPS
+  fprintf(ctx->fp, "\t.set nomips16\n\t.abicalls\n\t.set noreorder\n\t.set nomacro\n");
+#endif
   emit_asm_align(ctx, 4);
 
 #if LJ_TARGET_PS3
@@ -275,14 +263,11 @@ void emit_asm(BuildCtx *ctx)
 	  ".pad #28\n");
 #endif
 #endif
-#if LJ_TARGET_MIPS
-  fprintf(ctx->fp, ".set nomips16\n.abicalls\n.set noreorder\n.set nomacro\n");
-#endif
 
   for (i = rel = 0; i < ctx->nsym; i++) {
     int32_t ofs = ctx->sym[i].ofs;
     int32_t next = ctx->sym[i+1].ofs;
-#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND && LJ_HASFFI
+#if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND
     if (!strcmp(ctx->sym[i].name, "lj_vm_ffi_call"))
       fprintf(ctx->fp,
 	      ".globl lj_err_unwind_arm\n"
@@ -320,10 +305,6 @@ void emit_asm(BuildCtx *ctx)
 
 #if LJ_TARGET_ARM && defined(__GNUC__) && !LJ_NO_UNWIND
   fprintf(ctx->fp,
-#if !LJ_HASFFI
-	  ".globl lj_err_unwind_arm\n"
-	  ".personality lj_err_unwind_arm\n"
-#endif
 	  ".fnend\n");
 #endif
 

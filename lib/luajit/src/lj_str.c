@@ -1,6 +1,9 @@
 /*
 ** String handling.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+**
+** Portions taken verbatim or adapted from the Lua interpreter.
+** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
 */
 
 #define lj_str_c
@@ -23,9 +26,7 @@ int32_t lj_str_cmp(GCstr *a, GCstr *b)
     uint32_t va = *(const uint32_t *)(strdata(a)+i);
     uint32_t vb = *(const uint32_t *)(strdata(b)+i);
     if (va != vb) {
-#if LJ_LE
       va = lj_bswap(va); vb = lj_bswap(vb);
-#endif
       i -= n;
       if ((int32_t)i >= -3) {
 	va >>= 32+(i<<3); vb >>= 32+(i<<3);
@@ -130,7 +131,7 @@ GCstr *lj_str_new(lua_State *L, const char *str, size_t lenx)
   o = gcref(g->strhash[h & g->strmask]);
   while (o != NULL) {
     GCstr *sx = gco2str(o);
-    if (sx->len == len && memcmp(str, strdata(sx), len) == 0) {
+    if (sx->hash == h && sx->len == len && memcmp(str, strdata(sx), len) == 0) {
       /* Resurrect if dead. Can only happen with fixstring() (keywords). */
       if (isdead(g, o)) flipwhite(o);
       return sx;  /* Return existing string. */

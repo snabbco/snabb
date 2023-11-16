@@ -1,0 +1,8 @@
+Usage: snabb config shutown [OPTION]... ID
+Update the configuration for a Snabb network function.
+
+Available options:
+  -h, --help                 Display this message.
+
+See https://github.com/Igalia/snabb/blob/lwaftr/src/program/config/README.md
+for full documentation.

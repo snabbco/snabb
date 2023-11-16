@@ -83,7 +83,7 @@ static void log_mem(const char *type, void *ptr, unsigned int size) {
 static void log_event(const char *type, int nattributes) {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
-  lua_assert(nattributes <= 252);
+  lj_assertX(nattributes <= 252, "too many event attributes");
   fixmap(nattributes+3);
   str_16("nanotime");  /* = */ uint_64(ts.tv_sec * 1000000000LL + ts.tv_nsec);
   str_16("type");      /* = */ str_16("event");

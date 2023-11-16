@@ -25,7 +25,10 @@ function Fiber:resume(...)
    local ok, err = coroutine.resume(self.coroutine, ...)
    current_fiber = saved_current_fiber
    if not ok then
-      print('Error while running fiber: '..tostring(err))
+      local errstr = tostring(err)
+      if not string.find(errstr, "shutdown") then
+	 print('Error while running fiber: '..errstr)
+      end
       self.alive = false
    end
 end

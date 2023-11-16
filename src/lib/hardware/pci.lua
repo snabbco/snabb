@@ -96,6 +96,7 @@ local cards = {
            ["0x1017" ] = {model = 'MT27800', driver = 'apps.mellanox.connectx'},
            ["0x1019" ] = {model = 'MT28800', driver = 'apps.mellanox.connectx'},
            ["0x101d" ] = {model = 'MT2892',  driver = 'apps.mellanox.connectx'},
+           ["0x1021" ] = {model = 'MT2910',  driver = 'apps.mellanox.connectx'},
 	},
 }
 
@@ -239,7 +240,7 @@ function shutdown (pid)
    for _, device in ipairs(dma) do
       -- Only disable bus mastering if we are able to get an exclusive lock on
       -- resource 0 (i.e., no process left using the device.)
-      if pcall(open_pci_resource_locked(device, 0)) then
+      if pcall(function () return open_pci_resource_locked(device, 0) end) then
          set_bus_master(device, false)
       end
    end

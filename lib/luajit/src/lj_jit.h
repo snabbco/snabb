@@ -1,47 +1,49 @@
 /*
 ** Common definitions for the JIT compiler.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_JIT_H
 #define _LJ_JIT_H
 
 #include "lj_obj.h"
+#if LJ_HASJIT
 #include "lj_ir.h"
 
-/* JIT engine flags. */
+/* -- JIT engine flags ---------------------------------------------------- */
+
+/* General JIT engine flags. 4 bits. */
 #define JIT_F_ON		0x00000001
 
-/* CPU-specific JIT engine flags. */
-#define JIT_F_SSE2		0x00000010
-#define JIT_F_SSE3		0x00000020
-#define JIT_F_SSE4_1		0x00000040
-#define JIT_F_PREFER_IMUL	0x00000080
-#define JIT_F_LEA_AGU		0x00000100
-#define JIT_F_BMI2		0x00000200
+/* CPU-specific JIT engine flags. 12 bits. Flags and strings must match. */
+#define JIT_F_CPU		0x00000010
 
-/* Names for the CPU-specific flags. Must match the order above. */
-#define JIT_F_CPU_FIRST		JIT_F_SSE2
-#define JIT_F_CPUSTRING		"\4SSE2\4SSE3\6SSE4.1\3AMD\4ATOM\4BMI2"
+#define JIT_F_SSE3		(JIT_F_CPU << 0)
+#define JIT_F_SSE4_1		(JIT_F_CPU << 1)
+#define JIT_F_BMI2		(JIT_F_CPU << 2)
 
-/* Optimization flags. */
+
+#define JIT_F_CPUSTRING		"\4SSE3\6SSE4.1\4BMI2"
+
+/* Optimization flags. 12 bits. */
+#define JIT_F_OPT		0x00010000
 #define JIT_F_OPT_MASK		0x0fff0000
 
-#define JIT_F_OPT_FOLD		0x00010000
-#define JIT_F_OPT_CSE		0x00020000
-#define JIT_F_OPT_DCE		0x00040000
-#define JIT_F_OPT_FWD		0x00080000
-#define JIT_F_OPT_DSE		0x00100000
-#define JIT_F_OPT_NARROW	0x00200000
-#define JIT_F_OPT_LOOP		0x00400000
-#define JIT_F_OPT_ABC		0x00800000
-#define JIT_F_OPT_SINK		0x01000000
-#define JIT_F_OPT_FUSE		0x02000000
+#define JIT_F_OPT_FOLD		(JIT_F_OPT << 0)
+#define JIT_F_OPT_CSE		(JIT_F_OPT << 1)
+#define JIT_F_OPT_DCE		(JIT_F_OPT << 2)
+#define JIT_F_OPT_FWD		(JIT_F_OPT << 3)
+#define JIT_F_OPT_DSE		(JIT_F_OPT << 4)
+#define JIT_F_OPT_NARROW	(JIT_F_OPT << 5)
+#define JIT_F_OPT_LOOP		(JIT_F_OPT << 6)
+#define JIT_F_OPT_ABC		(JIT_F_OPT << 7)
+#define JIT_F_OPT_SINK		(JIT_F_OPT << 8)
+#define JIT_F_OPT_FUSE		(JIT_F_OPT << 9)
+#define JIT_F_OPT_FMA		(JIT_F_OPT << 10)
 
 /* Optimizations names for -O. Must match the order above. */
-#define JIT_F_OPT_FIRST		JIT_F_OPT_FOLD
 #define JIT_F_OPTSTRING	\
-  "\4fold\3cse\3dce\3fwd\3dse\6narrow\4loop\3abc\4sink\4fuse"
+  "\4fold\3cse\3dce\3fwd\3dse\6narrow\4loop\3abc\4sink\4fuse\3fma"
 
 /* Optimization levels set a fixed combination of flags. */
 #define JIT_F_OPT_0	0
@@ -50,17 +52,23 @@
 #define JIT_F_OPT_3	(JIT_F_OPT_2|\
   JIT_F_OPT_FWD|JIT_F_OPT_DSE|JIT_F_OPT_ABC|JIT_F_OPT_SINK|JIT_F_OPT_FUSE)
 #define JIT_F_OPT_DEFAULT	JIT_F_OPT_3
+/* Note: FMA is not set by default. */
 
-/* See: http://blogs.msdn.com/oldnewthing/archive/2003/10/08/55239.aspx */
-#define JIT_P_sizemcode_DEFAULT		64
+/* -- JIT engine parameters ----------------------------------------------- */
+
+#define JIT_P_sizemcode_DEFAULT		256
+
+// NB: setting maxirconst to REF_BIAS means
+//   "the maximum possible number of IR constants"
+// (due to implementation details, LuaJIT is funky.)
 
 /* Optimization parameters and their defaults. Length is a char in octal! */
 #define JIT_PARAMDEF(_) \
   _(\010, maxtrace,	10000)	/* Max. # of traces in cache. */ \
-  _(\011, maxrecord,	4000)	/* Max. # of recorded IR instructions. */ \
-  _(\012, maxirconst,	500)	/* Max. # of IR constants of a trace. */ \
-  _(\007, maxside,	100)	/* Max. # of side traces of a root trace. */ \
-  _(\007, maxsnap,	500)	/* Max. # of snapshots for a trace. */ \
+  _(\011, maxrecord,	10000)	/* Max. # of recorded IR instructions. */ \
+  _(\012, maxirconst,	REF_BIAS)	/* Max. # of IR constants of a trace. */ \
+  _(\007, maxside,	1000)	/* Max. # of side traces of a root trace. */ \
+  _(\007, maxsnap,	2000)	/* Max. # of snapshots for a trace. */ \
   _(\011, minstitch,	0)	/* Min. # of IR ins for a stitched trace. */ \
   \
   _(\007, hotloop,	56)	/* # of iter. to detect a hot loop/call. */ \
@@ -75,7 +83,7 @@
   /* Size of each machine code area (in KBytes). */ \
   _(\011, sizemcode,	JIT_P_sizemcode_DEFAULT) \
   /* Max. total size of all machine code areas (in KBytes). */ \
-  _(\010, maxmcode,	512) \
+  _(\010, maxmcode,	8192) \
   /* End of list. */
 
 enum {
@@ -88,11 +96,14 @@ JIT_PARAMDEF(JIT_PARAMENUM)
 #define JIT_PARAMSTR(len, name, value)	#len #name
 #define JIT_P_STRING	JIT_PARAMDEF(JIT_PARAMSTR)
 
+/* -- JIT engine data structures ------------------------------------------ */
+
 /* Trace compiler state. */
 typedef enum {
   LJ_TRACE_IDLE,	/* Trace compiler idle. */
   LJ_TRACE_ACTIVE = 0x10,
   LJ_TRACE_RECORD,	/* Bytecode recording active. */
+  LJ_TRACE_RECORD_1ST,	/* Record 1st instruction, too. */
   LJ_TRACE_START,	/* New trace started. */
   LJ_TRACE_END,		/* End of trace. */
   LJ_TRACE_ASM,		/* Assemble trace. */
@@ -115,8 +126,9 @@ typedef uint8_t MCode;
 
 /* Stack snapshot header. */
 typedef struct SnapShot {
-  uint16_t mapofs;	/* Offset into snapshot map. */
+  uint32_t mapofs;	/* Offset into snapshot map. */
   IRRef1 ref;		/* First IR ref for this snapshot. */
+  uint16_t mcofs;	/* Offset into machine code in MCode units. */
   uint8_t nslots;	/* Number of valid slots. */
   uint8_t topslot;	/* Maximum frame extent. */
   uint8_t nent;		/* Number of compressed entries. */
@@ -132,12 +144,15 @@ typedef uint32_t SnapEntry;
 #define SNAP_CONT		0x020000	/* Continuation slot. */
 #define SNAP_NORESTORE		0x040000	/* No need to restore slot. */
 #define SNAP_SOFTFPNUM		0x080000	/* Soft-float number. */
+#define SNAP_KEYINDEX		0x100000	/* Traversal key index. */
 LJ_STATIC_ASSERT(SNAP_FRAME == TREF_FRAME);
 LJ_STATIC_ASSERT(SNAP_CONT == TREF_CONT);
+LJ_STATIC_ASSERT(SNAP_KEYINDEX == TREF_KEYINDEX);
 
 #define SNAP(slot, flags, ref)	(((SnapEntry)(slot) << 24) + (flags) + (ref))
 #define SNAP_TR(slot, tr) \
-  (((SnapEntry)(slot) << 24) + ((tr) & (TREF_CONT|TREF_FRAME|TREF_REFMASK)))
+  (((SnapEntry)(slot) << 24) + \
+   ((tr) & (TREF_KEYINDEX|TREF_CONT|TREF_FRAME|TREF_REFMASK)))
 #define SNAP_MKFTSZ(ftsz)	((SnapEntry)(ftsz))
 #define snap_ref(sn)		((sn) & 0xffff)
 #define snap_slot(sn)		((BCReg)((sn) >> 24))
@@ -175,15 +190,13 @@ typedef enum {
 /* Trace object. */
 typedef struct GCtrace {
   GCHeader;
-  uint8_t topslot;	/* Top stack slot already checked to be allocated. */
-  uint8_t linktype;	/* Type of link. */
+  uint16_t nsnap;	/* Number of snapshots. */
   IRRef nins;		/* Next IR instruction. Biased with REF_BIAS. */
   uint32_t unused_gc64;
   GCRef gclist;
   IRIns *ir;		/* IR instructions/constants. Biased with REF_BIAS. */
   IRRef nk;		/* Lowest IR constant. Biased with REF_BIAS. */
-  uint16_t nsnap;	/* Number of snapshots. */
-  uint16_t nsnapmap;	/* Number of snapshot map elements. */
+  uint32_t nsnapmap;	/* Number of snapshot map elements. */
   SnapShot *snap;	/* Snapshot array. */
   SnapEntry *snapmap;	/* Snapshot map. */
   GCRef startpt;	/* Starting prototype. */
@@ -204,6 +217,8 @@ typedef struct GCtrace {
   TraceNo1 parent;      /* Parent of this trace (or 0 for root traces). */
   ExitNo exitno;        /* Exit number in parent (valid for side-traces only). */
   uint8_t sinktags;	/* Trace has SINK tags. */
+  uint8_t topslot;	/* Top stack slot already checked to be allocated. */
+  uint8_t linktype;	/* Type of link. */
   uint8_t unused1;
 } GCtrace;
 
@@ -280,11 +295,13 @@ enum {
   LJ_K64_M2P64_31 = LJ_K64_M2P64,
   LJ_K64__MAX,
 };
+#define LJ_K64__USED	(LJ_TARGET_X86ORX64 || LJ_TARGET_MIPS)
 
 enum {
   LJ_K32_M2P64_31,	/* -2^64 or -2^31 */
   LJ_K32__MAX
 };
+#define LJ_K32__USED	(LJ_TARGET_X86ORX64 || LJ_TARGET_PPC || LJ_TARGET_MIPS)
 
 /* Get 16 byte aligned pointer to SIMD constant. */
 #define LJ_KSIMD(J, n) \
@@ -341,9 +358,13 @@ typedef struct jit_State {
   int32_t framedepth;	/* Current frame depth. */
   int32_t retdepth;	/* Return frame depth (count of RETF). */
 
+#if LJ_K32__USED
+  uint32_t k32[LJ_K32__MAX];  /* Common 4 byte constants used by backends. */
+#endif
   TValue ksimd[LJ_KSIMD__MAX*2+1];  /* 16 byte aligned SIMD constants. */
-  TValue k64[LJ_K64__MAX];  /* Common 8 byte constants used by backends. */
-  uint32_t k32[LJ_K32__MAX];  /* Ditto for 4 byte constants. */
+#if LJ_K64__USED
+  TValue k64[LJ_K64__MAX];  /* Common 8 byte constants. */
+#endif
 
   IRIns *irbuf;		/* Temp. IR instruction buffer. Biased with REF_BIAS. */
   IRRef loopref;	/* Last loop reference or ref of final LOOP (or 0). */
@@ -374,7 +395,6 @@ typedef struct jit_State {
 
   HotPenalty penalty[PENALTY_SLOTS];  /* Penalty slots. */
   uint32_t penaltyslot;	/* Round-robin index into penalty slots. */
-  uint32_t prngstate;	/* PRNG state. */
 
 #ifdef LUAJIT_ENABLE_TABLE_BUMP
   RBCHashEntry rbchash[RBCHASH_SLOTS];  /* Reverse bytecode map. */
@@ -388,6 +408,7 @@ typedef struct jit_State {
   const BCIns *startpc;	/* Bytecode PC of starting instruction. */
   TraceNo parent;	/* Parent of current side trace (0 for root traces). */
   ExitNo exitno;	/* Exit number in parent of current side trace. */
+  int exitcode;		/* Exit code from unwound trace. */
 
   BCIns *patchpc;	/* PC for pending re-patch. */
   BCIns patchins;	/* Instruction for pending re-patch. */
@@ -404,12 +425,11 @@ typedef struct jit_State {
 }
 jit_State;
 
-/* Trivial PRNG e.g. used for penalty randomization. */
-static LJ_AINLINE uint32_t LJ_PRNG_BITS(jit_State *J, int bits)
-{
-  /* Yes, this LCG is very weak, but that doesn't matter for our use case. */
-  J->prngstate = J->prngstate * 1103515245 + 12345;
-  return J->prngstate >> (32-bits);
-}
+#ifdef LUA_USE_ASSERT
+#define lj_assertJ(c, ...)	lj_assertG_(J2G(J), (c), __VA_ARGS__)
+#else
+#define lj_assertJ(c, ...)	((void)J)
+#endif
+#endif
 
 #endif

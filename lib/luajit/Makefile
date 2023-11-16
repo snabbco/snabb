@@ -10,7 +10,7 @@
 # For MSVC, please follow the instructions given in src/msvcbuild.bat.
 # For MinGW and Cygwin, cd to src and run make with the Makefile there.
 #
-# Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+# Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
 MAJVER=  1
@@ -33,10 +33,12 @@ DPREFIX= $(DESTDIR)$(PREFIX)
 INSTALL_BIN=   $(DPREFIX)/bin
 INSTALL_LIB=   $(DPREFIX)/$(MULTILIB)
 INSTALL_SHARE= $(DPREFIX)/share
-INSTALL_INC=   $(DPREFIX)/include/raptorjit-$(MAJVER).$(MINVER)
+INSTALL_DEFINC= $(DPREFIX)/include/raptorjit-$(MAJVER).$(MINVER)
+INSTALL_INC=   $(INSTALL_DEFINC)
 
 INSTALL_LJLIBD= $(INSTALL_SHARE)/raptorjit-$(VERSION)
 INSTALL_JITLIB= $(INSTALL_LJLIBD)/jit
+INSTALL_PKGCONFIG= $(INSTALL_LIB)/pkgconfig
 
 INSTALL_TNAME= raptorjit-$(VERSION)
 INSTALL_TSYMNAME= raptorjit
@@ -47,6 +49,7 @@ INSTALL_SONAME= $(INSTALL_SOSHORT2).$(MINVER).$(RELVER)
 INSTALL_DYLIBSHORT1= libraptorjit-$(ABIVER).dylib
 INSTALL_DYLIBSHORT2= libraptorjit-$(ABIVER).$(MAJVER).dylib
 INSTALL_DYLIBNAME= libraptorjit-$(ABIVER).$(MAJVER).$(MINVER).$(RELVER).dylib
+INSTALL_PCNAME= raptorjit.pc
 
 INSTALL_STATIC= $(INSTALL_LIB)/$(INSTALL_ANAME)
 INSTALL_DYN= $(INSTALL_LIB)/$(INSTALL_SONAME)
@@ -66,11 +69,17 @@ SYMLINK= ln -sf
 INSTALL_X= install -m 0755
 INSTALL_F= install -m 0644
 UNINSTALL= $(RM)
-LDCONFIG= ldconfig -n
+LDCONFIG= ldconfig -n 2>/dev/null
+SED_PC= sed -e "s|^prefix=.*|prefix=$(PREFIX)|" \
+            -e "s|^multilib=.*|multilib=$(MULTILIB)|"
+ifneq ($(INSTALL_DEFINC),$(INSTALL_INC))
+  SED_PC+= -e "s|^includedir=.*|includedir=$(INSTALL_INC)|"
+endif
 
 FILE_T= raptorjit
 FILE_A= libraptorjit.a
 FILE_SO= libraptorjit.so
+FILE_PC= raptorjit.pc
 FILES_INC= lua.h lualib.h lauxlib.h luaconf.h lua.hpp luajit.h
 FILES_JITLIB= bc.lua bcsave.lua vmdef.lua
 
@@ -108,9 +117,12 @@ install: $(INSTALL_DEP)
 	$(RM) $(INSTALL_DYN) $(INSTALL_SHORT1) $(INSTALL_SHORT2)
 	cd src && test -f $(FILE_SO) && \
 	  $(INSTALL_X) $(FILE_SO) $(INSTALL_DYN) && \
-	  $(LDCONFIG) $(INSTALL_LIB) && \
+	  ( $(LDCONFIG) $(INSTALL_LIB) || : ) && \
 	  $(SYMLINK) $(INSTALL_SONAME) $(INSTALL_SHORT1) && \
 	  $(SYMLINK) $(INSTALL_SONAME) $(INSTALL_SHORT2) || :
+	cd etc && $(SED_PC) $(FILE_PC) > $(FILE_PC).tmp && \
+	  $(INSTALL_F) -D $(FILE_PC).tmp $(INSTALL_PC) && \
+	  $(RM) $(FILE_PC).tmp
 	cd src && $(INSTALL_F) $(FILES_INC) $(INSTALL_INC)
 	cd src/jit && $(INSTALL_F) $(FILES_JITLIB) $(INSTALL_JITLIB)
 	$(SYMLINK) $(INSTALL_TNAME) $(INSTALL_TSYM)

@@ -1,6 +1,6 @@
 /*
 ** FFI C callback handling.
-** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #include "lj_obj.h"
@@ -25,8 +25,8 @@
 #define CALLBACK_MCODE_SIZE	(LJ_PAGESIZE * LJ_NUM_CBPAGE)
 
 
-#define CALLBACK_MCODE_HEAD	(LJ_64 ? 8 : 0)
-#define CALLBACK_MCODE_GROUP	(-2+1+2+(LJ_GC64 ? 10 : 5)+(LJ_64 ? 6 : 5))
+#define CALLBACK_MCODE_HEAD	8
+#define CALLBACK_MCODE_GROUP	(-2+1+2+10+6)
 
 #define CALLBACK_SLOT2OFS(slot) \
   (CALLBACK_MCODE_HEAD + CALLBACK_MCODE_GROUP*((slot)/32) + 4*(slot))
@@ -68,12 +68,12 @@ MSize lj_ccallback_ptr2slot(CTState *cts, void *p)
 }
 
 /* Initialize machine code for callback function pointers. */
-static void callback_mcode_init(global_State *g, uint8_t *page)
+static uint8_t *callback_mcode_init(global_State *g, uint8_t *page)
 {
   uint8_t *p = page;
-  uint8_t *target = (uint8_t *)(void *)lj_vm_ffi_callback;
+  ASMFunction target = lj_vm_ffi_callback;
   MSize slot;
-  *(void **)p = target; p += 8;
+  ((ASMFunction *)p)[0] = target; p += 8;
   for (slot = 0; slot < CALLBACK_MAX_SLOT; slot++) {
     /* mov al, slot; jmp group */
     *p++ = XI_MOVrib | RID_EAX; *p++ = (uint8_t)slot;
@@ -90,7 +90,7 @@ static void callback_mcode_init(global_State *g, uint8_t *page)
       *p++ = XI_JMPs; *p++ = (uint8_t)((2+2)*(31-(slot&31)) - 2);
     }
   }
-  lua_assert(p - page <= CALLBACK_MCODE_SIZE);
+  return p;
 }
 
 /* -- Machine code management --------------------------------------------- */
@@ -106,7 +106,7 @@ static void callback_mcode_init(global_State *g, uint8_t *page)
 static void callback_mcode_new(CTState *cts)
 {
   size_t sz = (size_t)CALLBACK_MCODE_SIZE;
-  void *p;
+  void *p, *pe;
   if (CALLBACK_MAX_SLOT == 0)
     lj_err_caller(cts->L, LJ_ERR_FFI_CBACKOV);
   p = mmap(NULL, sz, (PROT_READ|PROT_WRITE), MAP_PRIVATE|MAP_ANONYMOUS,
@@ -114,7 +114,10 @@ static void callback_mcode_new(CTState *cts)
   if (p == MAP_FAILED)
     lj_err_caller(cts->L, LJ_ERR_FFI_CBACKOV);
   cts->cb.mcode = p;
-  callback_mcode_init(cts->g, p);
+  pe = callback_mcode_init(cts->g, p);
+  UNUSED(pe);
+  lj_assertCTS((size_t)((char *)pe - (char *)p) <= sz,
+	       "miscalculated CALLBACK_MAX_SLOT");
   lj_mcode_sync(p, (char *)p + sz);
   mprotect(p, sz, (PROT_READ|PROT_EXEC));
 }
@@ -179,13 +182,13 @@ static void callback_conv_args(CTState *cts, lua_State *L)
   if (LJ_FR2) {
     (o++)->u64 = LJ_CONT_FFI_CALLBACK;
     (o++)->u64 = rid;
-    o++;
   } else {
     o->u32.lo = LJ_CONT_FFI_CALLBACK;
     o->u32.hi = rid;
     o++;
   }
   setframe_gc(o, obj2gco(fn), fntp);
+  if (LJ_FR2) o++;
   setframe_ftsz(o, ((char *)(o+1) - (char *)L->base) + FRAME_CONT);
   L->top = L->base = ++o;
   if (!ct)
@@ -205,7 +208,7 @@ static void callback_conv_args(CTState *cts, lua_State *L)
       CTSize sz;
       int isfp;
       MSize n;
-      lua_assert(ctype_isfield(ctf->info));
+      lj_assertCTS(ctype_isfield(ctf->info), "field expected");
       cta = ctype_rawchild(cts, ctf);
       isfp = ctype_isfp(cta->info);
       sz = (cta->size + CTSIZE_PTR-1) & ~(CTSIZE_PTR-1);
@@ -214,15 +217,10 @@ static void callback_conv_args(CTState *cts, lua_State *L)
       CALLBACK_HANDLE_REGARG  /* Handle register arguments. */
 
       /* Otherwise pass argument on stack. */
-      if (CCALL_ALIGN_STACKARG && LJ_32 && sz == 8)
-	nsp = (nsp + 1) & ~1u;  /* Align 64 bit argument on stack. */
       sp = &stack[nsp];
       nsp += n;
 
     done:
-      if (LJ_BE && cta->size < CTSIZE_PTR
-	 )
-	sp = (void *)((uint8_t *)sp + CTSIZE_PTR-cta->size);
       gcsteps += lj_cconv_tv_ct(cts, cta, 0, o++, sp);
     }
     fid = ctf->sib;
@@ -263,7 +261,7 @@ lua_State * lj_ccallback_enter(CTState *cts, void *cf)
 {
   lua_State *L = cts->L;
   global_State *g = cts->g;
-  lua_assert(L != NULL);
+  lj_assertG(L != NULL, "uninitialized cts->L in callback");
   if (tvref(g->jit_base)) {
     setstrV(L, L->top++, lj_err_str(L, LJ_ERR_FFI_BADCBACK));
     if (g->panic) g->panic(L);
@@ -333,7 +331,7 @@ found:
 static CType *callback_checkfunc(CTState *cts, CType *ct)
 {
   int narg = 0;
-  if (!ctype_isptr(ct->info) || (LJ_64 && ct->size != CTSIZE_PTR))
+  if (!ctype_isptr(ct->info) || ct->size != CTSIZE_PTR)
     return NULL;
   ct = ctype_rawchild(cts, ct);
   if (ctype_isfunc(ct->info)) {
@@ -348,7 +346,7 @@ static CType *callback_checkfunc(CTState *cts, CType *ct)
       CType *ctf = ctype_get(cts, fid);
       if (!ctype_isattrib(ctf->info)) {
 	CType *cta;
-	lua_assert(ctype_isfield(ctf->info));
+	lj_assertCTS(ctype_isfield(ctf->info), "field expected");
 	cta = ctype_rawchild(cts, ctf);
 	if (!(ctype_isenum(cta->info) || ctype_isptr(cta->info) ||
 	      (ctype_isnum(cta->info) && cta->size <= 8)) ||
