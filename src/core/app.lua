@@ -182,6 +182,7 @@ function configure (new_config)
    local actions = compute_config_actions(configuration, new_config)
    apply_config_actions(actions)
    counter.add(configs)
+   collectgarbage('collect')
 end
 
 
@@ -598,12 +599,17 @@ function main (options)
 
    events.engine_started()
 
+   collectgarbage('stop')
+
    repeat
       breathe()
       if not no_timers then timer.run() events.polled_timers() end
       if not busywait then pace_breathing() end
       randomize_log_rate() -- roll random log rate
    until done and done()
+
+   collectgarbage('restart')
+
    counter.commit()
    if not options.no_report then report(options.report) end
    events.engine_stopped()
@@ -707,6 +713,8 @@ function breathe ()
    if counter.read(breaths) % 100 == 0 then
       counter.commit()
       events.commited_counters()
+      collectgarbage('step', 1)
+      events.gc_step()
    end
    running = false
 end
