@@ -80,35 +80,29 @@ local function skip_lv2(data)
    return tlv.data + ntohs(tlv.length)
 end
 
-local function tcp_header_size(l4)
-   local offset = bit.rshift(ffi.cast("uint8_t*", l4)[12], 4)
-   return offset * 4
-end
-
 local function out_of_bounds (eop, ptr, size)
    return ffi.cast("uint8_t *", ptr) + size > eop
 end
 
 function accumulate(self, entry, pkt)
    local md = metadata_get(pkt)
-   -- The TLS handshake starts right after the TCP handshake,
-   -- i.e. either in the second (piggy-backed on the handshake ACK) or
-   -- third packet of the flow.
-   local payload = md.l4 + tcp_header_size(md.l4)
-   -- The effective payload size is the amount of the payload that is
-   -- actually present. This can be smaller than the actual payload
-   -- size if the packet has been truncated, e.g. by a port-mirror. It
-   -- can also be larger if the packet has been padded to the minimum
-   -- frame size (64 bytes). This can be safely ignored.
-   local eff_payload_size = pkt.length - md.l3_offset - (payload - md.l3)
-   if ((entry.packetDeltaCount == 1 or -- SYN
-        (entry.packetDeltaCount == 2 and eff_payload_size == 0) or -- Empty ACK
-        entry.packetDeltaCount > 3)) then
+   local tcp_header_size = 4 * bit.rshift(ffi.cast("uint8_t*", md.l4)[12], 4)
+   local payload = md.l4 + tcp_header_size
+   local eff_payload_size = pkt.data + pkt.length - payload
+   if (md.length_delta > 0) then
+      -- Remove padding
+      eff_payload_size = eff_payload_size - md.length_delta
+   end
+   if (eff_payload_size == 0) then
       return
    end
    -- End Of Payload (first byte after the effective payload), used
    -- for bounds check
    local eop = payload + eff_payload_size
+   -- Only process the first packet with non-zero payload after the
+   -- TCP handshake is completed.
+   entry.state.done = 1
+   self.counters.HTTPS_flows_examined = self.counters.HTTPS_flows_examined + 1
 
    -- Check bounds for the fixed-size part of the message
    if out_of_bounds(eop, payload,

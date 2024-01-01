@@ -427,7 +427,7 @@ local function v6_extract (self, pkt, timestamp, entry)
    end
 end
 
---- Helper functions for HTTP templates
+--- Helper functions for HTTP, HTTPS templates
 
 local HTTP_state_t = ffi.typeof([[
    struct {
@@ -457,6 +457,7 @@ end
 -- HTTPS-specific statistics counters
 local function HTTPS_counters()
    return {
+      HTTPS_flows_examined = 0,
       HTTPS_client_hellos = 0,
       HTTPS_extensions_present = 0,
       HTTPS_snis = 0,
@@ -466,7 +467,10 @@ end
 local function HTTPS_accumulate(self, dst, new, pkt)
    accumulate_generic(dst, new)
    accumulate_tcp_flags_reduced(dst, new)
-   tls.accumulate(self, dst.value, pkt)
+   if (dst.value.state.done == 0 and bit.band(dst.value.tcpControlBitsReduced, 0x12) == 0x12) then
+      -- Handshake complete (SYN/ACK)
+      tls.accumulate(self, dst.value, pkt)
+   end
 end
 
 local function DNS_extract(self, pkt, timestamp, entry, extract_addr_fn)
@@ -703,6 +707,7 @@ templates = {
                  "tcpControlBitsReduced",
                  "tlsSNI=64",
                  "tlsSNILength"},
+      state_t = HTTP_state_t,
       counters = HTTPS_counters(),
       extract = v4_extract,
       accumulate = HTTPS_accumulate,
@@ -838,6 +843,7 @@ templates = {
                  "tcpControlBitsReduced",
                  "tlsSNI=64",
                  "tlsSNILength"},
+      state_t = HTTP_state_t,
       counters = HTTPS_counters(),
       extract = v6_extract,
       accumulate = HTTPS_accumulate,
