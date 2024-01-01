@@ -13,8 +13,8 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
 local ipv6     = require("lib.protocol.ipv6")
 local metadata = require("apps.rss.metadata")
-local strings  = require("apps.ipfix.strings")
 local dns      = require("apps.ipfix.dns")
+local http     = require("apps.ipfix.http")
 local tls      = require("apps.ipfix.tls")
 local S        = require("syscall")
 
@@ -429,73 +429,28 @@ end
 
 --- Helper functions for HTTP templates
 
--- We want to be able to find a "Host:" header even if it is not in
--- the same TCP segment as the GET request, which requires to keep
--- state.
 local HTTP_state_t = ffi.typeof([[
    struct {
-      uint8_t have_GET;
-      uint8_t have_host;
-      uint8_t examined;
+      uint8_t done;
    } __attribute__((packed))
 ]])
--- The number of TCP segments to scan for the first GET request
--- (including the SYN segment, which is skipped). Most requests are
--- found in the first non-handshake packet (segment #3 from the
--- client). Empirical evidence shows a strong peak there with a long
--- tail.  A cutoff of 10 is expected to find at least 80% of the GET
--- requests.
-local HTTP_scan_threshold = 10
+
 -- HTTP-specific statistics counters
 local function HTTP_counters()
    return {
+      -- Flows for which we have seen a complete TCP handshake and one
+      -- packet with non-zero payload
       HTTP_flows_examined = 0,
-      HTTP_GET_matches = 0,
-      HTTP_host_matches = 0
+      -- Subset of examined flows with invalid HTTP request methods
+      HTTP_invalid_method = 0,
    }
 end
-
-local HTTP_strings = strings.strings_to_buf({
-      GET = 'GET ',
-      Host = 'Host:'
-})
-
-local HTTP_ct = strings.ct_t()
-
 local function HTTP_accumulate(self, dst, new, pkt)
-   local md = metadata_get(pkt)
-   if ((dst.value.packetDeltaCount >= HTTP_scan_threshold or
-           -- TCP SYN
-        bit.band(new.value.tcpControlBitsReduced, 0x02) == 0x02)) then
-      return
-   end
-   local state = dst.value.state
-   if state.examined == 0 then
-      self.counters.HTTP_flows_examined =
-         self.counters.HTTP_flows_examined + 1
-      state.examined = 1
-   end
-   strings.ct_init(HTTP_ct, pkt.data, pkt.length, md.l4 - pkt.data)
-   if (state.have_GET == 0 and
-       strings.search(HTTP_strings.GET, HTTP_ct, true)) then
-      ffi.copy(dst.value.httpRequestMethod, 'GET')
-      state.have_GET = 1
-      strings.skip_space(HTTP_ct)
-      local start = strings.ct_at(HTTP_ct)
-      local _, length = strings.upto_space_or_cr(HTTP_ct)
-      length = math.min(length, ffi.sizeof(dst.value.httpRequestTarget) - 1)
-      ffi.copy(dst.value.httpRequestTarget, start, length)
-      self.counters.HTTP_GET_matches = self.counters.HTTP_GET_matches + 1
-   end
-   if (state.have_GET == 1 and state.have_host == 0 and
-       strings.search(HTTP_strings.Host, HTTP_ct, true)) then
-      state.have_host = 1
-      strings.skip_space(HTTP_ct)
-      local start = strings.ct_at(HTTP_ct)
-      local _, length = strings.upto_space_or_cr(HTTP_ct)
-      length = math.min(length, ffi.sizeof(dst.value.httpRequestHost) - 1)
-      ffi.copy(dst.value.httpRequestHost, start, length)
-      self.counters.HTTP_host_matches = self.counters.HTTP_host_matches + 1
+   accumulate_generic(dst, new)
+   accumulate_tcp_flags_reduced(dst, new)
+   if (dst.value.state.done == 0 and bit.band(dst.value.tcpControlBitsReduced, 0x12) == 0x12) then
+      -- Handshake complete (SYN/ACK)
+      http.accumulate(self, dst.value, pkt)
    end
 end
 
@@ -700,11 +655,7 @@ templates = {
       state_t = HTTP_state_t,
       counters = HTTP_counters(),
       extract = v4_extract,
-      accumulate = function (self, dst, new, pkt)
-         accumulate_generic(dst, new)
-         accumulate_tcp_flags_reduced(dst, new)
-         HTTP_accumulate(self, dst, new, pkt)
-      end
+      accumulate = HTTP_accumulate,
    },
    v4_DNS = {
       id     = 258,
@@ -839,11 +790,7 @@ templates = {
       state_t = HTTP_state_t,
       counters = HTTP_counters(),
       extract = v6_extract,
-      accumulate = function (self, dst, new, pkt)
-         accumulate_generic(dst, new)
-         accumulate_tcp_flags_reduced(dst, new)
-         HTTP_accumulate(self, dst, new, pkt)
-      end
+      accumulate = HTTP_accumulate,
    },
    v6_DNS = {
       id     = 514,
