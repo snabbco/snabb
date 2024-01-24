@@ -605,21 +605,104 @@ local function v6_extended_accumulate (self, dst, new)
    end
 end
 
+local function concat_lists(...)
+   local arg = {...}
+   local result = {}
+   for _, l in ipairs(arg) do
+      for i = 1, #l do
+	 result[#result+1] = l[i]
+      end
+   end
+   return result
+end
+
+local keys_ipv4 = {
+   "sourceIPv4Address",
+   "destinationIPv4Address",
+   "protocolIdentifier",
+   "sourceTransportPort",
+   "destinationTransportPort"
+}
+local keys_ipv6 = {
+   "sourceIPv6Address",
+   "destinationIPv6Address",
+   "protocolIdentifier",
+   "sourceTransportPort",
+   "destinationTransportPort"
+}
+local keys_dns = {
+      "dnsFlagsCodes",
+      "dnsQuestionCount",
+      "dnsAnswerCount",
+      "dnsQuestionName=64",
+      "dnsQuestionType",
+      "dnsQuestionClass",
+      "dnsAnswerName=64",
+      "dnsAnswerType",
+      "dnsAnswerClass",
+      "dnsAnswerTtl",
+      "dnsAnswerRdata=64",
+      "dnsAnswerRdataLen"
+}
+local keys_ipv4_dns = concat_lists(keys_ipv4, keys_dns)
+local keys_ipv6_dns = concat_lists(keys_ipv6, keys_dns)
+
+local values_min = {
+   "flowStartMilliseconds",
+   "flowEndMilliseconds",
+   "packetDeltaCount",
+   "octetDeltaCount"
+}
+local values = concat_lists(
+   values_min,
+   {
+      "tcpControlBitsReduced"
+   }
+)
+local values_extended = concat_lists(
+   values,
+   {
+      "sourceMacAddress",
+      "postDestinationMacAddress",
+      "vlanId",
+      "ipClassOfService",
+      "bgpSourceAsNumber",
+      "bgpDestinationAsNumber",
+      "bgpPrevAdjacentAsNumber",
+      "bgpNextAdjacentAsNumber",
+      "ingressInterface",
+      "egressInterface"
+   }
+)
+local values_extended_ipv4 = concat_lists(
+   values_extended,
+   {
+      "icmpTypeCodeIPv4",
+   }
+)
+local values_extended_ipv6 = concat_lists(
+   values_extended,
+   {
+      "icmpTypeCodeIPv6",
+   }
+)
+local values_HTTP = {
+   "httpRequestMethod=8",
+   "httpRequestHost=32",
+   "httpRequestTarget=64"
+}
+local values_HTTPS = {
+   "tlsSNI=64",
+   "tlsSNILength"
+}
+
 templates = {
    v4 = {
       id     = 256,
       filter = "ip",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced" },
+      keys   = keys_ipv4,
+      values = values,
       extract = v4_extract,
       accumulate = function (self, dst, new)
          accumulate_generic(dst, new)
@@ -643,19 +726,8 @@ templates = {
       id     = 257,
       filter = "ip and tcp dst port 80",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced",
-                 "httpRequestMethod=8",
-                 "httpRequestHost=32",
-                 "httpRequestTarget=64" },
+      keys   = keys_ipv4,
+      values = concat_lists(values, values_HTTP),
       state_t = HTTP_state_t,
       counters = HTTP_counters(),
       extract = v4_extract,
@@ -665,27 +737,8 @@ templates = {
       id     = 258,
       filter = "ip and udp port 53",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort",
-                 "dnsFlagsCodes",
-                 "dnsQuestionCount",
-                 "dnsAnswerCount",
-                 "dnsQuestionName=64",
-                 "dnsQuestionType",
-                 "dnsQuestionClass",
-                 "dnsAnswerName=64",
-                 "dnsAnswerType",
-                 "dnsAnswerClass",
-                 "dnsAnswerTtl",
-                 "dnsAnswerRdata=64",
-                 "dnsAnswerRdataLen" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount" },
+      keys   = keys_ipv4_dns,
+      values = values_min,
       extract = function (self, pkt, timestamp, entry)
          DNS_extract(self, pkt, timestamp, entry, extract_v4_addr)
       end,
@@ -695,18 +748,8 @@ templates = {
       id     = 259,
       filter = "ip and tcp and (dst port 443 or dst port 8443)",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced",
-                 "tlsSNI=64",
-                 "tlsSNILength"},
+      keys   = keys_ipv4,
+      values = concat_lists(values, values_HTTPS),
       state_t = HTTP_state_t,
       counters = HTTPS_counters(),
       extract = v4_extract,
@@ -716,28 +759,8 @@ templates = {
       id     = 1256,
       filter = "ip",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "sourceMacAddress",
-                 -- This is destinationMacAddress per NetFlowV9
-                 "postDestinationMacAddress",
-                 "vlanId",
-                 "ipClassOfService",
-                 "bgpSourceAsNumber",
-                 "bgpDestinationAsNumber",
-                 "bgpPrevAdjacentAsNumber",
-                 "bgpNextAdjacentAsNumber",
-                 "tcpControlBitsReduced",
-                 "icmpTypeCodeIPv4",
-                 "ingressInterface",
-                 "egressInterface" },
+      keys   = keys_ipv4,
+      values = values_extended_ipv4,
       require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx4_to_as' },
       extract = v4_extended_extract,
       accumulate = v4_extended_accumulate
@@ -746,16 +769,8 @@ templates = {
       id     = 512,
       filter = "ip6",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced" },
+      keys   = keys_ipv6,
+      values = values,
       extract = v6_extract,
       accumulate = function (self, dst, new)
          accumulate_generic(dst, new)
@@ -779,19 +794,8 @@ templates = {
       id     = 513,
       filter = "ip6 and tcp dst port 80",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced",
-                 "httpRequestMethod=8",
-                 "httpRequestHost=32",
-                 "httpRequestTarget=64" },
+      keys   = keys_ipv6,
+      values = concat_lists(values, values_HTTP),
       state_t = HTTP_state_t,
       counters = HTTP_counters(),
       extract = v6_extract,
@@ -801,27 +805,8 @@ templates = {
       id     = 514,
       filter = "ip6 and udp port 53",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort",
-                 "dnsFlagsCodes",
-                 "dnsQuestionCount",
-                 "dnsAnswerCount",
-                 "dnsQuestionName=64",
-                 "dnsQuestionType",
-                 "dnsQuestionClass",
-                 "dnsAnswerName=64",
-                 "dnsAnswerType",
-                 "dnsAnswerClass",
-                 "dnsAnswerTtl",
-                 "dnsAnswerRdata=64",
-                 "dnsAnswerRdataLen" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount" },
+      keys   = keys_ipv6_dns,
+      values = values_min,
       extract = function (self, pkt, timestamp, entry)
          DNS_extract(self, pkt, timestamp, entry, extract_v6_addr)
       end,
@@ -831,18 +816,8 @@ templates = {
       id     = 515,
       filter = "ip6 and tcp and (dst port 443 or dst port 8443)",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced",
-                 "tlsSNI=64",
-                 "tlsSNILength"},
+      keys   = keys_ipv6,
+      values = concat_lists(values, values_HTTPS),
       state_t = HTTP_state_t,
       counters = HTTPS_counters(),
       extract = v6_extract,
@@ -852,28 +827,8 @@ templates = {
       id     = 1512,
       filter = "ip6",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "sourceMacAddress",
-                 -- This is destinationMacAddress per NetFlowV9
-                 "postDestinationMacAddress",
-                 "vlanId",
-                 "ipClassOfService",
-                 "bgpSourceAsNumber",
-                 "bgpDestinationAsNumber",
-                 "bgpNextAdjacentAsNumber",
-                 "bgpPrevAdjacentAsNumber",
-                 "tcpControlBitsReduced",
-                 "icmpTypeCodeIPv6",
-                 "ingressInterface",
-                 "egressInterface" },
+      keys   = keys_ipv6,
+      values = values_extended_ipv6,
       require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx6_to_as' },
       extract = v6_extended_extract,
       accumulate = v6_extended_accumulate,
