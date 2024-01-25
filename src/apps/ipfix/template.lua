@@ -784,6 +784,44 @@ templates = {
       extract = v4_extended_extract,
       accumulate = v4_extended_accumulate
    },
+   v4_extended_HTTP = {
+      id     = 1257,
+      filter = "ip and tcp dst port 80",
+      aggregation_type = 'v4',
+      keys   = keys_ipv4,
+      values = concat_lists(values_extended_ipv4, values_HTTP),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx4_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v4_extended_extract,
+      accumulate = HTTP_accumulate,
+   },
+   v4_extended_HTTPS_Flowmon = {
+      id     = 1258,
+      filter = "ip and tcp and (dst port 443 or dst port 8443)",
+      aggregation_type = 'v4',
+      keys   = keys_ipv4,
+      values = concat_lists(values_extended_ipv4, values_HTTPS_Flowmon),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx4_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTPS_counters(),
+      extract = v4_extended_extract,
+      accumulate = HTTPS_accumulate,
+   },
+   v4_extended_HTTP_Flowmon = {
+      id     = 1259,
+      filter = "ip and tcp dst port 80",
+      aggregation_type = 'v4',
+      keys   = keys_ipv4,
+      values = concat_lists(values_extended_ipv4, values_HTTP_Flowmon),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx4_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v4_extended_extract,
+      accumulate = function (self, dst, new, pkt)
+	 HTTP_accumulate(self, dst, new, pkt, "flowmon")
+      end
+   },
    v6 = {
       id     = 512,
       filter = "ip6",
@@ -865,6 +903,44 @@ templates = {
       extract = v6_extended_extract,
       accumulate = v6_extended_accumulate,
    },
+   v6_extended_HTTP = {
+      id     = 1513,
+      filter = "ip6 and tcp dst port 80",
+      aggregation_type = 'v6',
+      keys   = keys_ipv6,
+      values = concat_lists(values_extended_ipv6, values_HTTP),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx6_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v6_extended_extract,
+      accumulate = HTTP_accumulate,
+   },
+   v6_extended_HTTPS_Flowmon = {
+      id     = 1514,
+      filter = "ip6 and tcp and (dst port 443 or dst port 8443)",
+      aggregation_type = 'v6',
+      keys   = keys_ipv6,
+      values = concat_lists(values_extended_ipv6, values_HTTPS_Flowmon),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx6_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTPS_counters(),
+      extract = v6_extended_extract,
+      accumulate = HTTPS_accumulate,
+   },
+   v6_extended_HTTP_Flowmon = {
+      id     = 1515,
+      filter = "ip6 and tcp dst port 80",
+      aggregation_type = 'v6',
+      keys   = keys_ipv6,
+      values = concat_lists(values_extended_ipv6, values_HTTP_Flowmon),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx6_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v6_extended_extract,
+      accumulate = function (self, dst, new, pkt)
+	 HTTP_accumulate(self, dst, new, pkt, "flowmon")
+      end
+   }
 }
 
 local templates_legend = [[
