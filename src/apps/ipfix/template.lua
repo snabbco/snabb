@@ -445,12 +445,12 @@ local function HTTP_counters()
       HTTP_invalid_method = 0,
    }
 end
-local function HTTP_accumulate(self, dst, new, pkt)
+local function HTTP_accumulate(self, dst, new, pkt, flowmon)
    accumulate_generic(dst, new)
    accumulate_tcp_flags_reduced(dst, new)
    if (dst.value.state.done == 0 and bit.band(dst.value.tcpControlBitsReduced, 0x12) == 0x12) then
       -- Handshake complete (SYN/ACK)
-      http.accumulate(self, dst.value, pkt)
+      http.accumulate(self, dst.value, pkt, flowmon)
    end
 end
 
@@ -691,6 +691,12 @@ local values_HTTP = {
    "httpRequestHost=32",
    "httpRequestTarget=64"
 }
+-- Proprietary Flowmon HTTP/HTTPS fields
+local values_HTTP_Flowmon = {
+   "fmHttpRequestMethod",
+   "fmHttpRequestHost=32",
+   "fmHttpRequestTarget=64"
+}
 local values_HTTPS = {
    "tlsSNI=64",
    "tlsSNILength"
@@ -754,6 +760,19 @@ templates = {
       counters = HTTPS_counters(),
       extract = v4_extract,
       accumulate = HTTPS_accumulate,
+   },
+   v4_HTTP_Flowmon = {
+      id     = 260,
+      filter = "ip and tcp dst port 80",
+      aggregation_type = 'v4',
+      keys   = keys_ipv4,
+      values = concat_lists(values, values_HTTP_Flowmon),
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v4_extract,
+      accumulate = function (self, dst, new, pkt)
+	 HTTP_accumulate(self, dst, new, pkt, "flowmon")
+      end
    },
    v4_extended = {
       id     = 1256,
@@ -822,6 +841,19 @@ templates = {
       counters = HTTPS_counters(),
       extract = v6_extract,
       accumulate = HTTPS_accumulate,
+   },
+   v6_HTTP_Flowmon = {
+      id     = 516,
+      filter = "ip6 and tcp dst port 80",
+      aggregation_type = 'v6',
+      keys   = keys_ipv6,
+      values = concat_lists(values, values_HTTP_Flowmon),
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v6_extract,
+      accumulate = function (self, dst, new, pkt)
+	 HTTP_accumulate(self, dst, new, pkt, "flowmon")
+      end
    },
    v6_extended = {
       id     = 1512,

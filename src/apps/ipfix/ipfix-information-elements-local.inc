@@ -15,3 +15,17 @@ compressed domain names have been replaced with their uncompressed counterparts"
 2946:111,dnsAnswerRdataLen,unsigned16,,,,,,,,,
 39499:338,tlsSNI,string,DNS name from the TLS Server Name Indication extension,,,,,,,,
 39499:339,tlsSNILength,unsigned16,Length of tlsSNI in bytes,,,,,,,,
+39499:1,fmHttpRequestHost,string,,,,,,,,,,
+39499:2,fmHttpRequestTarget,string,,,,,,,,,,
+39499:4,fmHttpRequestMethod,unsigned16,"Bit mask of HTTP request types
+GET     0x0001
+POST    0x0002
+HEAD    0x0004
+PUT     0x0008
+OPTIONS 0x0010
+DELETE  0x0020
+TRACE   0x0040
+PATCH   0x0080
+CONNECT 0x0100
+SSL     0x0200
+",,,,,,,,,
