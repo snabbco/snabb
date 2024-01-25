@@ -159,8 +159,8 @@ function accumulate(self, entry, pkt)
          if sni.name_type ~= 0 then return end
          local name_length = ntohs(sni.name_length)
          if out_of_bounds(eop, sni.name, name_length) then return end
-         ffi.copy(entry.tlsSNI, sni.name, math.min(ffi.sizeof(entry.tlsSNI), name_length))
-         entry.tlsSNILength = name_length
+         ffi.copy(entry.fmTlsSNI, sni.name, math.min(ffi.sizeof(entry.fmTlsSNI), name_length))
+         entry.fmTlsSNILength = name_length
          self.counters.HTTPS_snis = self.counters.HTTPS_snis + 1
          return
       end

@@ -697,9 +697,9 @@ local values_HTTP_Flowmon = {
    "fmHttpRequestHost=32",
    "fmHttpRequestTarget=64"
 }
-local values_HTTPS = {
-   "tlsSNI=64",
-   "tlsSNILength"
+local values_HTTPS_Flowmon = {
+   "fmTlsSNI=64",
+   "fmTlsSNILength"
 }
 
 templates = {
@@ -750,12 +750,12 @@ templates = {
       end,
       accumulate = DNS_accumulate
    },
-   v4_HTTPS = {
+   v4_HTTPS_Flowmon = {
       id     = 259,
       filter = "ip and tcp and (dst port 443 or dst port 8443)",
       aggregation_type = 'v4',
       keys   = keys_ipv4,
-      values = concat_lists(values, values_HTTPS),
+      values = concat_lists(values, values_HTTPS_Flowmon),
       state_t = HTTP_state_t,
       counters = HTTPS_counters(),
       extract = v4_extract,
@@ -831,12 +831,12 @@ templates = {
       end,
       accumulate = DNS_accumulate
    },
-   v6_HTTPS = {
+   v6_HTTPS_Flowmon = {
       id     = 515,
       filter = "ip6 and tcp and (dst port 443 or dst port 8443)",
       aggregation_type = 'v6',
       keys   = keys_ipv6,
-      values = concat_lists(values, values_HTTPS),
+      values = concat_lists(values, values_HTTPS_Flowmon),
       state_t = HTTP_state_t,
       counters = HTTPS_counters(),
       extract = v6_extract,
