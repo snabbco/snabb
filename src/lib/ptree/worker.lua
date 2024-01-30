@@ -15,6 +15,7 @@ local channel      = require("lib.ptree.channel")
 local action_codec = require("lib.ptree.action_codec")
 local ptree_alarms = require("lib.ptree.alarms")
 local timeline     = require("core.timeline")
+local gc           = require("core.gc")
 local events       = timeline.load_events(engine.timeline(), "core.engine")
 
 local Worker = {}
@@ -82,6 +83,7 @@ function Worker:commit_pending_actions()
    if #to_apply > 0 then engine.apply_config_actions(to_apply) end
    self.pending_actions = {}
    if should_flush then require('jit').flush() end
+   gc.collect()
 end
 
 function Worker:handle_actions_from_manager()
@@ -110,6 +112,9 @@ function Worker:main ()
    engine.enable_tick()
 
    engine.setvmprofile("engine")
+
+   gc.stop()
+
    repeat
       self.breathe()
       if next_time < engine.now() then
@@ -123,6 +128,9 @@ function Worker:main ()
       if not engine.busywait then engine.pace_breathing() end
       engine.randomize_log_rate()
    until stop < engine.now()
+
+   gc.restart()
+
    counter.commit()
    if not self.no_report then engine.report(self.report) end
 end

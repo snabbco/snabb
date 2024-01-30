@@ -41,6 +41,9 @@ can be used to track the rate of traffic.
 The engine commits the latest counter values to externally visible shared
 memory.
 
+1,5|gc_step:
+The engine performs a garbage collection step.
+
 1,4|polled_timers:
 The engine polled its timers and executed any that were expired.
 

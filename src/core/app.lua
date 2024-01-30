@@ -12,6 +12,7 @@ local histogram    = require('core.histogram')
 local counter      = require("core.counter")
 local timeline_mod = require("core.timeline") -- avoid collision with timeline
 local jit          = require("jit")
+local gc           = require("core.gc")
 local S            = require("syscall")
 local ffi          = require("ffi")
 local C            = ffi.C
@@ -182,6 +183,7 @@ function configure (new_config)
    local actions = compute_config_actions(configuration, new_config)
    apply_config_actions(actions)
    counter.add(configs)
+   gc.collect()
 end
 
 
@@ -598,12 +600,17 @@ function main (options)
 
    events.engine_started()
 
+   gc.stop()
+
    repeat
       breathe()
       if not no_timers then timer.run() events.polled_timers() end
       if not busywait then pace_breathing() end
       randomize_log_rate() -- roll random log rate
    until done and done()
+
+   gc.restart()
+
    counter.commit()
    if not options.no_report then report(options.report) end
    events.engine_stopped()
@@ -707,6 +714,13 @@ function breathe ()
    if counter.read(breaths) % 100 == 0 then
       counter.commit()
       events.commited_counters()
+      gc.step()
+      events.gc_step()
+   end
+   -- Perform GC steps at a reasonable frequency
+   if counter.read(breaths) % 1000 == 0 then
+      gc.step()
+      events.gc_step()
    end
    running = false
 end
