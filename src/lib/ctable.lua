@@ -358,8 +358,10 @@ function CTable:add(key, value, updates_allowed)
       local entry = entries + index
       if self.equal_fn(key, entry.key) then
          assert(updates_allowed, "key is already present in ctable")
-         entry.key = key
-         entry.value = value
+         if updates_allowed ~= 'preserve' then
+            entry.key = key
+            entry.value = value
+         end
          return entry
       end
       index = index + 1
