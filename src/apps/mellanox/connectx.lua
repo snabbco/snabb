@@ -848,7 +848,11 @@ end
 
 -- Provide the NIC with freshly allocated memory.
 function HCA:alloc_pages (num_pages)
-   assert(num_pages > 0)
+   -- Assume that num_pages is the result of a call to query_pages(),
+   -- i.e. 0 is a legal value and a negative value indicates that
+   -- pages can be reclaimed. The reclaim is done via notifications on
+   -- the event queue.
+   if num_pages <= 0 then return end
    if debug_info then
       print(("Allocating %d pages to HW"):format(num_pages))
    end
