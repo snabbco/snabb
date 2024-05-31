@@ -13,8 +13,8 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
 local ipv6     = require("lib.protocol.ipv6")
 local metadata = require("apps.rss.metadata")
-local strings  = require("apps.ipfix.strings")
 local dns      = require("apps.ipfix.dns")
+local http     = require("apps.ipfix.http")
 local tls      = require("apps.ipfix.tls")
 local S        = require("syscall")
 
@@ -427,81 +427,37 @@ local function v6_extract (self, pkt, timestamp, entry)
    end
 end
 
---- Helper functions for HTTP templates
+--- Helper functions for HTTP, HTTPS templates
 
--- We want to be able to find a "Host:" header even if it is not in
--- the same TCP segment as the GET request, which requires to keep
--- state.
 local HTTP_state_t = ffi.typeof([[
    struct {
-      uint8_t have_GET;
-      uint8_t have_host;
-      uint8_t examined;
+      uint8_t done;
    } __attribute__((packed))
 ]])
--- The number of TCP segments to scan for the first GET request
--- (including the SYN segment, which is skipped). Most requests are
--- found in the first non-handshake packet (segment #3 from the
--- client). Empirical evidence shows a strong peak there with a long
--- tail.  A cutoff of 10 is expected to find at least 80% of the GET
--- requests.
-local HTTP_scan_threshold = 10
+
 -- HTTP-specific statistics counters
 local function HTTP_counters()
    return {
+      -- Flows for which we have seen a complete TCP handshake and one
+      -- packet with non-zero payload
       HTTP_flows_examined = 0,
-      HTTP_GET_matches = 0,
-      HTTP_host_matches = 0
+      -- Subset of examined flows with invalid HTTP request methods
+      HTTP_invalid_method = 0,
    }
 end
-
-local HTTP_strings = strings.strings_to_buf({
-      GET = 'GET ',
-      Host = 'Host:'
-})
-
-local HTTP_ct = strings.ct_t()
-
-local function HTTP_accumulate(self, dst, new, pkt)
-   local md = metadata_get(pkt)
-   if ((dst.value.packetDeltaCount >= HTTP_scan_threshold or
-           -- TCP SYN
-        bit.band(new.value.tcpControlBitsReduced, 0x02) == 0x02)) then
-      return
-   end
-   local state = dst.value.state
-   if state.examined == 0 then
-      self.counters.HTTP_flows_examined =
-         self.counters.HTTP_flows_examined + 1
-      state.examined = 1
-   end
-   strings.ct_init(HTTP_ct, pkt.data, pkt.length, md.l4 - pkt.data)
-   if (state.have_GET == 0 and
-       strings.search(HTTP_strings.GET, HTTP_ct, true)) then
-      ffi.copy(dst.value.httpRequestMethod, 'GET')
-      state.have_GET = 1
-      strings.skip_space(HTTP_ct)
-      local start = strings.ct_at(HTTP_ct)
-      local _, length = strings.upto_space_or_cr(HTTP_ct)
-      length = math.min(length, ffi.sizeof(dst.value.httpRequestTarget) - 1)
-      ffi.copy(dst.value.httpRequestTarget, start, length)
-      self.counters.HTTP_GET_matches = self.counters.HTTP_GET_matches + 1
-   end
-   if (state.have_GET == 1 and state.have_host == 0 and
-       strings.search(HTTP_strings.Host, HTTP_ct, true)) then
-      state.have_host = 1
-      strings.skip_space(HTTP_ct)
-      local start = strings.ct_at(HTTP_ct)
-      local _, length = strings.upto_space_or_cr(HTTP_ct)
-      length = math.min(length, ffi.sizeof(dst.value.httpRequestHost) - 1)
-      ffi.copy(dst.value.httpRequestHost, start, length)
-      self.counters.HTTP_host_matches = self.counters.HTTP_host_matches + 1
+local function HTTP_accumulate(self, dst, new, pkt, flowmon)
+   accumulate_generic(dst, new)
+   accumulate_tcp_flags_reduced(dst, new)
+   if (dst.value.state.done == 0 and bit.band(dst.value.tcpControlBitsReduced, 0x12) == 0x12) then
+      -- Handshake complete (SYN/ACK)
+      http.accumulate(self, dst.value, pkt, flowmon)
    end
 end
 
 -- HTTPS-specific statistics counters
 local function HTTPS_counters()
    return {
+      HTTPS_flows_examined = 0,
       HTTPS_client_hellos = 0,
       HTTPS_extensions_present = 0,
       HTTPS_snis = 0,
@@ -511,7 +467,10 @@ end
 local function HTTPS_accumulate(self, dst, new, pkt)
    accumulate_generic(dst, new)
    accumulate_tcp_flags_reduced(dst, new)
-   tls.accumulate(self, dst.value, pkt)
+   if (dst.value.state.done == 0 and bit.band(dst.value.tcpControlBitsReduced, 0x12) == 0x12) then
+      -- Handshake complete (SYN/ACK)
+      tls.accumulate(self, dst.value, pkt)
+   end
 end
 
 local function DNS_extract(self, pkt, timestamp, entry, extract_addr_fn)
@@ -646,21 +605,110 @@ local function v6_extended_accumulate (self, dst, new)
    end
 end
 
+local function concat_lists(...)
+   local arg = {...}
+   local result = {}
+   for _, l in ipairs(arg) do
+      for i = 1, #l do
+	 result[#result+1] = l[i]
+      end
+   end
+   return result
+end
+
+local keys_ipv4 = {
+   "sourceIPv4Address",
+   "destinationIPv4Address",
+   "protocolIdentifier",
+   "sourceTransportPort",
+   "destinationTransportPort"
+}
+local keys_ipv6 = {
+   "sourceIPv6Address",
+   "destinationIPv6Address",
+   "protocolIdentifier",
+   "sourceTransportPort",
+   "destinationTransportPort"
+}
+local keys_dns = {
+      "dnsFlagsCodes",
+      "dnsQuestionCount",
+      "dnsAnswerCount",
+      "dnsQuestionName=64",
+      "dnsQuestionType",
+      "dnsQuestionClass",
+      "dnsAnswerName=64",
+      "dnsAnswerType",
+      "dnsAnswerClass",
+      "dnsAnswerTtl",
+      "dnsAnswerRdata=64",
+      "dnsAnswerRdataLen"
+}
+local keys_ipv4_dns = concat_lists(keys_ipv4, keys_dns)
+local keys_ipv6_dns = concat_lists(keys_ipv6, keys_dns)
+
+local values_min = {
+   "flowStartMilliseconds",
+   "flowEndMilliseconds",
+   "packetDeltaCount",
+   "octetDeltaCount"
+}
+local values = concat_lists(
+   values_min,
+   {
+      "tcpControlBitsReduced"
+   }
+)
+local values_extended = concat_lists(
+   values,
+   {
+      "sourceMacAddress",
+      "postDestinationMacAddress",
+      "vlanId",
+      "ipClassOfService",
+      "bgpSourceAsNumber",
+      "bgpDestinationAsNumber",
+      "bgpPrevAdjacentAsNumber",
+      "bgpNextAdjacentAsNumber",
+      "ingressInterface",
+      "egressInterface"
+   }
+)
+local values_extended_ipv4 = concat_lists(
+   values_extended,
+   {
+      "icmpTypeCodeIPv4",
+   }
+)
+local values_extended_ipv6 = concat_lists(
+   values_extended,
+   {
+      "icmpTypeCodeIPv6",
+   }
+)
+local values_HTTP = {
+   "httpRequestMethod=8",
+   "httpRequestHost=32",
+   "httpRequestTarget=64"
+}
+-- Proprietary Flowmon HTTP/HTTPS fields
+local values_HTTP_Flowmon = {
+   "fmHttpRequestMethod",
+   "fmHttpRequestHost=32",
+   "fmHttpRequestTarget=64"
+}
+local values_HTTPS_Flowmon = {
+   "fmTlsSNI=64",
+   "fmTlsSNILength"
+}
+
 templates = {
    v4 = {
       id     = 256,
       filter = "ip",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced" },
+      keys   = keys_ipv4,
+      values = values,
       extract = v4_extract,
       accumulate = function (self, dst, new)
          accumulate_generic(dst, new)
@@ -684,122 +732,102 @@ templates = {
       id     = 257,
       filter = "ip and tcp dst port 80",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced",
-                 "httpRequestMethod=8",
-                 "httpRequestHost=32",
-                 "httpRequestTarget=64" },
+      keys   = keys_ipv4,
+      values = concat_lists(values, values_HTTP),
       state_t = HTTP_state_t,
       counters = HTTP_counters(),
       extract = v4_extract,
-      accumulate = function (self, dst, new, pkt)
-         accumulate_generic(dst, new)
-         accumulate_tcp_flags_reduced(dst, new)
-         HTTP_accumulate(self, dst, new, pkt)
-      end
+      accumulate = HTTP_accumulate,
    },
    v4_DNS = {
       id     = 258,
       filter = "ip and udp port 53",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort",
-                 "dnsFlagsCodes",
-                 "dnsQuestionCount",
-                 "dnsAnswerCount",
-                 "dnsQuestionName=64",
-                 "dnsQuestionType",
-                 "dnsQuestionClass",
-                 "dnsAnswerName=64",
-                 "dnsAnswerType",
-                 "dnsAnswerClass",
-                 "dnsAnswerTtl",
-                 "dnsAnswerRdata=64",
-                 "dnsAnswerRdataLen" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount" },
+      keys   = keys_ipv4_dns,
+      values = values_min,
       extract = function (self, pkt, timestamp, entry)
          DNS_extract(self, pkt, timestamp, entry, extract_v4_addr)
       end,
       accumulate = DNS_accumulate
    },
-   v4_HTTPS = {
+   v4_HTTPS_Flowmon = {
       id     = 259,
       filter = "ip and tcp and (dst port 443 or dst port 8443)",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced",
-                 "tlsSNI=64",
-                 "tlsSNILength"},
+      keys   = keys_ipv4,
+      values = concat_lists(values, values_HTTPS_Flowmon),
+      state_t = HTTP_state_t,
       counters = HTTPS_counters(),
       extract = v4_extract,
       accumulate = HTTPS_accumulate,
+   },
+   v4_HTTP_Flowmon = {
+      id     = 260,
+      filter = "ip and tcp dst port 80",
+      aggregation_type = 'v4',
+      keys   = keys_ipv4,
+      values = concat_lists(values, values_HTTP_Flowmon),
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v4_extract,
+      accumulate = function (self, dst, new, pkt)
+	 HTTP_accumulate(self, dst, new, pkt, "flowmon")
+      end
    },
    v4_extended = {
       id     = 1256,
       filter = "ip",
       aggregation_type = 'v4',
-      keys   = { "sourceIPv4Address",
-                 "destinationIPv4Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "sourceMacAddress",
-                 -- This is destinationMacAddress per NetFlowV9
-                 "postDestinationMacAddress",
-                 "vlanId",
-                 "ipClassOfService",
-                 "bgpSourceAsNumber",
-                 "bgpDestinationAsNumber",
-                 "bgpPrevAdjacentAsNumber",
-                 "bgpNextAdjacentAsNumber",
-                 "tcpControlBitsReduced",
-                 "icmpTypeCodeIPv4",
-                 "ingressInterface",
-                 "egressInterface" },
+      keys   = keys_ipv4,
+      values = values_extended_ipv4,
       require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx4_to_as' },
       extract = v4_extended_extract,
       accumulate = v4_extended_accumulate
+   },
+   v4_extended_HTTP = {
+      id     = 1257,
+      filter = "ip and tcp dst port 80",
+      aggregation_type = 'v4',
+      keys   = keys_ipv4,
+      values = concat_lists(values_extended_ipv4, values_HTTP),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx4_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v4_extended_extract,
+      accumulate = HTTP_accumulate,
+   },
+   v4_extended_HTTPS_Flowmon = {
+      id     = 1258,
+      filter = "ip and tcp and (dst port 443 or dst port 8443)",
+      aggregation_type = 'v4',
+      keys   = keys_ipv4,
+      values = concat_lists(values_extended_ipv4, values_HTTPS_Flowmon),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx4_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTPS_counters(),
+      extract = v4_extended_extract,
+      accumulate = HTTPS_accumulate,
+   },
+   v4_extended_HTTP_Flowmon = {
+      id     = 1259,
+      filter = "ip and tcp dst port 80",
+      aggregation_type = 'v4',
+      keys   = keys_ipv4,
+      values = concat_lists(values_extended_ipv4, values_HTTP_Flowmon),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx4_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v4_extended_extract,
+      accumulate = function (self, dst, new, pkt)
+	 HTTP_accumulate(self, dst, new, pkt, "flowmon")
+      end
    },
    v6 = {
       id     = 512,
       filter = "ip6",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced" },
+      keys   = keys_ipv6,
+      values = values,
       extract = v6_extract,
       accumulate = function (self, dst, new)
          accumulate_generic(dst, new)
@@ -823,108 +851,96 @@ templates = {
       id     = 513,
       filter = "ip6 and tcp dst port 80",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced",
-                 "httpRequestMethod=8",
-                 "httpRequestHost=32",
-                 "httpRequestTarget=64" },
+      keys   = keys_ipv6,
+      values = concat_lists(values, values_HTTP),
       state_t = HTTP_state_t,
       counters = HTTP_counters(),
       extract = v6_extract,
-      accumulate = function (self, dst, new, pkt)
-         accumulate_generic(dst, new)
-         accumulate_tcp_flags_reduced(dst, new)
-         HTTP_accumulate(self, dst, new, pkt)
-      end
+      accumulate = HTTP_accumulate,
    },
    v6_DNS = {
       id     = 514,
       filter = "ip6 and udp port 53",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort",
-                 "dnsFlagsCodes",
-                 "dnsQuestionCount",
-                 "dnsAnswerCount",
-                 "dnsQuestionName=64",
-                 "dnsQuestionType",
-                 "dnsQuestionClass",
-                 "dnsAnswerName=64",
-                 "dnsAnswerType",
-                 "dnsAnswerClass",
-                 "dnsAnswerTtl",
-                 "dnsAnswerRdata=64",
-                 "dnsAnswerRdataLen" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount" },
+      keys   = keys_ipv6_dns,
+      values = values_min,
       extract = function (self, pkt, timestamp, entry)
          DNS_extract(self, pkt, timestamp, entry, extract_v6_addr)
       end,
       accumulate = DNS_accumulate
    },
-   v6_HTTPS = {
+   v6_HTTPS_Flowmon = {
       id     = 515,
       filter = "ip6 and tcp and (dst port 443 or dst port 8443)",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "tcpControlBitsReduced",
-                 "tlsSNI=64",
-                 "tlsSNILength"},
+      keys   = keys_ipv6,
+      values = concat_lists(values, values_HTTPS_Flowmon),
+      state_t = HTTP_state_t,
       counters = HTTPS_counters(),
       extract = v6_extract,
       accumulate = HTTPS_accumulate,
+   },
+   v6_HTTP_Flowmon = {
+      id     = 516,
+      filter = "ip6 and tcp dst port 80",
+      aggregation_type = 'v6',
+      keys   = keys_ipv6,
+      values = concat_lists(values, values_HTTP_Flowmon),
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v6_extract,
+      accumulate = function (self, dst, new, pkt)
+	 HTTP_accumulate(self, dst, new, pkt, "flowmon")
+      end
    },
    v6_extended = {
       id     = 1512,
       filter = "ip6",
       aggregation_type = 'v6',
-      keys   = { "sourceIPv6Address",
-                 "destinationIPv6Address",
-                 "protocolIdentifier",
-                 "sourceTransportPort",
-                 "destinationTransportPort" },
-      values = { "flowStartMilliseconds",
-                 "flowEndMilliseconds",
-                 "packetDeltaCount",
-                 "octetDeltaCount",
-                 "sourceMacAddress",
-                 -- This is destinationMacAddress per NetFlowV9
-                 "postDestinationMacAddress",
-                 "vlanId",
-                 "ipClassOfService",
-                 "bgpSourceAsNumber",
-                 "bgpDestinationAsNumber",
-                 "bgpNextAdjacentAsNumber",
-                 "bgpPrevAdjacentAsNumber",
-                 "tcpControlBitsReduced",
-                 "icmpTypeCodeIPv6",
-                 "ingressInterface",
-                 "egressInterface" },
+      keys   = keys_ipv6,
+      values = values_extended_ipv6,
       require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx6_to_as' },
       extract = v6_extended_extract,
       accumulate = v6_extended_accumulate,
    },
+   v6_extended_HTTP = {
+      id     = 1513,
+      filter = "ip6 and tcp dst port 80",
+      aggregation_type = 'v6',
+      keys   = keys_ipv6,
+      values = concat_lists(values_extended_ipv6, values_HTTP),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx6_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v6_extended_extract,
+      accumulate = HTTP_accumulate,
+   },
+   v6_extended_HTTPS_Flowmon = {
+      id     = 1514,
+      filter = "ip6 and tcp and (dst port 443 or dst port 8443)",
+      aggregation_type = 'v6',
+      keys   = keys_ipv6,
+      values = concat_lists(values_extended_ipv6, values_HTTPS_Flowmon),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx6_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTPS_counters(),
+      extract = v6_extended_extract,
+      accumulate = HTTPS_accumulate,
+   },
+   v6_extended_HTTP_Flowmon = {
+      id     = 1515,
+      filter = "ip6 and tcp dst port 80",
+      aggregation_type = 'v6',
+      keys   = keys_ipv6,
+      values = concat_lists(values_extended_ipv6, values_HTTP_Flowmon),
+      require_maps = { 'mac_to_as', 'vlan_to_ifindex', 'pfx6_to_as' },
+      state_t = HTTP_state_t,
+      counters = HTTP_counters(),
+      extract = v6_extended_extract,
+      accumulate = function (self, dst, new, pkt)
+	 HTTP_accumulate(self, dst, new, pkt, "flowmon")
+      end
+   }
 }
 
 local templates_legend = [[
