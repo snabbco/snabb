@@ -25,6 +25,7 @@
 #include "lj_vm.h"
 #include "lj_prng.h"
 #include "lj_lex.h"
+#include "lj_alloc.h"
 #include "luajit.h"
 
 /* -- Stack handling ------------------------------------------------------ */
@@ -183,10 +184,15 @@ static void close_state(lua_State *L)
   lj_assertG(g->gc.total == sizeof(GG_State),
 	     "memory leak of %lld bytes",
 	     (long long)(g->gc.total - sizeof(GG_State)));
-  g->allocf(g->allocd, G2GG(g), sizeof(GG_State), 0);
+#ifndef LUAJIT_USE_SYSMALLOC
+  if (g->allocf == lj_alloc_f)
+    lj_alloc_destroy(g->allocd);
+  else
+#endif
+    g->allocf(g->allocd, G2GG(g), sizeof(GG_State), 0);
 }
 
-LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
+LUA_API lua_State *lua_newstate(lua_Alloc allocf, void *allocd)
 {
   PRNGState prng;
   if (!lj_prng_seed_secure(&prng)) {
@@ -194,7 +200,14 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
     /* Can only return NULL here, so this errors with "not enough memory". */
     return NULL;
   }
-  GG_State *GG = (GG_State *)f(ud, NULL, 0, sizeof(GG_State));
+#ifndef LUAJIT_USE_SYSMALLOC
+  if (allocf == LJ_ALLOCF_INTERNAL) {
+    allocd = lj_alloc_create(&prng);
+    if (!allocd) return NULL;
+    allocf = lj_alloc_f;
+  }
+#endif
+  GG_State *GG = (GG_State *)allocf(allocd, NULL, 0, sizeof(GG_State));
   lua_State *L = &GG->L;
   global_State *g = &GG->g;
   jit_State *J = &GG->J;
@@ -209,9 +222,14 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   g->gc.currentwhite = LJ_GC_WHITE0 | LJ_GC_FIXED;
   g->strempty.marked = LJ_GC_WHITE0;
   g->strempty.gct = ~LJ_TSTR;
-  g->allocf = f;
-  g->allocd = ud;
+  g->allocf = allocf;
+  g->allocd = allocd;
   g->prng = prng;
+#ifndef LUAJIT_USE_SYSMALLOC
+  if (allocf == lj_alloc_f) {
+    lj_alloc_setprng(allocd, &g->prng);
+  }
+#endif
   setgcref(g->mainthref, obj2gco(L));
   setgcref(g->uvhead.prev, obj2gco(&g->uvhead));
   setgcref(g->uvhead.next, obj2gco(&g->uvhead));
