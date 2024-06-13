@@ -668,6 +668,73 @@ Deletes/unmaps a shared memory *frame*. The *frame* directory is unlinked if
 *frame* was created by `shm.create_frame`.
 
 
+### Cdata (core.cdata)
+
+Shared memory siblings of common Cdata types. The following types are
+registered with `core.shm`:
+
+- `int8_t` `int16_t` `int32_t` `int64_t`
+- `uint8_t` `uint16_t` `uint32_t` `uint64_t`
+- `float` `double`
+- `bool`
+
+The above types can be read and written using `cdata.read` and `cdata.set`.
+
+Additionally, types for fixed length strings for a handful of lengths are
+registered:
+
+- `string64`, `string512`, `string8192`
+
+These can be read and written using `ffi.string` and `ffi.copy`. For safety
+reasons it is advised to use the provided copy functions `cdata.string64.copy`,
+`cdata.string512.copy`, and `cdata.string8192.copy` for writing these types.
+
+**Example:**
+
+```
+myframe = shm.create_frame("myframe",
+                           {pi = {cdata.double, math.pi},
+                            info = {cdata.string512, "placeholder"}})
+cdata.read(myframe.pi) * 2 => 6.2831853071796
+ffi.string(myframe.info) => "placeholder"
+cdata.string512.copy(myframe.info, "Mathematical constant π")
+```
+
+— Function **cdata.create** *name*, [*initval*]
+
+Creates and returns a shared memory cdata object by *name*. The type of the
+created cdata object is derived from the type suffix in *name*. If *initval* is
+supplied the object is initialized to *initval*.
+
+**Example:**
+
+```
+cdata.create("pi.double", math.pi)
+```
+
+— Function **cdata.open** *name*
+
+Opens and returns the shared memory cdata object by *name* for reading. The
+type of the created cdata object is derived from the type suffix in *name*.
+
+— Function **cdata.set** *cdata* *value*
+
+Sets the value of shared memory *cdata* object to *value*.
+
+— Function **cdata.read** *cdata*
+
+Returns the value of shared memory *cdata* object.
+
+— Function **cdata.string64.copy** *cdata*, *string*
+
+— Function **cdata.string512.copy** *cdata*, *string*
+
+— Function **cdata.string8192.copy** *cdata*, *string*
+
+Copies *string* into shared memory *cdata* object. Throws an error if *string*
+does not fit the respective string type.
+
+
 ### Counter (core.counter)
 
 Double-buffered shared memory counters. Counters are 64-bit unsigned values.
