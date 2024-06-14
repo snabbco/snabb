@@ -1,0 +1,8 @@
+test-config {
+  ports{
+    port-range{
+      start 1024;
+      end 32000;
+    }
+  }
+}
