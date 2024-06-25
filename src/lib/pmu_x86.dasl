@@ -236,8 +236,8 @@ function selftest ()
    enable_rdpmc()
    print("nfixed", nfixed, "ngeneral", ngeneral)
    if vendor == "GenuineIntel" then
-      -- Expected values for Sandy Bridge - Skylake
-      assert(nfixed == 3,                    "nfixed: " .. nfixed)
+      -- Expected values for Sandy Bridge - Skylake - Saphire Rapids
+      assert(nfixed >= 3,                    "nfixed: " .. nfixed)
       assert(ngeneral == 4 or ngeneral == 8, "ngeneral: " .. ngeneral)
    elseif vendor == "AuthenticAMD" and family+extfamily >= 0x15 then
       assert(nfixed == 0,                    "nfixed: " .. nfixed)

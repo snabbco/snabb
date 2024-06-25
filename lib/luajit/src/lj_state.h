@@ -29,4 +29,6 @@ static LJ_AINLINE void lj_state_checkstack(lua_State *L, MSize need)
 LJ_FUNC lua_State *lj_state_new(lua_State *L);
 LJ_FUNC void lj_state_free(global_State *g, lua_State *L);
 
+#define LJ_ALLOCF_INTERNAL	((lua_Alloc)(void *)(uintptr_t)(1237<<4))
+
 #endif

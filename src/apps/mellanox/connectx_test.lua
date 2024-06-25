@@ -166,14 +166,13 @@ function switch (pci0, pci1, npackets, ncores, minlen, maxlen, minburst, maxburs
       --C.usleep(100)
       for id, app in pairs(io0) do app:pull() app:push() dump(pci0, id, app) end
       for id, app in pairs(io1) do app:pull() app:push() dump(pci1, id, app) end
-      -- Simulate breathing
    end
    engine.setvmprofile("engine")
    -- Receive any last packets
-   C.usleep(100)
-   for i = 1, 10 do
+   for i = 1, 3 do
       for id, app in pairs(io0) do app:pull() app:push() dump(pci0, id, app) end
       for id, app in pairs(io1) do app:pull() app:push() dump(pci1, id, app) end
+      C.usleep(50)
    end
    local finish = engine.now()
    print("reporting...")
