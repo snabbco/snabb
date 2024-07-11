@@ -1,2 +1,0 @@
-#./mklisper
-LISP_N=01 ./lisper "$@"

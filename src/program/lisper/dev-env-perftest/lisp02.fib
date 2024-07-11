@@ -1,7 +1,0 @@
-{ "instance-id": 1, "eid-prefix": "000000-00aa05/48", "rlocs": [{ "rloc": "fd80::12", "priority": 1, "weight": 50 }] }
-
-{ "instance-id": 1, "eid-prefix": "000000-00aa06/48", "rlocs": [{ "rloc": "fd80:8::2", "priority": 1, "weight": 50 }] }
-
-{ "instance-id": 1, "eid-prefix": "000000-00aa07/48", "rlocs": [{ "rloc": "fd80:8::2", "priority": 1, "weight": 50 }] }
-
-{ "instance-id": 1, "eid-prefix": "ffffff-ffffff/48", "rles":  [{ "rle":  "fd80:8::2" }] }
