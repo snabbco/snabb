@@ -1,6 +1,0 @@
-return {
-  { port_id = "Test",
-    rx_police_gbps = 1,
-    tx_police_gbps = 1
-  },
-}
