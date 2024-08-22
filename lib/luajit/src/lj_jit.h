@@ -1,13 +1,12 @@
 /*
 ** Common definitions for the JIT compiler.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_JIT_H
 #define _LJ_JIT_H
 
 #include "lj_obj.h"
-#if LJ_HASJIT
 #include "lj_ir.h"
 
 /* -- JIT engine flags ---------------------------------------------------- */
@@ -56,9 +55,10 @@
 
 /* -- JIT engine parameters ----------------------------------------------- */
 
+/* See: http://blogs.msdn.com/oldnewthing/archive/2003/10/08/55239.aspx */
 #define JIT_P_sizemcode_DEFAULT		256
 
-// NB: setting maxirconst to REF_BIAS means
+// NB: setting maxirconst to REF_BIAS means
 //   "the maximum possible number of IR constants"
 // (due to implementation details, LuaJIT is funky.)
 
@@ -429,7 +429,6 @@ jit_State;
 #define lj_assertJ(c, ...)	lj_assertG_(J2G(J), (c), __VA_ARGS__)
 #else
 #define lj_assertJ(c, ...)	((void)J)
-#endif
 #endif
 
 #endif

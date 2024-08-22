@@ -1,6 +1,6 @@
 /*
 ** LuaJIT common internal definitions.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_DEF_H
@@ -109,15 +109,9 @@ typedef uintptr_t BloomFilter;
 #define LJ_UNLIKELY(x)	__builtin_expect(!!(x), 0)
 
 #define lj_ffs(x)	((uint32_t)__builtin_ctz(x))
-/* Don't ask ... */
-#if defined(__INTEL_COMPILER) && (defined(__i386__) || defined(__x86_64__))
-static LJ_AINLINE uint32_t lj_fls(uint32_t x)
-{
-  uint32_t r; __asm__("bsrl %1, %0" : "=r" (r) : "rm" (x) : "cc"); return r;
-}
-#else
 #define lj_fls(x)	((uint32_t)(__builtin_clz(x)^31))
-#endif
+#define lj_ffs64(x)	((uint32_t)__builtin_ctzll(x))
+#define lj_fls64(x)	((uint32_t)(__builtin_clzll(x)^63))
 
 #if   (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3) || __clang__
 static LJ_AINLINE uint32_t lj_bswap(uint32_t x)

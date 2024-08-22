@@ -1,6 +1,6 @@
 /*
 ** Error handling.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_err_c
@@ -95,12 +95,15 @@ static void *err_unwind(lua_State *L, void *stopcf, int errcode)
     case FRAME_PCALL:  /* FF pcall() frame. */
     case FRAME_PCALLH:  /* FF pcall() frame inside hook. */
       if (errcode) {
+	global_State *g;
 	if (errcode == LUA_YIELD) {
 	  frame = frame_prevd(frame);
 	  break;
 	}
+	g = G(L);
+	setgcref(g->cur_L, obj2gco(L));
 	if (frame_typep(frame) == FRAME_PCALL)
-	  hook_leave(G(L));
+	  hook_leave(g);
 	L->base = frame_prevd(frame) + 1;
 	L->cframe = cf;
 	unwindstack(L, L->base);
@@ -153,7 +156,14 @@ LJ_NOINLINE void lj_err_mem(lua_State *L)
     TValue *base = tvref(G(L)->jit_base);
     if (base) L->base = base;
   }
-  if (curr_funcisL(L)) L->top = curr_topL(L);
+  if (curr_funcisL(L)) {
+    L->top = curr_topL(L);
+    if (LJ_UNLIKELY(L->top > tvref(L->maxstack))) {
+      /* The current Lua frame violates the stack. Replace it with a dummy. */
+      L->top = L->base;
+      setframe_gc(L->base - 1 - LJ_FR2, obj2gco(L), LJ_TTHREAD);
+    }
+  }
   setstrV(L, L->top++, lj_err_str(L, LJ_ERR_ERRMEM));
   lj_err_throw(L, LUA_ERRMEM);
 }
@@ -214,9 +224,11 @@ LJ_NOINLINE void lj_err_run(lua_State *L)
 {
   ptrdiff_t ef = tvref(G(L)->jit_base) ? 0 : finderrfunc(L);
   if (ef) {
-    TValue *errfunc = restorestack(L, ef);
-    TValue *top = L->top;
+    TValue *errfunc, *top;
+    lj_state_checkstack(L, LUA_MINSTACK * 2);  /* Might raise new error. */
     lj_trace_abort(G(L));
+    errfunc = restorestack(L, ef);
+    top = L->top;
     if (!tvisfunc(errfunc) || L->status == LUA_ERRERR) {
       setstrV(L, top-1, lj_err_str(L, LJ_ERR_ERRERR));
       lj_err_throw(L, LUA_ERRERR);
@@ -231,6 +243,14 @@ LJ_NOINLINE void lj_err_run(lua_State *L)
   lj_err_throw(L, LUA_ERRRUN);
 }
 
+/* Stack overflow error. */
+void lj_err_stkov(lua_State *L)
+{
+  lj_debug_addloc(L, err2msg(LJ_ERR_STKOV), L->base-1, NULL);
+  lj_err_run(L);
+}
+
+/* Rethrow error after doing a trace exit. */
 LJ_NOINLINE void lj_err_trace(lua_State *L, int errcode)
 {
   if (errcode == LUA_ERRRUN)

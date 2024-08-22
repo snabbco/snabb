@@ -32,7 +32,8 @@ lib_jit.o: lib_jit.c lua.h luaconf.h lauxlib.h lualib.h lj_obj.h lj_def.h \
  lj_target.h lj_target_*.h lj_trace.h lj_dispatch.h lj_traceerr.h \
  lj_vm.h lj_lib.h lj_auditlog.h luajit.h lj_libdef.h
 lib_math.o: lib_math.c lua.h luaconf.h lauxlib.h lualib.h lj_obj.h \
- lj_def.h lj_arch.h lj_lib.h lj_vm.h lj_prng.h lj_libdef.h
+ lj_def.h lj_arch.h lj_err.h lj_errmsg.h lj_lib.h lj_vm.h lj_prng.h \
+ lj_libdef.h
 lib_os.o: lib_os.c lua.h luaconf.h lauxlib.h lualib.h lj_obj.h lj_def.h \
  lj_arch.h lj_gc.h lj_err.h lj_errmsg.h lj_buf.h lj_str.h lj_lib.h \
  lj_libdef.h
@@ -55,7 +56,7 @@ lj_asm.o: lj_asm.c lj_obj.h lua.h luaconf.h lj_def.h lj_arch.h lj_gc.h \
  lj_buf.h lj_str.h lj_tab.h lj_frame.h lj_bc.h lj_ctype.h lj_ir.h \
  lj_jit.h lj_ircall.h lj_iropt.h lj_mcode.h lj_trace.h lj_dispatch.h \
  lj_traceerr.h lj_snap.h lj_asm.h lj_vm.h lj_target.h lj_target_*.h \
- lj_emit_*.h lj_asm_*.h
+ lj_prng.h lj_emit_*.h lj_asm_*.h
 lj_assert.o: lj_assert.c
 lj_auditlog.o: lj_auditlog.c lj_trace.h lj_obj.h lua.h luaconf.h lj_def.h \
  lj_arch.h lj_jit.h lj_ir.h lj_dispatch.h lj_bc.h lj_traceerr.h \
@@ -101,7 +102,7 @@ lj_crecord.o: lj_crecord.c lj_obj.h lua.h luaconf.h lj_def.h lj_arch.h \
  lj_cdata.h lj_cparse.h lj_cconv.h lj_carith.h lj_clib.h lj_ccall.h \
  lj_ff.h lj_ffdef.h lj_ir.h lj_jit.h lj_ircall.h lj_iropt.h lj_trace.h \
  lj_dispatch.h lj_traceerr.h lj_record.h lj_ffrecord.h lj_snap.h \
- lj_crecord.h lj_strfmt.h
+ lj_crecord.h lj_strfmt.h lj_strscan.h
 lj_ctype.o: lj_ctype.c lj_obj.h lua.h luaconf.h lj_def.h lj_arch.h \
  lj_gc.h lj_err.h lj_errmsg.h lj_str.h lj_tab.h lj_strfmt.h lj_ctype.h \
  lj_ccallback.h lj_buf.h lj_auditlog.h lj_jit.h lj_ir.h lj_trace.h \
@@ -242,6 +243,4 @@ host/buildvm_fold.o: host/buildvm_fold.c host/buildvm.h lj_def.h lua.h \
 host/buildvm_lib.o: host/buildvm_lib.c host/buildvm.h lj_def.h lua.h luaconf.h \
  lj_arch.h lj_obj.h lj_def.h lj_arch.h lj_bc.h lj_lib.h lj_obj.h \
  host/buildvm_libbc.h
-host/buildvm_peobj.o: host/buildvm_peobj.c host/buildvm.h lj_def.h lua.h \
- luaconf.h lj_arch.h lj_bc.h lj_def.h lj_arch.h
 host/minilua.o: host/minilua.c

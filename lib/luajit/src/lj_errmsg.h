@@ -1,6 +1,6 @@
 /*
 ** VM error messages.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 /* This file may be included multiple times with different ERRDEF macros. */
@@ -76,6 +76,7 @@ ERRDEF(SETFENV,	LUA_QL("setfenv") " cannot change environment of given object")
 ERRDEF(CORUN,	"cannot resume running coroutine")
 ERRDEF(CODEAD,	"cannot resume dead coroutine")
 ERRDEF(COSUSP,	"cannot resume non-suspended coroutine")
+ERRDEF(PRNGSD,	"PRNG seeding failed")
 ERRDEF(TABINS,	"wrong number of arguments to " LUA_QL("insert"))
 ERRDEF(TABCAT,	"invalid value (%s) at index %d in table for " LUA_QL("concat"))
 ERRDEF(TABSORT,	"invalid order function for sorting")
