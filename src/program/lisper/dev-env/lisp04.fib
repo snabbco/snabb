@@ -1,7 +1,0 @@
-{ "instance-id": 1, "eid-prefix": "000000-00aa05/48", "rlocs": [{ "rloc": "fd80:8::2", "priority": 1, "weight": 50, "decap-key": "12345678123456781234567812345678", "encap-key": "12345678123456781234567812345678", "key-id": "1" }] }
-
-{ "instance-id": 1, "eid-prefix": "000000-00aa06/48", "rlocs": [{ "rloc": "fd80:8::2", "priority": 1, "weight": 50, "decap-key": "12345678123456781234567812345678", "encap-key": "12345678123456781234567812345678", "key-id": "1" }] }
-
-{ "instance-id": 1, "eid-prefix": "000000-00aa07/48", "rlocs": [{ "rloc": "fd80:8::2", "priority": 1, "weight": 50, "decap-key": "12345678123456781234567812345678", "encap-key": "12345678123456781234567812345678", "key-id": "1" }] }
-
-{ "instance-id": 1, "eid-prefix": "ffffff-ffffff/48", "rles":  [{ "rle":  "fd80:8::2", "decap-key": "12345678123456781234567812345678", "encap-key": "12345678123456781234567812345678", "key-id": "1" }] }

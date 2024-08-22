@@ -1,9 +1,0 @@
-return {
-  { vlan = 1,
-    mac_address = "90:f5:ef:00:aa:67",
-    port_id = "id0",
-    ingress_filter = nil,
-    gbps = nil,
-    tunnel = nil
-  },
-}

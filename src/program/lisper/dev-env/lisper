@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-run()     { ip netns exec node${LISP_N} snabb/src/snabb lisper -c lisper${LISP_N}.conf; }
-start()   { run >lisper${LISP_N}.log & }
-stop()    { pgrep -f "snabb lisper -c lisper${LISP_N}" | xargs kill -9; }
-restart() { stop; start; }
-if [ "$1" ]; then $1; else stop; run; fi

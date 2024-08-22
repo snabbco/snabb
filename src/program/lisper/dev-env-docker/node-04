@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-
-[ "$1" ] || { echo "Usage: $0 <command>"; exit 1; }
-
-./node-eth $1 03
-./node-lisper $1 04

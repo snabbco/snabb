@@ -1,1 +1,0 @@
-snabb/src/program/lisper/lisper.lua

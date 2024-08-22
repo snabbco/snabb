@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-cd "$(dirname "$0")"
-
-run()     { snabb/src/snabb lisper -c lisper${LISP_N}.conf; }
-start()   { run >/dev/null & }
-stop()    { pgrep -f "snabb lisper -c lisper${LISP_N}" | xargs kill -9; }
-restart() { stop; start; }
-if [ "$1" ]; then $1; else stop; run; fi
