@@ -1,6 +1,6 @@
 /*
 ** SSA IR (Intermediate Representation) format.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_IR_H
@@ -75,8 +75,8 @@
   \
   _(ABS,	N , ref, ref) \
   _(LDEXP,	N , ref, ref) \
-  _(MIN,	C , ref, ref) \
-  _(MAX,	C , ref, ref) \
+  _(MIN,	N , ref, ref) \
+  _(MAX,	N , ref, ref) \
   _(FPMATH,	N , ref, lit) \
   \
   /* Overflow-checking arithmetic ops. */ \
@@ -382,6 +382,7 @@ typedef struct IRType1 { uint8_t irt; } IRType1;
 #define irt_isu32(t)		(irt_type(t) == IRT_U32)
 #define irt_isi64(t)		(irt_type(t) == IRT_I64)
 #define irt_isu64(t)		(irt_type(t) == IRT_U64)
+#define irt_isp32(t)		(irt_type(t) == IRT_P32)
 
 #define irt_isfp(t)		(irt_isnum(t) || irt_isfloat(t))
 #define irt_isinteger(t)	(irt_typerange((t), IRT_I8, IRT_INT))

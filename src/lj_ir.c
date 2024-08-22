@@ -1,6 +1,6 @@
 /*
 ** SSA IR (Intermediate Representation) emitter.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_ir_c
@@ -9,6 +9,7 @@
 /* For pointers to libc/libm functions. */
 #include <stdio.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "lj_obj.h"
 
@@ -125,6 +126,7 @@ static LJ_AINLINE IRRef ir_nextk(jit_State *J)
 {
   IRRef ref = J->cur.nk;
   J->cur.nk = --ref;
+  if (J->cur.nk >= REF_BIAS) abort();
   return ref;
 }
 

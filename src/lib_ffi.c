@@ -1,6 +1,6 @@
 /*
 ** FFI library.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lib_ffi_c
@@ -304,7 +304,7 @@ LJLIB_CF(ffi_meta___tostring)
       p = *(void **)p;
     } else if (ctype_isenum(ct->info)) {
       msg = "cdata<%s>: %d";
-      p = (void *)(uintptr_t)*(uint32_t **)p;
+      p = (void *)(uintptr_t)*(uint32_t *)p;
     } else {
       if (ctype_isptr(ct->info)) {
 	p = cdata_getptr(p, ct->size);
@@ -512,7 +512,7 @@ LJLIB_CF(ffi_new)	LJLIB_REC(.)
     /* Handle ctype __gc metamethod. Use the fast lookup here. */
     cTValue *tv = lj_tab_getinth(cts->miscmap, -(int32_t)id);
     if (tv && tvistab(tv) && (tv = lj_meta_fast(L, tabV(tv), MM_gc))) {
-      GCtab *t = cts->finalizer;
+      GCtab *t = tabref(G(L)->gcroot[GCROOT_FFI_FIN]);
       if (gcref(t->metatable)) {
 	/* Add to finalizer table, if still enabled. */
 	copyTV(L, lj_tab_set(L, t, o-1), tv);
@@ -736,7 +736,7 @@ LJLIB_CF(ffi_abi)	LJLIB_REC(.)
   return 1;
 }
 
-LJLIB_PUSH(top-8) LJLIB_SET(!)  /* Store reference to miscmap table. */
+LJLIB_PUSH(top-7) LJLIB_SET(!)  /* Store reference to miscmap table. */
 
 LJLIB_CF(ffi_metatype)
 {
@@ -761,8 +761,6 @@ LJLIB_CF(ffi_metatype)
   lj_gc_check(L);
   return 1;
 }
-
-LJLIB_PUSH(top-7) LJLIB_SET(!)  /* Store reference to finalizer table. */
 
 LJLIB_CF(ffi_gc)	LJLIB_REC(.)
 {
@@ -796,19 +794,6 @@ LJLIB_PUSH(top-2) LJLIB_SET(arch)
 
 /* ------------------------------------------------------------------------ */
 
-/* Create special weak-keyed finalizer table. */
-static GCtab *ffi_finalizer(lua_State *L)
-{
-  /* NOBARRIER: The table is new (marked white). */
-  GCtab *t = lj_tab_new(L, 0, 1);
-  settabV(L, L->top++, t);
-  setgcref(t->metatable, obj2gco(t));
-  setstrV(L, lj_tab_setstr(L, t, lj_str_newlit(L, "__mode")),
-	  lj_str_newlit(L, "k"));
-  t->nomm = (uint8_t)(~(1u<<MM_mode));
-  return t;
-}
-
 /* Register FFI module as loaded. */
 static void ffi_register_module(lua_State *L)
 {
@@ -824,7 +809,6 @@ LUALIB_API int luaopen_ffi(lua_State *L)
 {
   CTState *cts = lj_ctype_init(L);
   settabV(L, L->top++, (cts->miscmap = lj_tab_new(L, 0, 1)));
-  cts->finalizer = ffi_finalizer(L);
   LJ_LIB_REG(L, NULL, ffi_meta);
   /* NOBARRIER: basemt is a GC root. */
   setgcref(basemt_it(G(L), LJ_TCDATA), obj2gco(tabV(L->top-1)));

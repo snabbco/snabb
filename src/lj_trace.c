@@ -1,6 +1,6 @@
 /*
 ** Trace management.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_trace_c
@@ -850,7 +850,7 @@ int lj_trace_exit(jit_State *J, void *exptr)
   } else if (G(L)->gc.state == GCSatomic || G(L)->gc.state == GCSfinalize) {
     if (!(G(L)->hookmask & HOOK_GC))
       lj_gc_step(L);  /* Exited because of GC: drive GC forward. */
-  } else {
+  } else if ((J->flags & JIT_F_ON)) {
     trace_hotside(J, pc);
   }
   /* Return MULTRES or 0 or -17. */
