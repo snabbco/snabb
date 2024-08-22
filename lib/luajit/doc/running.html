@@ -2,8 +2,8 @@
 <html>
 <head>
 <title>Running LuaJIT</title>
-<meta charset="utf-8">
-<meta name="Copyright" content="Copyright (C) 2005-2022">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<meta name="Copyright" content="Copyright (C) 2005-2023">
 <meta name="Language" content="en">
 <link rel="stylesheet" type="text/css" href="bluequad.css" media="screen">
 <link rel="stylesheet" type="text/css" href="bluequad-print.css" media="print">
@@ -66,14 +66,15 @@ td.param_default {
 <a href="ext_c_api.html">Lua/C API</a>
 </li></ul>
 </li><li>
-<a href="status.html">Status</a>
+<a href="https://luajit.org/status.html">Status <span class="ext">&raquo;</span></a>
 </li><li>
-<a href="faq.html">FAQ</a>
+<a href="https://luajit.org/faq.html">FAQ <span class="ext">&raquo;</span></a>
 </li><li>
 <a href="https://luajit.org/list.html">Mailing List <span class="ext">&raquo;</span></a>
 </li></ul>
 </div>
 <div id="main">
+
 <p>
 LuaJIT has only a single stand-alone executable, called <tt>luajit</tt> on
 POSIX systems or <tt>luajit.exe</tt> on Windows. It can be used to run simple
@@ -103,6 +104,9 @@ are accepted:
 <li><tt>-l</tt> &mdash; Only list bytecode.</li>
 <li><tt>-s</tt> &mdash; Strip debug info (this is the default).</li>
 <li><tt>-g</tt> &mdash; Keep debug info.</li>
+<li><tt>-W</tt> &mdash; Generate 32 bit (non-GC64) bytecode.</li>
+<li><tt>-X</tt> &mdash; Generate 64 bit (GC64) bytecode.</li>
+<li><tt>-d</tt> &mdash; Generate bytecode in deterministic manner.</li>
 <li><tt>-n name</tt> &mdash; Set module name (default: auto-detect from input name)</li>
 <li><tt>-t type</tt> &mdash; Set output file type (default: auto-detect from output name).</li>
 <li><tt>-a arch</tt> &mdash; Override architecture for object files (default: native).</li>
@@ -117,7 +121,8 @@ file name:
 </p>
 <ul>
 <li><tt>c</tt> &mdash; C source file, exported bytecode data.</li>
-<li><tt>h</tt> &mdash; C header file, static bytecode data.</li>
+<li><tt>cc</tt> &mdash; C++ source file, exported bytecode data.</li>
+<li><tt>h</tt> &mdash; C/C++ header file, static bytecode data.</li>
 <li><tt>obj</tt> or <tt>o</tt> &mdash; Object file, exported bytecode data
 (OS- and architecture-specific).</li>
 <li><tt>raw</tt> or any other extension &mdash; Raw bytecode file (portable).
@@ -293,7 +298,7 @@ Here are the parameters and their default settings:
 </div>
 <div id="foot">
 <hr class="hide">
-Copyright &copy; 2005-2022
+Copyright &copy; 2005-2023
 <span class="noprint">
 &middot;
 <a href="contact.html">Contact</a>

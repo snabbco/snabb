@@ -10,7 +10,7 @@
 # For MSVC, please follow the instructions given in src/msvcbuild.bat.
 # For MinGW and Cygwin, cd to src and run make with the Makefile there.
 #
-# Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+# Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
 MAJVER=  1
@@ -71,7 +71,8 @@ INSTALL_F= install -m 0644
 UNINSTALL= $(RM)
 LDCONFIG= ldconfig -n 2>/dev/null
 SED_PC= sed -e "s|^prefix=.*|prefix=$(PREFIX)|" \
-            -e "s|^multilib=.*|multilib=$(MULTILIB)|"
+	    -e "s|^multilib=.*|multilib=$(MULTILIB)|" \
+	    -e "s|^relver=.*|relver=$(RELVER)|"
 ifneq ($(INSTALL_DEFINC),$(INSTALL_INC))
   SED_PC+= -e "s|^includedir=.*|includedir=$(INSTALL_INC)|"
 endif
@@ -126,8 +127,7 @@ install: $(INSTALL_DEP)
 	cd src && $(INSTALL_F) $(FILES_INC) $(INSTALL_INC)
 	cd src/jit && $(INSTALL_F) $(FILES_JITLIB) $(INSTALL_JITLIB)
 	$(SYMLINK) $(INSTALL_TNAME) $(INSTALL_TSYM)
-	@echo ""
-
+	@echo "==== Successfully installed LuaJIT $(VERSION) to $(PREFIX) ===="
 
 uninstall:
 	@echo "==== Uninstalling RaptorJIT $(VERSION) from $(PREFIX) ===="

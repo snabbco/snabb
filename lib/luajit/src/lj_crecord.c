@@ -1,6 +1,6 @@
 /*
 ** Trace recorder for C data operations.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_ffrecord_c
@@ -31,6 +31,7 @@
 #include "lj_crecord.h"
 #include "lj_dispatch.h"
 #include "lj_strfmt.h"
+#include "lj_strscan.h"
 
 /* Some local macros to save typing. Undef'd at the end. */
 #define IR(ref)			(&J->cur.ir[(ref)])
@@ -1395,7 +1396,8 @@ static TRef crec_arith_meta(jit_State *J, TRef *sp, CType **s, CTState *cts,
 
 void recff_cdata_arith(jit_State *J, RecordFFData *rd)
 {
-  CTState *cts = ctype_ctsG(J2G(J));
+  CTState *cts = ctype_cts(J->L);
+  MMS mm = (MMS)rd->data;
   TRef sp[2];
   CType *s[2];
   MSize i;
@@ -1445,6 +1447,8 @@ void recff_cdata_arith(jit_State *J, RecordFFData *rd)
 	}
       }
     } else if (tref_isnil(tr)) {
+      if (!(mm == MM_len || mm == MM_eq || mm == MM_lt || mm == MM_le))
+	lj_trace_err(J, LJ_TRERR_BADTYPE);
       tr = lj_ir_kptr(J, NULL);
       ct = ctype_get(cts, CTID_P_VOID);
     } else if (tref_isinteger(tr)) {
@@ -1463,12 +1467,12 @@ void recff_cdata_arith(jit_State *J, RecordFFData *rd)
 	  ct = ctype_child(cts, cct);
 	  tr = lj_ir_kint(J, (int32_t)ofs);
 	} else {  /* Interpreter will throw or return false. */
-	  ct = ctype_get(cts, CTID_P_VOID);
+	  lj_trace_err(J, LJ_TRERR_BADTYPE);
 	}
       } else if (ctype_isptr(ct->info)) {
 	tr = emitir(IRT(IR_ADD, IRT_PTR), tr, lj_ir_kintp(J, sizeof(GCstr)));
       } else {
-	ct = ctype_get(cts, CTID_P_VOID);
+	lj_trace_err(J, LJ_TRERR_BADTYPE);
       }
     } else if (!tref_isnum(tr)) {
       tr = 0;
@@ -1480,7 +1484,6 @@ void recff_cdata_arith(jit_State *J, RecordFFData *rd)
   }
   {
     TRef tr;
-    MMS mm = (MMS)rd->data;
     if ((mm == MM_len || mm == MM_concat ||
 	 (!(tr = crec_arith_int64(J, sp, s, mm)) &&
 	  !(tr = crec_arith_ptr(J, sp, s, mm)))) &&
@@ -1702,11 +1705,21 @@ static CTypeID crec_bit64_type(CTState *cts, cTValue *tv)
   return 0;  /* Use regular 32 bit ops. */
 }
 
+static TRef crec_bit64_arg(jit_State *J, CType *d, TRef sp, TValue *sval)
+{
+  if (LJ_UNLIKELY(tref_isstr(sp))) {
+    if (lj_strscan_num(strV(sval), sval)) {
+      sp = emitir(IRTG(IR_STRTO, IRT_NUM), sp, 0);
+    }  /* else: interpreter will throw. */
+  }
+  return crec_ct_tv(J, d, 0, sp, sval);
+}
+
 void recff_bit64_tobit(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
-  TRef tr = crec_ct_tv(J, ctype_get(cts, CTID_INT64), 0,
-		       J->base[0], &rd->argv[0]);
+  TRef tr = crec_bit64_arg(J, ctype_get(cts, CTID_INT64),
+			   J->base[0], &rd->argv[0]);
   if (!tref_isinteger(tr))
     tr = emitconv(tr, IRT_INT, tref_type(tr), 0);
   J->base[0] = tr;
@@ -1717,7 +1730,7 @@ int recff_bit64_unary(jit_State *J, RecordFFData *rd)
   CTState *cts = ctype_ctsG(J2G(J));
   CTypeID id = crec_bit64_type(cts, &rd->argv[0]);
   if (id) {
-    TRef tr = crec_ct_tv(J, ctype_get(cts, id), 0, J->base[0], &rd->argv[0]);
+    TRef tr = crec_bit64_arg(J, ctype_get(cts, id), J->base[0], &rd->argv[0]);
     tr = emitir(IRT(rd->data, id-CTID_INT64+IRT_I64), tr, 0);
     J->base[0] = emitir(IRTG(IR_CNEWI, IRT_CDATA), lj_ir_kint(J, id), tr);
     return 1;
@@ -1737,9 +1750,9 @@ int recff_bit64_nary(jit_State *J, RecordFFData *rd)
   if (id) {
     CType *ct = ctype_get(cts, id);
     uint32_t ot = IRT(rd->data, id-CTID_INT64+IRT_I64);
-    TRef tr = crec_ct_tv(J, ct, 0, J->base[0], &rd->argv[0]);
+    TRef tr = crec_bit64_arg(J, ct, J->base[0], &rd->argv[0]);
     for (i = 1; J->base[i] != 0; i++) {
-      TRef tr2 = crec_ct_tv(J, ct, 0, J->base[i], &rd->argv[i]);
+      TRef tr2 = crec_bit64_arg(J, ct, J->base[i], &rd->argv[i]);
       tr = emitir(ot, tr, tr2);
     }
     J->base[0] = emitir(IRTG(IR_CNEWI, IRT_CDATA), lj_ir_kint(J, id), tr);
@@ -1754,15 +1767,15 @@ int recff_bit64_shift(jit_State *J, RecordFFData *rd)
   CTypeID id;
   TRef tsh = 0;
   if (J->base[0] && tref_iscdata(J->base[1])) {
-    tsh = crec_ct_tv(J, ctype_get(cts, CTID_INT64), 0,
-		     J->base[1], &rd->argv[1]);
+    tsh = crec_bit64_arg(J, ctype_get(cts, CTID_INT64),
+			 J->base[1], &rd->argv[1]);
     if (!tref_isinteger(tsh))
       tsh = emitconv(tsh, IRT_INT, tref_type(tsh), 0);
     J->base[1] = tsh;
   }
   id = crec_bit64_type(cts, &rd->argv[0]);
   if (id) {
-    TRef tr = crec_ct_tv(J, ctype_get(cts, id), 0, J->base[0], &rd->argv[0]);
+    TRef tr = crec_bit64_arg(J, ctype_get(cts, id), J->base[0], &rd->argv[0]);
     uint32_t op = rd->data;
     if (!tsh) tsh = lj_opt_narrow_tobit(J, J->base[1]);
     if (!(op < IR_BROL ? LJ_TARGET_MASKSHIFT : LJ_TARGET_MASKROT) &&
@@ -1792,7 +1805,7 @@ TRef recff_bit64_tohex(jit_State *J, RecordFFData *rd, TRef hdr)
     CTypeID id2 = 0;
     n = (int32_t)lj_carith_check64(J->L, 2, &id2);
     if (id2)
-      trsf = crec_ct_tv(J, ctype_get(cts, CTID_INT32), 0, trsf, &rd->argv[1]);
+      trsf = crec_bit64_arg(J, ctype_get(cts, CTID_INT32), trsf, &rd->argv[1]);
     else
       trsf = lj_opt_narrow_tobit(J, trsf);
     emitir(IRTGI(IR_EQ), trsf, lj_ir_kint(J, n));  /* Specialize to n. */
@@ -1802,7 +1815,7 @@ TRef recff_bit64_tohex(jit_State *J, RecordFFData *rd, TRef hdr)
   if (n < 0) { n = -n; sf |= STRFMT_F_UPPER; }
   sf |= ((SFormat)((n+1)&255) << STRFMT_SH_PREC);
   if (id) {
-    tr = crec_ct_tv(J, ctype_get(cts, id), 0, J->base[0], &rd->argv[0]);
+    tr = crec_bit64_arg(J, ctype_get(cts, id), J->base[0], &rd->argv[0]);
     if (n < 16)
       tr = emitir(IRT(IR_BAND, IRT_U64), tr,
 		  lj_ir_kint64(J, ((uint64_t)1 << 4*n)-1));

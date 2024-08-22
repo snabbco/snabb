@@ -1,6 +1,6 @@
 /*
 ** C data management.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #include "lj_obj.h"
@@ -85,7 +85,7 @@ void lj_cdata_free(global_State *g, GCcdata *cd)
 
 void lj_cdata_setfin(lua_State *L, GCcdata *cd, GCobj *obj, uint32_t it)
 {
-  GCtab *t = ctype_ctsG(G(L))->finalizer;
+  GCtab *t = tabref(G(L)->gcroot[GCROOT_FFI_FIN]);
   if (gcref(t->metatable)) {
     /* Add cdata to finalizer table, if still enabled. */
     TValue *tv, tmp;

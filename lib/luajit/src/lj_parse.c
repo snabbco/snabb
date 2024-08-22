@@ -1,6 +1,6 @@
 /*
 ** Lua parser (source code -> bytecode).
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -654,19 +654,20 @@ static void bcemit_store(FuncState *fs, ExpDesc *var, ExpDesc *e)
 /* Emit method lookup expression. */
 static void bcemit_method(FuncState *fs, ExpDesc *e, ExpDesc *key)
 {
-  BCReg idx, func, obj = expr_toanyreg(fs, e);
+  BCReg idx, func, fr2, obj = expr_toanyreg(fs, e);
   expr_free(fs, e);
   func = fs->freereg;
-  bcemit_AD(fs, BC_MOV, func+1+LJ_FR2, obj);  /* Copy object to 1st argument. */
+  fr2 = fs->ls->fr2;
+  bcemit_AD(fs, BC_MOV, func+1+fr2, obj);  /* Copy object to 1st argument. */
   lj_assertFS(expr_isstrk(key), "bad usage");
   idx = const_str(fs, key);
   if (idx <= BCMAX_C) {
-    bcreg_reserve(fs, 2+LJ_FR2);
+    bcreg_reserve(fs, 2+fr2);
     bcemit_ABC(fs, BC_TGETS, func, obj, idx);
   } else {
-    bcreg_reserve(fs, 3+LJ_FR2);
-    bcemit_AD(fs, BC_KSTR, func+2+LJ_FR2, idx);
-    bcemit_ABC(fs, BC_TGETV, func, obj, func+2+LJ_FR2);
+    bcreg_reserve(fs, 3+fr2);
+    bcemit_AD(fs, BC_KSTR, func+2+fr2, idx);
+    bcemit_ABC(fs, BC_TGETV, func, obj, func+2+fr2);
     fs->freereg--;
   }
   e->u.s.info = func;
@@ -1295,9 +1296,12 @@ static void fs_fixup_bc(FuncState *fs, GCproto *pt, BCIns *bc, MSize n)
 {
   BCInsLine *base = fs->bcbase;
   MSize i;
+  BCIns op;
   pt->sizebc = n;
-  bc[0] = BCINS_AD((fs->flags & PROTO_VARARG) ? BC_FUNCV : BC_FUNCF,
-		   fs->framesize, 0);
+  if (fs->ls->fr2 != LJ_FR2) op = BC_NOT;  /* Mark non-native prototype. */
+  else if ((fs->flags & PROTO_VARARG)) op = BC_FUNCV;
+  else op = BC_FUNCF;
+  bc[0] = BCINS_AD(op, fs->framesize, 0);
   for (i = 1; i < n; i++)
     bc[i] = base[i].ins;
 }
@@ -1853,11 +1857,11 @@ static void parse_args(LexState *ls, ExpDesc *e)
   lj_assertFS(e->k == VNONRELOC, "bad expr type %d", e->k);
   base = e->u.s.info;  /* Base register for call. */
   if (args.k == VCALL) {
-    ins = BCINS_ABC(BC_CALLM, base, 2, args.u.s.aux - base - 1 - LJ_FR2);
+    ins = BCINS_ABC(BC_CALLM, base, 2, args.u.s.aux - base - 1 - ls->fr2);
   } else {
     if (args.k != VVOID)
       expr_tonextreg(fs, &args);
-    ins = BCINS_ABC(BC_CALL, base, 2, fs->freereg - base - LJ_FR2);
+    ins = BCINS_ABC(BC_CALL, base, 2, fs->freereg - base - ls->fr2);
   }
   expr_init(e, VCALL, bcemit_INS(fs, ins));
   e->u.s.aux = base;
@@ -1897,7 +1901,7 @@ static void expr_primary(LexState *ls, ExpDesc *v)
       parse_args(ls, v);
     } else if (ls->tok == '(' || ls->tok == TK_string || ls->tok == '{') {
       expr_tonextreg(fs, v);
-      if (LJ_FR2) bcreg_reserve(fs, 1);
+      if (ls->fr2) bcreg_reserve(fs, 1);
       parse_args(ls, v);
     } else {
       break;
@@ -2273,11 +2277,15 @@ static void parse_return(LexState *ls)
     BCReg nret = expr_list(ls, &e);
     if (nret == 1) {  /* Return one result. */
       if (e.k == VCALL) {  /* Check for tail call. */
+#ifdef LUAJIT_DISABLE_TAILCALL
+	goto notailcall;
+#else
 	BCIns *ip = bcptr(fs, &e);
 	/* It doesn't pay off to add BC_VARGT just for 'return ...'. */
 	if (bc_op(*ip) == BC_VARG) goto notailcall;
 	fs->pc--;
 	ins = BCINS_AD(bc_op(*ip)-BC_CALL+BC_CALLT, bc_a(*ip), bc_c(*ip));
+#endif
       } else {  /* Can return the result from any register. */
 	ins = BCINS_AD(BC_RET1, expr_toanyreg(fs, &e), 2);
       }
@@ -2501,8 +2509,8 @@ static void parse_for_iter(LexState *ls, GCstr *indexname)
   line = ls->linenumber;
   assign_adjust(ls, 3, expr_list(ls, &e), &e);
   /* The iterator needs another 3 [4] slots (func [pc] | state ctl). */
-  bcreg_bump(fs, 3+LJ_FR2);
-  isnext = (nvars <= 5 && predict_next(ls, fs, exprpc));
+  bcreg_bump(fs, 3+ls->fr2);
+  isnext = (nvars <= 5 && fs->pc > exprpc && predict_next(ls, fs, exprpc));
   var_add(ls, 3);  /* Hidden control variables. */
   lex_check(ls, TK_do);
   loop = bcemit_AJ(fs, isnext ? BC_ISNEXT : BC_JMP, base, NO_JMP);
