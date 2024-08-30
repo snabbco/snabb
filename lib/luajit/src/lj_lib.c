@@ -1,6 +1,6 @@
 /*
 ** Library function support.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_lib_c
@@ -60,6 +60,7 @@ static const uint8_t *lib_read_lfunc(lua_State *L, const uint8_t *p, GCtab *tab)
   ls.pe = (const char *)~(uintptr_t)0;
   ls.c = -1;
   ls.level = BCDUMP_F_STRIP;
+  ls.fr2 = LJ_FR2;
   ls.chunkname = name;
   pt = lj_bcread_proto(&ls);
   pt->firstline = ~(BCLine)0;
@@ -243,6 +244,23 @@ GCfunc *lj_lib_checkfunc(lua_State *L, int narg)
   if (!(o < L->top && tvisfunc(o)))
     lj_err_argt(L, narg, LUA_TFUNCTION);
   return funcV(o);
+}
+
+GCproto *lj_lib_checkLproto(lua_State *L, int narg, int nolua)
+{
+  TValue *o = L->base + narg-1;
+  if (L->top > o) {
+    if (tvisproto(o)) {
+      return protoV(o);
+    } else if (tvisfunc(o)) {
+      if (isluafunc(funcV(o)))
+	return funcproto(funcV(o));
+      else if (nolua)
+	return NULL;
+    }
+  }
+  lj_err_argt(L, narg, LUA_TFUNCTION);
+  return NULL;  /* unreachable */
 }
 
 GCtab *lj_lib_checktab(lua_State *L, int narg)

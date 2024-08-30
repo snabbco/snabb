@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-[ "$LISP_N" ] || exit 1
-run()     { ./lisp.lua ${LISP_N}; }
-start()   { run >/dev/null & }
-stop()    { pgrep -f "lisp.lua ${LISP_N}" | xargs kill -9; }
-restart() { stop; start; }
-if [ "$1" ]; then $1; else stop; run; fi

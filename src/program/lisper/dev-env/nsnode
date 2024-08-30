@@ -1,2 +1,0 @@
-[ "$1" ] || exit 1
-ip netns exec node$1 bash

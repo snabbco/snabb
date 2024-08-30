@@ -1,6 +1,6 @@
 /*
 ** LuaJIT VM builder.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _BUILDVM_H
@@ -91,7 +91,6 @@ typedef struct BuildCtx {
 
 extern void owrite(BuildCtx *ctx, const void *ptr, size_t sz);
 extern void emit_asm(BuildCtx *ctx);
-extern void emit_peobj(BuildCtx *ctx);
 extern void emit_lib(BuildCtx *ctx);
 extern void emit_fold(BuildCtx *ctx);
 

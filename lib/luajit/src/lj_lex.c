@@ -1,6 +1,6 @@
 /*
 ** Lexical analyzer.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -405,6 +405,7 @@ int lj_lex_setup(lua_State *L, LexState *ls)
   ls->lastline = 1;
   ls->log = NULL;
   ls->logend = NULL;
+  ls->fr2 = LJ_FR2;  /* Generate native bytecode by default. */
   lex_next(ls);  /* Read-ahead first char. */
   if (ls->c == 0xef && ls->p + 2 <= ls->pe && (uint8_t)ls->p[0] == 0xbb &&
       (uint8_t)ls->p[1] == 0xbf) {  /* Skip UTF-8 BOM (if buffered). */

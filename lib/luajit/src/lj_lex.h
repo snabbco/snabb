@@ -1,6 +1,6 @@
 /*
 ** Lexical analyzer.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_LEX_H
@@ -75,6 +75,7 @@ typedef struct LexState {
   uint32_t level;	/* Syntactical nesting level. */
   char *log;		/* Current position where input should be logged. */
   char *logend;		/* Last position where input can be logged. */
+  int fr2;		/* Generate bytecode for LJ_FR2 mode. */
 } LexState;
 
 LJ_FUNC int lj_lex_setup(lua_State *L, LexState *ls);

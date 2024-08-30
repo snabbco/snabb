@@ -1,6 +1,6 @@
 /*
 ** Fast function call recorder.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_ffrecord_c
@@ -97,6 +97,14 @@ static ptrdiff_t results_wanted(jit_State *J)
     return -1;
 }
 
+static TValue *rec_stop_stitch_cp(lua_State *L, lua_CFunction dummy, void *ud)
+{
+  jit_State *J = (jit_State *)ud;
+  lj_record_stop(J, LJ_TRLINK_STITCH, 0);
+  UNUSED(L); UNUSED(dummy);
+  return NULL;
+}
+
 /* Trace stitching: add continuation below frame to start a new trace. */
 static void recff_stitch(jit_State *J)
 {
@@ -107,10 +115,7 @@ static void recff_stitch(jit_State *J)
   TValue *nframe = base + 1 + LJ_FR2;
   const BCIns *pc = frame_pc(base-1);
   TValue *pframe = frame_prevl(base-1);
-
-  /* Check for this now. Throwing in lj_record_stop messes up the stack. */
-  if (J->cur.nsnap >= (MSize)J->param[JIT_P_maxsnap])
-    lj_trace_err(J, LJ_TRERR_SNAPOV);
+  int errcode;
 
   /* Move func + args up in Lua stack and insert continuation. */
   memmove(&base[1], &base[-1-LJ_FR2], sizeof(TValue)*nslot);
@@ -131,13 +136,21 @@ static void recff_stitch(jit_State *J)
   J->baseslot += 2 + LJ_FR2;
   J->framedepth++;
 
-  lj_record_stop(J, LJ_TRLINK_STITCH, 0);
+  errcode = lj_vm_cpcall(L, NULL, J, rec_stop_stitch_cp);
 
   /* Undo Lua stack changes. */
   memmove(&base[-1-LJ_FR2], &base[1], sizeof(TValue)*nslot);
   setframe_pc(base-1, pc);
   L->base -= 2 + LJ_FR2;
   L->top -= 2 + LJ_FR2;
+
+  if (errcode) {
+    if (errcode == LUA_ERRRUN)
+      copyTV(L, L->top-1, L->top + (1 + LJ_FR2));
+    else
+      setintV(L->top-1, (int32_t)LJ_TRERR_RECERR);
+    lj_err_throw(L, errcode);  /* Propagate errors. */
+  }
 }
 
 /* Fallback handler for fast functions that are not recorded (yet). */
@@ -951,6 +964,7 @@ static void recff_format(jit_State *J, RecordFFData *rd, TRef hdr, int sbufx)
   GCstr *fmt = argv2str(J, &rd->argv[arg]);
   FormatState fs;
   SFormat sf;
+  int nfmt = 0;
   /* Specialize to the format string. */
   emitir(IRTG(IR_EQ, IRT_STR), trfmt, lj_ir_kstr(J, fmt));
   lj_strfmt_init(&fs, strdata(fmt), fmt->len);
@@ -1021,6 +1035,7 @@ static void recff_format(jit_State *J, RecordFFData *rd, TRef hdr, int sbufx)
       recff_nyiu(J, rd);
       return;
     }
+    if (++nfmt > 100) lj_trace_err(J, LJ_TRERR_TRACEOV);
   }
   if (sbufx) {
     emitir(IRT(IR_USE, IRT_NIL), tr, 0);
@@ -1081,7 +1096,7 @@ static TRef recff_sbufx_check(jit_State *J, RecordFFData *rd, ptrdiff_t arg)
 /* Emit BUFHDR for write to extended string buffer. */
 static TRef recff_sbufx_write(jit_State *J, TRef ud)
 {
-  TRef trbuf = emitir(IRT(IR_ADD, IRT_PGC), ud, lj_ir_kint(J, sizeof(GCudata)));
+  TRef trbuf = emitir(IRT(IR_ADD, IRT_PGC), ud, lj_ir_kintpgc(J, sizeof(GCudata)));
   return emitir(IRT(IR_BUFHDR, IRT_PGC), trbuf, IRBUFHDR_WRITE);
 }
 
@@ -1111,19 +1126,19 @@ static void recff_buffer_method_reset(jit_State *J, RecordFFData *rd)
   SBufExt *sbx = bufV(&rd->argv[0]);
   int iscow = (int)sbufiscow(sbx);
   TRef trl = recff_sbufx_get_L(J, ud);
-  TRef trcow = emitir(IRT(IR_BAND, IRT_IGC), trl, lj_ir_kint(J, SBUF_FLAG_COW));
-  TRef zero = lj_ir_kint(J, 0);
-  emitir(IRTG(iscow ? IR_NE : IR_EQ, IRT_IGC), trcow, zero);
+  TRef trcow = emitir(IRT(IR_BAND, IRT_IGC), trl, lj_ir_kintpgc(J, SBUF_FLAG_COW));
+  TRef zeropgc = lj_ir_kintpgc(J, 0);
+  emitir(IRTG(iscow ? IR_NE : IR_EQ, IRT_IGC), trcow, zeropgc);
   if (iscow) {
-    trl = emitir(IRT(IR_BXOR, IRT_IGC), trl,
-		 lj_ir_kint64(J, SBUF_FLAG_COW));
-    recff_sbufx_set_ptr(J, ud, IRFL_SBUF_W, zero);
-    recff_sbufx_set_ptr(J, ud, IRFL_SBUF_E, zero);
-    recff_sbufx_set_ptr(J, ud, IRFL_SBUF_B, zero);
+    TRef zerop = lj_ir_kintp(J, 0);
+    trl = emitir(IRT(IR_BXOR, IRT_IGC), trl, lj_ir_kintpgc(J, SBUF_FLAG_COW));
+    recff_sbufx_set_ptr(J, ud, IRFL_SBUF_W, zerop);
+    recff_sbufx_set_ptr(J, ud, IRFL_SBUF_E, zerop);
+    recff_sbufx_set_ptr(J, ud, IRFL_SBUF_B, zerop);
     recff_sbufx_set_L(J, ud, trl);
     emitir(IRT(IR_FSTORE, IRT_PGC),
-	   emitir(IRT(IR_FREF, IRT_PGC), ud, IRFL_SBUF_REF), zero);
-    recff_sbufx_set_ptr(J, ud, IRFL_SBUF_R, zero);
+	   emitir(IRT(IR_FREF, IRT_PGC), ud, IRFL_SBUF_REF), zeropgc);
+    recff_sbufx_set_ptr(J, ud, IRFL_SBUF_R, zerop);
   } else {
     TRef trb = recff_sbufx_get_ptr(J, ud, IRFL_SBUF_B);
     recff_sbufx_set_ptr(J, ud, IRFL_SBUF_W, trb);
@@ -1151,6 +1166,12 @@ static void recff_buffer_method_set(jit_State *J, RecordFFData *rd)
   if (tref_isstr(tr)) {
     TRef trp = emitir(IRT(IR_STRREF, IRT_PGC), tr, lj_ir_kint(J, 0));
     TRef len = emitir(IRTI(IR_FLOAD), tr, IRFL_STR_LEN);
+    IRIns *irp = IR(tref_ref(trp));
+    /* trp must point into the anchored obj, even after folding. */
+    if (irp->o == IR_STRREF)
+      tr = irp->op1;
+    else if (!tref_isk(tr))
+      trp = emitir(IRT(IR_ADD, IRT_PGC), tr, lj_ir_kintpgc(J, sizeof(GCstr)));
     lj_ir_call(J, IRCALL_lj_bufx_set, trbuf, trp, len, tr);
   } else if (tref_iscdata(tr)) {
     TRef trp = lj_crecord_topcvoid(J, tr, &rd->argv[1]);
@@ -1386,6 +1407,15 @@ static void recff_table_new(jit_State *J, RecordFFData *rd)
 {
   TRef tra = lj_opt_narrow_toint(J, J->base[0]);
   TRef trh = lj_opt_narrow_toint(J, J->base[1]);
+  if (tref_isk(tra) && tref_isk(trh)) {
+    int32_t a = IR(tref_ref(tra))->i;
+    if (a < 0x7fff) {
+      uint32_t hbits = hsize2hbits(IR(tref_ref(trh))->i);
+      a = a > 0 ? a+1 : 0;
+      J->base[0] = emitir(IRTG(IR_TNEW, IRT_TAB), (uint32_t)a, hbits);
+      return;
+    }
+  }
   J->base[0] = lj_ir_call(J, IRCALL_lj_tab_new_ah, tra, trh);
   UNUSED(rd);
 }

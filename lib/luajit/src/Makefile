@@ -7,7 +7,7 @@
 # Also works with MinGW and Cygwin on Windows.
 # Please check msvcbuild.bat for building with MSVC on Windows.
 #
-# Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+# Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
 MAJVER=  1
@@ -206,7 +206,7 @@ DASM= $(HOST_LUA) $(DASM_DIR)/dynasm.lua
 DASM_ARCH= x64
 DASM_DASC= vm_$(DASM_ARCH).dasc
 
-BUILDVM_O= host/buildvm.o host/buildvm_asm.o host/buildvm_peobj.o \
+BUILDVM_O= host/buildvm.o host/buildvm_asm.o \
 	   host/buildvm_lib.o host/buildvm_fold.o
 BUILDVM_T= host/buildvm
 BUILDVM_X= $(BUILDVM_T)

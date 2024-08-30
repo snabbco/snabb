@@ -1,6 +1,6 @@
 /*
 ** C type management.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_CTYPE_H
@@ -177,7 +177,6 @@ typedef struct CTState {
   MSize sizetab;	/* Size of C type table. */
   lua_State *L;		/* Lua state (needed for errors and allocations). */
   global_State *g;	/* Global state. */
-  GCtab *finalizer;	/* Map of cdata to finalizer. */
   GCtab *miscmap;	/* Map of -CTypeID to metatable and cb slot to func. */
   CCallback cb;		/* Temporary callback state. */
   CTypeID1 hash[CTHASH_SIZE];  /* Hash anchors for C type table. */
@@ -266,6 +265,8 @@ typedef struct CTState {
 /* Target-dependent types. */
 #define CTTYDEFP(_)
 
+#define CTF_LONG_IF8		(CTF_LONG * (sizeof(long) == 8))
+
 /* Common types. */
 #define CTTYDEF(_) \
   _(NONE,		0,	CT_ATTRIB, CTATTRIB(CTA_BAD)) \
@@ -279,8 +280,8 @@ typedef struct CTState {
   _(UINT16,		2,	CT_NUM, CTF_UNSIGNED|CTALIGN(1)) \
   _(INT32,		4,	CT_NUM, CTALIGN(2)) \
   _(UINT32,		4,	CT_NUM, CTF_UNSIGNED|CTALIGN(2)) \
-  _(INT64,		8,	CT_NUM, CTF_LONG|CTALIGN(3)) \
-  _(UINT64,		8,	CT_NUM, CTF_UNSIGNED|CTF_LONG|CTALIGN(3)) \
+  _(INT64,		8,	CT_NUM, CTF_LONG_IF8|CTALIGN(3)) \
+  _(UINT64,		8,	CT_NUM, CTF_UNSIGNED|CTF_LONG_IF8|CTALIGN(3)) \
   _(FLOAT,		4,	CT_NUM, CTF_FP|CTALIGN(2)) \
   _(DOUBLE,		8,	CT_NUM, CTF_FP|CTALIGN(3)) \
   _(COMPLEX_FLOAT,	8,	CT_ARRAY, CTF_COMPLEX|CTALIGN(2)|CTID_FLOAT) \
@@ -453,6 +454,7 @@ LJ_FUNC GCstr *lj_ctype_repr(lua_State *L, CTypeID id, GCstr *name);
 LJ_FUNC GCstr *lj_ctype_repr_int64(lua_State *L, uint64_t n, int isunsigned);
 LJ_FUNC GCstr *lj_ctype_repr_complex(lua_State *L, void *sp, CTSize size);
 LJ_FUNC CTState *lj_ctype_init(lua_State *L);
+LJ_FUNC void lj_ctype_initfin(lua_State *L);
 LJ_FUNC void lj_ctype_log(lua_State *L);
 LJ_FUNC void lj_ctype_freestate(global_State *g);
 

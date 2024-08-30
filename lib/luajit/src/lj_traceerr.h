@@ -1,6 +1,6 @@
 /*
 ** Trace compiler error messages.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 /* This file may be included multiple times with different TREDEF macros. */
@@ -13,7 +13,7 @@ TREDEF(STACKOV,	"trace too deep")
 TREDEF(SNAPOV,	"too many snapshots")
 TREDEF(BLACKL,	"blacklisted")
 TREDEF(RETRY,	"retry recording")
-TREDEF(NYIBC,	"NYI: bytecode %d")
+TREDEF(NYIBC,	"NYI: bytecode %s")
 
 /* Recording loop ops. */
 TREDEF(LLEAVE,	"leaving loop in root trace")
