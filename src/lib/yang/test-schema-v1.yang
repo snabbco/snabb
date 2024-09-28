@@ -1,0 +1,16 @@
+module test-schema-v1 {
+  namespace snabb:test;
+  prefix test;
+
+  import ietf-inet-types { prefix inet; }
+  import ietf-yang-types { prefix yang; }
+
+  container test-config {
+    container ports {
+      container port-range {
+        leaf start  {type uint16; default 1025;}
+        leaf end    {type uint16; default 32000;}
+      }
+    }
+  }
+}
