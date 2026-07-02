@@ -968,7 +968,8 @@ function resolve(schema, features)
                local grouping = lookup_lazy(env, 'groupings', v.id)
                for k,v in pairs(grouping.body) do
                   assert(not node.body[k], 'duplicate identifier: '..k)
-                  node.body[k] = v
+                  -- Inline a copy for local refinements
+                  node.body[k] = lib.deepcopy(v)
                end
                for _,refine in ipairs(v.refines) do
                   local target = node.body[refine.node_id]
