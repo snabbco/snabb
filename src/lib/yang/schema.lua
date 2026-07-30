@@ -767,6 +767,18 @@ end
 -- Resolve all augment nodes. (TODO)
 function resolve(schema, features)
    if features == nil then features = default_features end
+   local function node_by_id(node_id, node)
+      if node_id:match("^[%a_][%w_%-%.]+$") then
+         return node.body[node_id]
+      end
+      local id, suffix = node_id:match("^([%a_][%w_%-%.]+)/(.+)$")
+      if not id then
+         error("Invalid node id: "..node_id)
+      end
+      if node.body[id] then
+         return node_by_id(suffix, node.body[id])
+      end
+   end
    local function pop_prop(node, prop)
       local val = node[prop]
       node[prop] = nil
@@ -972,7 +984,7 @@ function resolve(schema, features)
                   node.body[k] = lib.deepcopy(v)
                end
                for _,refine in ipairs(v.refines) do
-                  local target = node.body[refine.node_id]
+                  local target = node_by_id(refine.node_id, node)
                   assert(target, 'missing refine node: '..refine.node_id)
                   -- FIXME: Add additional "must" statements.
                   for _,k in ipairs({'config', 'description', 'reference',
@@ -1389,6 +1401,66 @@ function selftest()
    assert(interpret_if_feature(expr, test_features))
    assert(not interpret_if_feature("boo", test_features))
    assert(not interpret_if_feature("baz or foo", test_features))
+
+   -- Test nested refine.
+
+   local nested_refine_schema = [[module nested-refine {
+      namespace refine;
+      prefix refine;
+
+      grouping gruppo {
+         container conto {
+            leaf uno { type boolean; }
+         }
+      }
+
+      uses gruppo {
+         refine "conto/uno" {
+            default true;
+         }
+      }   
+   }]]
+   local nrschema = load_schema(nested_refine_schema)
+   assert(nrschema.body.conto.body.uno.default)
+
+   local invalid_nested_refine_schema = [[module nested-refine {
+      namespace refine;
+      prefix refine;
+
+      grouping gruppo {
+         container conto {
+            leaf uno { type boolean; }
+         }
+      }
+
+      uses gruppo {
+         refine "conto/due" {
+            default true;
+         }
+      }   
+   }]]
+   local ok, err = pcall(load_schema, invalid_nested_refine_schema)
+   assert(not ok and err:match("missing refine node: conto/due"))
+
+   -- NYI: absolute schema node ids
+   local absolute_nested_refine_schema = [[module nested-refine {
+      namespace refine;
+      prefix refine;
+
+      grouping gruppo {
+         container conto {
+            leaf uno { type boolean; }
+         }
+      }
+
+      uses gruppo {
+         refine "/conto/uno" {
+            default true;
+         }
+      }   
+   }]]
+   local ok, err = pcall(load_schema, absolute_nested_refine_schema)
+   assert(not ok and err:match("Invalid node id: /conto/uno"))
 
    print('selftest: ok')
 end
