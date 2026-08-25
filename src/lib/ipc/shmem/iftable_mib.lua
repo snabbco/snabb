@@ -33,6 +33,11 @@ function init_snmp (objs, name, counters, directory, interval, log_date)
    local logger = logger.new({ date = log_date,
                                module = 'iftable_mib' })
    -- ifTable
+   --
+   -- Include a dummy ifIndex to signal to the SNMP agent that it
+   -- needs to instantiate this OID in the table. The value will be
+   -- discarded and replaced by the actual ifIndex by the agent.
+   ifTable:register('ifIndex', 'Integer32')
    ifTable:register('ifDescr', 'OctetStr', objs.ifDescr)
    ifTable:register('ifType', 'Integer32')
    ifTable:set('ifType',

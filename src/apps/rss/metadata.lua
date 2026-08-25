@@ -192,6 +192,8 @@ local magic_number = 0x5ABB
 pkt_meta_data_t = ffi.typeof([[
    struct {
       uint16_t magic;
+      /* Unix timestamp in nanoseconds */
+      uint64_t timestamp;
       /* Actual ethertype for single-tagged frames */
       uint16_t ethertype;
       /* vlan == 0 if untagged frame */
@@ -272,6 +274,7 @@ function add (pkt, rm_ext_headers, vlan_override)
 
    local md = md_ptr(pkt)
    md.magic = magic_number
+   md.timestamp = ffi.C.get_unix_time_ns()
    md.ref = 0
    md.ethertype = ethertype
    md.vlan = vlan_override or vlan
