@@ -259,8 +259,9 @@ function ConnectX:new (conf)
    local fd = pci.open_pci_resource_locked(pciaddress, 0)
    local mmio = pci.map_pci_memory(fd)
    local init_seg = InitializationSegment:new(mmio)
-   local hca_factory = HCA_factory(init_seg)
-   local hca = hca_factory:new()
+   local cmdq = CMDQ:new(init_seg)
+   -- Main HCA used for all synchronous commands
+   local hca = cmdq:HCA()
 
    -- Makes enable_hca() hang with ConnectX5
    if self.mlx == 4 then
@@ -557,71 +558,53 @@ function ConnectX:new (conf)
    end
    self.stats = shm.create_frame("pci/"..pciaddress, frame)
 
-   -- Create separate HCAs to retreive port statistics.  Those
-   -- commands must be called asynchronously to reduce latency.
-   self.stats_reqs = {
-      {
-        start_fn = HCA.get_port_stats_start,
-        finish_fn = HCA.get_port_stats_finish,
-        process_fn = function (r, stats)
-           local set = counter.set
-           set(stats.rxbytes, r.rxbytes)
-           set(stats.rxpackets, r.rxpackets)
-           set(stats.rxmcast, r.rxmcast)
-           set(stats.rxbcast, r.rxbcast)
-           if self.mlx == 4 then
-              -- ConnectX 4 doesn't have per-queue drop stats,
-              -- but this counter appears to always be zero :/
-              set(stats.rxdrop, r.rxdrop)
-           end
-           set(stats.rxerrors, r.rxerrors)
-           set(stats.txbytes, r.txbytes)
-           set(stats.txpackets, r.txpackets)
-           set(stats.txmcast, r.txmcast)
-           set(stats.txbcast, r.txbcast)
-           set(stats.txdrop, r.txdrop)
-           set(stats.txerrors, r.txerrors)
-        end
-      },
-      {
-        start_fn = HCA.get_port_speed_start,
-        finish_fn = HCA.get_port_speed_finish,
-        args = self.extended_ethernet,
-        process_fn = function (r, stats)
-           counter.set(stats.speed, r)
-        end
-      },
-      {
-        start_fn = HCA.get_port_status_start,
-        finish_fn = HCA.get_port_status_finish,
-        process_fn = function (r, stats)
-           counter.set(stats.status, (r.oper_status == 1 and 1) or 2)
-        end
-      },
-   }
+   -- Dedicated HCAs for asynchronous commands called via sync_timer())
+   cmdq:HCA(
+      function (hca, r)
+         local set = counter.set
+         local stats = self.stats
+         set(stats.rxbytes, r.rxbytes)
+         set(stats.rxpackets, r.rxpackets)
+         set(stats.rxmcast, r.rxmcast)
+         set(stats.rxbcast, r.rxbcast)
+         if self.mlx == 4 then
+            -- ConnectX 4 doesn't have per-queue drop stats,
+            -- but this counter appears to always be zero :/
+            set(stats.rxdrop, r.rxdrop)
+         end
+         set(stats.rxerrors, r.rxerrors)
+         set(stats.txbytes, r.txbytes)
+         set(stats.txpackets, r.txpackets)
+         set(stats.txmcast, r.txmcast)
+         set(stats.txbcast, r.txbcast)
+         set(stats.txdrop, r.txdrop)
+         set(stats.txerrors, r.txerrors)
+      end
+   ):get_port_stats()
+   cmdq:HCA(
+      function (hca, r)
+         counter.set(self.stats.speed, r)
+      end
+   ):get_port_speed(self.extended_ethernet)
+   cmdq:HCA(
+      function (hca, r)
+         counter.set(self.stats.status, (r.oper_status == 1 and 1) or 2)
+      end
+   ):get_port_status()
 
    -- Empty for ConnectX4
    for _, q_counter in ipairs(q_counters) do
       local per_q_rxdrop = self.stats["rxdrop_"..q_counter.queue_id]
-      table.insert(self.stats_reqs,
-                   {
-                      start_fn = HCA.query_q_counter_start,
-                      finish_fn = HCA.query_q_counter_finish,
-                      args = q_counter.counter_id,
-                      process_fn = function(r, stats)
-                         -- Incremental update relies on query_q_counter to
-                         -- clear the counter after read.
-                         counter.add(stats.rxdrop, r.out_of_buffer)
-                         counter.add(per_q_rxdrop, r.out_of_buffer)
-                      end
-      })
+      cmdq:HCA(
+         function(hca, r)
+            -- Incremental update relies on query_q_counter to
+            -- clear the counter after read.
+            counter.add(self.stats.rxdrop, r.out_of_buffer)
+            counter.add(per_q_rxdrop, r.out_of_buffer)
+         end
+      ):query_q_counter(q_counter.counter_id)
    end
 
-   for _, req in ipairs(self.stats_reqs) do
-      req.hca = hca_factory:new()
-      -- Post command
-      req.start_fn(req.hca, req.args)
-   end
    self.sync_timer = lib.throttle(conf.sync_stats_interval)
 
    function free_cxq (cxq)
@@ -661,7 +644,7 @@ function ConnectX:new (conf)
 
    function self:pull ()
       if self.sync_timer() then
-         self:sync_stats()
+         cmdq:run()
          eq:poll()
       end
    end
@@ -689,16 +672,6 @@ function ConnectX:new (conf)
       print(pciaddress,
          "RX packets", lib.comma_value(tonumber(rxpackets)),
          "RX bytes", lib.comma_value(tonumber(rxbytes)))
-   end
-
-   function self:sync_stats ()
-      for _, req in ipairs(self.stats_reqs) do
-         local hca = req.hca
-         if hca:completed() then
-            req.process_fn(req.finish_fn(hca), self.stats)
-            hca:post()
-         end
-      end
    end
 
    -- Save "instance variable" values.
@@ -769,10 +742,16 @@ end
 --     given offset.
 --     The parameter name is given only for debugging purposes.
 --
---    execute()
+--    execute(finalizer)
 --      Execute the command specified starting with the most recent
---      call to command().
---      If the command fails then an exception is raised.
+--      call to command(). If finalizer is nil, wait for the command
+--      to complete. If the command fails then an exception is
+--      raised. If finalizer is non-nil it must be a function taking
+--      the HCA object as single argument. Instead of executing the
+--      command it is appended to the list of commands to be executed
+--      asynchronously and execute() returns immediately. The
+--      finalizer function is called by the queue runner when the
+--      command has completed.
 --
 --    output(offset, highbit, lowbit)
 --      Return a value from the output of the command.
@@ -780,28 +759,13 @@ end
 -- Note: Parameters are often omitted when their default value (zero)
 -- is sensible. Exceptions are made for more important ones.
 
--- hca object is the main interface towards the NIC firmware.
+-- The hca object is the main interface towards the NIC firmware.
+--
+-- Historical note: the acronym HCA stands for "Host Channel
+-- Adapter". It is a piece of Infiniband terminology inherited from
+-- the origin of the ConnectX series of NICs that has no meaning in
+-- the context of Ethernet.
 HCA = {}
-
--- Create a factory for HCAs for the given Initialization Segment
--- (i.e. device).  Application of the new() method to the returned
--- object allocates a new HCA for the next available Command Queue
--- Entry.
-function HCA_factory (init_seg, cmdq_size)
-   local self = {}
-   self.size = 2^init_seg:log_cmdq_size()
-   self.stride = 2^init_seg:log_cmdq_stride()
-   self.init_seg = init_seg
-   -- Next queue to be allocated by :new()
-   self.nextq = 0
-   local cmdq_size = cmdq_size or self.size
-   assert(cmdq_size <= self.size, "command queue size limit exceeded")
-   local cmdq_t = ffi.typeof("uint8_t (*)[$]", self.stride)
-   local entries, entries_phy = memory.dma_alloc(cmdq_size * self.stride, 4096)
-   self.entries = ffi.cast(cmdq_t, entries)
-   init_seg:cmdq_phy_addr(entries_phy)
-   return setmetatable(self, { __index = HCA })
-end
 
 ---------------------------------------------------------------
 -- Startup & General commands
@@ -1205,7 +1169,7 @@ end
 function HCA:alloc_transport_domain ()
    self:command("ALLOC_TRANSPORT_DOMAIN", 0x0c, 0x0c)
       :input("opcode", 0x00, 31, 16, 0x816)
-      :execute(0x0C, 0x0C)
+      :execute()
    return self:output(0x08, 23, 0)
 end
 
@@ -1992,7 +1956,7 @@ function HCA:query_ports_cap ()
 end
 
 -- Get the speed of the port in bps
-function HCA:get_port_speed_start (extended)
+function HCA:get_port_speed (extended)
    self.extended = extended
    self:command("ACCESS_REGISTER", 0x4C, 0x4C)
       :input("opcode",       0x00, 31, 16, 0x805)
@@ -2000,19 +1964,19 @@ function HCA:get_port_speed_start (extended)
       :input("register_id",  0x08, 15,  0, PTYS)
       :input("local_port",   0x10, 23, 16, 1)
       :input("proto_mask",   0x10, 2,   0, 0x4) -- Ethernet
-      :execute_async()
-end
-
-function HCA:get_port_speed_finish ()
-   local speed = 0
-   if self.extended then
-      local ext_eth_proto_oper = self:output(0x10 + 0x20, 31, 0)
-      speed = ext_port_speed[ext_eth_proto_oper]
-   else
-      local eth_proto_oper = self:output(0x10 + 0x24, 31, 0)
-      speed = port_speed[eth_proto_oper]
-   end
-   return (speed or 0) * 1e9
+      :execute(
+         function (self)
+            local speed = 0
+            if self.extended then
+               local ext_eth_proto_oper = self:output(0x10 + 0x20, 31, 0)
+               speed = ext_port_speed[ext_eth_proto_oper]
+            else
+               local eth_proto_oper = self:output(0x10 + 0x24, 31, 0)
+               speed = port_speed[eth_proto_oper]
+            end
+            return (speed or 0) * 1e9
+         end
+              )
 end
 
 -- Set the administrative status of the port (boolean up/down).
@@ -2044,25 +2008,13 @@ function HCA:get_port_status ()
       :input("opmod",  0x04, 15,  0, 1) -- read
       :input("register_id", 0x08, 15,  0, PAOS)
       :input("local_port", 0x10, 23, 16, 1)
-      :execute()
-   port_status.admin_status = self:output(0x10, 11, 8)
-   port_status.oper_status = self:output(0x10, 3, 0)
-   return port_status
-end
-
-function HCA:get_port_status_start ()
-   self:command("ACCESS_REGISTER", 0x10, 0x1C)
-      :input("opcode", 0x00, 31, 16, 0x805)
-      :input("opmod",  0x04, 15,  0, 1) -- read
-      :input("register_id", 0x08, 15,  0, PAOS)
-      :input("local_port", 0x10, 23, 16, 1)
-      :execute()
-end
-
-function HCA:get_port_status_finish ()
-   port_status.admin_status = self:output(0x10, 11, 8)
-   port_status.oper_status = self:output(0x10, 3, 0)
-   return port_status
+      :execute(
+         function (self)
+            port_status.admin_status = self:output(0x10, 11, 8)
+            port_status.oper_status = self:output(0x10, 3, 0)
+            return port_status
+         end
+              )
 end
 
 function HCA:get_port_loopback_capability ()
@@ -2100,43 +2052,43 @@ local port_stats = {
    txdrop = 0ULL,
    txerrors = 0ULL,
 }
-function HCA:get_port_stats_start ()
+function HCA:get_port_stats ()
    self:command("ACCESS_REGISTER", 0x14, 0x10C)
       :input("opcode",        0x00, 31, 16, 0x805)
       :input("opmod",         0x04, 15,  0, 1) -- read
       :input("register_id",   0x08, 15,  0, PPCNT)
       :input("local_port",    0x10, 23, 16, 1)
       :input("grp",           0x10, 5, 0, 0x1) -- RFC 2863
-      :execute_async()
-end
+      :execute(
+         function (self)
+            port_stats.rxbytes = self:output64(0x18 + 0x00) -- includes 4-byte CRC
+            local in_ucast_packets = self:output64(0x18 + 0x08)
+            local in_mcast_packets = self:output64(0x18 + 0x48)
+            local in_bcast_packets = self:output64(0x18 + 0x50)
+            -- This is weird. The intel_mp driver adds broadcast packets to the
+            -- mcast counter, it is unclear why.  Then
+            -- lib.ipc.shmem.iftable_mib reverses it to get the true mcast
+            -- counter back.  So we do the same here.  The proper fix would be
+            -- to fix the Intel driver and remove the anti-hack from
+            -- iftable_mib.
+            port_stats.rxmcast = in_mcast_packets + in_bcast_packets
+            port_stats.rxbcast = in_bcast_packets
+            port_stats.rxpackets = in_ucast_packets + port_stats.rxmcast
+            port_stats.rxdrop = self:output64(0x18 + 0x10)
+            port_stats.rxerrors = self:output64(0x18 + 0x18)
 
-function HCA:get_port_stats_finish ()
-   port_stats.rxbytes = self:output64(0x18 + 0x00) -- includes 4-byte CRC
-   local in_ucast_packets = self:output64(0x18 + 0x08)
-   local in_mcast_packets = self:output64(0x18 + 0x48)
-   local in_bcast_packets = self:output64(0x18 + 0x50)
-   -- This is weird. The intel_mp driver adds broadcast packets to the
-   -- mcast counter, it is unclear why.  Then
-   -- lib.ipc.shmem.iftable_mib reverses it to get the true mcast
-   -- counter back.  So we do the same here.  The proper fix would be
-   -- to fix the Intel driver and remove the anti-hack from
-   -- iftable_mib.
-   port_stats.rxmcast = in_mcast_packets + in_bcast_packets
-   port_stats.rxbcast = in_bcast_packets
-   port_stats.rxpackets = in_ucast_packets + port_stats.rxmcast
-   port_stats.rxdrop = self:output64(0x18 + 0x10)
-   port_stats.rxerrors = self:output64(0x18 + 0x18)
-
-   port_stats.txbytes = self:output64(0x18 + 0x28)
-   local out_ucast_packets = self:output64(0x18 + 0x30)
-   local out_mcast_packets = self:output64(0x18 + 0x58)
-   local out_bcast_packets = self:output64(0x18 + 0x60)
-   port_stats.txmcast = out_mcast_packets + out_bcast_packets
-   port_stats.txbcast = out_bcast_packets
-   port_stats.txpackets = out_ucast_packets + port_stats.txmcast
-   port_stats.txdrop = self:output64(0x18 + 0x38)
-   port_stats.txerrors = self:output64(0x18 + 0x40)
-   return port_stats
+            port_stats.txbytes = self:output64(0x18 + 0x28)
+            local out_ucast_packets = self:output64(0x18 + 0x30)
+            local out_mcast_packets = self:output64(0x18 + 0x58)
+            local out_bcast_packets = self:output64(0x18 + 0x60)
+            port_stats.txmcast = out_mcast_packets + out_bcast_packets
+            port_stats.txbcast = out_bcast_packets
+            port_stats.txpackets = out_ucast_packets + port_stats.txmcast
+            port_stats.txdrop = self:output64(0x18 + 0x38)
+            port_stats.txerrors = self:output64(0x18 + 0x40)
+            return port_stats
+         end
+              )
 end
 
 function HCA:set_port_flow_control (rx_enable, tx_enable)
@@ -2180,27 +2132,59 @@ end
 local q_stats = {
    out_of_buffer = 0ULL
 }
-function HCA:query_q_counter_start (id)
+function HCA:query_q_counter (id)
    self:command("QUERY_Q_COUNTER", 0x20, 0x10C)
       :input("opcode",        0x00, 31, 16, 0x773)
    -- Clear the counter after reading. This allows us to
    -- update the rxdrop stat incrementally.
       :input("clear",         0x18, 31,  31, 1)
       :input("counter_set_id",0x1c,  7,   0, id)
-      :execute_async()
-end
-
-local out_of_buffer = 0ULL
-function HCA:query_q_counter_finish ()
-   q_stats.out_of_buffer = self:output(0x10 + 0x20, 31, 0)
-   return q_stats
+      :execute(
+         function (self)
+            q_stats.out_of_buffer = self:output(0x10 + 0x20, 31, 0)
+            return q_stats
+         end
+              )
 end
 
 ---------------------------------------------------------------
 -- Command Interface implementation.
 --
--- Sends commands to the HCA firmware and receives replies.
--- Defined in "Command Interface" section of the PRM.
+-- Sends commands to the HCA firmware and receives replies.  Defined
+-- in the "Command Interface" section of the PRM. Commands are posted
+-- through a physical command queue associated with every
+-- initialization segment (i.e. device). The queue is represented by a
+-- CMDQ object and consists of an array of command queue entries.
+--
+-- The CMDQ:HCA() method creates a HCA object that can store an
+-- arbitrary firmware command and its output. A HCA is posted to a
+-- slot in the command queue for execution.
+--
+-- A command can either be executed synchronously or asynchronously. A
+-- synchronous command is always posted to slot #0 of the command
+-- queue by the HCA's execute() method, which then waits for the
+-- command to complete. A HCA object is designated to be used for
+-- asynchronous operation by passing a callback function as argument
+-- to CMDQ:HCA().
+--
+-- An asynchronous command calls execute() with a "finalizer" function
+-- as argument. In that case, execute() does not post the command to
+-- the firmware but adds it to a queue of the associated CMDQ object.
+-- The queue is serviced by a call to CMDQ:run(). This method sweeps
+-- through all slots of the command queue except for slot #0. It posts
+-- outstanding commands to free slots in the queue and checks for
+-- completion of previously posted commands. When a command has
+-- completed, the finalizer function is called on the HCA object to
+-- complete processing of the command. The output of the finalizer is
+-- then passed to the callback function that was specified when the
+-- HCA was created by CMDQ:HCA() to perform actions based on the
+-- output of the command.
+--
+-- Unless a second parameter evaluating to a true value is passed to
+-- CMDQ:HCA(), the completed HCA is added back to the queue to be
+-- executed again. Otherwise the HCA is discarded after completion
+-- (this is called "oneshot" mode)
+--
 ---------------------------------------------------------------
 
 local cmdq_entry_t   = ffi.typeof("uint32_t[0x40/4]")
@@ -2210,25 +2194,84 @@ local cmdq_mailbox_t = ffi.typeof("uint32_t[0x240/4]")
 local max_mailboxes = 1000
 local data_per_mailbox = 0x200 -- Bytes of input/output data in a mailbox
 
--- Create a command queue with dedicated/reusable DMA memory.
-function HCA:new ()
-   -- Must only be called from a factory created by HCA_factory()
-   assert(self ~= HCA)
-   local q = self.nextq
-   assert(q < self.size)
-   self.nextq = self.nextq + 1
+CMDQ = {}
 
+-- Allocate a physical command queue for the given initialization
+-- segment (i.e. device)
+function CMDQ:new (init_seg)
+   local self = {}
+   self.init_seg = init_seg
+   -- Number of entries in the command queue
+   self.cmdq_size = 2^init_seg:log_cmdq_size()
+   -- Size of an entry in bytes
+   self.cmdq_stride = 2^init_seg:log_cmdq_stride()
+   assert(ffi.sizeof(cmdq_entry_t) == self.cmdq_stride)
+   local entries, entries_phy = memory.dma_alloc(self.cmdq_size *
+                                                 self.cmdq_stride, 4096)
+   init_seg:cmdq_phy_addr(entries_phy)
+   self.entries = ffi.cast(ffi.typeof("$ *", cmdq_entry_t), entries)
+   -- Array of HCAs waiting to be sent to firmware asynchronously
+   self.queue = {}
+   -- Array of HCAs currently executing. The index in this array
+   -- corresponds to the HCA's slot in the physical command queue
+   self.posted = {}
+   return setmetatable(self, { __index = CMDQ })
+end
+
+-- Allocate a set of in- and outboxes and a private command queue
+-- entry to hold an arbitray firmware command. The private command
+-- queue entry is copied to/from a slot in the physical command queue
+-- by the post() and completed() methods, respectively. If specified,
+-- callback must be a function with synopsis
+--
+--  callback = function (self, <output of command's finalizer>)
+--               ...
+--             end
+--
+-- It is intended to be used to execute a specific asynchronous
+-- command, see CMDQ:run() below for details.  By default, such a
+-- command is kept on the CMDQs queue and re-posted indefinitely. If
+-- oneshot is a true value, the command is executed only once.
+function CMDQ:HCA (callback, oneshot)
    local inboxes, outboxes = {}, {}
    for i = 0, max_mailboxes-1 do
       -- XXX overpadding.. 0x240 alignment is not accepted?
       inboxes[i]  = ffi.cast("uint32_t*", memory.dma_alloc(0x240, 4096))
       outboxes[i] = ffi.cast("uint32_t*", memory.dma_alloc(0x240, 4096))
    end
-   return setmetatable({entry = ffi.cast("uint32_t *", self.entries[q]),
+   return setmetatable({entry = cmdq_entry_t(),
                         inboxes = inboxes,
                         outboxes = outboxes,
-                        q = q},
-      {__index = self})
+                        callback = callback,
+                        oneshot = oneshot,
+                        cmdq = self},
+      {__index = HCA})
+end
+
+function CMDQ:add (hca)
+   assert(hca.callback, "Missing callback for async HCA")
+   table.insert(self.queue, hca)
+end
+
+-- Pass through the physical command queue, check for completed
+-- commands and (re-)schedule new commands.
+function CMDQ:run ()
+   -- Slot 0 is reserved for synchronous commands
+   for slot = 1, self.cmdq_size - 1 do
+      local hca = self.posted[slot]
+      if hca and hca:completed(slot) then
+         hca:callback(hca:finalizer())
+         self.posted[slot] = nil
+         if not hca.oneshot then
+               table.insert(self.queue, 1, hca)
+         end
+      end
+      if not self.posted[slot] and #self.queue > 0 then
+         local hca = table.remove(self.queue)
+         hca:post(slot)
+         self.posted[slot] = hca
+      end
+   end
 end
 
 -- Reset all data structures to zero values.
@@ -2410,30 +2453,20 @@ local command_errors = {
    [0x40] = 'BAD_SIZE: More outstanding CQEs in CQ than new CQ size',
 }
 
-function HCA:post ()
+-- Copy the private command entry to a specific slot in the physical
+-- command queue and signal the firmware to execute it.
+function HCA:post (slot)
    self:setbits(0x3C, 0, 0, 1)
-   self.init_seg:ring_doorbell(self.q)
+   ffi.copy(self.cmdq.entries[slot], self.entry, ffi.sizeof(self.entry))
+   self.cmdq.init_seg:ring_doorbell(slot)
 end
 
-function HCA:execute_async ()
-   if debug_hexdump then
-      local dumpoffset = 0
-      print("command INPUT:")
-      dumpoffset = hexdump(self.entry, 0, 0x40, dumpoffset)
-      local ninboxes  = math.ceil((self.input_size + 4 - 16) / data_per_mailbox)
-      for i = 0, ninboxes-1 do
-         local blocknumber = getint(self.inboxes[i], 0x238, 31, 0)
-         local address = memory.virtual_to_physical(self.inboxes[i])
-         print("Block "..blocknumber.." @ "..bit.tohex(address, 12)..":")
-         dumpoffset = hexdump(self.inboxes[i], 0, ffi.sizeof(cmdq_mailbox_t), dumpoffset)
-      end
-   end
-   assert(self:getbits(0x3C, 0, 0) == 1)
-   self:post()
-end
-
-function HCA:completed ()
-   if self:getbits(0x3C, 0, 0) == 0 then
+-- Check for completion of a specific slot in the physical command
+-- queue, copy the command entry to the HCA's private entry and check
+-- for errors.
+function HCA:completed (slot)
+   if getbits(getint(self.cmdq.entries[slot], 0x3C), 0, 0) == 0 then
+      ffi.copy(self.entry, self.cmdq.entries[slot], ffi.sizeof(self.entry))
       if debug_hexdump then
          local dumpoffset = 0
          print("command OUTPUT:")
@@ -2456,20 +2489,40 @@ function HCA:completed ()
 
       return signature, token
    else
-      if self.init_seg:getbits(0x1010, 31, 24) ~= 0 then
-         error("HCA health syndrome: " .. bit.tohex(self.init_seg:getbits(0x1010, 31, 24)))
+      if self.cmdq.init_seg:getbits(0x1010, 31, 24) ~= 0 then
+         error("HCA health syndrome: " .. bit.tohex(self.cmdq.init_seg:getbits(0x1010, 31, 24)))
       end
       return nil, nil
    end
 end
 
-function HCA:execute ()
-   self:execute_async()
-   local signature, token = self:completed()
-   --poll for command completion
+function HCA:execute (finalizer)
+   if debug_hexdump then
+      local dumpoffset = 0
+      print("command INPUT:")
+      dumpoffset = hexdump(self.entry, 0, 0x40, dumpoffset)
+      local ninboxes  = math.ceil((self.input_size + 4 - 16) / data_per_mailbox)
+      for i = 0, ninboxes-1 do
+         local blocknumber = getint(self.inboxes[i], 0x238, 31, 0)
+         local address = memory.virtual_to_physical(self.inboxes[i])
+         print("Block "..blocknumber.." @ "..bit.tohex(address, 12)..":")
+         dumpoffset = hexdump(self.inboxes[i], 0, ffi.sizeof(cmdq_mailbox_t), dumpoffset)
+      end
+   end
+
+   if finalizer then
+      -- Asynchronous command, add it to the run queue for our CMDQ
+      self.finalizer = finalizer
+      self.cmdq:add(self)
+      return nil, nil
+   end
+   -- Synchronous commands are posted through slot 0
+   self:post(0)
+   local signature, token = self:completed(0)
+   -- poll for command completion
    while not signature do
       C.usleep(10000)
-      signature, token = self:completed()
+      signature, token = self:completed(0)
    end
    return signature, token
 end
