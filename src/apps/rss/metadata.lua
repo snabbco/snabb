@@ -192,8 +192,8 @@ local magic_number = 0x5ABB
 pkt_meta_data_t = ffi.typeof([[
    struct {
       uint16_t magic;
-      /* Unix timestamp in nanoseconds */
-      uint64_t timestamp;
+      /* Unix timestamp in seconds */
+      double timestamp;
       /* Actual ethertype for single-tagged frames */
       uint16_t ethertype;
       /* vlan == 0 if untagged frame */
@@ -259,7 +259,7 @@ function copy (pkt)
    return cpkt
 end
 
-function add (pkt, rm_ext_headers, vlan_override)
+function add (pkt, timestamp, rm_ext_headers, vlan_override)
    local vlan = 0
    local filter_offset = 0
    local l3_offset = ethernet_header_size
@@ -274,7 +274,7 @@ function add (pkt, rm_ext_headers, vlan_override)
 
    local md = md_ptr(pkt)
    md.magic = magic_number
-   md.timestamp = ffi.C.get_unix_time_ns()
+   md.timestamp = timestamp or ffi.C.get_unix_time()
    md.ref = 0
    md.ethertype = ethertype
    md.vlan = vlan_override or vlan
