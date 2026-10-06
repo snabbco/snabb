@@ -673,6 +673,10 @@ function ConnectX:new (conf)
          "RX bytes", lib.comma_value(tonumber(rxbytes)))
    end
 
+   function self:sync_stats ()
+      cmdq:run()
+   end
+
    -- Save "instance variable" values.
    self.hca = hca
 
