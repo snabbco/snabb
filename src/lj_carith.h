@@ -1,6 +1,6 @@
 /*
 ** C data arithmetic.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_CARITH_H
@@ -13,6 +13,7 @@ LJ_FUNC int lj_carith_op(lua_State *L, MMS mm);
 
 LJ_FUNC uint64_t lj_carith_shift64(uint64_t x, int32_t sh, int op);
 LJ_FUNC uint64_t lj_carith_check64(lua_State *L, int narg, CTypeID *id);
+LJ_FUNC uint64_t lj_carith_checkbit64(lua_State *L, cTValue *o, CTypeID *id);
 
 LJ_FUNC uint64_t lj_carith_divu64(uint64_t a, uint64_t b);
 LJ_FUNC int64_t lj_carith_divi64(int64_t a, int64_t b);

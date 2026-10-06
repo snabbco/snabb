@@ -1,6 +1,6 @@
 /*
 ** C type management.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_CTYPE_H
@@ -50,7 +50,7 @@ LJ_STATIC_ASSERT(((int)CT_STRUCT & (int)CT_ARRAY) == CT_STRUCT);
 ** |FUNC      ....VS.. cc   cid | nargs  | field | name? | name? |
 ** |TYPEDEF                 cid |        |       | name  | name  |
 ** |ATTRIB        attrnum   cid | attr   | sib?  | type? |       |
-** |FIELD                   cid | offset | field |       | name? |
+** |FIELD               A   cid | offset | field |       | name? |
 ** |BITFIELD  B.cvU csz bsz pos | offset | field |       | name? |
 ** |CONSTVAL    c           cid | value  | const | name  | name  |
 ** |EXTERN                  cid |        | sib?  | name  | name  |
@@ -282,6 +282,8 @@ typedef struct CTState {
   _(UINT32,		4,	CT_NUM, CTF_UNSIGNED|CTALIGN(2)) \
   _(INT64,		8,	CT_NUM, CTF_LONG_IF8|CTALIGN(3)) \
   _(UINT64,		8,	CT_NUM, CTF_UNSIGNED|CTF_LONG_IF8|CTALIGN(3)) \
+  _(INT128,		16,	CT_NUM, CTALIGN(4)) \
+  _(UINT128,		16,	CT_NUM, CTF_UNSIGNED|CTALIGN(4)) \
   _(FLOAT,		4,	CT_NUM, CTF_FP|CTALIGN(2)) \
   _(DOUBLE,		8,	CT_NUM, CTF_FP|CTALIGN(3)) \
   _(COMPLEX_FLOAT,	8,	CT_ARRAY, CTF_COMPLEX|CTALIGN(2)|CTID_FLOAT) \

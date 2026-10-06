@@ -1,6 +1,6 @@
 /*
 ** IR CALL* instruction definitions.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_IRCALL_H
@@ -178,20 +178,15 @@ typedef struct CCallInfo {
   _(SOFTFP_MIPS, lj_vm_sfmax,		4,   N, NUM, 0) \
   _(SOFTFP_FFI,	softfp_ui2d,		1,   N, NUM, 0) \
   _(SOFTFP_FFI,	softfp_f2d,		1,   N, NUM, 0) \
-  _(SOFTFP_FFI,	softfp_d2ui,		2,   N, INT, 0) \
   _(SOFTFP_FFI,	softfp_d2f,		2,   N, FLOAT, 0) \
   _(SOFTFP_FFI,	softfp_i2f,		1,   N, FLOAT, 0) \
   _(SOFTFP_FFI,	softfp_ui2f,		1,   N, FLOAT, 0) \
   _(SOFTFP_FFI,	softfp_f2i,		1,   N, INT, 0) \
-  _(SOFTFP_FFI,	softfp_f2ui,		1,   N, INT, 0) \
   _(FP64_FFI,	fp64_l2d,		1,   N, NUM, XA_64) \
   _(FP64_FFI,	fp64_ul2d,		1,   N, NUM, XA_64) \
   _(FP64_FFI,	fp64_l2f,		1,   N, FLOAT, XA_64) \
   _(FP64_FFI,	fp64_ul2f,		1,   N, FLOAT, XA_64) \
-  _(FP64_FFI,	fp64_d2l,		1,   N, I64, XA_FP) \
-  _(FP64_FFI,	fp64_d2ul,		1,   N, U64, XA_FP) \
-  _(FP64_FFI,	fp64_f2l,		1,   N, I64, 0) \
-  _(FP64_FFI,	fp64_f2ul,		1,   N, U64, 0) \
+  _(FP64_FFI,	lj_vm_num2u64,		1,   N, U64, XA_FP) \
   _(FFI,	lj_carith_divi64,	2,   N, I64, XA2_64|CCI_NOFPRCLOBBER) \
   _(FFI,	lj_carith_divu64,	2,   N, U64, XA2_64|CCI_NOFPRCLOBBER) \
   _(FFI,	lj_carith_modi64,	2,   N, I64, XA2_64|CCI_NOFPRCLOBBER) \
@@ -232,10 +227,6 @@ LJ_DATA const CCallInfo lj_ir_callinfo[IRCALL__MAX+1];
 #define fp64_ul2d __floatundidf
 #define fp64_l2f __floatdisf
 #define fp64_ul2f __floatundisf
-#define fp64_d2l __fixdfdi
-#define fp64_d2ul __fixunsdfdi
-#define fp64_f2l __fixsfdi
-#define fp64_f2ul __fixunssfdi
 #else
 #error "Missing fp64 helper definitions for this compiler"
 #endif
@@ -246,10 +237,6 @@ extern double fp64_l2d(int64_t a);
 extern double fp64_ul2d(uint64_t a);
 extern float fp64_l2f(int64_t a);
 extern float fp64_ul2f(uint64_t a);
-extern int64_t fp64_d2l(double a);
-extern uint64_t fp64_d2ul(double a);
-extern int64_t fp64_f2l(float a);
-extern uint64_t fp64_f2ul(float a);
 #endif
 
 #endif
