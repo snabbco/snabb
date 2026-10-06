@@ -15,14 +15,6 @@ uint64_t get_time_ns()
     return ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
-/* Return the current wall-clock time in nanoseconds. */
-uint64_t get_unix_time_ns()
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return ts.tv_sec * 1000000000LL + ts.tv_nsec;
-}
-
 static double get_time(int clock)
 {
   struct timespec ts;
