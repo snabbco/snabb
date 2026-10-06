@@ -1,6 +1,6 @@
 /*
 ** SSA IR (Intermediate Representation) format.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_IR_H
@@ -52,7 +52,7 @@
   _(KINT64,	N , cst, ___) \
   _(KSLOT,	N , ref, lit) \
   \
-  /* Bit ops. */ \
+  /* Bit ops. ORDER BIT */ \
   _(BNOT,	N , ref, ___) \
   _(BSWAP,	N , ref, ___) \
   _(BAND,	C , ref, ref) \

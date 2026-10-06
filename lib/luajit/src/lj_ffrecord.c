@@ -1,6 +1,6 @@
 /*
 ** Fast function call recorder.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_ffrecord_c
@@ -69,7 +69,7 @@ static int32_t argv2int(jit_State *J, TValue *o)
 {
   if (!lj_strscan_numberobj(o))
     lj_trace_err(J, LJ_TRERR_BADTYPE);
-  return lj_num2int(numV(o));
+  return numberVint(o);
 }
 
 /* Get runtime value of string argument. */
@@ -117,16 +117,7 @@ static void recff_stitch(jit_State *J)
   TValue *pframe = frame_prevl(base-1);
   int errcode;
 
-  /* Move func + args up in Lua stack and insert continuation. */
-  memmove(&base[1], &base[-1-LJ_FR2], sizeof(TValue)*nslot);
-  setframe_ftsz(nframe, ((char *)nframe - (char *)pframe) + FRAME_CONT);
-  setcont(base-LJ_FR2, cont);
-  setframe_pc(base, pc);
-  setnilV(base-1-LJ_FR2);  /* Incorrect, but rec_check_slots() won't run anymore. */
-  L->base += 2 + LJ_FR2;
-  L->top += 2 + LJ_FR2;
-
-  /* Ditto for the IR. */
+  /* Move func + args up in IR slots and insert continuation. */
   memmove(&J->base[1], &J->base[-1-LJ_FR2], sizeof(TRef)*nslot);
   J->base[2] = TREF_FRAME;
   J->base[-1] = lj_ir_k64(J, IR_KNUM, u64ptr(contptr(cont)));
@@ -135,6 +126,15 @@ static void recff_stitch(jit_State *J)
   J->base += 2 + LJ_FR2;
   J->baseslot += 2 + LJ_FR2;
   J->framedepth++;
+
+  /* Ditto for the Lua stack. */
+  memmove(&base[1], &base[-1-LJ_FR2], sizeof(TValue)*nslot);
+  setframe_ftsz(nframe, ((char *)nframe - (char *)pframe) + FRAME_CONT);
+  setcont(base-LJ_FR2, cont);
+  setframe_pc(base, pc);
+  setnilV(base-1-LJ_FR2);  /* Incorrect, but rec_check_slots() won't run anymore. */
+  L->base += 2 + LJ_FR2;
+  L->top += 2 + LJ_FR2;
 
   errcode = lj_vm_cpcall(L, NULL, J, rec_stop_stitch_cp);
 
@@ -252,7 +252,7 @@ static void recff_setmetatable(jit_State *J, RecordFFData *rd)
     mtref = tref_isnil(mt) ? lj_ir_knull(J, IRT_TAB) : mt;
     emitir(IRT(IR_FSTORE, IRT_TAB), fref, mtref);
     if (!tref_isnil(mt))
-      emitir(IRT(IR_TBAR, IRT_TAB), tr, 0);
+      emitir(IRT(IR_TBAR, IRT_NIL), tr, 0);
     J->base[0] = tr;
     J->needsnap = 1;
   }  /* else: Interpreter will throw. */
@@ -306,6 +306,58 @@ static void recff_rawlen(jit_State *J, RecordFFData *rd)
   UNUSED(rd);
 }
 #endif
+
+static void recff_unpack(jit_State *J, RecordFFData *rd)
+{
+  TRef trtab, trstart, trend;
+  int32_t start, end;
+  GCtab *t;
+  /* Check for table. */
+  trtab = J->base[0];
+  if (!tref_istab(trtab)) return;  /* Interpreter will throw. */
+  t = tabV(&rd->argv[0]);
+  /* Starting index. */
+  trstart = J->base[1];
+  if (tref_isnil(trstart)) {  /* Default start = 1. */
+    start = 1;
+    trstart = lj_ir_kint(J, 1);
+  } else {
+    start = argv2int(J, &rd->argv[1]);
+    trstart = lj_opt_narrow_toint(J, trstart);
+    if (!tref_isk(trstart))
+      emitir(IRTGI(IR_EQ), trstart, lj_ir_kint(J, start));
+  }
+  /* Ending index. */
+  trend = J->base[2];
+  if (J->maxslot < 3 || tref_isnil(trend)) {  /* Default end = #t. */
+    end = (int32_t)lj_tab_len(t);
+    trend = emitir(IRTI(IR_ALEN), trtab, TREF_NIL);
+  } else {
+    end = argv2int(J, &rd->argv[2]);
+    trend = lj_opt_narrow_toint(J, trend);
+  }
+  if (!tref_isk(trend))
+    emitir(IRTGI(IR_EQ), trend, lj_ir_kint(J, end));
+  if (start <= end) {
+    RecordIndex ix;
+    int32_t i;
+    uint32_t len = (uint32_t)end - (uint32_t)start;
+    if (len > LJ_MAX_JSLOTS || (uint32_t)J->baseslot + len > LJ_MAX_JSLOTS)
+      lj_trace_err_info(J, LJ_TRERR_STACKOV);
+    rd->nres = (ptrdiff_t)(len + 1);
+    ix.tab = trtab; ix.val = 0; ix.idxchain = 0;
+    settabV(J->L, &ix.tabv, t);
+    for (i = start; ; i++) {
+      ix.key = lj_ir_kint(J, i);
+      setintV(&ix.keyv, i);
+      J->base[i - start] = lj_record_idx(J, &ix);
+      if (i == end) break;
+    }
+  } else {  /* Empty result. */
+    emitir(IRTGI(IR_LT), trend, trstart);
+    rd->nres = 0;
+  }
+}
 
 /* Determine mode of select() call. */
 int32_t lj_ffrecord_select_mode(jit_State *J, TRef tr, TValue *tv)
@@ -531,6 +583,9 @@ static void recff_next(jit_State *J, RecordFFData *rd)
     if (tref_isnil(J->base[1])) {  /* Shortcut for start of traversal. */
       ix.key = lj_ir_kint(J, 0);
       keyv = niltvg(J2G(J));
+    } else if ((J->base[1] & TREF_KEYINDEX)) {
+      ix.key = J->base[1] & ~TREF_KEYINDEX;
+      keyv = &rd->argv[1];
     } else {
       TRef tmp = recff_tmpref(J, J->base[1], IRTMPREF_IN1);
       ix.key = lj_ir_call(J, IRCALL_lj_tab_keyindex, tab, tmp);
@@ -709,7 +764,7 @@ static void recff_bit_nary(jit_State *J, RecordFFData *rd)
 /* Record bit shifts. */
 static void recff_bit_shift(jit_State *J, RecordFFData *rd)
 {
-  if (recff_bit64_shift(J, rd))
+  if (recff_bit64_shift(J, &J->base[0], &J->base[1], &rd->argv[0], &rd->argv[1], rd->data))
     return;
   {
     TRef tr = lj_opt_narrow_tobit(J, J->base[0]);
@@ -755,7 +810,7 @@ static TRef recff_string_start(jit_State *J, GCstr *s, int32_t *st, TRef tr,
     emitir(IRTGI(IR_EQ), tr, tr0);
     tr = tr0;
   } else {
-    tr = emitir(IRTI(IR_ADD), tr, lj_ir_kint(J, -1));
+    tr = emitir(IRTGI(IR_ADDOV), tr, lj_ir_kint(J, -1));
     emitir(IRTGI(IR_GE), tr, tr0);
     start--;
   }
@@ -805,17 +860,28 @@ static void recff_string_range(jit_State *J, RecordFFData *rd)
 		   lj_ir_kint(J, 1));
     end = end+(int32_t)str->len+1;
   } else if ((MSize)end <= str->len) {
+    if (trstart == trend && start != 0) {  /* Common 1-char case. */
+      TRef trptr, tr = emitir(IRTI(IR_ADD), trstart, lj_ir_kint(J, -1));
+      emitir(IRTGI(IR_ULT), tr, trlen);
+      trptr = emitir(IRT(IR_STRREF, IRT_PGC), trstr, tr);
+      if (rd->data) {  /* Return string.sub result. */
+	J->base[0] = emitir(IRT(IR_SNEW, IRT_STR), trptr, lj_ir_kint(J, 1));
+      } else {  /* Return string.byte result. */
+	J->base[0] = emitir(IRT(IR_XLOAD, IRT_U8), trptr, IRXLOAD_READONLY);
+      }
+      return;
+    }
     emitir(IRTGI(IR_ULE), trend, trlen);
   } else {
-    emitir(IRTGI(IR_UGT), trend, trlen);
+    emitir(IRTGI(IR_GT), trend, trlen);
     end = (int32_t)str->len;
     trend = trlen;
   }
   trstart = recff_string_start(J, str, &start, trstart, trlen, tr0);
   if (rd->data) {  /* Return string.sub result. */
-    if (end - start >= 0) {
+    if (start <= end) {
       /* Also handle empty range here, to avoid extra traces. */
-      TRef trptr, trslen = emitir(IRTI(IR_SUB), trend, trstart);
+      TRef trptr, trslen = emitir(IRTGI(IR_SUBOV), trend, trstart);
       emitir(IRTGI(IR_GE), trslen, tr0);
       trptr = emitir(IRT(IR_STRREF, IRT_PGC), trstr, trstart);
       J->base[0] = emitir(IRT(IR_SNEW, IRT_STR), trptr, trslen);
@@ -824,9 +890,9 @@ static void recff_string_range(jit_State *J, RecordFFData *rd)
       J->base[0] = lj_ir_kstr(J, &J2G(J)->strempty);
     }
   } else {  /* Return string.byte result(s). */
-    ptrdiff_t i, len = end - start;
-    if (len > 0) {
-      TRef trslen = emitir(IRTI(IR_SUB), trend, trstart);
+    if (start < end) {
+      ptrdiff_t i, len = end - start;
+      TRef trslen = emitir(IRTGI(IR_SUBOV), trend, trstart);
       emitir(IRTGI(IR_EQ), trslen, lj_ir_kint(J, (int32_t)len));
       if (J->baseslot + len > LJ_MAX_JSLOTS)
 	lj_trace_err_info(J, LJ_TRERR_STACKOV);

@@ -1,6 +1,6 @@
 /*
 ** Trace management.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_trace_c
@@ -226,14 +226,6 @@ static void trace_unpatch(jit_State *J, GCtrace *T)
 	       bc_isret(op), "bad original bytecode %d", op);
     *pc = T->startins;
     break;
-  case BC_JMP:
-    lj_assertJ(op == BC_ITERL, "bad original bytecode %d", op);
-    pc += bc_j(*pc)+2;
-    if (bc_op(*pc) == BC_JITERL) {
-      lj_assertJ(traceref(J, bc_d(*pc)) == T, "JITERL references other trace");
-      *pc = T->startins;
-    }
-    break;
   case BC_JFUNCF:
     lj_assertJ(op == BC_FUNCF, "bad original bytecode %d", op);
     *pc = T->startins;
@@ -249,18 +241,19 @@ static void trace_flushroot(jit_State *J, GCtrace *T)
   GCproto *pt = &gcref(T->startpt)->pt;
   lj_assertJ(T->root == 0, "not a root trace");
   lj_assertJ(pt != NULL, "trace has no prototype");
-  /* First unpatch any modified bytecode. */
-  trace_unpatch(J, T);
   /* Unlink root trace from chain anchored in prototype. */
   if (pt->trace == T->traceno) {  /* Trace is first in chain. Easy. */
     pt->trace = T->nextroot;
+unpatch:
+    /* Unpatch modified bytecode only if the trace has not been flushed. */
+    trace_unpatch(J, T);
   } else if (pt->trace) {  /* Otherwise search in chain of root traces. */
     GCtrace *T2 = traceref(J, pt->trace);
     if (T2) {
       for (; T2->nextroot; T2 = traceref(J, T2->nextroot))
 	if (T2->nextroot == T->traceno) {
 	  T2->nextroot = T->nextroot;  /* Unlink from chain. */
-	  break;
+	  goto unpatch;
 	}
     }
   }
@@ -344,10 +337,10 @@ void lj_trace_initstate(global_State *g)
   tv[1].u64 = U64x(80000000,00000000);
 
   /* Initialize 32/64 bit constants. */
+  J->k64[LJ_K64_M2P64].u64 = U64x(c3f00000,00000000);
   J->k64[LJ_K64_TOBIT].u64 = U64x(43380000,00000000);
   J->k64[LJ_K64_2P64].u64 = U64x(43f00000,00000000);
-  J->k32[LJ_K32_M2P64_31] = 0xdf800000;
-  J->k64[LJ_K64_M2P64].u64 = U64x(c3f00000,00000000);
+  J->k32[LJ_K32_M2P64] = 0xdf800000;
 }
 
 /* Free everything associated with the JIT compiler state. */
@@ -631,10 +624,15 @@ static int trace_abort(jit_State *J)
     J->cur.traceno = 0;
   }
   L->top--;  /* Remove error object */
-  if (e == LJ_TRERR_DOWNREC)
+  if (e == LJ_TRERR_DOWNREC) {
     return trace_downrec(J);
-  else if (e == LJ_TRERR_MCODEAL)
+  } else if (e == LJ_TRERR_MCODEAL) {
+    if (!J->mcarea) {  /* Disable JIT compiler if first mcode alloc fails. */
+      J->flags &= ~JIT_F_ON;
+      lj_dispatch_update(J2G(J));
+    }
     lj_trace_flushall(L);
+  }
   return 0;
 }
 

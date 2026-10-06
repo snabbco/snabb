@@ -1,6 +1,6 @@
 /*
 ** IR assembler (SSA IR -> machine code).
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_asm_c
@@ -88,6 +88,7 @@ typedef struct ASMState {
   MCode *invmcp;	/* Points to invertible loop branch (or NULL). */
   MCode *flagmcp;	/* Pending opportunity to merge flag setting ins. */
   MCode *realign;	/* Realign loop if not NULL. */
+  MCode *mctail;	/* Tail of trace before stack adjust + jmp. */
 
 #ifdef LUAJIT_RANDOM_RA
   /* Randomize register allocation. OK for fuzz testing, not for production. */
@@ -870,11 +871,11 @@ static int asm_sunk_store(ASMState *as, IRIns *ira, IRIns *irs)
 static void asm_snap_alloc1(ASMState *as, IRRef ref)
 {
   IRIns *ir = IR(ref);
-  if (!irref_isk(ref) && ir->r != RID_SUNK) {
+  if (!irref_isk(ref)) {
     bloomset(as->snapfilt1, ref);
     bloomset(as->snapfilt2, hashrot(ref, ref + HASH_BIAS));
     if (ra_used(ir)) return;
-    if (ir->r == RID_SINK) {
+    if (ir->r == RID_SINK || ir->r == RID_SUNK) {
       ir->r = RID_SUNK;
       if (ir->o == IR_CNEWI) {  /* Allocate CNEWI value. */
 	asm_snap_alloc1(as, ir->op2);
@@ -2265,7 +2266,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
     RA_DBGX((as, "===== STOP ====="));
 
     /* General trace setup. Emit tail of trace. */
-    asm_tail_prep(as);
+    asm_tail_prep(as, T->link);
     as->mcloop = NULL;
     as->flagmcp = NULL;
     as->topslot = 0;

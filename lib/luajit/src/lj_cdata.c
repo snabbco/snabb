@@ -1,6 +1,6 @@
 /*
 ** C data management.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #include "lj_obj.h"
@@ -129,8 +129,7 @@ collect_attrib:
   lj_assertCTS(!ctype_isref(ct->info), "bad ref of ref");
 
   if (tvisnum(key)) {  /* Numeric key. */
-    lua_Number n = numV(key);
-    idx = (ptrdiff_t)n;
+    idx = lj_num2int_type(numV(key), ptrdiff_t);
   integer_key:
     if (ctype_ispointer(ct->info)) {
       CTSize sz = lj_ctype_size(cts, ctype_cid(ct->info));  /* Element size. */

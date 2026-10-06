@@ -1,6 +1,6 @@
 /*
 ** Metamethod handling.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -22,6 +22,9 @@
 #include "lj_strscan.h"
 #include "lj_strfmt.h"
 #include "lj_lib.h"
+#include "lj_ctype.h"
+#include "lj_cdata.h"
+#include "lj_carith.h"
 
 /* -- Metamethod handling ------------------------------------------------- */
 
@@ -226,6 +229,47 @@ TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc,
       }
     }
     return mmcall(L, lj_cont_ra, mo, rb, rc);
+  }
+}
+
+/* Helper for bit operators. No bitop metamethods in v2.1. */
+void lj_meta_bitop(lua_State *L, TValue *ra, cTValue *rb, cTValue *rc, BCReg op)
+{
+  CTypeID id = 0, id_ignore = 0;
+  uint64_t b = lj_carith_checkbit64(L, rb, &id);
+  uint64_t c = lj_carith_checkbit64(L, rc, op >= BC_BSHL ? &id_ignore : &id);
+  if (id) {
+    if (tvisnum(rb)) {
+      b = id == CTID_UINT64 ? lj_num2u64(numV(rb)) : (uint64_t)lj_num2i64(numV(rb));
+    }
+    if (tvisnum(rc)) {
+      c = id == CTID_UINT64 ? lj_num2u64(numV(rc)) : (uint64_t)lj_num2i64(numV(rc));
+    }
+  }
+  switch (op) {
+  case BC_BNOT: b = ~b; break;
+  case BC_BAND: b &= c; break;
+  case BC_BOR: b |= c; break;
+  case BC_BXOR: b ^= c; break;
+  default:
+    if (id) {
+      b = lj_carith_shift64(b, (int32_t)c, op-BC_BSHL);
+    } else if (op == BC_BSHL) {
+      b = (uint64_t)((uint32_t)b << ((uint32_t)c & 31));
+    } else if (op == BC_BSHR) {
+      b = (uint64_t)((uint32_t)b >> ((uint32_t)c & 31));
+    } else {
+      lj_assertL(op == BC_BSAR, "bad bytecode op %d", op);
+      b = (uint64_t)(uint32_t)((int32_t)b >> ((uint32_t)c & 31));
+    }
+    break;
+  }
+  if (id) {
+    GCcdata *cd = lj_cdata_new_(L, id, 8);
+    *(uint64_t *)cdataptr(cd) = b;
+    setcdataV(L, ra, cd);
+  } else {
+    setintV(ra, (int32_t)b);
   }
 }
 
