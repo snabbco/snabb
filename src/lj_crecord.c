@@ -1290,7 +1290,7 @@ static TRef crec_arith_int64(jit_State *J, TRef *sp, CType **s, MMS mm)
 	sp[i] = emitconv(sp[i], dt, st, IRCONV_ANY);
       else if (!(st == IRT_I64 || st == IRT_U64))
 	sp[i] = emitconv(sp[i], dt, IRT_INT,
-			 ((st - IRT_I8) & 1) ? 0 : IRCONV_SEXT);
+			 (s[i]->info & CTF_UNSIGNED) ? 0 : IRCONV_SEXT);
     }
     if (mm < MM_add) {
     comp:
