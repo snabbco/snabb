@@ -1103,10 +1103,7 @@ LJFOLDF(simplify_conv_i64_num)
     fins->op2 = ((IRT_I64<<5)|IRT_INT|IRCONV_SEXT);
     return RETRYFOLD;
   } else if ((fleft->op2 & IRCONV_SRCMASK) == IRT_U32) {
-    /* Reduce to a zero-extension. */
-    fins->op1 = fleft->op1;
-    fins->op2 = (IRT_I64<<5)|IRT_U32;
-    return RETRYFOLD;
+    return fleft->op1;
   }
   return NEXTFOLD;
 }
