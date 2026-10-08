@@ -1,6 +1,6 @@
 /*
 ** Bit manipulation library.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lib_bit_c
@@ -64,7 +64,7 @@ LJLIB_ASM(bit_lshift)		LJLIB_REC(bit_shift IR_BSHL)
     x = lj_carith_shift64(x, sh, curr_func(L)->c.ffid - (int)FF_bit_lshift);
     return bit_result64(L, id, x);
   }
-  if (id2) setintV(L->base+1, sh);
+  setintV(L->base+1, sh);
   return FFH_RETRY;
 }
 LJLIB_ASM_(bit_rshift)		LJLIB_REC(bit_shift IR_BSHR)

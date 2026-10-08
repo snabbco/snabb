@@ -1,6 +1,6 @@
 /*
 ** Common definitions for the JIT compiler.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_JIT_H
@@ -55,9 +55,6 @@
 
 /* -- JIT engine parameters ----------------------------------------------- */
 
-/* See: http://blogs.msdn.com/oldnewthing/archive/2003/10/08/55239.aspx */
-#define JIT_P_sizemcode_DEFAULT		256
-
 // NB: setting maxirconst to REF_BIAS means
 //   "the maximum possible number of IR constants"
 // (due to implementation details, LuaJIT is funky.)
@@ -81,7 +78,7 @@
   _(\011, recunroll,	2)	/* Min. unroll for true recursion. */ \
   \
   /* Size of each machine code area (in KBytes). */ \
-  _(\011, sizemcode,	JIT_P_sizemcode_DEFAULT) \
+  _(\011, sizemcode,	64) \
   /* Max. total size of all machine code areas (in KBytes). */ \
   _(\010, maxmcode,	8192) \
   /* End of list. */
@@ -289,16 +286,15 @@ enum {
 };
 
 enum {
+  LJ_K64_M2P64,		/* -2^64 */
   LJ_K64_TOBIT,		/* 2^52 + 2^51 */
   LJ_K64_2P64,		/* 2^64 */
-  LJ_K64_M2P64,		/* -2^64 */
-  LJ_K64_M2P64_31 = LJ_K64_M2P64,
   LJ_K64__MAX,
 };
-#define LJ_K64__USED	(LJ_TARGET_X86ORX64 || LJ_TARGET_MIPS)
+#define LJ_K64__USED	(LJ_TARGET_X86ORX64 || LJ_TARGET_ARM64 || LJ_TARGET_MIPS)
 
 enum {
-  LJ_K32_M2P64_31,	/* -2^64 or -2^31 */
+  LJ_K32_M2P64,		/* -2^64 */
   LJ_K32__MAX
 };
 #define LJ_K32__USED	(LJ_TARGET_X86ORX64 || LJ_TARGET_PPC || LJ_TARGET_MIPS)
@@ -419,6 +415,7 @@ typedef struct jit_State {
   MCode *mcbot;		/* Bottom of current mcode area. */
   size_t szmcarea;	/* Size of current mcode area. */
   size_t szallmcarea;	/* Total size of all allocated mcode areas. */
+  uintptr_t mcmin, mcmax;	/* Mcode allocation range. */
 
   TValue errinfo;	/* Additional info element for trace errors. */
   int8_t final;		/* True if trace error is final. */

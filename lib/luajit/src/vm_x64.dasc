@@ -1,6 +1,6 @@
 |// Low-level VM code for x64 CPUs in LJ_GC64 mode.
 |// Bytecode interpreter, fast functions and helper functions.
-|// Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
+|// Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 |
 |.arch x64
 |.section code_op, code_sub
@@ -254,11 +254,11 @@
 |
 |// Synthesize SSE FP constants.
 |.macro sseconst_abs, reg, tmp		// Synthesize abs mask.
-|  mov64 tmp, U64x(7fffffff,ffffffff); movd reg, tmp
+|  mov64 tmp, U64x(7fffffff,ffffffff); movq reg, tmp
 |.endmacro
 |
 |.macro sseconst_hi, reg, tmp, val	// Synthesize hi-32 bit const.
-|  mov64 tmp, U64x(val,00000000); movd reg, tmp
+|  mov64 tmp, U64x(val,00000000); movq reg, tmp
 |.endmacro
 |
 |.macro sseconst_sign, reg, tmp		// Synthesize sign mask.
@@ -915,6 +915,43 @@ static void build_subroutines(BuildCtx *ctx)
   |  jmp ->vmeta_binop			// Binop call for compatibility.
 #endif
   |
+  |//-- Bit operator metamethods -------------------------------------------
+  |
+  |->vmeta_bnot:
+  |  mov RB, RA
+  |  lea RC, [BASE+RD*8]
+  |  mov RA, RC
+  |  jmp >2
+  |
+  |// Caveat: ra=RB rb=RC rc=RA.
+  |->vmeta_bitop:
+  |  lea RC, [BASE+RC*8]
+  |  lea RA, [BASE+RA*8]
+  |2:
+  |.if X64WIN
+  |  mov CARG3, RC
+  |  mov CARG4, RA
+  |  lea RA, [BASE+RB*8]
+  |  movzx RC, PC_OP
+  |  mov ARG5, RC
+  |  mov L:RB, SAVE_L
+  |  mov L:RB->base, BASE		// Caveat: CARG2d == BASE.
+  |  mov CARG2, RA
+  |  mov CARG1, L:RB			// Caveat: CARG1d == RA.
+  |.else
+  |  lea CARG2, [BASE+RB*8]
+  |  // CARG4 == RA.
+  |  movzx CARG5, PC_OP
+  |  mov L:CARG1, SAVE_L
+  |  mov L:CARG1->base, BASE		// Caveat: CARG3d == BASE.
+  |  mov CARG3, RC
+  |  mov L:RB, L:CARG1
+  |.endif
+  |  mov SAVE_PC, PC
+  |  call extern lj_meta_bitop // (lua_State *L, TValue *ra,*rb,*rc, BCReg op)
+  |  mov BASE, L:RB->base
+  |  jmp ->cont_nop
+  |
   |//-- Call metamethod ----------------------------------------------------
   |
   |->vmeta_call_ra:
@@ -1200,11 +1237,10 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov TAB:RB, [BASE]
   |  checktab TAB:RB, ->fff_fallback
   |  checknumtp [BASE+8], ->fff_fallback
-  |  movsd xmm0, qword [BASE+8]
+  |  cvttsd2si RAd, qword [BASE+8]
   |  mov PC, [BASE-8]
-  |  sseconst_1 xmm1, TMPR
-  |  addsd xmm0, xmm1
-  |  cvttsd2si RAd, xmm0
+  |  add RAd, 1
+  |  cvtsi2sd xmm0, RAd
   |  movsd qword [BASE-16], xmm0
   |  cmp RAd, TAB:RB->asize;  jae >2	// Not in array part?
   |  mov RD, TAB:RB->array
@@ -2184,6 +2220,49 @@ static void build_subroutines(BuildCtx *ctx)
   |  ret
   |
   |//-----------------------------------------------------------------------
+  |//-- Number conversion functions ----------------------------------------
+  |//-----------------------------------------------------------------------
+  |
+  |// int64_t lj_vm_num2int_check(double x)
+  |->vm_num2int_check:
+  |  cvttsd2si eax, xmm0
+  |  xorps xmm1, xmm1
+  |  cvtsi2sd xmm1, eax
+  |  ucomisd xmm1, xmm0
+  |  jp >1
+  |  jne >1
+  |  ret
+  |1:
+  |  mov64 rax, U64x(80000000,80000000)
+  |  ret
+  |
+  |// int64_t lj_vm_num2i64(double x)
+  |->vm_num2i64:
+  |  cvttsd2si rax, xmm0
+  |  ret
+  |
+  |// uint64_t lj_vm_num2u64(double x)
+  |->vm_num2u64:
+  |  cvttsd2si rax, xmm0		// Convert [-2^63..2^63) range.
+  |  cmp rax, 1	// Indefinite result -0x8000000000000000LL - 1 sets overflow.
+  |  jo >1
+  |  ret
+  |1:
+  |  mov64 rdx, U64x(c3f00000,00000000)	// -0x1p64 (double).
+  |  movq xmm1, rdx
+  |  addsd xmm0,  xmm1
+  |  cvttsd2si rax, xmm0		// Convert [2^63..2^64+2^63) range.
+  |  // Note that -0x1p63 converts to -0x8000000000000000LL either way.
+  |  ret
+  |
+  |// int32_t lj_vm_tobit(double x)
+  |->vm_tobit:
+  |  sseconst_tobit xmm1, RC
+  |  addsd xmm0, xmm1
+  |  movd eax, xmm0
+  |  ret
+  |
+  |//-----------------------------------------------------------------------
   |//-- Miscellaneous functions --------------------------------------------
   |//-----------------------------------------------------------------------
   |
@@ -2326,12 +2405,12 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |  // Copy stack slots.
   |  movzx ecx, byte CCSTATE->nsp
-  |  sub ecx, 1
+  |  sub ecx, 8
   |  js >2
   |1:
-  |  mov rax, [CCSTATE+rcx*8+offsetof(CCallState, stack)]
-  |  mov [rsp+rcx*8+CCALL_SPS_EXTRA*8], rax
-  |  sub ecx, 1
+  |  mov rax, [CCSTATE+rcx+offsetof(CCallState, stack)]
+  |  mov [rsp+rcx+CCALL_SPS_EXTRA*8], rax
+  |  sub ecx, 8
   |  jns <1
   |2:
   |
@@ -2410,9 +2489,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cmp ITYPEd, LJ_TISNUM; jae ->vmeta_comp
     |  cmp RBd, LJ_TISNUM; jae ->vmeta_comp
     |1:
-    |  movd xmm0, RD
+    |  movq xmm0, RD
     |2:
-    |  movd xmm1, RA
+    |  movq xmm1, RA
     |3:
     |  add PC, 4
     |  ucomisd xmm0, xmm1
@@ -2437,9 +2516,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  sar ITYPE, 47
     |  cmp RBd, LJ_TISNUM; jae >5
     |  cmp ITYPEd, LJ_TISNUM; jae >5
-    |  movd xmm1, RD
+    |  movq xmm1, RD
     |1:
-    |  movd xmm0, RA
+    |  movq xmm0, RA
     |2:
     |  ucomisd xmm0, xmm1
     |4:
@@ -2722,7 +2801,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.endmacro
     |
     |.macro ins_arith, intins, sseins
-    |  ins_arith, sseins
+    |  ins_arith sseins
     |.endmacro
 
     |  // RA = dst, RB = src1 or num const, RC = src2 or num const
@@ -2779,6 +2858,65 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mov RC, [BASE+RB*8]
     |  mov [BASE+RA*8], RC
     |  ins_next
+    break;
+
+  /* -- Bit ops ----------------------------------------------------------- */
+
+  case BC_BNOT:
+    |  ins_AD  // RA = dst, RD = src
+    |  checknumtp [BASE+RD*8], ->vmeta_bnot
+    |  movsd xmm0, qword [BASE+RD*8]
+    |  sseconst_tobit xmm1, RB
+    |  addsd xmm0, xmm1
+    |  movd RBd, xmm0
+    |  not RBd
+    |  cvtsi2sd xmm0, RBd
+    |  movsd qword [BASE+RA*8], xmm0
+    |  ins_next
+    break;
+
+    |.macro ins_bitop, ins, shift
+    |  ins_A  // Really ins_ABC. RB = dst, RC = src1, RA = src2
+    |  // Swap registers around to avoid reloading RA.
+    |  mov RB, RA
+    |  movzx RAd, RCL	// Really src2 (C).
+    |  movzx RCd, RCH	// Really src1 (B).
+    |  checknumtp [BASE+RA*8], ->vmeta_bitop
+    |  checknumtp [BASE+RC*8], ->vmeta_bitop
+    |  movsd xmm0, qword [BASE+RA*8]
+    |  movsd xmm1, qword [BASE+RC*8]
+    |  sseconst_tobit xmm2, RC
+    |  addsd xmm0, xmm2
+    |  addsd xmm1, xmm2
+    |  movd RAd, xmm0
+    |  movd RCd, xmm1
+    |.if shift == 1
+    |  ins RCd, cl		// Assumes RA is ecx.
+    |.else
+    |  ins RCd, RAd
+    |.endif
+    |  cvtsi2sd xmm0, RCd
+    |  movsd qword [BASE+RB*8], xmm0
+    |  ins_next
+    |.endmacro
+
+  case BC_BAND:
+    |  ins_bitop and, 0
+    break;
+  case BC_BOR:
+    |  ins_bitop or, 0
+    break;
+  case BC_BXOR:
+    |  ins_bitop xor, 0
+    break;
+  case BC_BSHL:
+    |  ins_bitop shl, 1
+    break;
+  case BC_BSHR:
+    |  ins_bitop shr, 1
+    break;
+  case BC_BSAR:
+    |  ins_bitop sar, 1
     break;
 
   /* -- Constant ops ------------------------------------------------------ */
@@ -3048,7 +3186,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  // Integer key?
     |  // Convert number to int and back and compare.
     |  checknum RC, >5
-    |  movd xmm0, RC
+    |  movq xmm0, RC
     |  cvttsd2si RCd, xmm0
     |  cvtsi2sd xmm1, RCd
     |  ucomisd xmm0, xmm1
@@ -3166,7 +3304,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  // Integer key?
     |  // Convert number to int and back and compare.
     |  checknum RC, >5
-    |  movd xmm0, RC
+    |  movq xmm0, RC
     |  cvttsd2si RCd, xmm0
     |  cvtsi2sd xmm1, RCd
     |  ucomisd xmm0, xmm1
@@ -3460,6 +3598,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_ITERN:
     |  hotloop RBd
     |->vm_IITERN:
+    |.if JIT
+    |  endbr
+    |.endif
     |  ins_A	// RA = base, (RB = nresults+1, RC = nargs+1 (2+1))
     |  mov TAB:RB, [BASE+RA*8-16]
     |  cleartp TAB:RB
