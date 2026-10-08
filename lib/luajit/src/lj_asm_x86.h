@@ -724,8 +724,10 @@ static void asm_conv(ASMState *as, IRIns *ir)
 	ra_left(as, tmp, lref);
 
       } else {
+	if (irt_isu32(ir->t))
+	  emit_rr(as, XO_MOV, dest, dest);  /* Zero hiword. */
 	emit_mrm(as, op,
-		 dest|((irt_is64(ir->t)) ? REX_64 : 0),
+		 dest|((irt_is64(ir->t) || irt_isu32(ir->t)) ? REX_64 : 0),
 		 asm_fuseload(as, lref, RSET_FPR));
       }
     }
