@@ -7,8 +7,8 @@ local data = require("lib.yang.data")
 local value = require("lib.yang.value")
 local schema = require("lib.yang.schema")
 local path = require("lib.yang.path")
+local copy_path = path.copy_path
 local parse_path = path.parse_path
-local unparse_path = path.unparse_path
 local parse_relative_path = path.parse_relative_path
 local normalize_path = path.normalize_path
 local util = require("lib.yang.util")
@@ -320,10 +320,8 @@ end
 
 function checker_from_grammar(grammar, checker)
    local function path_add(path, name)
-      local p = {}
-      function p.unparse() return unparse_path(p, grammar) end
-      for i, part in ipairs(path) do p[i] = part end
-      p[#p+1] = {name=name, query={}}
+      local p = copy_path(path)
+      table.insert(p, {name=name, query={}})
       return p
    end
    local function visitor(node, path)
@@ -356,10 +354,9 @@ function checker_from_grammar(grammar, checker)
                root = root or data
                if check then check(data, root) end
                for idx, elt in ipairs(data) do
-                  path[#path].key = idx
+                  path[#path].query = {['position()']=idx} -- for error message in check_elt, consistency_error
                   check_elt(elt, root)
                end
-               path[#path].key = nil
             end
          end
          return check
@@ -397,7 +394,6 @@ function checker_from_grammar(grammar, checker)
 end
 
 local function consistency_error(path, msg, ...)
-   if path.unparse then path = path.unparse() end
    error(("Consistency error in '%s': %s")
       :format(normalize_path(path), msg:format(...)))
 end
@@ -415,11 +411,11 @@ local function leafref_checker(node, path, grammar)
       -- NYI: queries in leafrefs are currently ignored.
       part.query = {}
    end
-   local ok, err = pcall(parse_relative_path, leafref, path, grammar)
+   local ok, leafref = pcall(parse_relative_path, leafref, path, grammar)
    if not ok then
       consistency_error(path,
          "invalid leafref '%s' (%s)",
-         node.argument_type.leafref, err)
+         node.argument_type.leafref, leafref)
    end
    if node.require_instances ~= false then
       -- We only support one simple case:
@@ -434,8 +430,7 @@ local function leafref_checker(node, path, grammar)
       return function (data, root)
          local ok, err = pcall(function ()
             list.query = {[leaf.name]=assert(data, "missing leafref value")}
-            local p = parse_relative_path(leafref, unparse_path(path, grammar))
-            return resolver(grammar, p)(root)
+            return resolver(grammar, parse_path(leafref))(root)
          end)
          if not ok then
             consistency_error(path,
@@ -980,6 +975,57 @@ function selftest()
    assert(not ok)
    print(err)
 
+   -- Test leafref inconsistency #1535
+   local leafref_schema2 = schema.load_schema([[module leafref_schema2 {
+      namespace "urn:ietf:params:xml:ns:yang:leafref_schema2";
+      prefix "test";
+
+      list foo {
+         key name;
+         leaf name {
+            type string;
+         }
+      }
+      
+      list bar {
+         key name;
+         leaf name {
+            type leafref {
+               path "/foo/name";
+               require-instance true;
+            }
+         }
+      }
+
+   }]])
+
+   -- Test leafref inconsistency in list entry (should fail)
+   local ok, err = pcall(
+      consistency_checker_from_schema(leafref_schema2, true),
+      data.load_config_for_schema(leafref_schema2,
+                                  mem.open_input_string [[
+         foo { name a; }
+         foo { name b; }
+         
+         bar { name a; }
+         bar { name c; }
+   ]]))
+   assert(not ok)
+   print(err)
+
+   -- Test leafref inconsistency in list entry (should fail)
+   local ok, err = pcall(
+      consistency_checker_from_schema(leafref_schema2, true),
+      data.load_config_for_schema(leafref_schema2,
+                                  mem.open_input_string [[
+         foo { name a; }
+         foo { name b; }
+
+         bar { name c; }
+         bar { name b; }
+   ]]))
+   assert(not ok)
+   print(err)
 
    print("selftest: ok")
 end

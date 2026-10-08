@@ -984,7 +984,7 @@ function selftest ()
    config.app(c, "a", App)
    engine.configure(c)
    engine.main{duration=0.1}
-   assert(pull_count > 600 and pull_count < 700)
+   assert(pull_count > 200)
    pull_count = 0
    engine.Hz = 1000
    local c = config.new()

@@ -48,6 +48,16 @@ function selftest ()
    local pcap = "program/ipfix/tests/sanitized500k_truncated128.pcap"
    local confpath = "program/ipfix/tests/test_v4_v6_dnshttp.conf"
 
+   local pciaddr = lib.getenv("SNABB_PCI0")
+   if not pciaddr then
+      print("SNABB_PCI0 not set.")
+      os.exit(engine.test_skipped_code)
+   end
+
+   -- Instantiate config
+   local template = assert(lib.readfile(confpath..".template", "*a"))
+   assert(lib.writefile(confpath, template:format(pciaddr)))
+
    -- Maybe decompress pcap
    if not io.open(pcap) then
       local cmd = "bunzip2 -k "..pcap..".bz2" 

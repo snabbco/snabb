@@ -1,6 +1,6 @@
 snabbflow-config {
     interface {
-        device "00:00.0";
+        device %q;
     }
     flow-director {
         class {
