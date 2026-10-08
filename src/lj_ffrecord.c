@@ -1061,7 +1061,6 @@ static void recff_format(jit_State *J, RecordFFData *rd, TRef hdr, int sbufx)
 	tra = emitir(IRT(IR_CONV, IRT_U64), tra,
 		     (IRT_INT|(IRT_U64<<5)|IRCONV_SEXT));
 	tr = lj_ir_call(J, IRCALL_lj_strfmt_putfxint, tr, trsf, tra);
-	lj_needsplit(J);
       }
       break;
     case STRFMT_UINT:
@@ -1072,7 +1071,6 @@ static void recff_format(jit_State *J, RecordFFData *rd, TRef hdr, int sbufx)
     handle_num:
       tra = lj_ir_tonum(J, tra);
       tr = lj_ir_call(J, id, tr, trsf, tra);
-      if (LJ_SOFTFP) lj_needsplit(J);
       break;
     case STRFMT_STR:
       if (!tref_isstr(tra)) {

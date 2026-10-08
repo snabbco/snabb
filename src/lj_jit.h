@@ -303,10 +303,6 @@ enum {
 #define LJ_KSIMD(J, n) \
   ((TValue *)(((intptr_t)&J->ksimd[2*(n)] + 15) & ~(intptr_t)15))
 
-/* Set/reset flag to activate the SPLIT pass for the current trace. */
-#define lj_needsplit(J)		UNUSED(J)
-#define lj_resetsplit(J)	UNUSED(J)
-
 /* Fold state is used to fold instructions on-the-fly. */
 typedef struct FoldState {
   IRIns ins;		/* Currently emitted instruction. */
