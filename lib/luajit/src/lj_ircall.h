@@ -66,13 +66,7 @@ typedef struct CCallInfo {
 
 #define IRCALLCOND_SOFTFP_MIPS(x)	NULL
 
-#define LJ_NEED_FP64	(LJ_TARGET_ARM || LJ_TARGET_PPC || LJ_TARGET_MIPS32)
-
-#if (LJ_SOFTFP || LJ_NEED_FP64)
-#define IRCALLCOND_FP64_FFI(x)		x
-#else
 #define IRCALLCOND_FP64_FFI(x)		NULL
-#endif
 
 #define IRCALLCOND_FFI(x)		x
 #define IRCALLCOND_FFI32(x)		NULL
@@ -218,25 +212,5 @@ IRCALLDEF(IRCALLENUM)
 LJ_FUNC TRef lj_ir_call(jit_State *J, IRCallID id, ...);
 
 LJ_DATA const CCallInfo lj_ir_callinfo[IRCALL__MAX+1];
-
-/* Soft-float declarations. */
-
-#if LJ_NEED_FP64 && !(LJ_TARGET_ARM && LJ_SOFTFP)
-#ifdef __GNUC__ || defined(__clang__)
-#define fp64_l2d __floatdidf
-#define fp64_ul2d __floatundidf
-#define fp64_l2f __floatdisf
-#define fp64_ul2f __floatundisf
-#else
-#error "Missing fp64 helper definitions for this compiler"
-#endif
-#endif
-
-#if (LJ_SOFTFP || LJ_NEED_FP64)
-extern double fp64_l2d(int64_t a);
-extern double fp64_ul2d(uint64_t a);
-extern float fp64_l2f(int64_t a);
-extern float fp64_ul2f(uint64_t a);
-#endif
 
 #endif

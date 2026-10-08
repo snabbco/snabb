@@ -67,8 +67,6 @@ static MSize snapshot_slots(jit_State *J, SnapEntry *map, BCReg nslots)
 	if ((ir->op2 & (IRSLOAD_READONLY|IRSLOAD_PARENT)) != IRSLOAD_PARENT)
           sn |= SNAP_NORESTORE;
       }
-      if (LJ_SOFTFP && irt_isnum(ir->t))
-	sn |= SNAP_SOFTFPNUM;
       map[n++] = sn;
     }
   }
@@ -371,8 +369,6 @@ IRIns *lj_snap_regspmap(jit_State *J, GCtrace *T, SnapNo snapno, IRIns *ir)
 	  break;
 	}
       }
-    } else if (LJ_SOFTFP && ir->o == IR_HIOP) {
-      ref++;
     } else if (ir->o == IR_PVAL) {
       ref = ir->op1 + REF_BIAS;
     } else {
@@ -484,7 +480,6 @@ void lj_snap_replay(jit_State *J, GCtrace *T)
     } else {
       IRType t = irt_type(ir->t);
       uint32_t mode = IRSLOAD_INHERIT|IRSLOAD_PARENT;
-      if (LJ_SOFTFP && (sn & SNAP_SOFTFPNUM)) t = IRT_NUM;
       if (ir->o == IR_SLOAD) mode |= (ir->op2 & IRSLOAD_READONLY);
       if ((sn & SNAP_KEYINDEX)) mode |= IRSLOAD_KEYINDEX;
       tr = emitir_raw(IRT(IR_SLOAD, t), s, mode);
@@ -520,9 +515,6 @@ void lj_snap_replay(jit_State *J, GCtrace *T)
 	    if (irs->r == RID_SINK && snap_sunk_store(T, ir, irs)) {
 	      if (snap_pref(J, T, map, nent, seen, irs->op2) == 0)
 		snap_pref(J, T, map, nent, seen, T->ir[irs->op2].op1);
-	      else if (LJ_SOFTFP &&
-		       irs+1 < irlast && (irs+1)->o == IR_HIOP)
-		snap_pref(J, T, map, nent, seen, (irs+1)->op2);
 	    }
 	}
       } else if (!irref_isk(refp) && !regsp_used(ir->prev)) {
@@ -595,22 +587,6 @@ void lj_snap_replay(jit_State *J, GCtrace *T)
 			   refp - REF_BIAS, irc->o);
 		val = snap_pref(J, T, map, nent, seen, irc->op1);
 		val = emitir(IRTN(IR_CONV), val, IRCONV_NUM_INT);
-	      } else if (LJ_SOFTFP &&
-			 irs+1 < irlast && (irs+1)->o == IR_HIOP) {
-		IRType t = IRT_I64;
-		if (LJ_SOFTFP && irt_type((irs+1)->t) == IRT_SOFTFP)
-		  t = IRT_NUM;
-		lj_needsplit(J);
-		if (irref_isk(irs->op2) && irref_isk((irs+1)->op2)) {
-		  uint64_t k = (uint32_t)T->ir[irs->op2].i +
-			       ((uint64_t)T->ir[(irs+1)->op2].i << 32);
-		  val = lj_ir_k64(J, t == IRT_I64 ? IR_KINT64 : IR_KNUM, k);
-		} else {
-		  val = emitir_raw(IRT(IR_HIOP, t), val,
-			  snap_pref(J, T, map, nent, seen, (irs+1)->op2));
-		}
-		tmp = emitir(IRT(irs->o, t), tmp, val);
-		continue;
 	      }
 	      tmp = emitir(irs->ot, tmp, val);
 	    } else if (irs->o == IR_XBAR && ir->o == IR_CNEW) {
@@ -819,10 +795,6 @@ static void snap_unsink(jit_State *J, GCtrace *T, ExitState *ex,
 	  val = lj_tab_set(J->L, t, &tmp);
 	  /* NOBARRIER: The table is new (marked white). */
 	  snap_restoreval(J, T, ex, snapno, rfilt, irs->op2, val);
-	  if (LJ_SOFTFP && irs+1 < T->ir + T->nins && (irs+1)->o == IR_HIOP) {
-	    snap_restoreval(J, T, ex, snapno, rfilt, (irs+1)->op2, &tmp);
-	    val->u32.hi = tmp.u32.lo;
-	  }
 	}
       }
     }

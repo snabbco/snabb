@@ -724,9 +724,9 @@ static void asm_conv(ASMState *as, IRIns *ir)
 	ra_left(as, tmp, lref);
 
       } else {
-	emit_mrm(as, op,
-		 dest|((irt_is64(ir->t)) ? REX_64 : 0),
-		 asm_fuseload(as, lref, RSET_FPR));
+	if (!irt_is64(ir->t))
+	  emit_rr(as, XO_MOV, dest, dest);  /* Zero hiword. */
+	emit_mrm(as, op, dest|REX_64, asm_fuseload(as, lref, RSET_FPR));
       }
     }
   } else if (st >= IRT_I8 && st <= IRT_U16) {  /* Extend to 32 bit integer. */
