@@ -1,6 +1,6 @@
 /*
 ** LuaJIT common internal definitions.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_DEF_H
@@ -95,6 +95,7 @@ typedef uintptr_t BloomFilter;
 #define LJ_INLINE	inline
 #define LJ_AINLINE	inline __attribute__((always_inline))
 #define LJ_NOINLINE	__attribute__((noinline))
+#define LJ_CONSTF	__attribute__((nothrow,const))
 
 #if defined(__ELF__) || defined(__MACH__) || defined(__psp2__)
 #define LJ_NOAPI	extern __attribute__((visibility("hidden")))

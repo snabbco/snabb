@@ -1,6 +1,6 @@
 /*
 ** Base and coroutine library.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2011 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -140,6 +140,8 @@ LJLIB_CF(getfenv)		LJLIB_REC(.)
   cTValue *o = L->base;
   if (!(o < L->top && tvisfunc(o))) {
     int level = lj_lib_optint(L, 1, 1);
+    if (level < 0)
+      lj_err_arg(L, 1, LJ_ERR_INVLVL);
     o = lj_debug_frame(L, level, &level);
     if (o == NULL)
       lj_err_arg(L, 1, LJ_ERR_INVLVL);
@@ -162,6 +164,8 @@ LJLIB_CF(setfenv)
       setgcref(L->env, obj2gco(t));
       return 0;
     }
+    if (level < 0)
+      lj_err_arg(L, 1, LJ_ERR_INVLVL);
     o = lj_debug_frame(L, level, &level);
     if (o == NULL)
       lj_err_arg(L, 1, LJ_ERR_INVLVL);
@@ -214,7 +218,7 @@ LJLIB_CF(rawlen)		LJLIB_REC(.)
 }
 #endif
 
-LJLIB_CF(unpack)
+LJLIB_CF(unpack)		LJLIB_REC(.)
 {
   GCtab *t = lj_lib_checktab(L, 1);
   int32_t n, i = lj_lib_optint(L, 2, 1);
@@ -233,7 +237,9 @@ LJLIB_CF(unpack)
     } else {
       setnilV(L->top++);
     }
-  } while (i++ < e);
+    if (i >= e) break;
+    i++;
+  } while (1);
   return n;
 }
 

@@ -1,6 +1,6 @@
 /*
 ** Public Lua/C API.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -396,7 +396,7 @@ LUA_API lua_Integer lua_tointeger(lua_State *L, int idx)
       return 0;
     n = numV(&tmp);
   }
-  return (lua_Integer)n;
+  return lj_num2int_type(n, lua_Integer);
 }
 
 LUA_API lua_Integer lua_tointegerx(lua_State *L, int idx, int *ok)
@@ -414,7 +414,7 @@ LUA_API lua_Integer lua_tointegerx(lua_State *L, int idx, int *ok)
     n = numV(&tmp);
   }
   if (ok) *ok = 1;
-  return (lua_Integer)n;
+  return lj_num2int_type(n, lua_Integer);
 }
 
 LUALIB_API lua_Integer luaL_checkinteger(lua_State *L, int idx)
@@ -429,7 +429,7 @@ LUALIB_API lua_Integer luaL_checkinteger(lua_State *L, int idx)
       lj_err_argt(L, idx, LUA_TNUMBER);
     n = numV(&tmp);
   }
-  return (lua_Integer)n;
+  return lj_num2int_type(n, lua_Integer);
 }
 
 LUALIB_API lua_Integer luaL_optinteger(lua_State *L, int idx, lua_Integer def)
@@ -446,7 +446,7 @@ LUALIB_API lua_Integer luaL_optinteger(lua_State *L, int idx, lua_Integer def)
       lj_err_argt(L, idx, LUA_TNUMBER);
     n = numV(&tmp);
   }
-  return (lua_Integer)n;
+  return lj_num2int_type(n, lua_Integer);
 }
 
 LUA_API int lua_toboolean(lua_State *L, int idx)
@@ -671,7 +671,7 @@ LUA_API void lua_pushlightuserdata(lua_State *L, void *p)
 LUA_API void lua_createtable(lua_State *L, int narray, int nrec)
 {
   lj_gc_check(L);
-  settabV(L, L->top, lj_tab_new_ah(L, narray, nrec));
+  settabV(L, L->top, lj_tab_new_ah(L, (uint32_t)narray, (uint32_t)nrec));
   incr_top(L);
 }
 

@@ -1,6 +1,6 @@
 /*
 ** Garbage collector.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -103,6 +103,7 @@ static void gc_mark_start(global_State *g)
   setgcrefnull(g->gc.weak);
   gc_markobj(g, mainthread(g));
   gc_markobj(g, tabref(mainthread(g)->env));
+  gc_markobj(g, vmthread(g));
   gc_marktv(g, &g->registrytv);
   gc_mark_gcroot(g);
   g->gc.state = GCSpropagate;
@@ -457,16 +458,18 @@ static void gc_call_finalizer(global_State *g, lua_State *L,
   uint8_t oldh = hook_save(g);
   GCSize oldt = g->gc.threshold;
   int errcode;
+  lua_State *VL = vmthread(g);
   TValue *top;
   lj_trace_abort(g);
   hook_entergc(g);  /* Disable hooks and new traces during __gc. */
   g->gc.threshold = LJ_MAX_MEM;  /* Prevent GC steps. */
-  top = L->top;
-  copyTV(L, top++, mo);
+  top = VL->top;
+  copyTV(VL, top++, mo);
   if (LJ_FR2) setnilV(top++);
-  setgcV(L, top, o, ~o->gch.gct);
-  L->top = top+1;
-  errcode = lj_vm_pcall(L, top, 1+0, -1);  /* Stack: |mo|o| -> | */
+  setgcV(VL, top, o, ~o->gch.gct);
+  VL->top = top+1;
+  errcode = lj_vm_pcall(VL, top, 1+0, -1);  /* Stack: |mo|o| -> | */
+  setgcref(g->cur_L, obj2gco(L));
   hook_restore(g, oldh);
   g->gc.threshold = oldt;  /* Restore GC threshold. */
   if (errcode)
@@ -566,6 +569,8 @@ static void atomic(global_State *g, lua_State *L)
   setgcrefnull(g->gc.weak);
   lj_assertG(!iswhite(obj2gco(mainthread(g))), "main thread turned white");
   gc_markobj(g, L);  /* Mark running thread. */
+  if (ctype_ctsG(g) && ctype_ctsG(g)->L)  /* Mark cts->L thread. */
+    gc_markobj(g, ctype_ctsG(g)->L);
   gc_traverse_curtrace(g);  /* Traverse current trace. */
   gc_mark_gcroot(g);  /* Mark GC roots (again). */
   gc_propagate_gray(g);  /* Propagate all of the above. */

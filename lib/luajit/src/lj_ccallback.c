@@ -1,6 +1,6 @@
 /*
 ** FFI C callback handling.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #include "lj_obj.h"
@@ -253,6 +253,9 @@ static void callback_conv_result(CTState *cts, lua_State *L, TValue *o)
 	*(int32_t *)dp = ctr->size == 1 ? (int32_t)*(int8_t *)dp :
 					  (int32_t)*(int16_t *)dp;
     }
+    /* Always zero-extend results to 64 bits. */
+    if (ctr->size <= 4 && ctype_isinteger_or_bool(ctr->info))
+      *(uint64_t *)dp = (uint64_t)*(uint32_t *)dp;
   }
 }
 
@@ -262,12 +265,14 @@ lua_State * lj_ccallback_enter(CTState *cts, void *cf)
   lua_State *L = cts->L;
   global_State *g = cts->g;
   lj_assertG(L != NULL, "uninitialized cts->L in callback");
+  lj_assertG(!isdead(g, obj2gco(L)), "dead cts->L in callback");
   if (tvref(g->jit_base)) {
     setstrV(L, L->top++, lj_err_str(L, LJ_ERR_FFI_BADCBACK));
     if (g->panic) g->panic(L);
     exit(EXIT_FAILURE);
   }
   lj_trace_abort(g);  /* Never record across callback. */
+  setgcref(g->cur_L, obj2gco(L));
   /* Setup C frame. */
   cframe_prev(cf) = L->cframe;
   setcframe_L(cf, L);

@@ -1,6 +1,6 @@
 /*
 ** x86/x64 instruction emitter.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 /* -- Emit basic instructions --------------------------------------------- */
@@ -411,6 +411,12 @@ static void emit_sfixup(ASMState *as, MCLabel source)
 /* Return label pointing to current PC. */
 #define emit_label(as)		((as)->mcp)
 
+/* Check if two adresses are in relative jump range. */
+static LJ_AINLINE int jmprel_ok(MCode *a, MCode *b)
+{
+  return a - b == (int32_t)(a - b);
+}
+
 /* Compute relative 32 bit offset for jump and call instructions. */
 static LJ_AINLINE int32_t jmprel(jit_State *J, MCode *p, MCode *target)
 {
@@ -443,7 +449,7 @@ static void emit_jmp(ASMState *as, MCode *target)
 static void emit_call_(ASMState *as, MCode *target)
 {
   MCode *p = as->mcp;
-  if (target-p != (int32_t)(target-p)) {
+  if (!jmprel_ok(target, p)) {
     /* Assumes RID_RET is never an argument to calls and always clobbered. */
     emit_rr(as, XO_GROUP5, XOg_CALL, RID_RET);
     emit_loadu64(as, RID_RET, (uint64_t)target);

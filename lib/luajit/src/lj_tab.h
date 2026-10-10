@@ -1,6 +1,6 @@
 /*
 ** Table handling.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_TAB_H
@@ -42,12 +42,11 @@ static LJ_AINLINE Node *hashmask(const GCtab *t, uint32_t hash)
 #define hsize2hbits(s)	((s) ? ((s)==1 ? 1 : 1+lj_fls((uint32_t)((s)-1))) : 0)
 
 LJ_FUNCA GCtab *lj_tab_new(lua_State *L, uint32_t asize, uint32_t hbits);
-LJ_FUNC GCtab *lj_tab_new_ah(lua_State *L, int32_t a, int32_t h);
-LJ_FUNC GCtab * lj_tab_new1(lua_State *L, uint32_t ahsize);
-LJ_FUNCA GCtab * lj_tab_dup(lua_State *L, const GCtab *kt);
+LJ_FUNC GCtab *lj_tab_new_ah(lua_State *L, uint32_t a, uint32_t h);
+LJ_FUNC GCtab *lj_tab_new1(lua_State *L, uint32_t ahsize);
+LJ_FUNCA GCtab *lj_tab_dup(lua_State *L, const GCtab *kt);
 LJ_FUNC void lj_tab_clear(GCtab *t);
 LJ_FUNC void lj_tab_free(global_State *g, GCtab *t);
-LJ_FUNC void lj_tab_rehash(lua_State *L, GCtab *t);
 LJ_FUNC void lj_tab_resize(lua_State *L, GCtab *t, uint32_t asize, uint32_t hbits);
 LJ_FUNCA void lj_tab_reasize(lua_State *L, GCtab *t, uint32_t nasize);
 

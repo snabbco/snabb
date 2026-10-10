@@ -1,6 +1,6 @@
 /*
 ** Trace recorder for C data operations.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_CRECORD_H
@@ -28,8 +28,11 @@ LJ_FUNC void recff_ffi_gc(jit_State *J, RecordFFData *rd);
 LJ_FUNC void recff_bit64_tobit(jit_State *J, RecordFFData *rd);
 LJ_FUNC int recff_bit64_unary(jit_State *J, RecordFFData *rd);
 LJ_FUNC int recff_bit64_nary(jit_State *J, RecordFFData *rd);
-LJ_FUNC int recff_bit64_shift(jit_State *J, RecordFFData *rd);
+LJ_FUNC int recff_bit64_shift(jit_State *J, TRef *rb, TRef *rc,
+			      TValue *rbv, TValue *rcv, IROp op);
 LJ_FUNC TRef recff_bit64_tohex(jit_State *J, RecordFFData *rd, TRef hdr);
+LJ_FUNC TRef recff_bit64_bitop(jit_State *J, TRef rb, TRef rc,
+			       TValue *rbv, TValue *rcv, IROp op);
 
 LJ_FUNC void lj_crecord_tonumber(jit_State *J, RecordFFData *rd);
 LJ_FUNC TRef lj_crecord_loadiu64(jit_State *J, TRef tr, cTValue *o);

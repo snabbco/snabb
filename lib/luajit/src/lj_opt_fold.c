@@ -2,7 +2,7 @@
 ** FOLD: Constant Folding, Algebraic Simplifications and Reassociation.
 ** ABCelim: Array Bounds Check Elimination.
 ** CSE: Common-Subexpression Elimination.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_opt_fold_c
@@ -296,17 +296,18 @@ LJFOLDF(kfold_intarith)
   return INTFOLD(kfold_intop(fleft->i, fright->i, (IROp)fins->o));
 }
 
+/* Forward declaration. */
+static uint64_t kfold_int64arith(jit_State *J, uint64_t k1, uint64_t k2,
+				 IROp op);
+
 LJFOLD(ADDOV KINT KINT)
 LJFOLD(SUBOV KINT KINT)
 LJFOLD(MULOV KINT KINT)
 LJFOLDF(kfold_intovarith)
 {
-  lua_Number n = lj_vm_foldarith((lua_Number)fleft->i, (lua_Number)fright->i,
-				 fins->o - IR_ADDOV);
-  int32_t k = lj_num2int(n);
-  if (n != (lua_Number)k)
-    return FAILFOLD;
-  return INTFOLD(k);
+  int64_t k = kfold_int64arith(J, (int64_t)fleft->i, (int64_t)fright->i,
+		(IROp)((int)fins->o - (int)IR_ADDOV + (int)IR_ADD));
+  return checki32(k) ? INTFOLD(k) : FAILFOLD;
 }
 
 LJFOLD(BNOT KINT)
@@ -837,8 +838,11 @@ LJFOLD(CONV KNUM IRCONV_INT_NUM)
 LJFOLDF(kfold_conv_knum_int_num)
 {
   lua_Number n = knumleft;
-  int32_t k = lj_num2int(n);
-  if (irt_isguard(fins->t) && n != (lua_Number)k) {
+  if (irt_isguard(fins->t)) {
+    int64_t i64;
+    int32_t k;
+    if (lj_num2int_check(n, i64, k))
+      return INTFOLD(k);
     /* We're about to create a guard which always fails, like CONV +1.5.
     ** Some pathological loops cause this during LICM, e.g.:
     **   local x,k,t = 0,1.5,{1,[1.5]=2}
@@ -846,20 +850,15 @@ LJFOLDF(kfold_conv_knum_int_num)
     **   assert(x == 300)
     */
     return FAILFOLD;
+  } else {
+    return INTFOLD(lj_num2int(n));
   }
-  return INTFOLD(k);
-}
-
-LJFOLD(CONV KNUM IRCONV_U32_NUM)
-LJFOLDF(kfold_conv_knum_u32_num)
-{
-  return INTFOLD((int32_t)(uint32_t)knumleft);
 }
 
 LJFOLD(CONV KNUM IRCONV_I64_NUM)
 LJFOLDF(kfold_conv_knum_i64_num)
 {
-  return INT64FOLD((uint64_t)(int64_t)knumleft);
+  return INT64FOLD((uint64_t)lj_num2i64(knumleft));
 }
 
 LJFOLD(CONV KNUM IRCONV_U64_NUM)
@@ -1049,6 +1048,8 @@ LJFOLD(MUL NEG NEG)
 LJFOLD(DIV NEG NEG)
 LJFOLDF(simplify_nummuldiv_negneg)
 {
+  if (fins->o == IR_DIV && (irt_isu32(fins->t) || irt_isu64(fins->t)))
+    return NEXTFOLD;
   PHIBARRIER(fleft);
   PHIBARRIER(fright);
   fins->op1 = fleft->op1;  /* (-a) o (-b) ==> a o b */
@@ -1082,7 +1083,6 @@ LJFOLDF(shortcut_conv_num_int)
 }
 
 LJFOLD(CONV CONV IRCONV_INT_NUM)  /* _INT */
-LJFOLD(CONV CONV IRCONV_U32_NUM)  /* _U32 */
 LJFOLDF(simplify_conv_int_num)
 {
   /* Fold even across PHI to avoid expensive num->int conversions in loop. */
@@ -1253,6 +1253,20 @@ LJFOLDF(narrow_convert)
   lj_assertJ(fins->o != IR_CONV || (fins->op2&IRCONV_CONVMASK) != IRCONV_TOBIT,
 	     "unexpected CONV TOBIT");
   return lj_opt_narrow_convert(J);
+}
+
+LJFOLD(XSTORE any CONV)
+LJFOLDF(xstore_conv)
+{
+  PHIBARRIER(fright);
+  if (!irt_is64(fins->t) &&
+      irt_type(fins->t) == (IRType)((fright->op2&IRCONV_DSTMASK)>>IRCONV_DSH) &&
+      ((fright->op2&IRCONV_SRCMASK) == IRT_I64 ||
+       (fright->op2&IRCONV_SRCMASK) == IRT_U64)) {
+    fins->op2 = fright->op1;
+    return RETRYFOLD;
+  }
+  return NEXTFOLD;
 }
 
 /* -- Integer algebraic simplifications ----------------------------------- */
@@ -2126,9 +2140,11 @@ LJFOLD(HREF TDUP KNUM)
 LJFOLDF(fwd_href_tdup)
 {
   TValue keyv;
+  cTValue *val;
   lj_ir_kvalue(J->L, &keyv, fright);
-  if (lj_tab_get(J->L, ir_ktab(IR(fleft->op1)), &keyv) == niltvg(J2G(J)) &&
-      lj_opt_fwd_href_nokey(J))
+  val = lj_tab_get(J->L, ir_ktab(IR(fleft->op1)), &keyv);
+  /* Check for either nil or the nil value marker in the template table. */
+  if ((tvisnil(val) || tvistab(val)) && lj_opt_fwd_href_nokey(J))
     return lj_ir_kkptr(J, niltvg(J2G(J)));
   return NEXTFOLD;
 }

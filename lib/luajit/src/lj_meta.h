@@ -1,6 +1,6 @@
 /*
 ** Metamethod handling.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_META_H
@@ -24,6 +24,8 @@ LJ_FUNCA cTValue *lj_meta_tget(lua_State *L, cTValue *o, cTValue *k);
 LJ_FUNCA TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k);
 LJ_FUNCA TValue *lj_meta_arith(lua_State *L, TValue *ra, cTValue *rb,
 			       cTValue *rc, BCReg op);
+LJ_FUNCA void lj_meta_bitop(lua_State *L, TValue *ra, cTValue *rb,
+			    cTValue *rc, BCReg op);
 LJ_FUNCA TValue *lj_meta_cat(lua_State *L, TValue *top, int left);
 LJ_FUNCA TValue * lj_meta_len(lua_State *L, cTValue *o);
 LJ_FUNCA TValue *lj_meta_equal(lua_State *L, GCobj *o1, GCobj *o2, int ne);
