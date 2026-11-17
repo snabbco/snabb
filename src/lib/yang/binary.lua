@@ -705,6 +705,68 @@ function selftest()
       end
    end
 
+   do
+      local test_schema = schema.load_schema([[module snabb-default-bug {
+         namespace snabb:test;
+         prefix test;
+
+         import ietf-inet-types { prefix inet; }
+  
+         container address-families {
+            presence "foo";
+            container ipv4 {
+               leaf address {
+                  type inet:ipv4-address;
+                  mandatory true;
+               }
+               leaf next-hop {
+                  type inet:ipv4-address;
+                  mandatory true;
+               }
+            }
+            container ipv6 {
+               presence "foo";
+               leaf address {
+                  type inet:ipv6-address;
+                  mandatory true;
+               }
+               leaf next-hop {
+                  type inet:ipv6-address;
+                  mandatory true;
+               }
+            }
+         }
+      }]])
+      local mem = require('lib.stream.mem')
+      local dat = data.load_config_for_schema(test_schema,
+                                             mem.open_input_string [[
+         address-families {
+            ipv4 {
+               address "10.0.0.1";
+               next-hop "10.0.0.2";
+            }
+            ipv6 {
+               address "ff00::1";
+               next-hop "ff00::2";
+            }
+         }
+      ]])
+
+      for i=1,3 do
+         assert(type(dat.address_families) == 'cdata')
+         assert(dat.address_families.ipv4.address == util.ipv4_pton('10.0.0.1'))
+
+         local tmp = os.tmpname()
+         compile_config_for_schema(test_schema, dat, tmp)
+         local dat2 = load_compiled_data_file(tmp)
+         
+         assert(type(dat2.data.address_families) == 'cdata')
+         assert(dat2.data.address_families.ipv4.address == util.ipv4_pton('10.0.0.1'))
+         
+         dat = copy_config_for_schema(test_schema, dat2.data)
+         os.remove(tmp)
+      end
+   end
 
    print('selfcheck: ok')
 end

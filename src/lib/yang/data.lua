@@ -40,8 +40,15 @@ function data_grammar_from_schema(schema, is_config)
       local ctype = 'struct { '
       for _,k in ipairs(member_names) do
          -- Separate the array suffix off of things like "uint8_t[4]".
-         local head, tail = members[k].ctype:match('^([^%[]*)(.*)$')
-         ctype = ctype..head..' '..normalize_id(k)..tail..'; '
+         local scalar_t, name = members[k].ctype, normalize_id(k)
+         local array_t, size = scalar_t:match('^(.*)%[(%d+)%]$')
+         if array_t and size then
+            -- array_t name[size];
+            ctype = ctype..("%s %s[%s]; "):format(array_t, name, size)
+         else
+            -- scalar_t name;
+            ctype = ctype..("%s %s; "):format(scalar_t, name)
+         end
       end
       ctype = ctype..'}'
       return ctype
