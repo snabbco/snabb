@@ -1,6 +1,6 @@
 /*
 ** Target architecture selection.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_ARCH_H
@@ -120,8 +120,6 @@
 #ifndef LJ_ARCH_HASFPU
 #define LJ_ARCH_HASFPU		1
 #endif
-#define LJ_ABI_SOFTFP		0
-#define LJ_SOFTFP		(!LJ_ARCH_HASFPU)
 
 #if LJ_ARCH_ENDIAN == LUAJIT_BE
 #define LJ_ENDIAN_SELECT(le, be)	be
