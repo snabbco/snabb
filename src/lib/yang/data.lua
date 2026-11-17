@@ -78,7 +78,7 @@ function data_grammar_from_schema(schema, is_config)
    end
    function handlers.container(node)
       local members = visit_body(node)
-      if is_empty(members) then return end
+      if is_empty(members) and not node.presence then return end
       return {type='struct', members=members, ctype=struct_ctype(members)}
    end
    function handlers.choice(node)
