@@ -171,7 +171,7 @@ end
 function handler (reason)
    local ok, bt = pcall(STP.stacktrace)
    if ok and bt then
-      io.stderr:write(reason)
+      io.stderr:write(tostring(reason))
       io.stderr:write("\n")
       io.stderr:write(bt)
       io.stderr:write("\n")

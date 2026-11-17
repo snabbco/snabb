@@ -45,11 +45,10 @@ function Parser:loc()
 end
 
 function Parser:error(msg, ...)
-   print(self.str:match("[^\n]*"))
-   print(string.rep(" ", self.column).."^")
-   print(('%s: error: '..msg):format(self:loc(), ...))
-   -- use an empty error to avoid printing stack trace
-   error()
+   error(("\n%s\n%s^\n%s: error: "..msg):format(
+      self.str:match("[^\n]*"),
+      string.rep(" ", self.column),
+      self:loc(), ...))
 end
 
 function Parser:read_char()
