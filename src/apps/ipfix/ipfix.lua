@@ -853,7 +853,7 @@ function IPFIX:push1(input)
    if self.add_packet_metadata then
       for _ = 1, nreadable do
          local p = link.receive(input)
-         metadata_add(p)
+         metadata_add(p, timestamp)
          link.transmit(input, p)
       end
       events.added_metadata()

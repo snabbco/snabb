@@ -6,7 +6,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-/* Return the current wall-clock time in nanoseconds. */
+/* Return the monotonic time in nanoseconds. */
 uint64_t get_time_ns()
 {
     /* XXX Consider using RDTSC. */

@@ -121,7 +121,7 @@ local function data_emitter(production)
             expanded[keyword] = prod
          end
       end
-      return {type="struct", members=expanded}
+      return {type="struct", members=expanded, ctype=production.ctype}
    end
    local function visitn(productions)
       local ret = {}
@@ -545,117 +545,166 @@ function selftest()
       local data = { foo = 12, [42] = { [43] = "bar", baz = 44 } }
       local tmp = os.tmpname()
       compile_ad_hoc_lua_data_to_file(tmp, data)
-      local data2 = load_compiled_data_file(tmp).data
-      assert(lib.equal(data, data2))
+      local dat2 = load_compiled_data_file(tmp).data
+      assert(lib.equal(data, dat2))
    end
-   local test_schema = schema.load_schema([[module snabb-simple-router {
-      namespace snabb:simple-router;
-      prefix simple-router;
+   do
+      local test_schema = schema.load_schema([[module snabb-simple-router {
+         namespace snabb:simple-router;
+         prefix simple-router;
 
-      import ietf-inet-types {prefix inet;}
-      import ietf-yang-types { prefix yang; }
+         import ietf-inet-types {prefix inet;}
+         import ietf-yang-types { prefix yang; }
 
-      leaf is-active { type boolean; default true; }
+         leaf is-active { type boolean; default true; }
 
-      leaf-list integers { type uint32; }
-      leaf-list addrs { type inet:ipv4-address; }
+         leaf-list integers { type uint32; }
+         leaf-list addrs { type inet:ipv4-address; }
 
-      typedef severity  {
-         type enumeration {
-            enum indeterminate;
-            enum minor {
-               value 3;
-            }
-            enum warning {
-               value 4;
-            }
-         }
-      }
-
-      container routes {
-         list route {
-            key addr;
-            leaf addr { type inet:ipv4-address; mandatory true; }
-            leaf port { type uint8 { range 0..11; } mandatory true; }
-            container metadata {
-               leaf info { type string; }
+         typedef severity  {
+            type enumeration {
+               enum indeterminate;
+               enum minor {
+                  value 3;
+               }
+               enum warning {
+                  value 4;
+               }
             }
          }
-         leaf severity {
-            type severity;
-         }
-      }
 
-      container next-hop {
-         choice address {
-            case mac {
-               leaf mac { type yang:mac-address; }
+         container routes {
+            list route {
+               key addr;
+               leaf addr { type inet:ipv4-address; mandatory true; }
+               leaf port { type uint8 { range 0..11; } mandatory true; }
+               container metadata {
+                  leaf info { type string; }
+               }
             }
-            case ipv4 {
-               leaf ipv4 { type inet:ipv4-address; }
-            }
-            case ipv6 {
-               leaf ipv6 { type inet:ipv6-address; }
+            leaf severity {
+               type severity;
             }
          }
-      }
 
-      container foo {
-         leaf enable-qos {
-            type empty;
+         container next-hop {
+            choice address {
+               case mac {
+                  leaf mac { type yang:mac-address; }
+               }
+               case ipv4 {
+                  leaf ipv4 { type inet:ipv4-address; }
+               }
+               case ipv6 {
+                  leaf ipv6 { type inet:ipv6-address; }
+               }
+            }
          }
-      }
-   }]])
-   local mem = require('lib.stream.mem')
-   local data = data.load_config_for_schema(test_schema,
-                                            mem.open_input_string [[
-      is-active true;
-      integers 1;
-      integers 2;
-      integers 0xffffffff;
-      addrs 4.3.2.1;
-      addrs 5.4.3.2;
-      routes {
-        route { addr 1.2.3.4; port 1; }
-        route { addr 2.3.4.5; port 10; metadata { info "bar"; } }
-        route { addr 3.4.5.6; port 2; metadata { info "foo"; } }
-        severity minor;
-      }
-      next-hop {
-         ipv4 5.6.7.8;
-      }
-      foo {
-         enable-qos;
-      }
-   ]])
 
-   local ipv4 = require('lib.protocol.ipv4')
+         container foo {
+            leaf enable-qos {
+               type empty;
+            }
+         }
+      }]])
+      local mem = require('lib.stream.mem')
+      local data = data.load_config_for_schema(test_schema,
+                                             mem.open_input_string [[
+         is-active true;
+         integers 1;
+         integers 2;
+         integers 0xffffffff;
+         addrs 4.3.2.1;
+         addrs 5.4.3.2;
+         routes {
+         route { addr 1.2.3.4; port 1; }
+         route { addr 2.3.4.5; port 10; metadata { info "bar"; } }
+         route { addr 3.4.5.6; port 2; metadata { info "foo"; } }
+         severity minor;
+         }
+         next-hop {
+            ipv4 5.6.7.8;
+         }
+         foo {
+            enable-qos;
+         }
+      ]])
 
-   for i=1,3 do
-      assert(data.is_active == true)
-      assert(#data.integers == 3)
-      assert(data.integers[1] == 1)
-      assert(data.integers[2] == 2)
-      assert(data.integers[3] == 0xffffffff)
-      assert(#data.addrs == 2)
-      assert(data.addrs[1]==util.ipv4_pton('4.3.2.1'))
-      assert(data.addrs[2]==util.ipv4_pton('5.4.3.2'))
-      local routing_table = data.routes.route
-      assert(routing_table[util.ipv4_pton('1.2.3.4')].port == 1)
-      assert(routing_table[util.ipv4_pton('2.3.4.5')].port == 10)
-      assert(routing_table[util.ipv4_pton('3.4.5.6')].port == 2)
-      assert(
-         data.next_hop.ipv4 == util.ipv4_pton('5.6.7.8'),
-         "Choice type test failed (round: "..i..")"
-      )
+      local ipv4 = require('lib.protocol.ipv4')
 
-      local tmp = os.tmpname()
-      compile_config_for_schema(test_schema, data, tmp)
-      local data2 = load_compiled_data_file(tmp)
-      assert(data2.schema_name == 'snabb-simple-router')
-      assert(data2.revision_date == '')
-      data = copy_config_for_schema(test_schema, data2.data)
-      os.remove(tmp)
+      for i=1,3 do
+         assert(data.is_active == true)
+         assert(#data.integers == 3)
+         assert(data.integers[1] == 1)
+         assert(data.integers[2] == 2)
+         assert(data.integers[3] == 0xffffffff)
+         assert(#data.addrs == 2)
+         assert(data.addrs[1]==util.ipv4_pton('4.3.2.1'))
+         assert(data.addrs[2]==util.ipv4_pton('5.4.3.2'))
+         local routing_table = data.routes.route
+         assert(routing_table[util.ipv4_pton('1.2.3.4')].port == 1)
+         assert(routing_table[util.ipv4_pton('2.3.4.5')].port == 10)
+         assert(routing_table[util.ipv4_pton('3.4.5.6')].port == 2)
+         assert(
+            data.next_hop.ipv4 == util.ipv4_pton('5.6.7.8'),
+            "Choice type test failed (round: "..i..")"
+         )
+
+         local tmp = os.tmpname()
+         compile_config_for_schema(test_schema, data, tmp)
+         local data2 = load_compiled_data_file(tmp)
+         assert(data2.schema_name == 'snabb-simple-router')
+         assert(data2.revision_date == '')
+         data = copy_config_for_schema(test_schema, data2.data)
+         os.remove(tmp)
+      end
    end
+   do
+      local test_schema = schema.load_schema([[module snabb-default-bug {
+         namespace snabb:test;
+         prefix test;
+
+         container config {
+            leaf foobar {
+               type boolean;
+            }
+            container baz {
+               leaf foo {
+                  type boolean;
+                  default true;
+               }
+               leaf bar {
+                  type boolean;
+                  default true;
+               }
+            }
+         }
+      }]])
+      local mem = require('lib.stream.mem')
+      local dat = data.load_config_for_schema(test_schema,
+                                             mem.open_input_string [[
+         config {
+         }
+      ]])
+
+      local gram = data.data_grammar_from_schema(test_schema, true)
+
+      for i=1,3 do
+         assert(type(dat.config) == 'table')
+         assert(type(dat.config.baz) == 'cdata')
+
+         local tmp = os.tmpname()
+         compile_config_for_schema(test_schema, dat, tmp)
+         local dat2 = load_compiled_data_file(tmp)
+         
+         assert(type(dat2.data.config) == 'table')
+         assert(type(dat2.data.config.baz) == 'cdata')
+         
+         dat = copy_config_for_schema(test_schema, dat2.data)
+         os.remove(tmp)
+      end
+   end
+
+
    print('selfcheck: ok')
 end

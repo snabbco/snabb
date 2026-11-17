@@ -255,7 +255,7 @@ function B4Gen:pull ()
    self.bucket_content = self.bucket_content + self.rate * 1e6 * (cur_now - last_time)
    self.last_time = cur_now
 
-   for _=1, math.min(engine.pull_npackets, self.bucket_content) do
+   for _=1, engine.pull_npackets do
       if #self.sizes > self.bucket_content then break end
       self.bucket_content = self.bucket_content - #self.sizes
 
@@ -433,7 +433,7 @@ function InetGen:pull ()
    self.bucket_content = self.bucket_content + self.rate * 1e6 * (cur_now - last_time)
    self.last_time = cur_now
 
-   for _=1, math.min(engine.pull_npackets, self.bucket_content) do
+   for _=1, engine.pull_npackets do
       if #self.sizes > self.bucket_content then break end
       self.bucket_content = self.bucket_content - #self.sizes
 

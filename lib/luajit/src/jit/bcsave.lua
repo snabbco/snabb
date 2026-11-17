@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------
 -- LuaJIT module to save/list bytecode.
 --
--- Copyright (C) 2005-2023 Mike Pall. All rights reserved.
+-- Copyright (C) 2005-2026 Mike Pall. All rights reserved.
 -- Released under the MIT license. See Copyright Notice in luajit.h
 ----------------------------------------------------------------------------
 --
@@ -165,6 +165,8 @@ extern "C"
 #endif
 #ifdef _WIN32
 __declspec(dllexport)
+#elif (defined(__ELF__) || defined(__MACH__) || defined(__psp2__)) && !((defined(__sun__) && defined(__svr4__)) || defined(__CELLOS_LV2__))
+__attribute__((visibility("default")))
 #endif
 const unsigned char %s%s[] = {
 ]], LJBC_PREFIX, ctx.modname))
@@ -487,49 +489,15 @@ typedef struct
   int32_t cputype, cpusubtype, offset, size, align;
 } mach_fat_arch;
 typedef struct {
-  struct {
-    mach_header hdr;
-    mach_segment_command seg;
-    mach_section sec;
-    mach_symtab_command sym;
-  } arch[1];
-  mach_nlist sym_entry;
-  uint8_t space[4096];
-} mach_obj;
-typedef struct {
-  struct {
-    mach_header_64 hdr;
-    mach_segment_command_64 seg;
-    mach_section_64 sec;
-    mach_symtab_command sym;
-  } arch[1];
-  mach_nlist_64 sym_entry;
-  uint8_t space[4096];
+  mach_header_64 hdr;
+  mach_segment_command_64 seg;
+  mach_section_64 sec;
+  mach_symtab_command sym;
 } mach_obj_64;
 typedef struct {
-  mach_fat_header fat;
-  mach_fat_arch fat_arch[2];
-  struct {
-    mach_header hdr;
-    mach_segment_command seg;
-    mach_section sec;
-    mach_symtab_command sym;
-  } arch[2];
-  mach_nlist sym_entry;
-  uint8_t space[4096];
-} mach_fat_obj;
-typedef struct {
-  mach_fat_header fat;
-  mach_fat_arch fat_arch[2];
-  struct {
-    mach_header_64 hdr;
-    mach_segment_command_64 seg;
-    mach_section_64 sec;
-    mach_symtab_command sym;
-  } arch[2];
   mach_nlist_64 sym_entry;
   uint8_t space[4096];
-} mach_fat_obj_64;
+} mach_obj_64_tail;
 ]]
   local symname = '_'..LJBC_PREFIX..ctx.modname
   local isfat, is64, align, mobj = false, false, 4, "mach_obj"
@@ -546,62 +514,47 @@ typedef struct {
   local be32 = bit.bswap -- Mach-O FAT is BE, supported archs are LE.
 
   -- Create Mach-O object and fill in header.
-  local o = ffi.new(mobj)
-  local mach_size = aligned(ffi.offsetof(o, "space")+#symname+2, align)
-  local cputype = ({ x86={7}, x64={0x01000007}, arm={7,12}, arm64={0x01000007,0x0100000c} })[ctx.arch]
-  local cpusubtype = ({ x86={3}, x64={3}, arm={3,9}, arm64={3,0} })[ctx.arch]
-  if isfat then
-    o.fat.magic = be32(0xcafebabe)
-    o.fat.nfat_arch = be32(#cpusubtype)
-  end
+  local o = ffi.new("mach_obj_64")
+  local t = ffi.new("mach_obj_64_tail")
+  local ofs_bc = ffi.sizeof(o)
+  local sz_bc = aligned(#s, 8)
+  local ofs_sym = ofs_bc + sz_bc
 
   -- Fill in sections and symbols.
-  for i=0,#cpusubtype-1 do
-    local ofs = 0
-    if isfat then
-      local a = o.fat_arch[i]
-      a.cputype = be32(cputype[i+1])
-      a.cpusubtype = be32(cpusubtype[i+1])
-      -- Subsequent slices overlap each other to share data.
-      ofs = ffi.offsetof(o, "arch") + i*ffi.sizeof(o.arch[0])
-      a.offset = be32(ofs)
-      a.size = be32(mach_size-ofs+#s)
-    end
-    local a = o.arch[i]
-    a.hdr.magic = is64 and 0xfeedfacf or 0xfeedface
-    a.hdr.cputype = cputype[i+1]
-    a.hdr.cpusubtype = cpusubtype[i+1]
-    a.hdr.filetype = 1
-    a.hdr.ncmds = 2
-    a.hdr.sizeofcmds = ffi.sizeof(a.seg)+ffi.sizeof(a.sec)+ffi.sizeof(a.sym)
-    a.seg.cmd = is64 and 0x19 or 0x1
-    a.seg.cmdsize = ffi.sizeof(a.seg)+ffi.sizeof(a.sec)
-    a.seg.vmsize = #s
-    a.seg.fileoff = mach_size-ofs
-    a.seg.filesize = #s
-    a.seg.maxprot = 1
-    a.seg.initprot = 1
-    a.seg.nsects = 1
-    ffi.copy(a.sec.sectname, "__data")
-    ffi.copy(a.sec.segname, "__DATA")
-    a.sec.size = #s
-    a.sec.offset = mach_size-ofs
-    a.sym.cmd = 2
-    a.sym.cmdsize = ffi.sizeof(a.sym)
-    a.sym.symoff = ffi.offsetof(o, "sym_entry")-ofs
-    a.sym.nsyms = 1
-    a.sym.stroff = ffi.offsetof(o, "sym_entry")+ffi.sizeof(o.sym_entry)-ofs
-    a.sym.strsize = aligned(#symname+2, align)
-  end
-  o.sym_entry.type = 0xf
-  o.sym_entry.sect = 1
-  o.sym_entry.strx = 1
-  ffi.copy(o.space+1, symname)
+  o.hdr.magic = 0xfeedfacf
+  o.hdr.cputype = cputype
+  o.hdr.cpusubtype = cpusubtype
+  o.hdr.filetype = 1
+  o.hdr.ncmds = 2
+  o.hdr.sizeofcmds = ffi.sizeof(o.seg)+ffi.sizeof(o.sec)+ffi.sizeof(o.sym)
+  o.seg.cmd = 0x19
+  o.seg.cmdsize = ffi.sizeof(o.seg)+ffi.sizeof(o.sec)
+  o.seg.vmsize = #s
+  o.seg.fileoff = ofs_bc
+  o.seg.filesize = #s
+  o.seg.maxprot = 1
+  o.seg.initprot = 1
+  o.seg.nsects = 1
+  ffi.copy(o.sec.sectname, "__data")
+  ffi.copy(o.sec.segname, "__DATA")
+  o.sec.size = #s
+  o.sec.offset = ofs_bc
+  o.sym.cmd = 2
+  o.sym.cmdsize = ffi.sizeof(o.sym)
+  o.sym.symoff = ofs_sym
+  o.sym.nsyms = 1
+  o.sym.stroff = ofs_sym + ffi.offsetof(t, "space")
+  o.sym.strsize = aligned(#symname+2, 8)
+  t.sym_entry.type = 0xf
+  t.sym_entry.sect = 1
+  t.sym_entry.strx = 1
+  ffi.copy(t.space+1, symname)
 
   -- Write Mach-O object file.
   local fp = savefile(output, "wb")
-  fp:write(ffi.string(o, mach_size))
-  bcsave_tail(fp, output, s)
+  fp:write(ffi.string(o, ofs_bc))
+  fp:write(s, ("\0"):rep(sz_bc - #s))
+  bcsave_tail(fp, output, ffi.string(t, ffi.offsetof(t, "space") + o.sym.strsize))
 end
 
 local function bcsave_obj(ctx, output, s)

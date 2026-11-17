@@ -176,7 +176,7 @@ local function calloc(t, count)
    local mem, err
    if try_huge_pages and byte_size > huge_page_threshold then
       alloc_byte_size = ceil(byte_size/huge_page_size) * huge_page_size
-      mem, err = S.mmap(nil, byte_size, 'read, write',
+      mem, err = S.mmap(nil, alloc_byte_size, 'read, write',
                         'private, anonymous, hugetlb')
       if not mem then
          print("hugetlb mmap failed ("..tostring(err)..'), falling back.')
@@ -185,7 +185,7 @@ local function calloc(t, count)
       end
    end
    if not mem then
-      mem, err = S.mmap(nil, byte_size, 'read, write',
+      mem, err = S.mmap(nil, alloc_byte_size, 'read, write',
                         'private, anonymous')
       if not mem then error("mmap failed: " .. tostring(err)) end
    end

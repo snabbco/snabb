@@ -310,9 +310,9 @@ local function distribute (p, links, hash)
    transmit(links[index], p)
 end
 
-local function md_wrapper(self, demux_queue, queue, vlan)
+local function md_wrapper(self, timestamp, demux_queue, queue, vlan)
    local p = receive(demux_queue)
-   hash(mdadd(p, self.rm_ext_headers, vlan))
+   hash(mdadd(p, timestamp, self.rm_ext_headers, vlan))
    transmit(queue, p)
 end
 
@@ -324,6 +324,7 @@ function rss:push_with_vlan(link, vlan)
    -- Use a do..end blocks here to limit the scopes of locals to avoid
    -- "too many spill slots" trace aborts
    do
+      local timestamp = ffi.C.get_unix_time()
       -- Performance tuning: mdadd() needs to be called for every
       -- packet. With a mix of tagged/untagged ipv4/ipv6 traffic, that
       -- function has a number of unbiased branches, leading to
@@ -356,7 +357,7 @@ function rss:push_with_vlan(link, vlan)
          local dqueue = demux_queues.default_untagged
          local npackets = nreadable(dqueue)
          for _ = 1, npackets do
-            md_wrapper(self, dqueue, queue, vlan)
+            md_wrapper(self, timestamp, dqueue, queue, vlan)
          end
          events.added_md_hash_default(npackets)
       end
@@ -364,7 +365,7 @@ function rss:push_with_vlan(link, vlan)
          local dqueue = demux_queues.default_tagged
          local npackets = nreadable(dqueue)
          for _ = 1, npackets do
-            md_wrapper(self, dqueue, queue, vlan)
+            md_wrapper(self, timestamp, dqueue, queue, vlan)
          end
          events.added_md_hash_default_dot1q(npackets)
       end
@@ -372,7 +373,7 @@ function rss:push_with_vlan(link, vlan)
          local dqueue = demux_queues.ipv4
          local npackets = nreadable(dqueue)
          for _ = 1, npackets do
-            md_wrapper(self, dqueue, queue, vlan)
+            md_wrapper(self, timestamp, dqueue, queue, vlan)
          end
          events.added_md_hash_ipv4(npackets)
       end
@@ -380,7 +381,7 @@ function rss:push_with_vlan(link, vlan)
          local dqueue = demux_queues.ipv6
          local npackets = nreadable(dqueue)
          for _ = 1, npackets do
-            md_wrapper(self, dqueue, queue, vlan)
+            md_wrapper(self, timestamp, dqueue, queue, vlan)
          end
          events.added_md_hash_ipv6(npackets)
       end
@@ -388,7 +389,7 @@ function rss:push_with_vlan(link, vlan)
          local dqueue = demux_queues.ipv4_tagged
          local npackets = nreadable(dqueue)
          for _ = 1, npackets do
-            md_wrapper(self, dqueue, queue, vlan)
+            md_wrapper(self, timestamp, dqueue, queue, vlan)
          end
          events.added_md_hash_ipv4_dot1q(npackets)
       end
@@ -396,7 +397,7 @@ function rss:push_with_vlan(link, vlan)
          local dqueue = demux_queues.ipv6_tagged
          local npackets = nreadable(dqueue)
          for _ = 1, npackets do
-            md_wrapper(self, dqueue, queue, vlan)
+            md_wrapper(self, timestamp, dqueue, queue, vlan)
          end
          events.added_md_hash_ipv6_dot1q(npackets)
       end

@@ -165,7 +165,28 @@ local function parse_query(grammar, query)
    end
 end
 
+function copy_path(path)
+   if type(path) == 'string' then
+      return path
+   end
+   local copy = {relative=path.relative}
+   for i, part in ipairs(path) do
+      local query = {}
+      for k, v in pairs(part.query) do
+         query[k] = part.query[k]
+      end
+      copy[i] = {
+         name = part.name,
+         grammar = part.grammar,
+         key = part.key,
+         query = query
+      }
+   end
+   return copy
+end
+
 function parse_path(path, grammar)
+   path = copy_path(path)
    if type(path) == 'string' then
       path = parse_path1(path)
    end
@@ -177,44 +198,6 @@ function parse_path(path, grammar)
             part.key = parse_query(grammar, part.query)
             break
          end
-      end
-   end
-   return path
-end
-
-local function unparse_query(grammar, key)
-   if grammar.type == 'array' then
-      return {['position()']=tonumber(key)}
-   elseif grammar.type == 'list' then
-      if not grammar.list.has_key then
-         error("Invalid key: list has no key.")
-      end
-      local query = {}
-      for k,grammar in pairs(grammar.keys) do
-         local key_primitive_type = grammar.argument_type.primitive_type
-         local tostring = valuelib.types[key_primitive_type].tostring
-         local id = normalize_id(k)
-         if key[id] then
-            query[k] = tostring(key[id])
-         elseif grammar.default then
-            query[k] = grammar.default
-         else
-            error("Invalid key: missing required key '"..k.."'")
-         end
-      end
-      return query
-   else
-      error("Invalid key: can only query list or leaf-list.")
-   end
-end
-
-function unparse_path(path, grammar)
-   path = lib.deepcopy(path)
-   for _, part in ipairs(path) do
-      grammar = extract_grammar_node(grammar, part.name)
-      part.grammar = grammar
-      if part.key then
-         part.query = unparse_query(grammar, part.key)
       end
    end
    return path

@@ -50,8 +50,8 @@ end
 
 local function consume_pat(input, pat)
    local ch = input:read_char()
-   if ch:match(pat) then return ch end
    if ch == nil then error('unexpected EOF') end
+   if ch:match(pat) then return ch end
    error('unexpected character '..ch)
 end
 
@@ -284,6 +284,13 @@ function selftest ()
              {foo='bar', baz='qux'})
    test_json('{ "fo\\u000ao" : "ba\\r " , "baz" : "qux" }',
              {['fo\no']='ba\r ', baz='qux'})
+
+   local truncated_unicode_escape = tmpfile()
+   truncated_unicode_escape:write('"\\u')
+   truncated_unicode_escape:seek('set', 0)
+   local ok, err = pcall(read_json, truncated_unicode_escape)
+   assert(not ok)
+   assert(err:match('unexpected EOF'))
    
    -- Nested lists and objects
    test_json('{"foo":"bar","baz":["foo","bar","baz"]}', {foo='bar', baz={"foo","bar","baz"}})
