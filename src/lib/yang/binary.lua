@@ -140,6 +140,9 @@ local function data_emitter(production)
          for name, body in pairs(block) do productions[name] = body end
       end
    end
+   function handlers.choice()
+      -- Emitted upwards, nop.
+   end
    function handlers.struct(production)
       local member_keys = {}
       for k,_ in pairs(production.members) do table.insert(member_keys, k) end
@@ -786,6 +789,49 @@ function selftest()
          compile_config_for_schema(test_schema, dat, tmp)
          local dat2 = load_compiled_data_file(tmp)
          assert(dat2.data.foo)
+         dat = copy_config_for_schema(test_schema, dat2.data)
+         os.remove(tmp)
+      end
+   end
+   do
+      local test_schema = schema.load_schema([[module snabb-choice {
+         namespace snabb:test;
+         prefix test;
+
+         list foo {
+            key "name";
+            leaf name {
+               type string;
+            }
+            choice bar {
+               mandatory true;
+               case case1 {
+                  leaf case1 {
+                     type string;
+                  }
+               }
+               case case2 {
+                  leaf case2 {
+                     type string;
+                  }
+               }
+            }
+         }
+      }]])
+      local mem = require('lib.stream.mem')
+      local dat = data.load_config_for_schema(test_schema,
+                                             mem.open_input_string [[
+         foo {
+            name "bar";
+            case1 "baz";
+         }
+      ]])
+      for i=1,3 do
+         assert(dat.foo.bar.case1 == "baz")
+         local tmp = os.tmpname()
+         compile_config_for_schema(test_schema, dat, tmp)
+         local dat2 = load_compiled_data_file(tmp)
+         assert(dat2.data.foo.bar.case1 == dat.foo.bar.case1)
          dat = copy_config_for_schema(test_schema, dat2.data)
          os.remove(tmp)
       end
