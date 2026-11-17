@@ -3,7 +3,7 @@
 ** AA: Alias Analysis using high-level semantic disambiguation.
 ** FWD: Load Forwarding (L2L) + Store Forwarding (S2L).
 ** DSE: Dead-Store Elimination.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_opt_mem_c
@@ -230,7 +230,9 @@ static TRef fwd_ahload(jit_State *J, IRRef xref)
 	  return TREF_PRI(itype2irt(tv));
 	else if (tvisnum(tv))
 	  return lj_ir_knum_u64(J, tv->u64);
-	else if (tvisgcv(tv))
+	else if (tvistab(tv)) /* Template table nil value marker. */
+	  return TREF_NIL;
+	else if (tvisstr(tv))
 	  return lj_ir_kstr(J, strV(tv));
       }
       /* Othwerwise: don't intern as a constant. */
@@ -392,14 +394,18 @@ TRef lj_opt_fwd_alen(jit_State *J)
   IRRef tab = fins->op1;  /* Table reference. */
   IRRef lim = tab;  /* Search limit. */
   IRRef ref;
+  IROp op;
 
-  /* Search for conflicting HSTORE with numeric key. */
+  /* Search for conflicting HSTORE or NEWREF with numeric key. */
   ref = J->chain[IR_HSTORE];
   while (ref > lim) {
     IRIns *store = IR(ref);
-    IRIns *href = IR(store->op1);
-    IRIns *key = IR(href->op2);
-    if (irt_isnum(key->o == IR_KSLOT ? IR(key->op1)->t : key->t)) {
+    IRIns *xref = IR(store->op1);
+    IRIns *key = IR(xref->op2);
+    IRRef htab = xref->o == IR_HREFK ? IR(xref->op1)->op1 : xref->op1;
+    if ((tab == htab || aa_table(J, tab, htab) != ALIAS_NO) &&
+	(xref->o == IR_NEWREF ||
+	 irt_isnum(key->o == IR_KSLOT ? IR(key->op1)->t : key->t))) {
       lim = ref;  /* Conflicting store found, limits search for ALEN. */
       break;
     }
@@ -443,6 +449,28 @@ TRef lj_opt_fwd_alen(jit_State *J)
     }
     ref = IR(ref)->prev;
   }
+
+  /* Try to const-fold length. */
+  op = IR(tab)->o;
+  if (lim == tab &&
+      (op == IR_TNEW || op == IR_TDUP) &&
+      fwd_aa_tab_clear(J, tab, tab)) {
+    /* Search for conflicting store. */
+    int32_t len = 0;
+    IRRef sref = J->chain[IR_ASTORE];
+    while (sref > ref) {
+      IRIns *store = IR(sref);
+      IRIns *aref = IR(store->op1);
+      IRIns *fref = IR(aref->op1);
+      if (tab == fref->op1 || aa_table(J, tab, fref->op1) != ALIAS_NO) {
+	goto doemit;  /* Conflicting store. */
+      }
+      sref = store->prev;
+    }
+    if (op == IR_TDUP) len = (int32_t)lj_tab_len(ir_ktab(IR(IR(tab)->op1)));
+    return lj_ir_kint(J, len);
+  }
+
 doemit:
   return EMITFOLD;
 }
