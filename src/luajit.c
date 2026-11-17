@@ -1,6 +1,6 @@
 /*
 ** LuaJIT frontend. Runs commands, scripts, read-eval-print (REPL) etc.
-** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2026 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -26,6 +26,16 @@
 
 #include <signal.h>
 
+/* Improve signal handling on POSIX. Try CTRL-C on: luajit -e 'io.read()' */
+static void signal_set(int sig, void (*h)(int))
+{
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = h;
+  sigemptyset(&sa.sa_mask);
+  sigaction(sig, &sa, NULL);
+}
+
 static lua_State *globalL = NULL;
 static const char *progname = LUA_PROGNAME;
 static char *empty_argv[2] = { NULL, NULL };
@@ -42,8 +52,8 @@ static void lstop(lua_State *L, lua_Debug *ar)
 
 static void laction(int i)
 {
-  signal(i, SIG_DFL); /* if another SIGINT happens before lstop,
-			 terminate process (default action) */
+  /* Terminate process if another SIGINT happens (double CTRL-C). */
+  signal_set(i, SIG_DFL);
   lua_sethook(globalL, lstop, LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
 }
 
@@ -105,9 +115,9 @@ static int docall(lua_State *L, int narg, int clear)
   int base = lua_gettop(L) - narg;  /* function index */
   lua_pushcfunction(L, traceback);  /* push traceback function */
   lua_insert(L, base);  /* put it under chunk and args */
-  signal(SIGINT, laction);
+  signal_set(SIGINT, laction);
   status = lua_pcall(L, narg, (clear ? 0 : LUA_MULTRET), base);
-  signal(SIGINT, SIG_DFL);
+  signal_set(SIGINT, SIG_DFL);
   lua_remove(L, base);  /* remove traceback function */
   /* force a complete garbage collection in case of errors */
   if (status != LUA_OK) lua_gc(L, LUA_GCCOLLECT, 0);
